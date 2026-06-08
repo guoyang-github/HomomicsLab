@@ -4,12 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from homics_lab.config import settings
+from homics_lab.agent.factory import create_default_agents
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
+    create_default_agents()
     yield
 
 
