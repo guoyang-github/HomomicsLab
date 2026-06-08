@@ -7,6 +7,7 @@ from homics_lab.config import settings
 from homics_lab.agent.factory import create_default_agents
 from homics_lab.skills.runtime import SkillRuntimeExecutor
 from homics_lab.skills.builtin import register_builtin_skills
+from homics_lab.api.router import api_router
 
 
 @asynccontextmanager
@@ -27,6 +28,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
