@@ -1,7 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class TaskStatus(str, Enum):
@@ -62,7 +66,7 @@ class ChatMessage(BaseModel):
     type: MessageType = MessageType.TEXT
     content: Any
     sender: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     task_id: Optional[str] = None
     skill_id: Optional[str] = None
     related_files: list[str] = Field(default_factory=list)
@@ -72,4 +76,4 @@ class AgentMessage(BaseModel):
     from_agent: str
     to_agent: Optional[str] = None
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
