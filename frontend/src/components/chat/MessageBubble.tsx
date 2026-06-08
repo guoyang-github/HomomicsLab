@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@/types/chat'
+import { TodoList } from './TodoList'
 
 interface Props {
   message: ChatMessage
@@ -7,10 +8,25 @@ interface Props {
 export function MessageBubble({ message }: Props) {
   const isUser = message.sender === 'user'
 
+  const renderContent = () => {
+    if (typeof message.content === 'string') {
+      return <p className="text-sm">{message.content}</p>
+    }
+
+    switch (message.type) {
+      case 'todo_list':
+        return <TodoList content={message.content as { text: string; tasks: any[]; progress?: any }} />
+      case 'error':
+        return <p className="text-sm text-error">{String(message.content)}</p>
+      default:
+        return <pre className="text-xs">{JSON.stringify(message.content, null, 2)}</pre>
+    }
+  }
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
-        className={`max-w-[80%] rounded-lg px-4 py-2 ${
+        className={`max-w-[90%] rounded-lg px-4 py-3 ${
           isUser
             ? 'bg-primary text-white'
             : 'bg-white border border-slate-200 text-slate-800'
@@ -19,11 +35,7 @@ export function MessageBubble({ message }: Props) {
         <div className="text-xs opacity-75 mb-1">
           {isUser ? 'You' : 'Agent'} • {new Date(message.timestamp).toLocaleTimeString()}
         </div>
-        <div className="text-sm">
-          {typeof message.content === 'string'
-            ? message.content
-            : JSON.stringify(message.content, null, 2)}
-        </div>
+        {renderContent()}
       </div>
     </div>
   )
