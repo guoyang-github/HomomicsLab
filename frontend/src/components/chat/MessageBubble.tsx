@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@/types/chat'
 import { TodoList } from './TodoList'
+import { HITLRequest } from './HITLRequest'
 
 interface Props {
   message: ChatMessage
@@ -16,6 +17,10 @@ export function MessageBubble({ message }: Props) {
     switch (message.type) {
       case 'todo_list':
         return <TodoList content={message.content as { text: string; tasks: any[]; progress?: any }} />
+      case 'hitl_request': {
+        const hitl = message.content as { checkpoint: any; task_id: string }
+        return <HITLRequest checkpoint={hitl.checkpoint} taskId={hitl.task_id} />
+      }
       case 'error':
         return <p className="text-sm text-error">{String(message.content)}</p>
       default:

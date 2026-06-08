@@ -80,17 +80,31 @@ async def send_message(request: SendMessageRequest):
     if any("hitl" in r for r in results.values()):
         response_text += " 部分步骤需要您确认参数。"
 
-    # Add agent message
-    agent_msg = ChatMessage(
-        id=f"msg_{len(wm.messages)}",
-        type=MessageType.TODO_LIST,
-        content={
-            "text": response_text,
-            "tasks": [t.model_dump() for t in tree.tasks],
-            "progress": orchestrator.get_progress(tree),
-        },
-        sender="agent",
-    )
+    # Check for HITL results and send appropriate message type
+    hitl_found = None
+    for task_id, result in results.items():
+        if isinstance(result, dict) and "hitl" in result:
+            hitl_found = {"checkpoint": result["hitl"], "task_id": task_id}
+            break
+
+    if hitl_found:
+        agent_msg = ChatMessage(
+            id=f"msg_{len(wm.messages)}",
+            type=MessageType.HITL_REQUEST,
+            content=hitl_found,
+            sender="agent",
+        )
+    else:
+        agent_msg = ChatMessage(
+            id=f"msg_{len(wm.messages)}",
+            type=MessageType.TODO_LIST,
+            content={
+                "text": response_text,
+                "tasks": [t.model_dump() for t in tree.tasks],
+                "progress": orchestrator.get_progress(tree),
+            },
+            sender="agent",
+        )
     wm.add_message(agent_msg)
 
     return SendMessageResponse(
