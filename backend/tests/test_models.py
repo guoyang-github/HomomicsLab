@@ -1,4 +1,4 @@
-from homics_lab.models.common import (
+from homomics_lab.models.common import (
     TaskStatus, MessageType, HITLTrigger,
     Option, HITLCheckpoint, ChatMessage,
 )

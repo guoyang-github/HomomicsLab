@@ -5,7 +5,7 @@ install:
 	cd frontend && npm install
 
 dev-backend:
-	cd backend && uvicorn homics_lab.main:app --reload --port 8080
+	cd backend && uvicorn homomics_lab.main:app --reload --port 8080
 
 dev-frontend:
 	cd frontend && npm run dev
@@ -18,7 +18,7 @@ test-frontend:
 
 lint-backend:
 	cd backend && ruff check .
-	cd backend && mypy homics_lab
+	cd backend && mypy homomics_lab
 
 format:
 	cd backend && black .
@@ -36,4 +36,4 @@ clean:
 	find . -type d -name ".mypy_cache" -prune -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".ruff_cache" -prune -exec rm -rf {} + 2>/dev/null || true
 	rm -rf frontend/dist
-	rm -f backend/homics_lab.db
+	rm -f backend/homomics_lab.db

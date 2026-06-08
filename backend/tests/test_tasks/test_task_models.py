@@ -1,5 +1,5 @@
-from homics_lab.tasks.models import TaskNode, TaskStatus, RetryPolicy
-from homics_lab.models.common import HITLTrigger
+from homomics_lab.tasks.models import TaskNode, TaskStatus, RetryPolicy
+from homomics_lab.models.common import HITLTrigger
 
 
 def test_task_node_defaults():

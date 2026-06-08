@@ -1,6 +1,6 @@
 import pytest
-from homics_lab.agent.message_bus import MessageBus
-from homics_lab.models.common import AgentMessage
+from homomics_lab.agent.message_bus import MessageBus
+from homomics_lab.models.common import AgentMessage
 
 
 @pytest.fixture

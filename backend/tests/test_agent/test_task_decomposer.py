@@ -1,6 +1,6 @@
 import pytest
-from homics_lab.agent.task_decomposer import TaskDecomposer
-from homics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.intent_analyzer import UserIntent
 
 
 @pytest.fixture

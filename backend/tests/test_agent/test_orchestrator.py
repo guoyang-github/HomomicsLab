@@ -1,10 +1,10 @@
 import pytest
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.tasks.task_tree import TaskTree
-from homics_lab.models.common import AgentType, TaskStatus
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.models.common import AgentType, TaskStatus
+from homomics_lab.tasks.models import TaskNode
 
 
 class FakeBioinfoAgent(BaseAgent):

@@ -1,7 +1,7 @@
 import pytest
-from homics_lab.hitl.detector import HITLDetector
-from homics_lab.tasks.models import TaskNode
-from homics_lab.models.common import HITLTrigger
+from homomics_lab.hitl.detector import HITLDetector
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.models.common import HITLTrigger
 
 
 @pytest.fixture

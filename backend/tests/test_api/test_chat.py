@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 

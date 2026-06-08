@@ -1,6 +1,6 @@
 import pytest
-from homics_lab.tasks.task_tree import TaskTree
-from homics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
 def test_topological_sort_simple():

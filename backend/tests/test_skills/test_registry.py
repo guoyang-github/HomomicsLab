@@ -1,6 +1,6 @@
 import pytest
-from homics_lab.skills.registry import SkillRegistry
-from homics_lab.skills.models import SkillDefinition
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.models import SkillDefinition
 
 
 @pytest.fixture

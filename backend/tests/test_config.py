@@ -1,5 +1,5 @@
 from pathlib import Path
-from homics_lab.config import Settings
+from homomics_lab.config import Settings
 
 
 def test_default_port():
@@ -18,4 +18,4 @@ def test_env_override(monkeypatch):
 
 def test_app_name_default():
     settings = Settings()
-    assert settings.app_name == "HomicsLab"
+    assert settings.app_name == "HomomicsLab"

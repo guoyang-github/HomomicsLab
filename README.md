@@ -1,4 +1,4 @@
-# HomicsLab
+# HomomicsLab
 
 A general-purpose agent for bioinformatics analysis.
 
@@ -33,5 +33,5 @@ pip install -e ".[dev]"
 ## Verify installation
 
 ```bash
-python -c "import homics_lab; print(homics_lab.__version__)"
+python -c "import homomics_lab; print(homomics_lab.__version__)"
 ```

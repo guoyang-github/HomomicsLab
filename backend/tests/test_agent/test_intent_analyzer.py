@@ -1,5 +1,5 @@
 import pytest
-from homics_lab.agent.intent_analyzer import IntentAnalyzer
+from homomics_lab.agent.intent_analyzer import IntentAnalyzer
 
 
 @pytest.fixture

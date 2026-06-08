@@ -1,5 +1,5 @@
-from homics_lab.context.working_memory import WorkingMemory
-from homics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.models.common import ChatMessage, MessageType
 
 
 def test_add_and_retrieve_messages():

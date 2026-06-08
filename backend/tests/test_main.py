@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 
@@ -11,4 +11,4 @@ def test_health_check():
 def test_app_info():
     response = client.get("/")
     assert response.status_code == 200
-    assert "HomicsLab" in response.json()["name"]
+    assert "HomomicsLab" in response.json()["name"]

@@ -1,13 +1,13 @@
 import pytest
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.bioinfo_agent import BioinfoAgent
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.registry import SkillRegistry
-from homics_lab.skills.builtin import register_builtin_skills
-from homics_lab.tasks.models import TaskNode
-from homics_lab.models.common import TaskStatus
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.models.common import TaskStatus
 
 
 @pytest.fixture

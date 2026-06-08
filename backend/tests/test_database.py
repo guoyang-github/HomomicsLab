@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from homics_lab.database.connection import async_engine, get_async_session
+from homomics_lab.database.connection import async_engine, get_async_session
 
 
 @pytest.mark.asyncio

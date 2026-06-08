@@ -1,5 +1,5 @@
 import pytest
-from homics_lab.skills.sandbox import LocalSandbox
+from homomics_lab.skills.sandbox import LocalSandbox
 
 
 @pytest.fixture

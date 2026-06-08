@@ -1,6 +1,6 @@
 import pytest
-from homics_lab.tasks.models import TaskNode, TaskStatus
-from homics_lab.tasks.state_machine import TaskStateMachine, TransitionError
+from homomics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.state_machine import TaskStateMachine, TransitionError
 
 
 @pytest.fixture

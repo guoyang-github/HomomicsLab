@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end health check for HomicsLab."""
+"""End-to-end health check for HomomicsLab."""
 
 import sys
 import httpx
@@ -42,7 +42,7 @@ def check_chat_api() -> bool:
 
 
 def main():
-    print("Running HomicsLab health check...")
+    print("Running HomomicsLab health check...")
 
     checks = [
         check_backend(),

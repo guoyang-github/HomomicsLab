@@ -1,8 +1,8 @@
 import pytest
-from homics_lab.agent.bioinfo_agent import BioinfoAgent
-from homics_lab.agent.viz_agent import VizAgent
-from homics_lab.agent.experiment_agent import ExperimentAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.viz_agent import VizAgent
+from homomics_lab.agent.experiment_agent import ExperimentAgent
+from homomics_lab.models.common import AgentType
 
 
 @pytest.mark.asyncio

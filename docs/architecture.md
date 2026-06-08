@@ -1,8 +1,8 @@
-# HomicsLab MVP Architecture
+# HomomicsLab MVP Architecture
 
 ## Overview
 
-HomicsLab uses a layered hybrid architecture:
+HomomicsLab uses a layered hybrid architecture:
 - **Core**: Python/FastAPI modular monolith
 - **Frontend**: React + TypeScript + Zustand + ReactFlow
 - **Skills**: Local subprocess sandbox execution

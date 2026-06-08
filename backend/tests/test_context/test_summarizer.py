@@ -1,5 +1,5 @@
 import pytest
-from homics_lab.context.summarizer import ContextSummarizer
+from homomics_lab.context.summarizer import ContextSummarizer
 
 
 @pytest.fixture

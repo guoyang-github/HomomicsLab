@@ -1,5 +1,5 @@
 import pytest
-from homics_lab.context.relevance_filter import RelevanceFilter, ContextItem
+from homomics_lab.context.relevance_filter import RelevanceFilter, ContextItem
 
 
 @pytest.fixture

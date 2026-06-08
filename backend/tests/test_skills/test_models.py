@@ -1,4 +1,4 @@
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillRuntime
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillRuntime
 
 
 def test_skill_definition_validation():

@@ -41,7 +41,7 @@ This MVP plan implements the "Agent Brain First" strategy from the design spec. 
 ## File Structure
 
 ```
-homics-lab/
+homomics-lab/
 ├── pyproject.toml                    # Python package config
 ├── README.md                         # Setup instructions
 ├── Makefile                          # Common dev commands
@@ -239,7 +239,7 @@ homics-lab/
 **Files:**
 - Create: `pyproject.toml`
 - Create: `README.md`
-- Create: `backend/homics_lab/__init__.py`
+- Create: `backend/homomics_lab/__init__.py`
 
 - [ ] **Step 1: Create pyproject.toml**
 
@@ -249,7 +249,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "homics-lab"
+name = "homomics-lab"
 version = "0.1.0"
 description = "A general-purpose agent for bioinformatics analysis"
 requires-python = ">=3.10"
@@ -272,15 +272,15 @@ dependencies = [
 dev = ["black", "ruff", "mypy"]
 
 [project.scripts]
-homics-lab = "homics_lab.cli:main"
+homomics-lab = "homomics_lab.cli:main"
 ```
 
 - [ ] **Step 2: Create package init file**
 
 ```bash
-mkdir -p backend/homics_lab
-touch backend/homics_lab/__init__.py
-echo '__version__ = "0.1.0"' > backend/homics_lab/__init__.py
+mkdir -p backend/homomics_lab
+touch backend/homomics_lab/__init__.py
+echo '__version__ = "0.1.0"' > backend/homomics_lab/__init__.py
 ```
 
 - [ ] **Step 3: Create README with basic setup**
@@ -308,14 +308,14 @@ npm run dev
 
 - [ ] **Step 4: Verify install**
 
-Run: `cd backend && pip install -e "." && python -c "import homics_lab; print(homics_lab.__version__)"`
+Run: `cd backend && pip install -e "." && python -c "import homomics_lab; print(homomics_lab.__version__)"`
 Expected: `0.1.0`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add pyproject.toml README.md backend/homics_lab/__init__.py
-git commit -m "chore: initialize HomicsLab Python package"
+git add pyproject.toml README.md backend/homomics_lab/__init__.py
+git commit -m "chore: initialize HomomicsLab Python package"
 ```
 
 ---
@@ -323,7 +323,7 @@ git commit -m "chore: initialize HomicsLab Python package"
 ### Task 2: Setup Configuration Module
 
 **Files:**
-- Create: `backend/homics_lab/config.py`
+- Create: `backend/homomics_lab/config.py`
 - Create: `backend/tests/__init__.py`
 - Test: `backend/tests/test_config.py`
 
@@ -333,7 +333,7 @@ Create `backend/tests/test_config.py`:
 
 ```python
 import os
-from homics_lab.config import Settings
+from homomics_lab.config import Settings
 
 def test_default_port():
     settings = Settings()
@@ -349,11 +349,11 @@ def test_env_override():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && pytest tests/test_config.py -v`
-Expected: `ModuleNotFoundError: No module named 'homics_lab.config'`
+Expected: `ModuleNotFoundError: No module named 'homomics_lab.config'`
 
 - [ ] **Step 3: Implement config module**
 
-Create `backend/homics_lab/config.py`:
+Create `backend/homomics_lab/config.py`:
 
 ```python
 from pathlib import Path
@@ -361,11 +361,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "HomicsLab"
+    app_name: str = "HomomicsLab"
     port: int = 8080
     host: str = "0.0.0.0"
     debug: bool = False
-    database_url: str = "sqlite+aiosqlite:///./homics_lab.db"
+    database_url: str = "sqlite+aiosqlite:///./homomics_lab.db"
     data_dir: Path = Path("./data")
     skills_dir: Path = Path("./skills")
     
@@ -384,7 +384,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/config.py backend/tests/test_config.py backend/tests/__init__.py
+git add backend/homomics_lab/config.py backend/tests/test_config.py backend/tests/__init__.py
 git commit -m "feat: add configuration module with pydantic-settings"
 ```
 
@@ -393,8 +393,8 @@ git commit -m "feat: add configuration module with pydantic-settings"
 ### Task 3: Define Shared Pydantic Models
 
 **Files:**
-- Create: `backend/homics_lab/models/__init__.py`
-- Create: `backend/homics_lab/models/common.py`
+- Create: `backend/homomics_lab/models/__init__.py`
+- Create: `backend/homomics_lab/models/common.py`
 - Test: `backend/tests/test_models.py`
 
 - [ ] **Step 1: Write failing test**
@@ -402,7 +402,7 @@ git commit -m "feat: add configuration module with pydantic-settings"
 Create `backend/tests/test_models.py`:
 
 ```python
-from homics_lab.models.common import (
+from homomics_lab.models.common import (
     TaskStatus, MessageType, AgentType, HITLTrigger
 )
 
@@ -423,12 +423,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement shared models**
 
-Create `backend/homics_lab/models/__init__.py`:
+Create `backend/homomics_lab/models/__init__.py`:
 ```python
 from .common import *
 ```
 
-Create `backend/homics_lab/models/common.py`:
+Create `backend/homomics_lab/models/common.py`:
 
 ```python
 from datetime import datetime
@@ -516,7 +516,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/models/ backend/tests/test_models.py
+git add backend/homomics_lab/models/ backend/tests/test_models.py
 git commit -m "feat: add shared Pydantic models for tasks, messages, agents"
 ```
 
@@ -525,8 +525,8 @@ git commit -m "feat: add shared Pydantic models for tasks, messages, agents"
 ### Task 4: Setup SQLite Database Layer
 
 **Files:**
-- Create: `backend/homics_lab/database/__init__.py`
-- Create: `backend/homics_lab/database/connection.py`
+- Create: `backend/homomics_lab/database/__init__.py`
+- Create: `backend/homomics_lab/database/connection.py`
 - Test: `backend/tests/test_database.py`
 
 - [ ] **Step 1: Write failing test**
@@ -536,7 +536,7 @@ Create `backend/tests/test_database.py`:
 ```python
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from homics_lab.database.connection import async_engine, get_async_session
+from homomics_lab.database.connection import async_engine, get_async_session
 
 
 @pytest.mark.asyncio
@@ -560,17 +560,17 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement database connection**
 
-Create `backend/homics_lab/database/__init__.py`:
+Create `backend/homomics_lab/database/__init__.py`:
 ```python
 from .connection import async_engine, get_async_session
 ```
 
-Create `backend/homics_lab/database/connection.py`:
+Create `backend/homomics_lab/database/connection.py`:
 
 ```python
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from homics_lab.config import settings
+from homomics_lab.config import settings
 
 
 async_engine = create_async_engine(
@@ -604,7 +604,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/database/ backend/tests/test_database.py
+git add backend/homomics_lab/database/ backend/tests/test_database.py
 git commit -m "feat: add async SQLite database connection"
 ```
 
@@ -613,7 +613,7 @@ git commit -m "feat: add async SQLite database connection"
 ### Task 5: Create FastAPI Application Entry
 
 **Files:**
-- Create: `backend/homics_lab/main.py`
+- Create: `backend/homomics_lab/main.py`
 - Test: `backend/tests/test_main.py`
 
 - [ ] **Step 1: Write failing test**
@@ -622,7 +622,7 @@ Create `backend/tests/test_main.py`:
 
 ```python
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 
@@ -634,7 +634,7 @@ def test_health_check():
 def test_app_info():
     response = client.get("/")
     assert response.status_code == 200
-    assert "HomicsLab" in response.json()["name"]
+    assert "HomomicsLab" in response.json()["name"]
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -644,7 +644,7 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement FastAPI app**
 
-Create `backend/homics_lab/main.py`:
+Create `backend/homomics_lab/main.py`:
 
 ```python
 from contextlib import asynccontextmanager
@@ -652,7 +652,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from homics_lab.config import settings
+from homomics_lab.config import settings
 
 
 @asynccontextmanager
@@ -695,7 +695,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/main.py backend/tests/test_main.py
+git add backend/homomics_lab/main.py backend/tests/test_main.py
 git commit -m "feat: add FastAPI application entry with health endpoint"
 ```
 
@@ -715,7 +715,7 @@ git commit -m "feat: add FastAPI application entry with health endpoint"
 
 ```json
 {
-  "name": "homics-lab-frontend",
+  "name": "homomics-lab-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -833,7 +833,7 @@ export default defineConfig({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HomicsLab</title>
+    <title>HomomicsLab</title>
   </head>
   <body>
     <div id="root"></div>
@@ -861,10 +861,10 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-blue-600 p-4 text-white">
-        <h1 className="text-xl font-bold">HomicsLab</h1>
+        <h1 className="text-xl font-bold">HomomicsLab</h1>
       </header>
       <main className="p-4">
-        <p>Welcome to HomicsLab</p>
+        <p>Welcome to HomomicsLab</p>
       </main>
     </div>
   )
@@ -973,11 +973,11 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-primary p-4 text-white">
-        <h1 className="text-xl font-bold">HomicsLab</h1>
+        <h1 className="text-xl font-bold">HomomicsLab</h1>
       </header>
       <main className="p-4">
         <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="text-lg font-semibold text-slate-800">Welcome to HomicsLab</h2>
+          <h2 className="text-lg font-semibold text-slate-800">Welcome to HomomicsLab</h2>
           <p className="mt-2 text-slate-600">Your bioinformatics AI assistant</p>
         </div>
       </main>
@@ -1017,7 +1017,7 @@ install:
 	cd frontend && npm install
 
 dev-backend:
-	cd backend && uvicorn homics_lab.main:app --reload --port 8080
+	cd backend && uvicorn homomics_lab.main:app --reload --port 8080
 
 dev-frontend:
 	cd frontend && npm run dev
@@ -1030,7 +1030,7 @@ test-frontend:
 
 lint-backend:
 	cd backend && ruff check .
-	cd backend && mypy homics_lab
+	cd backend && mypy homomics_lab
 
 format:
 	cd backend && black .
@@ -1040,7 +1040,7 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name "node_modules" -exec rm -rf {} +
 	find . -type d -name "dist" -exec rm -rf {} +
-	rm -f backend/homics_lab.db
+	rm -f backend/homomics_lab.db
 ```
 
 - [ ] **Step 2: Verify Makefile commands work**
@@ -1076,8 +1076,8 @@ Next: Build the Agent Core engine.
 ### Task 9: Create Base Agent Class
 
 **Files:**
-- Create: `backend/homics_lab/agent/__init__.py`
-- Create: `backend/homics_lab/agent/base_agent.py`
+- Create: `backend/homomics_lab/agent/__init__.py`
+- Create: `backend/homomics_lab/agent/base_agent.py`
 - Test: `backend/tests/test_agent/test_base_agent.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1086,8 +1086,8 @@ Create `backend/tests/test_agent/test_base_agent.py`:
 
 ```python
 import pytest
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentMessage
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentMessage
 
 
 class TestAgent(BaseAgent):
@@ -1117,12 +1117,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement base agent class**
 
-Create `backend/homics_lab/agent/base_agent.py`:
+Create `backend/homomics_lab/agent/base_agent.py`:
 
 ```python
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-from homics_lab.models.common import AgentMessage, AgentType
+from homomics_lab.models.common import AgentMessage, AgentType
 
 
 class BaseAgent(ABC):
@@ -1160,7 +1160,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/ backend/tests/test_agent/
+git add backend/homomics_lab/agent/ backend/tests/test_agent/
 git commit -m "feat: add BaseAgent abstract class with messaging support"
 ```
 
@@ -1169,7 +1169,7 @@ git commit -m "feat: add BaseAgent abstract class with messaging support"
 ### Task 10: Create Agent Registry
 
 **Files:**
-- Create: `backend/homics_lab/agent/agent_registry.py`
+- Create: `backend/homomics_lab/agent/agent_registry.py`
 - Test: `backend/tests/test_agent/test_agent_registry.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1178,9 +1178,9 @@ Create `backend/tests/test_agent/test_agent_registry.py`:
 
 ```python
 import pytest
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class FakeBioinfoAgent(BaseAgent):
@@ -1226,12 +1226,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement agent registry**
 
-Create `backend/homics_lab/agent/agent_registry.py`:
+Create `backend/homomics_lab/agent/agent_registry.py`:
 
 ```python
 from typing import Dict, List, Optional, Type
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class AgentRegistry:
@@ -1273,7 +1273,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/agent_registry.py backend/tests/test_agent/test_agent_registry.py
+git add backend/homomics_lab/agent/agent_registry.py backend/tests/test_agent/test_agent_registry.py
 git commit -m "feat: add agent registry for task-to-agent routing"
 ```
 
@@ -1282,7 +1282,7 @@ git commit -m "feat: add agent registry for task-to-agent routing"
 ### Task 11: Implement Intent Analyzer
 
 **Files:**
-- Create: `backend/homics_lab/agent/intent_analyzer.py`
+- Create: `backend/homomics_lab/agent/intent_analyzer.py`
 - Test: `backend/tests/test_agent/test_intent_analyzer.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1291,7 +1291,7 @@ Create `backend/tests/test_agent/test_intent_analyzer.py`:
 
 ```python
 import pytest
-from homics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
+from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
 
 
 @pytest.fixture
@@ -1327,7 +1327,7 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement intent analyzer**
 
-Create `backend/homics_lab/agent/intent_analyzer.py`:
+Create `backend/homomics_lab/agent/intent_analyzer.py`:
 
 ```python
 import re
@@ -1427,7 +1427,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/intent_analyzer.py backend/tests/test_agent/test_intent_analyzer.py
+git add backend/homomics_lab/agent/intent_analyzer.py backend/tests/test_agent/test_intent_analyzer.py
 git commit -m "feat: add rule-based intent analyzer for bioinformatics queries"
 ```
 
@@ -1436,7 +1436,7 @@ git commit -m "feat: add rule-based intent analyzer for bioinformatics queries"
 ### Task 12: Implement Task Decomposer
 
 **Files:**
-- Create: `backend/homics_lab/agent/task_decomposer.py`
+- Create: `backend/homomics_lab/agent/task_decomposer.py`
 - Test: `backend/tests/test_agent/test_task_decomposer.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1445,8 +1445,8 @@ Create `backend/tests/test_agent/test_task_decomposer.py`:
 
 ```python
 import pytest
-from homics_lab.agent.task_decomposer import TaskDecomposer
-from homics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.intent_analyzer import UserIntent
 
 
 @pytest.fixture
@@ -1505,14 +1505,14 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement task decomposer**
 
-Create `backend/homics_lab/agent/task_decomposer.py`:
+Create `backend/homomics_lab/agent/task_decomposer.py`:
 
 ```python
 import uuid
 from typing import Any, Dict, List
-from homics_lab.agent.intent_analyzer import UserIntent
-from homics_lab.models.common import AgentType
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.models.common import AgentType
+from homomics_lab.tasks.models import TaskNode
 
 
 class TaskTree:
@@ -1662,7 +1662,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/task_decomposer.py backend/tests/test_agent/test_task_decomposer.py
+git add backend/homomics_lab/agent/task_decomposer.py backend/tests/test_agent/test_task_decomposer.py
 git commit -m "feat: add task decomposer for single-cell pipeline and simple tasks"
 ```
 
@@ -1671,8 +1671,8 @@ git commit -m "feat: add task decomposer for single-cell pipeline and simple tas
 ### Task 13: Define Task Data Models
 
 **Files:**
-- Create: `backend/homics_lab/tasks/__init__.py`
-- Create: `backend/homics_lab/tasks/models.py`
+- Create: `backend/homomics_lab/tasks/__init__.py`
+- Create: `backend/homomics_lab/tasks/models.py`
 - Test: `backend/tests/test_tasks/test_task_models.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1680,8 +1680,8 @@ git commit -m "feat: add task decomposer for single-cell pipeline and simple tas
 Create `backend/tests/test_tasks/test_task_models.py`:
 
 ```python
-from homics_lab.tasks.models import TaskNode, TaskStatus, RetryPolicy
-from homics_lab.models.common import HITLTrigger
+from homomics_lab.tasks.models import TaskNode, TaskStatus, RetryPolicy
+from homomics_lab.models.common import HITLTrigger
 
 
 def test_task_node_defaults():
@@ -1719,19 +1719,19 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement task models**
 
-Create `backend/homics_lab/tasks/__init__.py`:
+Create `backend/homomics_lab/tasks/__init__.py`:
 ```python
 from .models import TaskNode, TaskStatus, RetryPolicy
 from .task_tree import TaskTree
 ```
 
-Create `backend/homics_lab/tasks/models.py`:
+Create `backend/homomics_lab/tasks/models.py`:
 
 ```python
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from homics_lab.models.common import HITLCheckpoint, TaskStatus
+from homomics_lab.models.common import HITLCheckpoint, TaskStatus
 
 
 class RetryPolicy(BaseModel):
@@ -1776,7 +1776,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/tasks/ backend/tests/test_tasks/
+git add backend/homomics_lab/tasks/ backend/tests/test_tasks/
 git commit -m "feat: add TaskNode and RetryPolicy models"
 ```
 
@@ -1785,7 +1785,7 @@ git commit -m "feat: add TaskNode and RetryPolicy models"
 ### Task 14: Implement Task State Machine
 
 **Files:**
-- Create: `backend/homics_lab/tasks/state_machine.py`
+- Create: `backend/homomics_lab/tasks/state_machine.py`
 - Test: `backend/tests/test_tasks/test_state_machine.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1794,8 +1794,8 @@ Create `backend/tests/test_tasks/test_state_machine.py`:
 
 ```python
 import pytest
-from homics_lab.tasks.models import TaskNode, TaskStatus
-from homics_lab.tasks.state_machine import TaskStateMachine, TransitionError
+from homomics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.state_machine import TaskStateMachine, TransitionError
 
 
 @pytest.fixture
@@ -1837,12 +1837,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement state machine**
 
-Create `backend/homics_lab/tasks/state_machine.py`:
+Create `backend/homomics_lab/tasks/state_machine.py`:
 
 ```python
 from datetime import datetime
 from typing import Set
-from homics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
 class TransitionError(ValueError):
@@ -1902,7 +1902,7 @@ Expected: 4 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/tasks/state_machine.py backend/tests/test_tasks/test_state_machine.py
+git add backend/homomics_lab/tasks/state_machine.py backend/tests/test_tasks/test_state_machine.py
 git commit -m "feat: add task state machine with validation and timestamps"
 ```
 
@@ -1911,7 +1911,7 @@ git commit -m "feat: add task state machine with validation and timestamps"
 ### Task 15: Implement Orchestrator
 
 **Files:**
-- Create: `backend/homics_lab/agent/orchestrator.py`
+- Create: `backend/homomics_lab/agent/orchestrator.py`
 - Test: `backend/tests/test_agent/test_orchestrator.py`
 
 - [ ] **Step 1: Write failing test**
@@ -1920,12 +1920,12 @@ Create `backend/tests/test_agent/test_orchestrator.py`:
 
 ```python
 import pytest
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.models.common import AgentType, TaskStatus
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.models.common import AgentType, TaskStatus
+from homomics_lab.tasks.models import TaskNode
 
 
 class FakeBioinfoAgent(BaseAgent):
@@ -1990,15 +1990,15 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement orchestrator**
 
-Create `backend/homics_lab/agent/orchestrator.py`:
+Create `backend/homomics_lab/agent/orchestrator.py`:
 
 ```python
 from typing import Any, Dict
-from homics_lab.agent.agent_registry import AgentRegistry, get_default_registry
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.models.common import TaskStatus
-from homics_lab.tasks.models import TaskNode
-from homics_lab.tasks.state_machine import TaskStateMachine
+from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.models.common import TaskStatus
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.tasks.state_machine import TaskStateMachine
 
 
 class Orchestrator:
@@ -2102,7 +2102,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/orchestrator.py backend/tests/test_agent/test_orchestrator.py
+git add backend/homomics_lab/agent/orchestrator.py backend/tests/test_agent/test_orchestrator.py
 git commit -m "feat: add task orchestrator with dependency resolution and progress tracking"
 ```
 
@@ -2111,9 +2111,9 @@ git commit -m "feat: add task orchestrator with dependency resolution and progre
 ### Task 16: Implement Simple Bioinfo and Viz Agents
 
 **Files:**
-- Create: `backend/homics_lab/agent/bioinfo_agent.py`
-- Create: `backend/homics_lab/agent/viz_agent.py`
-- Create: `backend/homics_lab/agent/experiment_agent.py`
+- Create: `backend/homomics_lab/agent/bioinfo_agent.py`
+- Create: `backend/homomics_lab/agent/viz_agent.py`
+- Create: `backend/homomics_lab/agent/experiment_agent.py`
 - Test: `backend/tests/test_agent/test_specialized_agents.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2122,10 +2122,10 @@ Create `backend/tests/test_agent/test_specialized_agents.py`:
 
 ```python
 import pytest
-from homics_lab.agent.bioinfo_agent import BioinfoAgent
-from homics_lab.agent.viz_agent import VizAgent
-from homics_lab.agent.experiment_agent import ExperimentAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.viz_agent import VizAgent
+from homomics_lab.agent.experiment_agent import ExperimentAgent
+from homomics_lab.models.common import AgentType
 
 
 @pytest.mark.asyncio
@@ -2160,12 +2160,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement specialized agents**
 
-Create `backend/homics_lab/agent/bioinfo_agent.py`:
+Create `backend/homomics_lab/agent/bioinfo_agent.py`:
 
 ```python
 from typing import Any, Dict
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class BioinfoAgent(BaseAgent):
@@ -2189,12 +2189,12 @@ class BioinfoAgent(BaseAgent):
         }
 ```
 
-Create `backend/homics_lab/agent/viz_agent.py`:
+Create `backend/homomics_lab/agent/viz_agent.py`:
 
 ```python
 from typing import Any, Dict
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class VizAgent(BaseAgent):
@@ -2210,12 +2210,12 @@ class VizAgent(BaseAgent):
         }
 ```
 
-Create `backend/homics_lab/agent/experiment_agent.py`:
+Create `backend/homomics_lab/agent/experiment_agent.py`:
 
 ```python
 from typing import Any, Dict
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class ExperimentAgent(BaseAgent):
@@ -2238,7 +2238,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/bioinfo_agent.py backend/homics_lab/agent/viz_agent.py backend/homics_lab/agent/experiment_agent.py backend/tests/test_agent/test_specialized_agents.py
+git add backend/homomics_lab/agent/bioinfo_agent.py backend/homomics_lab/agent/viz_agent.py backend/homomics_lab/agent/experiment_agent.py backend/tests/test_agent/test_specialized_agents.py
 git commit -m "feat: add specialized bioinfo, viz, and experiment agents"
 ```
 
@@ -2247,7 +2247,7 @@ git commit -m "feat: add specialized bioinfo, viz, and experiment agents"
 ### Task 17: Implement Agent Message Bus
 
 **Files:**
-- Create: `backend/homics_lab/agent/message_bus.py`
+- Create: `backend/homomics_lab/agent/message_bus.py`
 - Test: `backend/tests/test_agent/test_message_bus.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2256,8 +2256,8 @@ Create `backend/tests/test_agent/test_message_bus.py`:
 
 ```python
 import pytest
-from homics_lab.agent.message_bus import MessageBus
-from homics_lab.models.common import AgentMessage
+from homomics_lab.agent.message_bus import MessageBus
+from homomics_lab.models.common import AgentMessage
 
 
 @pytest.fixture
@@ -2296,12 +2296,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement message bus**
 
-Create `backend/homics_lab/agent/message_bus.py`:
+Create `backend/homomics_lab/agent/message_bus.py`:
 
 ```python
 from collections import defaultdict
 from typing import Dict, List
-from homics_lab.models.common import AgentMessage
+from homomics_lab.models.common import AgentMessage
 
 
 class MessageBus:
@@ -2346,7 +2346,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/message_bus.py backend/tests/test_agent/test_message_bus.py
+git add backend/homomics_lab/agent/message_bus.py backend/tests/test_agent/test_message_bus.py
 git commit -m "feat: add in-memory message bus for agent communication"
 ```
 
@@ -2355,8 +2355,8 @@ git commit -m "feat: add in-memory message bus for agent communication"
 ### Task 18: Wire Up Agent System Initialization
 
 **Files:**
-- Create: `backend/homics_lab/agent/factory.py`
-- Modify: `backend/homics_lab/main.py`
+- Create: `backend/homomics_lab/agent/factory.py`
+- Modify: `backend/homomics_lab/main.py`
 - Test: `backend/tests/test_agent/test_factory.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2364,9 +2364,9 @@ git commit -m "feat: add in-memory message bus for agent communication"
 Create `backend/tests/test_agent/test_factory.py`:
 
 ```python
-from homics_lab.agent.factory import create_default_agents
-from homics_lab.agent.agent_registry import get_default_registry
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.factory import create_default_agents
+from homomics_lab.agent.agent_registry import get_default_registry
+from homomics_lab.models.common import AgentType
 
 
 def test_create_default_agents():
@@ -2388,13 +2388,13 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement agent factory and wire into app**
 
-Create `backend/homics_lab/agent/factory.py`:
+Create `backend/homomics_lab/agent/factory.py`:
 
 ```python
-from homics_lab.agent.agent_registry import get_default_registry
-from homics_lab.agent.bioinfo_agent import BioinfoAgent
-from homics_lab.agent.viz_agent import VizAgent
-from homics_lab.agent.experiment_agent import ExperimentAgent
+from homomics_lab.agent.agent_registry import get_default_registry
+from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.viz_agent import VizAgent
+from homomics_lab.agent.experiment_agent import ExperimentAgent
 
 
 def create_default_agents():
@@ -2406,7 +2406,7 @@ def create_default_agents():
     registry.register(ExperimentAgent())
 ```
 
-Modify `backend/homics_lab/main.py` to initialize agents on startup:
+Modify `backend/homomics_lab/main.py` to initialize agents on startup:
 
 ```python
 from contextlib import asynccontextmanager
@@ -2414,8 +2414,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from homics_lab.config import settings
-from homics_lab.agent.factory import create_default_agents
+from homomics_lab.config import settings
+from homomics_lab.agent.factory import create_default_agents
 
 
 @asynccontextmanager
@@ -2442,7 +2442,7 @@ Expected: All tests pass
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/factory.py backend/homics_lab/main.py backend/tests/test_agent/test_factory.py
+git add backend/homomics_lab/agent/factory.py backend/homomics_lab/main.py backend/tests/test_agent/test_factory.py
 git commit -m "feat: wire up default agent registration on app startup"
 ```
 
@@ -2468,8 +2468,8 @@ Next: Context compression and memory management.
 ### Task 19: Extract TaskTree to Dedicated Module
 
 **Files:**
-- Create: `backend/homics_lab/tasks/task_tree.py`
-- Modify: `backend/homics_lab/agent/task_decomposer.py` to use TaskTree from tasks module
+- Create: `backend/homomics_lab/tasks/task_tree.py`
+- Modify: `backend/homomics_lab/agent/task_decomposer.py` to use TaskTree from tasks module
 - Test: `backend/tests/test_tasks/test_task_tree.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2478,8 +2478,8 @@ Create `backend/tests/test_tasks/test_task_tree.py`:
 
 ```python
 import pytest
-from homics_lab.tasks.task_tree import TaskTree
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.models import TaskNode
 
 
 def test_topological_sort_simple():
@@ -2518,11 +2518,11 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement TaskTree module**
 
-Create `backend/homics_lab/tasks/task_tree.py`:
+Create `backend/homomics_lab/tasks/task_tree.py`:
 
 ```python
 from typing import List, Set
-from homics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
 class TaskTree:
@@ -2571,9 +2571,9 @@ class TaskTree:
 
 - [ ] **Step 4: Update task_decomposer to import TaskTree from tasks module**
 
-Modify `backend/homics_lab/agent/task_decomposer.py`:
+Modify `backend/homomics_lab/agent/task_decomposer.py`:
 ```python
-from homics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.task_tree import TaskTree
 # Remove local TaskTree class definition
 ```
 
@@ -2585,7 +2585,7 @@ Expected: All tests pass
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/homics_lab/tasks/task_tree.py backend/tests/test_tasks/test_task_tree.py
+git add backend/homomics_lab/tasks/task_tree.py backend/tests/test_tasks/test_task_tree.py
 git commit -m "refactor: extract TaskTree to dedicated module with ready-task detection"
 ```
 
@@ -2596,8 +2596,8 @@ git commit -m "refactor: extract TaskTree to dedicated module with ready-task de
 ### Task 20: Implement Working Memory
 
 **Files:**
-- Create: `backend/homics_lab/context/__init__.py`
-- Create: `backend/homics_lab/context/working_memory.py`
+- Create: `backend/homomics_lab/context/__init__.py`
+- Create: `backend/homomics_lab/context/working_memory.py`
 - Test: `backend/tests/test_context/test_working_memory.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2606,8 +2606,8 @@ Create `backend/tests/test_context/test_working_memory.py`:
 
 ```python
 import pytest
-from homics_lab.context.working_memory import WorkingMemory
-from homics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.models.common import ChatMessage, MessageType
 
 
 def test_add_and_retrieve_messages():
@@ -2643,17 +2643,17 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement working memory**
 
-Create `backend/homics_lab/context/__init__.py`:
+Create `backend/homomics_lab/context/__init__.py`:
 ```python
 from .working_memory import WorkingMemory
 ```
 
-Create `backend/homics_lab/context/working_memory.py`:
+Create `backend/homomics_lab/context/working_memory.py`:
 
 ```python
 from collections import deque
 from typing import List, Optional
-from homics_lab.models.common import ChatMessage
+from homomics_lab.models.common import ChatMessage
 
 
 class WorkingMemory:
@@ -2694,7 +2694,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/context/ backend/tests/test_context/
+git add backend/homomics_lab/context/ backend/tests/test_context/
 git commit -m "feat: add working memory for session state"
 ```
 
@@ -2703,7 +2703,7 @@ git commit -m "feat: add working memory for session state"
 ### Task 21: Implement Relevance Filter
 
 **Files:**
-- Create: `backend/homics_lab/context/relevance_filter.py`
+- Create: `backend/homomics_lab/context/relevance_filter.py`
 - Test: `backend/tests/test_context/test_relevance_filter.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2712,7 +2712,7 @@ Create `backend/tests/test_context/test_relevance_filter.py`:
 
 ```python
 import pytest
-from homics_lab.context.relevance_filter import RelevanceFilter, ContextItem
+from homomics_lab.context.relevance_filter import RelevanceFilter, ContextItem
 
 
 @pytest.fixture
@@ -2756,7 +2756,7 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement relevance filter**
 
-Create `backend/homics_lab/context/relevance_filter.py`:
+Create `backend/homomics_lab/context/relevance_filter.py`:
 
 ```python
 from dataclasses import dataclass, field
@@ -2841,7 +2841,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/context/relevance_filter.py backend/tests/test_context/test_relevance_filter.py
+git add backend/homomics_lab/context/relevance_filter.py backend/tests/test_context/test_relevance_filter.py
 git commit -m "feat: add context relevance filter with multi-dimensional scoring"
 ```
 
@@ -2850,7 +2850,7 @@ git commit -m "feat: add context relevance filter with multi-dimensional scoring
 ### Task 22: Implement Context Summarizer
 
 **Files:**
-- Create: `backend/homics_lab/context/summarizer.py`
+- Create: `backend/homomics_lab/context/summarizer.py`
 - Test: `backend/tests/test_context/test_summarizer.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2859,7 +2859,7 @@ Create `backend/tests/test_context/test_summarizer.py`:
 
 ```python
 import pytest
-from homics_lab.context.summarizer import ContextSummarizer, ContextSummary
+from homomics_lab.context.summarizer import ContextSummarizer, ContextSummary
 
 
 @pytest.fixture
@@ -2892,7 +2892,7 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement summarizer**
 
-Create `backend/homics_lab/context/summarizer.py`:
+Create `backend/homomics_lab/context/summarizer.py`:
 
 ```python
 import re
@@ -2968,7 +2968,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/context/summarizer.py backend/tests/test_context/test_summarizer.py
+git add backend/homomics_lab/context/summarizer.py backend/tests/test_context/test_summarizer.py
 git commit -m "feat: add context summarizer with parameter and warning extraction"
 ```
 
@@ -2977,7 +2977,7 @@ git commit -m "feat: add context summarizer with parameter and warning extractio
 ### Task 23: Implement Prompter
 
 **Files:**
-- Create: `backend/homics_lab/context/prompter.py`
+- Create: `backend/homomics_lab/context/prompter.py`
 - Test: `backend/tests/test_context/test_prompter.py`
 
 - [ ] **Step 1: Write failing test**
@@ -2986,9 +2986,9 @@ Create `backend/tests/test_context/test_prompter.py`:
 
 ```python
 import pytest
-from homics_lab.context.prompter import Prompter
-from homics_lab.context.working_memory import WorkingMemory
-from homics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.context.prompter import Prompter
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.models.common import ChatMessage, MessageType
 
 
 @pytest.fixture
@@ -3032,11 +3032,11 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement prompter**
 
-Create `backend/homics_lab/context/prompter.py`:
+Create `backend/homomics_lab/context/prompter.py`:
 
 ```python
 from typing import Any, Dict, Optional
-from homics_lab.context.working_memory import WorkingMemory
+from homomics_lab.context.working_memory import WorkingMemory
 
 
 class Prompter:
@@ -3091,7 +3091,7 @@ class Prompter:
         return self._truncate_if_needed(prompt)
     
     def _system_prompt(self) -> str:
-        return """You are HomicsLab, an AI assistant specialized in bioinformatics analysis.
+        return """You are HomomicsLab, an AI assistant specialized in bioinformatics analysis.
 You help researchers design experiments, analyze omics data, and interpret results.
 Be concise, accurate, and ask for clarification when needed."""
     
@@ -3120,7 +3120,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/context/prompter.py backend/tests/test_context/test_prompter.py
+git add backend/homomics_lab/context/prompter.py backend/tests/test_context/test_prompter.py
 git commit -m "feat: add prompter that assembles context from layered memory"
 ```
 
@@ -3142,8 +3142,8 @@ Next: Skills runtime.
 ### Task 24: Define Skill Models
 
 **Files:**
-- Create: `backend/homics_lab/skills/__init__.py`
-- Create: `backend/homics_lab/skills/models.py`
+- Create: `backend/homomics_lab/skills/__init__.py`
+- Create: `backend/homomics_lab/skills/models.py`
 - Test: `backend/tests/test_skills/test_models.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3151,7 +3151,7 @@ Next: Skills runtime.
 Create `backend/tests/test_skills/test_models.py`:
 
 ```python
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillRuntime
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillRuntime
 
 
 def test_skill_definition_validation():
@@ -3197,12 +3197,12 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement skill models**
 
-Create `backend/homics_lab/skills/__init__.py`:
+Create `backend/homomics_lab/skills/__init__.py`:
 ```python
 from .models import SkillDefinition, SkillRuntime, SkillInputSchema
 ```
 
-Create `backend/homics_lab/skills/models.py`:
+Create `backend/homomics_lab/skills/models.py`:
 
 ```python
 from typing import Any, Dict, List, Optional
@@ -3281,7 +3281,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/skills/ backend/tests/test_skills/
+git add backend/homomics_lab/skills/ backend/tests/test_skills/
 git commit -m "feat: add SkillDefinition model with input validation"
 ```
 
@@ -3290,7 +3290,7 @@ git commit -m "feat: add SkillDefinition model with input validation"
 ### Task 25: Implement Skill Registry
 
 **Files:**
-- Create: `backend/homics_lab/skills/registry.py`
+- Create: `backend/homomics_lab/skills/registry.py`
 - Test: `backend/tests/test_skills/test_registry.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3299,8 +3299,8 @@ Create `backend/tests/test_skills/test_registry.py`:
 
 ```python
 import pytest
-from homics_lab.skills.registry import SkillRegistry
-from homics_lab.skills.models import SkillDefinition, SkillRuntime
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.models import SkillDefinition, SkillRuntime
 
 
 @pytest.fixture
@@ -3334,11 +3334,11 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement skill registry**
 
-Create `backend/homics_lab/skills/registry.py`:
+Create `backend/homomics_lab/skills/registry.py`:
 
 ```python
 from typing import Dict, List, Optional
-from homics_lab.skills.models import SkillDefinition
+from homomics_lab.skills.models import SkillDefinition
 
 
 class SkillRegistry:
@@ -3389,7 +3389,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/skills/registry.py backend/tests/test_skills/test_registry.py
+git add backend/homomics_lab/skills/registry.py backend/tests/test_skills/test_registry.py
 git commit -m "feat: add skill registry with search and category filtering"
 ```
 
@@ -3398,7 +3398,7 @@ git commit -m "feat: add skill registry with search and category filtering"
 ### Task 26: Implement Sandboxed Skill Execution
 
 **Files:**
-- Create: `backend/homics_lab/skills/sandbox.py`
+- Create: `backend/homomics_lab/skills/sandbox.py`
 - Test: `backend/tests/test_skills/test_sandbox.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3407,7 +3407,7 @@ Create `backend/tests/test_skills/test_sandbox.py`:
 
 ```python
 import pytest
-from homics_lab.skills.sandbox import LocalSandbox
+from homomics_lab.skills.sandbox import LocalSandbox
 
 
 @pytest.fixture
@@ -3452,7 +3452,7 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement local sandbox**
 
-Create `backend/homics_lab/skills/sandbox.py`:
+Create `backend/homomics_lab/skills/sandbox.py`:
 
 ```python
 import asyncio
@@ -3536,7 +3536,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/skills/sandbox.py backend/tests/test_skills/test_sandbox.py
+git add backend/homomics_lab/skills/sandbox.py backend/tests/test_skills/test_sandbox.py
 git commit -m "feat: add local subprocess sandbox for skill execution"
 ```
 
@@ -3545,7 +3545,7 @@ git commit -m "feat: add local subprocess sandbox for skill execution"
 ### Task 27: Implement Skills Runtime
 
 **Files:**
-- Create: `backend/homics_lab/skills/runtime.py`
+- Create: `backend/homomics_lab/skills/runtime.py`
 - Test: `backend/tests/test_skills/test_runtime.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3554,9 +3554,9 @@ Create `backend/tests/test_skills/test_runtime.py`:
 
 ```python
 import pytest
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.models import SkillDefinition
-from homics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.models import SkillDefinition
+from homomics_lab.skills.registry import SkillRegistry
 
 
 @pytest.fixture
@@ -3600,14 +3600,14 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement skill runtime executor**
 
-Create `backend/homics_lab/skills/runtime.py`:
+Create `backend/homomics_lab/skills/runtime.py`:
 
 ```python
 from pathlib import Path
 from typing import Any, Dict
-from homics_lab.skills.models import SkillDefinition
-from homics_lab.skills.registry import SkillRegistry, get_default_registry
-from homics_lab.skills.sandbox import LocalSandbox
+from homomics_lab.skills.models import SkillDefinition
+from homomics_lab.skills.registry import SkillRegistry, get_default_registry
+from homomics_lab.skills.sandbox import LocalSandbox
 
 
 class SkillRuntimeExecutor:
@@ -3666,7 +3666,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/skills/runtime.py backend/tests/test_skills/test_runtime.py
+git add backend/homomics_lab/skills/runtime.py backend/tests/test_skills/test_runtime.py
 git commit -m "feat: add skill runtime executor with validation and sandboxing"
 ```
 
@@ -3675,11 +3675,11 @@ git commit -m "feat: add skill runtime executor with validation and sandboxing"
 ### Task 28: Create Builtin Skills
 
 **Files:**
-- Create: `backend/homics_lab/skills/builtin/__init__.py`
-- Create: `backend/homics_lab/skills/builtin/data_loader.py`
-- Create: `backend/homics_lab/skills/builtin/scanpy_qc.py`
-- Create: `backend/homics_lab/skills/builtin/scanpy_cluster.py`
-- Modify: `backend/homics_lab/main.py` to register builtin skills
+- Create: `backend/homomics_lab/skills/builtin/__init__.py`
+- Create: `backend/homomics_lab/skills/builtin/data_loader.py`
+- Create: `backend/homomics_lab/skills/builtin/scanpy_qc.py`
+- Create: `backend/homomics_lab/skills/builtin/scanpy_cluster.py`
+- Modify: `backend/homomics_lab/main.py` to register builtin skills
 - Test: `backend/tests/test_skills/test_builtin.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3688,9 +3688,9 @@ Create `backend/tests/test_skills/test_builtin.py`:
 
 ```python
 import pytest
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.registry import SkillRegistry
-from homics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.builtin import register_builtin_skills
 
 
 @pytest.fixture
@@ -3722,10 +3722,10 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement builtin skills**
 
-Create `backend/homics_lab/skills/builtin/__init__.py`:
+Create `backend/homomics_lab/skills/builtin/__init__.py`:
 
 ```python
-from homics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from .data_loader import DATA_LOADER_SKILL, DATA_LOADER_CODE
 from .scanpy_qc import SCANPY_QC_SKILL, SCANPY_QC_CODE
 from .scanpy_cluster import SCANPY_CLUSTER_SKILL, SCANPY_CLUSTER_CODE
@@ -3737,10 +3737,10 @@ def register_builtin_skills(executor: SkillRuntimeExecutor) -> None:
     executor.register_builtin(SCANPY_CLUSTER_SKILL, SCANPY_CLUSTER_CODE)
 ```
 
-Create `backend/homics_lab/skills/builtin/data_loader.py`:
+Create `backend/homomics_lab/skills/builtin/data_loader.py`:
 
 ```python
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 
 
 DATA_LOADER_SKILL = SkillDefinition(
@@ -3773,10 +3773,10 @@ result = {
 '''
 ```
 
-Create `backend/homics_lab/skills/builtin/scanpy_qc.py`:
+Create `backend/homomics_lab/skills/builtin/scanpy_qc.py`:
 
 ```python
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 
 
 SCANPY_QC_SKILL = SkillDefinition(
@@ -3813,10 +3813,10 @@ result = {
 '''
 ```
 
-Create `backend/homics_lab/skills/builtin/scanpy_cluster.py`:
+Create `backend/homomics_lab/skills/builtin/scanpy_cluster.py`:
 
 ```python
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 
 
 SCANPY_CLUSTER_SKILL = SkillDefinition(
@@ -3852,11 +3852,11 @@ result = {
 
 - [ ] **Step 4: Update main.py to register builtin skills**
 
-Modify `backend/homics_lab/main.py`:
+Modify `backend/homomics_lab/main.py`:
 ```python
-from homics_lab.agent.factory import create_default_agents
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.agent.factory import create_default_agents
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.builtin import register_builtin_skills
 
 
 @asynccontextmanager
@@ -3880,7 +3880,7 @@ Expected: 2 passing tests
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/homics_lab/skills/builtin/ backend/homics_lab/main.py backend/tests/test_skills/test_builtin.py
+git add backend/homomics_lab/skills/builtin/ backend/homomics_lab/main.py backend/tests/test_skills/test_builtin.py
 git commit -m "feat: add builtin skills for data loading, QC, and clustering"
 ```
 
@@ -3889,9 +3889,9 @@ git commit -m "feat: add builtin skills for data loading, QC, and clustering"
 ### Task 29: Integrate Skills with Orchestrator
 
 **Files:**
-- Modify: `backend/homics_lab/agent/orchestrator.py`
-- Modify: `backend/homics_lab/agent/base_agent.py` to accept skill executor
-- Modify: `backend/homics_lab/agent/bioinfo_agent.py`
+- Modify: `backend/homomics_lab/agent/orchestrator.py`
+- Modify: `backend/homomics_lab/agent/base_agent.py` to accept skill executor
+- Modify: `backend/homomics_lab/agent/bioinfo_agent.py`
 - Test: `backend/tests/test_agent/test_skill_integration.py`
 
 - [ ] **Step 1: Write failing test**
@@ -3900,15 +3900,15 @@ Create `backend/tests/test_agent/test_skill_integration.py`:
 
 ```python
 import pytest
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.bioinfo_agent import BioinfoAgent
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.registry import SkillRegistry
-from homics_lab.skills.builtin import register_builtin_skills
-from homics_lab.tasks.models import TaskNode
-from homics_lab.models.common import TaskStatus
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.models.common import TaskStatus
 
 
 @pytest.fixture
@@ -3953,11 +3953,11 @@ Expected: Test fails (agent not using skill executor yet)
 
 - [ ] **Step 3: Update base agent and bioinfo agent to support skill execution**
 
-Modify `backend/homics_lab/agent/base_agent.py`:
+Modify `backend/homomics_lab/agent/base_agent.py`:
 ```python
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
-from homics_lab.models.common import AgentMessage, AgentType
+from homomics_lab.models.common import AgentMessage, AgentType
 
 
 class BaseAgent(ABC):
@@ -3969,11 +3969,11 @@ class BaseAgent(ABC):
         self.skill_executor = skill_executor
 ```
 
-Modify `backend/homics_lab/agent/bioinfo_agent.py`:
+Modify `backend/homomics_lab/agent/bioinfo_agent.py`:
 ```python
 from typing import Any, Dict
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class BioinfoAgent(BaseAgent):
@@ -4009,7 +4009,7 @@ Expected: Test passes
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/ backend/tests/test_agent/test_skill_integration.py
+git add backend/homomics_lab/agent/ backend/tests/test_agent/test_skill_integration.py
 git commit -m "feat: integrate skills runtime with agent orchestrator"
 ```
 
@@ -4033,8 +4033,8 @@ Next: Human-in-the-loop mechanism.
 ### Task 30: Implement HITL Checkpoint Detection
 
 **Files:**
-- Create: `backend/homics_lab/hitl/__init__.py`
-- Create: `backend/homics_lab/hitl/detector.py`
+- Create: `backend/homomics_lab/hitl/__init__.py`
+- Create: `backend/homomics_lab/hitl/detector.py`
 - Test: `backend/tests/test_hitl/test_detector.py`
 
 - [ ] **Step 1: Write failing test**
@@ -4043,9 +4043,9 @@ Create `backend/tests/test_hitl/test_detector.py`:
 
 ```python
 import pytest
-from homics_lab.hitl.detector import HITLDetector
-from homics_lab.tasks.models import TaskNode
-from homics_lab.models.common import HITLTrigger
+from homomics_lab.hitl.detector import HITLDetector
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.models.common import HITLTrigger
 
 
 @pytest.fixture
@@ -4099,17 +4099,17 @@ Expected: ImportError
 
 - [ ] **Step 3: Implement HITL detector**
 
-Create `backend/homics_lab/hitl/__init__.py`:
+Create `backend/homomics_lab/hitl/__init__.py`:
 ```python
 from .detector import HITLDetector
 ```
 
-Create `backend/homics_lab/hitl/detector.py`:
+Create `backend/homomics_lab/hitl/detector.py`:
 
 ```python
 from typing import Any, Dict, Optional
-from homics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
+from homomics_lab.tasks.models import TaskNode
 
 
 class HITLDetector:
@@ -4173,7 +4173,7 @@ Expected: 3 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/hitl/ backend/tests/test_hitl/
+git add backend/homomics_lab/hitl/ backend/tests/test_hitl/
 git commit -m "feat: add HITL checkpoint detector"
 ```
 
@@ -4182,8 +4182,8 @@ git commit -m "feat: add HITL checkpoint detector"
 ### Task 31: Integrate HITL with Orchestrator
 
 **Files:**
-- Modify: `backend/homics_lab/agent/orchestrator.py`
-- Create: `backend/homics_lab/hitl/manager.py`
+- Modify: `backend/homomics_lab/agent/orchestrator.py`
+- Create: `backend/homomics_lab/hitl/manager.py`
 - Test: `backend/tests/test_hitl/test_orchestrator_hitl.py`
 
 - [ ] **Step 1: Write failing test**
@@ -4192,12 +4192,12 @@ Create `backend/tests/test_hitl/test_orchestrator_hitl.py`:
 
 ```python
 import pytest
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.models.common import AgentType, TaskStatus, HITLTrigger
-from homics_lab.tasks.models import TaskNode
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.models.common import AgentType, TaskStatus, HITLTrigger
+from homomics_lab.tasks.models import TaskNode
 
 
 class FakeBioinfoAgent(BaseAgent):
@@ -4272,16 +4272,16 @@ Expected: Test fails (orchestrator doesn't support HITL yet)
 
 - [ ] **Step 3: Update orchestrator with HITL support**
 
-Modify `backend/homics_lab/agent/orchestrator.py`:
+Modify `backend/homomics_lab/agent/orchestrator.py`:
 
 ```python
 from typing import Any, Dict, Optional
-from homics_lab.agent.agent_registry import AgentRegistry, get_default_registry
-from homics_lab.agent.task_decomposer import TaskTree
-from homics_lab.hitl.detector import HITLDetector
-from homics_lab.models.common import TaskStatus
-from homics_lab.tasks.models import TaskNode
-from homics_lab.tasks.state_machine import TaskStateMachine
+from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.agent.task_decomposer import TaskTree
+from homomics_lab.hitl.detector import HITLDetector
+from homomics_lab.models.common import TaskStatus
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.tasks.state_machine import TaskStateMachine
 
 
 class Orchestrator:
@@ -4410,7 +4410,7 @@ Expected: 2 passing tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/agent/orchestrator.py backend/homics_lab/hitl/detector.py backend/tests/test_hitl/test_orchestrator_hitl.py
+git add backend/homomics_lab/agent/orchestrator.py backend/homomics_lab/hitl/detector.py backend/tests/test_hitl/test_orchestrator_hitl.py
 git commit -m "feat: integrate HITL checkpoints with orchestrator pause/resume"
 ```
 
@@ -4431,10 +4431,10 @@ Next: API Layer.
 ### Task 32: Create Chat API and WebSocket Endpoint
 
 **Files:**
-- Create: `backend/homics_lab/api/__init__.py`
-- Create: `backend/homics_lab/api/router.py`
-- Create: `backend/homics_lab/api/chat.py`
-- Modify: `backend/homics_lab/main.py` to include router
+- Create: `backend/homomics_lab/api/__init__.py`
+- Create: `backend/homomics_lab/api/router.py`
+- Create: `backend/homomics_lab/api/chat.py`
+- Modify: `backend/homomics_lab/main.py` to include router
 - Test: `backend/tests/test_api/test_chat.py`
 
 - [ ] **Step 1: Write failing test**
@@ -4444,7 +4444,7 @@ Create `backend/tests/test_api/test_chat.py`:
 ```python
 import pytest
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 
@@ -4474,12 +4474,12 @@ Expected: 404 (routes don't exist yet)
 
 - [ ] **Step 3: Implement chat API**
 
-Create `backend/homics_lab/api/__init__.py`:
+Create `backend/homomics_lab/api/__init__.py`:
 ```python
 from .router import api_router
 ```
 
-Create `backend/homics_lab/api/router.py`:
+Create `backend/homomics_lab/api/router.py`:
 ```python
 from fastapi import APIRouter
 from . import chat
@@ -4488,21 +4488,21 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 ```
 
-Create `backend/homics_lab/api/chat.py`:
+Create `backend/homomics_lab/api/chat.py`:
 
 ```python
 from typing import List
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
-from homics_lab.agent.agent_registry import get_default_registry
-from homics_lab.agent.intent_analyzer import IntentAnalyzer
-from homics_lab.agent.orchestrator import Orchestrator
-from homics_lab.agent.task_decomposer import TaskDecomposer
-from homics_lab.context.prompter import Prompter
-from homics_lab.context.working_memory import WorkingMemory
-from homics_lab.models.common import ChatMessage, MessageType
-from homics_lab.tasks.task_tree import TaskTree
+from homomics_lab.agent.agent_registry import get_default_registry
+from homomics_lab.agent.intent_analyzer import IntentAnalyzer
+from homomics_lab.agent.orchestrator import Orchestrator
+from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.context.prompter import Prompter
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.tasks.task_tree import TaskTree
 
 router = APIRouter()
 
@@ -4600,9 +4600,9 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
 - [ ] **Step 4: Wire router into main app**
 
-Modify `backend/homics_lab/main.py`:
+Modify `backend/homomics_lab/main.py`:
 ```python
-from homics_lab.api.router import api_router
+from homomics_lab.api.router import api_router
 # ... after app creation
 app.include_router(api_router)
 ```
@@ -4615,7 +4615,7 @@ Expected: 2 passing tests
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/homics_lab/api/ backend/tests/test_api/test_chat.py backend/homics_lab/main.py
+git add backend/homomics_lab/api/ backend/tests/test_api/test_chat.py backend/homomics_lab/main.py
 git commit -m "feat: add chat REST API and WebSocket endpoint"
 ```
 
@@ -4624,7 +4624,7 @@ git commit -m "feat: add chat REST API and WebSocket endpoint"
 ### Task 33: Add HITL Response API
 
 **Files:**
-- Modify: `backend/homics_lab/api/chat.py`
+- Modify: `backend/homomics_lab/api/chat.py`
 - Test: `backend/tests/test_api/test_hitl_api.py`
 
 - [ ] **Step 1: Write failing test**
@@ -4633,7 +4633,7 @@ Create `backend/tests/test_api/test_hitl_api.py`:
 
 ```python
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 
@@ -4666,7 +4666,7 @@ Expected: 404
 
 - [ ] **Step 3: Implement HITL response endpoint**
 
-Add to `backend/homics_lab/api/chat.py`:
+Add to `backend/homomics_lab/api/chat.py`:
 
 ```python
 from pydantic import BaseModel
@@ -4729,7 +4729,7 @@ Expected: Test passes
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/homics_lab/api/chat.py backend/tests/test_api/test_hitl_api.py
+git add backend/homomics_lab/api/chat.py backend/tests/test_api/test_hitl_api.py
 git commit -m "feat: add HITL response API endpoint"
 ```
 
@@ -4738,9 +4738,9 @@ git commit -m "feat: add HITL response API endpoint"
 ### Task 34: Add Project and File Upload APIs
 
 **Files:**
-- Create: `backend/homics_lab/api/projects.py`
-- Create: `backend/homics_lab/api/files.py`
-- Modify: `backend/homics_lab/api/router.py`
+- Create: `backend/homomics_lab/api/projects.py`
+- Create: `backend/homomics_lab/api/files.py`
+- Modify: `backend/homomics_lab/api/router.py`
 - Test: `backend/tests/test_api/test_projects.py`
 
 - [ ] **Step 1: Write failing test**
@@ -4749,7 +4749,7 @@ Create `backend/tests/test_api/test_projects.py`:
 
 ```python
 from fastapi.testclient import TestClient
-from homics_lab.main import app
+from homomics_lab.main import app
 
 client = TestClient(app)
 
@@ -4778,7 +4778,7 @@ Expected: 404
 
 - [ ] **Step 3: Implement project API**
 
-Create `backend/homics_lab/api/projects.py`:
+Create `backend/homomics_lab/api/projects.py`:
 
 ```python
 from typing import List
@@ -4836,12 +4836,12 @@ async def get_project(project_id: str):
 
 - [ ] **Step 4: Implement file upload API**
 
-Create `backend/homics_lab/api/files.py`:
+Create `backend/homomics_lab/api/files.py`:
 
 ```python
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File
-from homics_lab.config import settings
+from homomics_lab.config import settings
 
 router = APIRouter()
 
@@ -4864,7 +4864,7 @@ async def upload_file(file: UploadFile = File(...), project_id: str = "default")
 
 - [ ] **Step 5: Update router**
 
-Modify `backend/homics_lab/api/router.py`:
+Modify `backend/homomics_lab/api/router.py`:
 ```python
 from fastapi import APIRouter
 from . import chat, projects, files
@@ -4883,7 +4883,7 @@ Expected: 2 passing tests
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/homics_lab/api/projects.py backend/homics_lab/api/files.py backend/homics_lab/api/router.py backend/tests/test_api/test_projects.py
+git add backend/homomics_lab/api/projects.py backend/homomics_lab/api/files.py backend/homomics_lab/api/router.py backend/tests/test_api/test_projects.py
 git commit -m "feat: add project management and file upload APIs"
 ```
 
@@ -5484,7 +5484,7 @@ function App() {
   return (
     <div className="flex h-screen flex-col bg-slate-50">
       <header className="bg-primary px-4 py-3 text-white">
-        <h1 className="text-lg font-bold">HomicsLab</h1>
+        <h1 className="text-lg font-bold">HomomicsLab</h1>
       </header>
       <main className="flex flex-1 overflow-hidden">
         <div className="w-2/5 min-w-[360px] max-w-[480px]">
@@ -5796,7 +5796,7 @@ import { HITLRequest } from './HITLRequest'
 
 - [ ] **Step 3: Update backend to send HITL messages**
 
-Modify `backend/homics_lab/api/chat.py` send_message to detect HITL results and add a hitl_request message:
+Modify `backend/homomics_lab/api/chat.py` send_message to detect HITL results and add a hitl_request message:
 
 ```python
 # After running orchestrator
@@ -5837,7 +5837,7 @@ Expected: Tests pass
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/chat/HITLRequest.tsx backend/homics_lab/api/chat.py
+git add frontend/src/components/chat/HITLRequest.tsx backend/homomics_lab/api/chat.py
 git commit -m "feat: add HITL request UI and backend message formatting"
 ```
 
@@ -6087,7 +6087,7 @@ function App() {
   return (
     <div className="flex h-screen flex-col bg-slate-50">
       <header className="bg-primary px-4 py-3 text-white">
-        <h1 className="text-lg font-bold">HomicsLab</h1>
+        <h1 className="text-lg font-bold">HomomicsLab</h1>
       </header>
       <main className="flex flex-1 overflow-hidden">
         <div className="w-2/5 min-w-[360px] max-w-[480px]">
@@ -6160,7 +6160,7 @@ export function ChatInput() {
 
 - [ ] **Step 2: Test by running dev server**
 
-Run backend: `cd backend && uvicorn homics_lab.main:app --reload --port 8080`
+Run backend: `cd backend && uvicorn homomics_lab.main:app --reload --port 8080`
 Run frontend: `cd frontend && npm run dev`
 
 Open browser to `http://localhost:5173`
@@ -6285,24 +6285,24 @@ Next: Integration and local deployment.
 ### Task 44: Create CLI Entry Point
 
 **Files:**
-- Create: `backend/homics_lab/cli.py`
+- Create: `backend/homomics_lab/cli.py`
 - Modify: `pyproject.toml` to register CLI
-- Test: `homics-lab --help`
+- Test: `homomics-lab --help`
 
 - [ ] **Step 1: Create CLI module**
 
-Create `backend/homics_lab/cli.py`:
+Create `backend/homomics_lab/cli.py`:
 
 ```python
 import argparse
 import sys
 import uvicorn
 
-from homics_lab.config import settings
+from homomics_lab.config import settings
 
 
 def main():
-    parser = argparse.ArgumentParser(description="HomicsLab - Bioinformatics Agent")
+    parser = argparse.ArgumentParser(description="HomomicsLab - Bioinformatics Agent")
     parser.add_argument(
         "command",
         choices=["start", "version"],
@@ -6315,14 +6315,14 @@ def main():
     args = parser.parse_args()
     
     if args.command == "version":
-        from homics_lab import __version__
-        print(f"HomicsLab {__version__}")
+        from homomics_lab import __version__
+        print(f"HomomicsLab {__version__}")
         return
     
     if args.command == "start":
-        print(f"Starting HomicsLab on http://{args.host}:{args.port}")
+        print(f"Starting HomomicsLab on http://{args.host}:{args.port}")
         uvicorn.run(
-            "homics_lab.main:app",
+            "homomics_lab.main:app",
             host=args.host,
             port=args.port,
             reload=args.reload,
@@ -6338,7 +6338,7 @@ if __name__ == "__main__":
 Ensure `pyproject.toml` contains:
 ```toml
 [project.scripts]
-homics-lab = "homics_lab.cli:main"
+homomics-lab = "homomics_lab.cli:main"
 ```
 
 - [ ] **Step 3: Reinstall and test CLI**
@@ -6347,17 +6347,17 @@ Run:
 ```bash
 cd backend
 pip install -e "."
-homics-lab version
+homomics-lab version
 ```
-Expected: `HomicsLab 0.1.0`
+Expected: `HomomicsLab 0.1.0`
 
-Run: `homics-lab --help`
+Run: `homomics-lab --help`
 Expected: Help text displayed
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add backend/homics_lab/cli.py
+git add backend/homomics_lab/cli.py
 git commit -m "feat: add CLI entry point with start and version commands"
 ```
 
@@ -6375,14 +6375,14 @@ git commit -m "feat: add CLI entry point with start and version commands"
 Create `docs/setup.md`:
 
 ```markdown
-# HomicsLab Development Setup
+# HomomicsLab Development Setup
 
 ## Quick Start
 
 ```bash
 # 1. Clone and install
 git clone <repo-url>
-cd homics-lab
+cd homomics-lab
 make install
 
 # 2. Start backend (terminal 1)
@@ -6399,7 +6399,7 @@ make dev-frontend
 
 ```bash
 # SQLite is used by default
-HOMICS_DATABASE_URL="sqlite+aiosqlite:///./homics_lab.db" homics-lab start
+HOMICS_DATABASE_URL="sqlite+aiosqlite:///./homomics_lab.db" homomics-lab start
 ```
 
 ## Running Tests
@@ -6415,10 +6415,10 @@ make test-frontend
 Create `docs/architecture.md`:
 
 ```markdown
-# HomicsLab MVP Architecture
+# HomomicsLab MVP Architecture
 
 ## Overview
-HomicsLab uses a layered hybrid architecture:
+HomomicsLab uses a layered hybrid architecture:
 - **Core**: Python/FastAPI modular monolith
 - **Frontend**: React + TypeScript + Zustand + ReactFlow
 - **Skills**: Local subprocess sandbox execution
@@ -6469,7 +6469,7 @@ Create `scripts/health_check.py`:
 
 ```python
 #!/usr/bin/env python3
-"""End-to-end health check for HomicsLab."""
+"""End-to-end health check for HomomicsLab."""
 
 import sys
 import httpx
@@ -6512,7 +6512,7 @@ def check_chat_api() -> bool:
 
 
 def main():
-    print("Running HomicsLab health check...")
+    print("Running HomomicsLab health check...")
     
     checks = [
         check_backend(),
@@ -6533,7 +6533,7 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: Run health check against running backend**
 
-In one terminal: `cd backend && homics-lab start`
+In one terminal: `cd backend && homomics-lab start`
 In another: `python scripts/health_check.py`
 Expected: All checks pass
 
@@ -6575,7 +6575,7 @@ cd backend && black .
 
 - [ ] **Step 4: Manual end-to-end smoke test**
 
-1. Start backend: `cd backend && homics-lab start`
+1. Start backend: `cd backend && homomics-lab start`
 2. Start frontend: `cd frontend && npm run dev`
 3. Open `http://localhost:5173`
 4. Type: "帮我分析单细胞数据"
@@ -6601,7 +6601,7 @@ git commit -m "fix: resolve integration test issues"
 
 - [ ] **Step 1: Update version**
 
-Modify `backend/homics_lab/__init__.py`:
+Modify `backend/homomics_lab/__init__.py`:
 ```python
 __version__ = "0.1.0-mvp"
 ```
@@ -6616,7 +6616,7 @@ Modify `frontend/package.json`:
 ```bash
 git add -A
 git commit -m "chore: bump version to 0.1.0-mvp"
-git tag -a v0.1.0-mvp -m "HomicsLab MVP: Agent Brain Core"
+git tag -a v0.1.0-mvp -m "HomomicsLab MVP: Agent Brain Core"
 ```
 
 - [ ] **Step 3: Verify tag**
@@ -6635,7 +6635,7 @@ git push origin v0.1.0-mvp
 ## Milestone 10 Complete ✅
 
 At this point you have:
-- CLI entry point (`homics-lab start`)
+- CLI entry point (`homomics-lab start`)
 - Development documentation
 - Health check script
 - All tests passing

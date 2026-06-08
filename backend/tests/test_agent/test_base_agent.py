@@ -1,5 +1,5 @@
 import pytest
-from homics_lab.agent.base_agent import BaseAgent
+from homomics_lab.agent.base_agent import BaseAgent
 
 
 class FakeAgent(BaseAgent):

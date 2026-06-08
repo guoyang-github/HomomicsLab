@@ -1,7 +1,7 @@
 import pytest
-from homics_lab.context.prompter import Prompter
-from homics_lab.context.working_memory import WorkingMemory
-from homics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.context.prompter import Prompter
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.models.common import ChatMessage, MessageType
 
 
 @pytest.fixture

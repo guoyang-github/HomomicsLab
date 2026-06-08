@@ -1,7 +1,7 @@
 import pytest
-from homics_lab.skills.runtime import SkillRuntimeExecutor
-from homics_lab.skills.models import SkillDefinition, SkillInputSchema
-from homics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.registry import SkillRegistry
 
 
 @pytest.fixture

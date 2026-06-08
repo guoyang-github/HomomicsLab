@@ -1,7 +1,7 @@
 import pytest
-from homics_lab.agent.agent_registry import AgentRegistry
-from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentType
+from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
+from homomics_lab.models.common import AgentType
 
 
 class FakeBioinfoAgent(BaseAgent):
