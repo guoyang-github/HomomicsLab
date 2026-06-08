@@ -1,4 +1,5 @@
 import { useTaskStore } from '@/stores/taskStore'
+import { DataUploader } from '@/components/shared/DataUploader'
 
 export function DetailPanel() {
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
@@ -9,7 +10,8 @@ export function DetailPanel() {
   if (!task) {
     return (
       <div className="w-72 border-l border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm text-slate-500">点击节点查看详情</p>
+        <p className="mb-4 text-sm text-slate-500">点击节点查看详情，或上传数据开始分析</p>
+        <DataUploader />
       </div>
     )
   }
