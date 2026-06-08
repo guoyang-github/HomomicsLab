@@ -1,4 +1,5 @@
 import { ChatPanel } from '@/components/chat/ChatPanel'
+import { Workspace } from '@/components/workspace/Workspace'
 
 function App() {
   return (
@@ -10,10 +11,8 @@ function App() {
         <div className="w-2/5 min-w-[360px] max-w-[480px]">
           <ChatPanel />
         </div>
-        <div className="flex-1 bg-white p-4">
-          <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-slate-200">
-            <p className="text-slate-400">工作空间将在后续任务中实现</p>
-          </div>
+        <div className="flex-1">
+          <Workspace />
         </div>
       </main>
     </div>
