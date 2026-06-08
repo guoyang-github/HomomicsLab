@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useChatStore } from '@/stores/chatStore'
+import { useTaskStore } from '@/stores/taskStore'
 import { chatApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
 
@@ -7,6 +8,7 @@ export function ChatInput() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { addMessage, currentSessionId, currentProjectId, setIsTyping } = useChatStore()
+  const { setTaskTree, setProgress } = useTaskStore()
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -30,12 +32,20 @@ export function ChatInput() {
         message: input,
       })
 
+      // Update task store with the task tree from response
+      const tasks = response.data.task_tree.tasks
+      setTaskTree(tasks)
+      const lastMsg = response.data.messages[response.data.messages.length - 1]
+      if (lastMsg?.content && typeof lastMsg.content === 'object' && 'progress' in lastMsg.content) {
+        setProgress(lastMsg.content.progress as any)
+      }
+
       const agentMessage: ChatMessage = {
         id: `msg_${Date.now()}_agent`,
         type: 'todo_list',
         content: {
           text: response.data.response,
-          tasks: response.data.task_tree.tasks,
+          tasks: tasks,
         },
         sender: 'agent',
         timestamp: new Date().toISOString(),
