@@ -20,7 +20,6 @@ DATA_LOADER_SKILL = SkillDefinition(
 
 DATA_LOADER_CODE = '''
 # Mock data loader for MVP
-import os
 
 result = {
     "format": format,

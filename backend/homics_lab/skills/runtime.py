@@ -44,10 +44,15 @@ class SkillRuntimeExecutor:
 
     def _parse_timeout(self, time_str: str) -> float:
         """Parse time string like '30m' or '1h' into seconds."""
+        time_str = str(time_str).strip()
         if time_str.endswith("m"):
-            return float(time_str[:-1]) * 60
+            seconds = float(time_str[:-1]) * 60
         elif time_str.endswith("h"):
-            return float(time_str[:-1]) * 3600
+            seconds = float(time_str[:-1]) * 3600
         elif time_str.endswith("s"):
-            return float(time_str[:-1])
-        return float(time_str)
+            seconds = float(time_str[:-1])
+        else:
+            seconds = float(time_str)
+
+        # Cap at 1 hour for MVP
+        return min(seconds, 3600.0)
