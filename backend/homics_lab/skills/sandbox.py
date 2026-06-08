@@ -24,6 +24,19 @@ class LocalSandbox:
 
         result_path = self.working_dir / "__skill_result__.json"
 
+        def _set_limits():
+            """Set resource limits for the child process."""
+            try:
+                import resource
+                # 512 MB memory limit
+                resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+                # 60 seconds CPU time limit
+                resource.setrlimit(resource.RLIMIT_CPU, (60, 60))
+                # 100 MB file size limit
+                resource.setrlimit(resource.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024))
+            except (ImportError, OSError, ValueError):
+                pass  # resource module not available on non-Unix systems
+
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -31,6 +44,7 @@ class LocalSandbox:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
+                preexec_fn=_set_limits,
             )
 
             try:
@@ -75,18 +89,36 @@ class LocalSandbox:
 
         return f"""import json
 import sys
+import types
+
+# Delete dangerous modules if they were pre-loaded
+for _mod in ['os', 'subprocess', 'socket', 'urllib', 'http', 'ftplib',
+              'telnetlib', 'smtplib', 'poplib', 'imaplib', 'nntplib',
+              'ssl', 'importlib', 'ctypes', 'mmap']:
+    if _mod in sys.modules:
+        del sys.modules[_mod]
 
 # Block dangerous imports
-_blocked_modules = ['os', 'subprocess', 'socket', 'urllib', 'http', 'ftplib', 'telnetlib', 'smtplib', 'poplib', 'imaplib', 'nntplib', 'ssl']
+_BLOCKED = frozenset(['os', 'subprocess', 'socket', 'urllib', 'http', 'ftplib',
+                      'telnetlib', 'smtplib', 'poplib', 'imaplib', 'nntplib',
+                      'ssl', 'importlib', 'ctypes', 'mmap', 'builtins'])
+
 _original_import = __builtins__.__import__
 
-def _safe_import(name, *args, **kwargs):
+def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
     base = name.split('.')[0]
-    if base in _blocked_modules:
-        raise ImportError("Import of '" + name + "' is not allowed in skill sandbox")
-    return _original_import(name, *args, **kwargs)
+    if base in _BLOCKED:
+        raise ImportError(f"Module '{{name}}' is restricted in skill sandbox")
+    return _original_import(name, globals, locals, fromlist, level)
 
 __builtins__.__import__ = _safe_import
+
+# Also restrict __import__ attribute access
+class _RestrictedBuiltins(dict):
+    def __getitem__(self, key):
+        if key == '__import__':
+            return _safe_import
+        return super().__getitem__(key)
 
 # Inject inputs
 __inputs__ = json.loads({repr(inputs_json)})
