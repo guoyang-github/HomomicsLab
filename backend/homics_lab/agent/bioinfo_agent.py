@@ -15,10 +15,18 @@ class BioinfoAgent(BaseAgent):
     ]
 
     async def run(self, task: Any, context: Dict[str, Any]) -> Dict[str, Any]:
+        if task.skills_required and self.skill_executor:
+            skill_id = task.skills_required[0]
+            result = await self.skill_executor.execute(skill_id, task.parameters)
+            return {
+                "agent_type": self.agent_type,
+                "task": task.name,
+                "skill": skill_id,
+                "result": result,
+            }
+
         return {
             "agent_type": self.agent_type,
             "task": task.name,
-            "skills": task.skills_required,
             "message": f"BioinfoAgent executed {task.name}",
-            "output": context.get("input_data"),
         }
