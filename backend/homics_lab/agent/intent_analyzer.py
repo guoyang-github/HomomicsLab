@@ -9,11 +9,7 @@ class UserIntent:
     complexity: str  # direct_response, single_step, complex
     data_scale: Optional[str] = None
     urgency: str = "normal"
-    domain_knowledge: list[str] = None
-
-    def __post_init__(self):
-        if self.domain_knowledge is None:
-            self.domain_knowledge = []
+    domain_knowledge: list[str] = field(default_factory=list)
 
 
 class IntentAnalyzer:

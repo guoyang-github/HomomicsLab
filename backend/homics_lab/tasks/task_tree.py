@@ -1,5 +1,5 @@
 from typing import List
-from homics_lab.tasks.models import TaskNode
+from homics_lab.tasks.models import TaskNode, TaskStatus
 
 
 class TaskTree:
@@ -11,6 +11,11 @@ class TaskTree:
             if task.id == task_id:
                 return task
         raise KeyError(f"Task {task_id} not found")
+
+    def get_ready_tasks(self) -> List[TaskNode]:
+        """Return tasks whose dependencies are all completed and status is pending."""
+        completed = {t.id for t in self.tasks if t.status == TaskStatus.COMPLETED}
+        return [t for t in self.tasks if t.status == TaskStatus.PENDING and all(dep in completed for dep in t.dependencies)]
 
     def topological_sort(self) -> List[TaskNode]:
         """Return tasks in dependency order."""

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from homics_lab.models.common import HITLCheckpoint, TaskStatus
@@ -35,4 +35,4 @@ class TaskTreeSnapshot(BaseModel):
     project_id: str
     session_id: str
     tasks: List[TaskNode]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,7 +1,7 @@
 import uuid
 from typing import Any, Dict, List
 from homics_lab.agent.intent_analyzer import UserIntent
-from homics_lab.models.common import AgentType
+from homics_lab.models.common import AgentType, HITLCheckpoint, Option
 from homics_lab.tasks.models import TaskNode
 from homics_lab.tasks.task_tree import TaskTree
 
@@ -87,6 +87,18 @@ class TaskDecomposer:
                 if dep in id_map
             ]
 
+            hitl_checkpoints = []
+            if "hitl" in step:
+                hitl_checkpoints.append(HITLCheckpoint(
+                    id=f"hitl_{task_id}",
+                    trigger_reason="policy",
+                    context_summary=f"Please confirm parameters for {step['name']}: {', '.join(step['hitl'])}",
+                    options=[
+                        Option(id="default", label="Use defaults", description="Use recommended parameter values"),
+                        Option(id="custom", label="Customize", description="Set custom parameter values"),
+                    ],
+                ))
+
             task = TaskNode(
                 id=task_id,
                 name=step["name"],
@@ -95,6 +107,7 @@ class TaskDecomposer:
                 agent_assignment=step["agent"],
                 skills_required=step["skills"],
                 dependencies=dependencies,
+                hitl_checkpoints=hitl_checkpoints,
             )
             tasks.append(task)
 
