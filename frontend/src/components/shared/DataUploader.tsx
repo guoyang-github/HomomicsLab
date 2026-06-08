@@ -11,9 +11,10 @@ export function DataUploader() {
       try {
         const response = await fileApi.uploadFile(file, currentProjectId)
         // File uploaded successfully
-        alert(`上传成功: ${response.data.filename}`)
+        // TODO: Replace with toast notification in Phase 2
+        console.log(`上传成功: ${response.data.filename}`)
       } catch (error) {
-        alert(`上传失败: ${file.name}`)
+        console.error(`上传失败: ${file.name}`)
       }
     }
   }, [currentProjectId])

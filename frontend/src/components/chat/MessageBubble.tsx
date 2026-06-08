@@ -2,6 +2,24 @@ import type { ChatMessage, TodoListContent, HITLContent } from '@/types/chat'
 import { TodoList } from './TodoList'
 import { HITLRequest } from './HITLRequest'
 
+function isTodoListContent(content: unknown): content is TodoListContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'text' in content &&
+    'tasks' in content
+  )
+}
+
+function isHITLContent(content: unknown): content is HITLContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'checkpoint' in content &&
+    'task_id' in content
+  )
+}
+
 interface Props {
   message: ChatMessage
 }
@@ -16,11 +34,15 @@ export function MessageBubble({ message }: Props) {
 
     switch (message.type) {
       case 'todo_list':
-        return <TodoList content={(message.content as unknown) as TodoListContent} />
-      case 'hitl_request': {
-        const hitl = (message.content as unknown) as HITLContent
-        return <HITLRequest checkpoint={hitl.checkpoint} taskId={hitl.task_id} />
-      }
+        if (isTodoListContent(message.content)) {
+          return <TodoList content={message.content} />
+        }
+        return null
+      case 'hitl_request':
+        if (isHITLContent(message.content)) {
+          return <HITLRequest checkpoint={message.content.checkpoint} taskId={message.content.task_id} />
+        }
+        return null
       case 'error':
         return <p className="text-sm text-error">{String(message.content)}</p>
       default:
