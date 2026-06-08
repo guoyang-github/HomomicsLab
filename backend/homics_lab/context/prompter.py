@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 from homics_lab.context.working_memory import WorkingMemory
 
 

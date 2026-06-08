@@ -1,1 +1,1 @@
-from .working_memory import WorkingMemory
+from .working_memory import WorkingMemory as WorkingMemory

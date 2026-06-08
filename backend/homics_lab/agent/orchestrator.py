@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from homics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homics_lab.tasks.task_tree import TaskTree
 from homics_lab.hitl.detector import HITLDetector
@@ -25,9 +25,9 @@ class Orchestrator:
                 completed.add(task.id)
                 continue
 
-            # Check dependencies
+            # Check dependencies - skip if upstream is blocked (e.g., awaiting HITL)
             if not all(dep in completed for dep in task.dependencies):
-                raise ValueError(f"Dependencies not satisfied for task {task.id}")
+                continue
 
             # Check HITL
             checkpoint = self.hitl_detector.check(task, context)
@@ -71,7 +71,9 @@ class Orchestrator:
         backoff = task.retry_policy.backoff_seconds
 
         for attempt in range(1, max_attempts + 1):
-            self.state_machine.transition(task, TaskStatus.RUNNING)
+            # Only transition if not already running (e.g., on retry)
+            if task.status != TaskStatus.RUNNING:
+                self.state_machine.transition(task, TaskStatus.RUNNING)
 
             try:
                 agent = self._resolve_agent(task)
@@ -89,6 +91,8 @@ class Orchestrator:
                 task.attempt_count = attempt
 
                 if attempt < max_attempts:
+                    # Transition to FAILED so we can retry
+                    self.state_machine.transition(task, TaskStatus.FAILED)
                     # Retry with backoff
                     import asyncio
                     await asyncio.sleep(backoff * (2 ** (attempt - 1)))

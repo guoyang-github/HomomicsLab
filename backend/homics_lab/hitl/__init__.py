@@ -1,1 +1,1 @@
-from .detector import HITLDetector
+from .detector import HITLDetector as HITLDetector

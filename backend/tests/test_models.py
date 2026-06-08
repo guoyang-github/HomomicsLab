@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
 from homics_lab.models.common import (
-    TaskStatus, MessageType, AgentType, HITLTrigger,
-    Option, HITLCheckpoint, ChatMessage, AgentMessage,
+    TaskStatus, MessageType, HITLTrigger,
+    Option, HITLCheckpoint, ChatMessage,
 )
 
 def test_task_status_values():

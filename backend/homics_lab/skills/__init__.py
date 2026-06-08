@@ -1,1 +1,1 @@
-from .models import SkillDefinition, SkillRuntime, SkillInputSchema
+from .models import SkillDefinition as SkillDefinition, SkillRuntime as SkillRuntime, SkillInputSchema as SkillInputSchema

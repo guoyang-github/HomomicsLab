@@ -1,6 +1,5 @@
 import pytest
 from homics_lab.agent.base_agent import BaseAgent
-from homics_lab.models.common import AgentMessage
 
 
 class FakeAgent(BaseAgent):

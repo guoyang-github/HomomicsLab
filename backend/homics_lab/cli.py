@@ -1,5 +1,4 @@
 import argparse
-import sys
 import uvicorn
 
 from homics_lab.config import settings

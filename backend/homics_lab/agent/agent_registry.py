@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional
 from homics_lab.agent.base_agent import BaseAgent
 from homics_lab.models.common import AgentType
 

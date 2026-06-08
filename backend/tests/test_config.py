@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from homics_lab.config import Settings
 
