@@ -3,6 +3,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { chatApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
+import type { TaskProgress } from '@/types/tasks'
 
 export function ChatInput() {
   const [input, setInput] = useState('')
@@ -36,8 +37,11 @@ export function ChatInput() {
       const tasks = response.data.task_tree.tasks
       setTaskTree(tasks)
       const lastMsg = response.data.messages[response.data.messages.length - 1]
-      if (lastMsg?.content && typeof lastMsg.content === 'object' && 'progress' in lastMsg.content) {
-        setProgress(lastMsg.content.progress as any)
+      if (lastMsg?.content && typeof lastMsg.content === 'object' && lastMsg.content !== null && 'progress' in lastMsg.content) {
+        const content = lastMsg.content as unknown as { progress?: TaskProgress }
+        if (content.progress) {
+          setProgress(content.progress)
+        }
       }
 
       const agentMessage: ChatMessage = {

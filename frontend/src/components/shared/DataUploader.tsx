@@ -10,7 +10,7 @@ export function DataUploader() {
     for (const file of acceptedFiles) {
       try {
         const response = await fileApi.uploadFile(file, currentProjectId)
-        console.log('Uploaded:', response.data)
+        // File uploaded successfully
         alert(`上传成功: ${response.data.filename}`)
       } catch (error) {
         alert(`上传失败: ${file.name}`)

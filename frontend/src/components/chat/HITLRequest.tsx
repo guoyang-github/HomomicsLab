@@ -31,10 +31,14 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
     setIsSubmitting(true)
     try {
       let parsedParams = {}
-      try {
-        parsedParams = JSON.parse(parameters)
-      } catch {
-        // Invalid JSON, ignore
+      if (parameters.trim()) {
+        try {
+          parsedParams = JSON.parse(parameters)
+        } catch {
+          alert('参数 JSON 格式无效，请检查输入')
+          setIsSubmitting(false)
+          return
+        }
       }
 
       await chatApi.respondToHITL({

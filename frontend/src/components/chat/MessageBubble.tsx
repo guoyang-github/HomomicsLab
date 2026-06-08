@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@/types/chat'
+import type { ChatMessage, TodoListContent, HITLContent } from '@/types/chat'
 import { TodoList } from './TodoList'
 import { HITLRequest } from './HITLRequest'
 
@@ -16,9 +16,9 @@ export function MessageBubble({ message }: Props) {
 
     switch (message.type) {
       case 'todo_list':
-        return <TodoList content={message.content as { text: string; tasks: any[]; progress?: any }} />
+        return <TodoList content={(message.content as unknown) as TodoListContent} />
       case 'hitl_request': {
-        const hitl = message.content as { checkpoint: any; task_id: string }
+        const hitl = (message.content as unknown) as HITLContent
         return <HITLRequest checkpoint={hitl.checkpoint} taskId={hitl.task_id} />
       }
       case 'error':
