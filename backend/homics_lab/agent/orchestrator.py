@@ -1,6 +1,7 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from homics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homics_lab.tasks.task_tree import TaskTree
+from homics_lab.hitl.detector import HITLDetector
 from homics_lab.models.common import TaskStatus
 from homics_lab.tasks.models import TaskNode
 from homics_lab.tasks.state_machine import TaskStateMachine
@@ -12,6 +13,7 @@ class Orchestrator:
     def __init__(self, registry: AgentRegistry = None):
         self.registry = registry or get_default_registry()
         self.state_machine = TaskStateMachine()
+        self.hitl_detector = HITLDetector()
 
     async def run_tree(self, tree: TaskTree, context: Dict[str, Any] = None) -> Dict[str, Any]:
         context = context or {}
@@ -19,12 +21,48 @@ class Orchestrator:
         completed = set()
 
         for task in tree.topological_sort():
-            # Check dependencies are satisfied
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.ABORTED):
+                completed.add(task.id)
+                continue
+
+            # Check dependencies
             if not all(dep in completed for dep in task.dependencies):
                 raise ValueError(f"Dependencies not satisfied for task {task.id}")
 
+            # Check HITL
+            checkpoint = self.hitl_detector.check(task, context)
+            if checkpoint:
+                self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+                results[task.id] = {"hitl": checkpoint.model_dump()}
+                continue
+
             await self._execute_task(task, context, results)
             completed.add(task.id)
+
+        return results
+
+    async def resume_task(
+        self,
+        tree: TaskTree,
+        task_id: str,
+        human_response: Dict[str, Any],
+        context: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        task = tree.get_task(task_id)
+        if task.status != TaskStatus.AWAITING_HUMAN:
+            raise ValueError(f"Task {task_id} is not awaiting human input")
+
+        # Apply human response to parameters
+        if "parameters" in human_response:
+            task.parameters.update(human_response["parameters"])
+
+        context = context or {}
+        results = {}
+        await self._execute_task(task, context, results)
+
+        # Continue with remaining tasks
+        remaining_results = await self.run_tree(tree, context)
+        results.update(remaining_results)
 
         return results
 
