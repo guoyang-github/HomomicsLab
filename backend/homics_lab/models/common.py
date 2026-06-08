@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field
+import uuid as _uuid
 
 
 def utc_now():
@@ -53,7 +54,7 @@ class Option(BaseModel):
 
 
 class HITLCheckpoint(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(_uuid.uuid4()))
     trigger_reason: HITLTrigger
     context_summary: str
     options: list[Option]
