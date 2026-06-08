@@ -23,38 +23,41 @@ class Orchestrator:
             if not all(dep in completed for dep in task.dependencies):
                 raise ValueError(f"Dependencies not satisfied for task {task.id}")
 
-            # Transition to running
+            await self._execute_task(task, context, results)
+            completed.add(task.id)
+
+        return results
+
+    async def _execute_task(self, task: TaskNode, context: Dict[str, Any], results: Dict[str, Any]) -> None:
+        max_attempts = task.retry_policy.max_attempts
+        backoff = task.retry_policy.backoff_seconds
+
+        for attempt in range(1, max_attempts + 1):
             self.state_machine.transition(task, TaskStatus.RUNNING)
 
             try:
-                # Find agent for this task
                 agent = self._resolve_agent(task)
-
                 if agent is None:
                     raise RuntimeError(f"No agent found for task {task.name}")
 
-                # Execute task
                 result = await agent.run(task, context)
                 results[task.id] = result
                 task.result = result
-
-                # Transition to completed
                 self.state_machine.transition(task, TaskStatus.COMPLETED)
-                completed.add(task.id)
+                return
 
             except Exception as e:
                 task.error_message = str(e)
-                task.attempt_count += 1
+                task.attempt_count = attempt
 
-                if task.attempt_count < task.retry_policy.max_attempts:
-                    self.state_machine.transition(task, TaskStatus.FAILED)
-                    # In a real system, retry with backoff
-                    raise  # For MVP, just raise
+                if attempt < max_attempts:
+                    # Retry with backoff
+                    import asyncio
+                    await asyncio.sleep(backoff * (2 ** (attempt - 1)))
                 else:
+                    # Final attempt failed
                     self.state_machine.transition(task, TaskStatus.FAILED)
                     raise
-
-        return results
 
     def _resolve_agent(self, task: TaskNode):
         """Find the best agent for a task."""
@@ -81,6 +84,7 @@ class Orchestrator:
             "completed": 0,
             "failed": 0,
             "awaiting_human": 0,
+            "aborted": 0,
         }
 
         for task in tree.tasks:
@@ -94,6 +98,8 @@ class Orchestrator:
                 by_status["failed"] += 1
             elif task.status == TaskStatus.AWAITING_HUMAN:
                 by_status["awaiting_human"] += 1
+            elif task.status == TaskStatus.ABORTED:
+                by_status["aborted"] += 1
 
         by_status["percent"] = int((by_status["completed"] / total) * 100) if total > 0 else 0
         return by_status
