@@ -38,9 +38,9 @@ export function ChatInput() {
       setTaskTree(tasks)
       const lastMsg = response.data.messages[response.data.messages.length - 1]
       if (lastMsg?.content && typeof lastMsg.content === 'object' && lastMsg.content !== null && 'progress' in lastMsg.content) {
-        const content = lastMsg.content as unknown as { progress?: TaskProgress }
-        if (content.progress) {
-          setProgress(content.progress)
+        const content = lastMsg.content as Record<string, unknown>
+        if (content.progress && typeof content.progress === 'object') {
+          setProgress(content.progress as TaskProgress)
         }
       }
 
