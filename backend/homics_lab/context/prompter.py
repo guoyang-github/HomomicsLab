@@ -65,11 +65,26 @@ Be concise, accurate, and ask for clarification when needed."""
         if len(words) <= max_words:
             return prompt
 
-        # Simple truncation from the middle (keep system + user message)
-        # A more sophisticated approach would use the relevance filter
-        system_end = words.index("Assistant:") if "Assistant:" in words else 0
+        # Find "User:" section to preserve
         user_idx = prompt.rfind("User:")
-        user_part = prompt[user_idx:] if user_idx > 0 else ""
+        if user_idx == -1:
+            user_idx = len(prompt)
 
-        head_words = words[:max_words - len(user_part.split()) - 10]
-        return " ".join(head_words) + "\n\n... [context truncated] ...\n\n" + user_part
+        system_part = prompt[:user_idx]
+        user_part = prompt[user_idx:]
+
+        system_words = system_part.split()
+        user_words = user_part.split()
+
+        # Reserve space for user message
+        reserved_for_user = min(len(user_words), max_words // 4)
+        available_for_system = max_words - reserved_for_user
+
+        if available_for_system <= 0:
+            # Not enough space, return just user part truncated
+            return "...\n\n" + " ".join(user_words[:max_words])
+
+        truncated_system = " ".join(system_words[:available_for_system])
+        truncated_user = " ".join(user_words[:reserved_for_user])
+
+        return truncated_system + "\n\n... [context truncated] ...\n\n" + truncated_user

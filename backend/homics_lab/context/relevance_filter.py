@@ -1,6 +1,9 @@
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import math
+
+_CJK_RE = re.compile(r'[一-鿿぀-ゟ゠-ヿ가-힯]')
 
 
 @dataclass
@@ -55,38 +58,25 @@ class RelevanceFilter:
         return pinned + selected_unpinned
 
     def _semantic_similarity(self, item: ContextItem, goal: str) -> float:
-        """Simple keyword overlap similarity (replace with embedding in Phase 2).
-
-        For CJK text (Chinese, Japanese, Korean) without word boundaries,
-        falls back to character-level overlap.
-        """
         if not item.content or not goal:
             return 0.0
 
-        content_lower = item.content.lower()
-        goal_lower = goal.lower()
+        has_cjk = bool(_CJK_RE.search(item.content) or _CJK_RE.search(goal))
 
-        content_words = set(content_lower.split())
-        goal_words = set(goal_lower.split())
+        if has_cjk:
+            # Character-level overlap for CJK text
+            content_chars = set(item.content)
+            goal_chars = set(goal)
+        else:
+            # Word-level overlap for English/other
+            content_chars = set(item.content.lower().split())
+            goal_chars = set(goal.lower().split())
 
-        # Detect CJK text: if splitting by whitespace yields single tokens
-        # that are long strings, use character-level overlap instead
-        is_cjk_content = len(content_words) == 1 and len(next(iter(content_words))) > 3
-        is_cjk_goal = len(goal_words) == 1 and len(next(iter(goal_words))) > 3
-
-        if is_cjk_content or is_cjk_goal:
-            content_chars = set(content_lower)
-            goal_chars = set(goal_lower)
-            if not content_chars or not goal_chars:
-                return 0.0
-            overlap = len(content_chars & goal_chars)
-            return overlap / max(len(goal_chars), 1)
-
-        if not content_words or not goal_words:
+        if not content_chars or not goal_chars:
             return 0.0
 
-        overlap = len(content_words & goal_words)
-        return overlap / max(len(goal_words), 1)
+        overlap = len(content_chars & goal_chars)
+        return overlap / max(len(content_chars | goal_chars), 1)
 
     def _temporal_decay(self, hours: float) -> float:
         return math.exp(-hours / 24.0)  # Decay over 24 hours

@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+_SENTENCE_RE = re.compile(r'(?<=[.!?])\s+')
+
 
 @dataclass
 class ContextSummary:
@@ -22,22 +24,18 @@ class ContextSummarizer:
     def summarize(self, text: str, summary_type: str = "result") -> ContextSummary:
         summary = ContextSummary()
 
-        # Extract key conclusions (first sentence + result sentences)
-        sentences = [s.strip() for s in text.split(".") if s.strip()]
+        sentences = [s.strip() for s in _SENTENCE_RE.split(text) if s.strip()]
         if sentences:
             summary.key_conclusions.append(sentences[0][:200])
 
         for sentence in sentences:
-            if any(kw in sentence.lower() for kw in ["final", "result", "output", "contains", "identified"]):
+            lowered = sentence.lower()
+            if any(kw in lowered for kw in ["final", "result", "output", "contains", "identified", "conclusion", "found"]):
                 if sentence not in summary.key_conclusions:
                     summary.key_conclusions.append(sentence[:200])
 
         summary.key_conclusions = summary.key_conclusions[:5]
-
-        # Extract parameters
         summary.key_parameters = self._extract_parameters(text)
-
-        # Extract warnings
         summary.warnings = self._extract_warnings(text)
 
         return summary
@@ -57,7 +55,8 @@ class ContextSummarizer:
 
     def _extract_warnings(self, text: str) -> List[str]:
         warnings = []
-        for sentence in text.split("."):
+        sentences = [s.strip() for s in _SENTENCE_RE.split(text) if s.strip()]
+        for sentence in sentences:
             if any(kw in sentence.lower() for kw in ["warning", "caution", "note", "attention", "error"]):
                 warnings.append(sentence.strip())
         return warnings[:3]
