@@ -6,6 +6,9 @@ build-backend = "hatchling.build"
 name = "homics-lab"
 version = "0.1.0"
 description = "A general-purpose agent for bioinformatics analysis"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "HomicsLab Team"}]
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.109.0",
@@ -15,15 +18,13 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
     "aiosqlite>=0.19.0",
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "httpx>=0.26.0",
     "python-multipart>=0.0.6",
     "aiofiles>=23.2.0",
 ]
 
 [project.optional-dependencies]
 dev = ["black", "ruff", "mypy"]
+test = ["pytest>=7.4.0", "pytest-asyncio>=0.21.0", "httpx>=0.26.0"]
 
 [project.scripts]
 homics-lab = "homics_lab.cli:main"
