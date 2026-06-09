@@ -140,6 +140,10 @@ class ReportGenerator:
         """Generate final Markdown report."""
         return self.template_engine.render_markdown(report)
 
+    def generate_pdf(self, report: AnalysisReport) -> bytes:
+        """Generate final PDF report."""
+        return self.template_engine.render_pdf(report)
+
     def build_from_pipeline(
         self,
         title: str,

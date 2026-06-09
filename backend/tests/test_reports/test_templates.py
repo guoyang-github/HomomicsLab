@@ -162,3 +162,21 @@ class TestReportTemplateEngine:
     def test_fmt_cell_none(self):
         engine = ReportTemplateEngine()
         assert engine._fmt_cell(None) == ""
+
+    def test_render_pdf(self, sample_report):
+        """PDF rendering produces non-empty bytes."""
+        engine = ReportTemplateEngine()
+        pdf_bytes = engine.render_pdf(sample_report)
+        assert isinstance(pdf_bytes, bytes)
+        assert len(pdf_bytes) > 100
+        # PDF magic number
+        assert pdf_bytes[:4] == b"%PDF"
+
+    def test_render_pdf_empty_report(self):
+        """PDF rendering works even for minimal reports."""
+        report = AnalysisReport(id="empty", title="Empty Report")
+        engine = ReportTemplateEngine()
+        pdf_bytes = engine.render_pdf(report)
+        assert isinstance(pdf_bytes, bytes)
+        assert len(pdf_bytes) > 100
+        assert pdf_bytes[:4] == b"%PDF"

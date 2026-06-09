@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from homomics_lab.viz.generator import PlotGenerator, PlotType
+from homomics_lab.viz.plotly_adapter import to_plotly_json
 
 router = APIRouter()
 
@@ -21,6 +22,20 @@ class PlotResponse(BaseModel):
     image_base64: str
     plot_type: str
     title: str
+
+
+class PlotDataRequest(BaseModel):
+    plot_type: PlotType
+    data: Dict[str, Any]
+    title: str = ""
+    width: int = 800
+    height: int = 600
+
+
+class PlotDataResponse(BaseModel):
+    data: list
+    layout: dict
+    plot_type: str
 
 
 @router.post("/plot", response_model=PlotResponse)
@@ -45,6 +60,31 @@ async def generate_plot(request: PlotRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Plot generation failed: {str(e)}")
+
+
+@router.post("/plot-data", response_model=PlotDataResponse)
+async def generate_plot_data(request: PlotDataRequest):
+    """Generate Plotly-compatible JSON data for interactive frontend rendering.
+
+    Returns structured data that react-plotly.js can render directly.
+    """
+    try:
+        figure = to_plotly_json(
+            plot_type=request.plot_type,
+            data=request.data,
+            title=request.title,
+            width=request.width,
+            height=request.height,
+        )
+        return PlotDataResponse(
+            data=figure["data"],
+            layout=figure["layout"],
+            plot_type=request.plot_type.value,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Plot data generation failed: {str(e)}")
 
 
 @router.get("/plot/types")

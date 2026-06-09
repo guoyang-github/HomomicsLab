@@ -447,6 +447,21 @@ class ReportTemplateEngine:
             return f"{value:.4g}"
         return str(value)
 
+    def render_pdf(self, report: AnalysisReport) -> bytes:
+        """Render report as PDF using WeasyPrint.
+
+        Converts the HTML report to PDF, preserving all CSS styling.
+        """
+        html_content = self.render_html(report)
+
+        try:
+            from weasyprint import HTML
+
+            pdf_bytes = HTML(string=html_content).write_pdf()
+            return pdf_bytes
+        except Exception as e:
+            raise RuntimeError(f"PDF generation failed: {e}")
+
     @staticmethod
     def _markdown_to_html(text: str) -> str:
         """Simple Markdown to HTML conversion."""

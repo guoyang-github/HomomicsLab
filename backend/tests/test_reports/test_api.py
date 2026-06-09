@@ -173,6 +173,23 @@ class TestReportsAPI:
         assert "markdown" in data
         assert "# MD Export Test" in data["markdown"]
 
+    def test_export_pdf(self, client):
+        create_resp = client.post(
+            "/api/reports/create",
+            json={"title": "PDF Export Test"},
+        )
+        report_id = create_resp.json()["report_id"]
+
+        response = client.get(f"/api/reports/{report_id}/pdf")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert b"%PDF" in response.content
+        assert len(response.content) > 100
+
+    def test_export_pdf_nonexistent(self, client):
+        response = client.get("/api/reports/nonexistent/pdf")
+        assert response.status_code == 404
+
     def test_build_from_pipeline(self, client):
         response = client.post(
             "/api/reports/build-from-pipeline",

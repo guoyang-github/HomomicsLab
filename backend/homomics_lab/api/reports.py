@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from homomics_lab.reports.generator import ReportGenerator
@@ -232,6 +232,27 @@ async def export_markdown(report_id: str):
     generator = _get_or_create_generator()
     md = generator.generate_markdown(report)
     return {"markdown": md, "report_id": report_id, "title": report.title}
+
+
+@router.get("/{report_id}/pdf")
+async def export_pdf(report_id: str):
+    """Export report as PDF."""
+    report = _reports_db.get(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found")
+
+    generator = _get_or_create_generator()
+    try:
+        pdf_bytes = generator.generate_pdf(report)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{report.title.replace(" ", "_")}.pdf"'
+            },
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/build-from-pipeline")
