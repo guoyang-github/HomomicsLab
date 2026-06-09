@@ -104,3 +104,21 @@ export interface ReportMarkdownExport {
   report_id: string
   title: string
 }
+
+export interface SkillSummary {
+  id: string
+  name: string
+  description: string
+  category: string
+  runtime_type: string
+  primary_tool: string
+}
+
+export interface SkillDetail extends SkillSummary {
+  version: string
+  supported_tools: string[]
+  keywords: string[]
+  dependencies: string[]
+  scripts_dir: string | null
+  source: string
+}

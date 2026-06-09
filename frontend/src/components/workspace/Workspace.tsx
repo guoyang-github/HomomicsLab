@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { FlowCanvas } from './FlowCanvas'
 import { DetailPanel } from './DetailPanel'
 import { ReportPanel } from '@/components/reports/ReportPanel'
+import { SkillSearch } from '@/components/skills/SkillSearch'
 
-type WorkspaceTab = 'workflow' | 'reports'
+type WorkspaceTab = 'workflow' | 'reports' | 'skills'
 
 export function Workspace() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('workflow')
@@ -33,6 +34,16 @@ export function Workspace() {
           >
             Reports
           </button>
+          <button
+            onClick={() => setActiveTab('skills')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'skills'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Skills
+          </button>
         </div>
       </div>
 
@@ -48,6 +59,11 @@ export function Workspace() {
         {activeTab === 'reports' && (
           <div className="flex-1">
             <ReportPanel />
+          </div>
+        )}
+        {activeTab === 'skills' && (
+          <div className="flex-1">
+            <SkillSearch />
           </div>
         )}
       </div>

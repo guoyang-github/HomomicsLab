@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 
 const API_BASE = '/api'
@@ -55,6 +55,17 @@ export const reportApi = {
 
   exportMarkdown: (reportId: string) =>
     api.get<ReportMarkdownExport>(`/reports/${reportId}/markdown`),
+}
+
+export const skillsApi = {
+  listSkills: () =>
+    api.get<SkillSummary[]>('/skills/'),
+
+  searchSkills: (query: string) =>
+    api.get<SkillSummary[]>('/skills/search', { params: { q: query } }),
+
+  getSkill: (skillId: string) =>
+    api.get<SkillDetail>(`/skills/${skillId}`),
 }
 
 export default api
