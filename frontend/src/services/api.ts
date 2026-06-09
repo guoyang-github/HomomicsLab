@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 
 const API_BASE = '/api'
@@ -38,6 +38,23 @@ export const fileApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+}
+
+export const reportApi = {
+  listReports: () =>
+    api.get<ReportSummary[]>('/reports/list'),
+
+  getReport: (reportId: string) =>
+    api.get<ReportDetail>(`/reports/${reportId}`),
+
+  createReport: (data: { title: string; project_name?: string; analysis_type?: string; tags?: string[] }) =>
+    api.post<{ report_id: string; title: string }>('/reports/create', data),
+
+  exportHtml: (reportId: string) =>
+    api.get<ReportHtmlExport>(`/reports/${reportId}/html`),
+
+  exportMarkdown: (reportId: string) =>
+    api.get<ReportMarkdownExport>(`/reports/${reportId}/markdown`),
 }
 
 export default api
