@@ -6,6 +6,7 @@ export type MessageType =
   | 'result_preview'
   | 'parameter_form'
   | 'file_reference'
+  | 'plot'
   | 'error'
   | 'system'
 
@@ -33,6 +34,13 @@ export interface HITLContent {
     }
   }
   task_id: string
+}
+
+export interface PlotContent {
+  image_base64: string
+  plot_type: string
+  title: string
+  caption?: string
 }
 
 export interface ChatMessage {
