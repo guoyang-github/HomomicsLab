@@ -12,12 +12,20 @@ def executor(tmp_path):
 
 @pytest.mark.asyncio
 async def test_execute_builtin_skill(executor, tmp_path):
+    """Test executing a skill from a scripts directory (unified path)."""
+    scripts_dir = tmp_path / "scripts" / "python"
+    scripts_dir.mkdir(parents=True)
+    (scripts_dir / "add.py").write_text("""
+result = {"sum": a + b}
+""")
+
     skill = SkillDefinition(
         id="add_numbers",
         name="Add Numbers",
         version="1.0.0",
         category="math",
         runtime={"type": "python", "python_version": "3.10"},
+        metadata={"scripts_dir": str(scripts_dir)},
         input_schema=SkillInputSchema(
             type="object",
             properties={
@@ -28,12 +36,6 @@ async def test_execute_builtin_skill(executor, tmp_path):
         ),
     )
     executor.registry.register(skill)
-
-    # Register the skill code
-    code = """
-result = {"sum": a + b}
-"""
-    executor._register_builtin_code("add_numbers", code)
 
     result = await executor.execute("add_numbers", {"a": 2, "b": 3})
     assert result["sum"] == 5
@@ -61,6 +63,7 @@ result = {"product": x * y}
         version="1.0.0",
         category="math",
         runtime={"type": "python", "python_version": "3.10"},
+        metadata={"scripts_dir": str(scripts_dir)},
         input_schema=SkillInputSchema(
             type="object",
             properties={
@@ -71,7 +74,6 @@ result = {"product": x * y}
         ),
     )
     executor.registry.register(skill)
-    executor.register_file_skill(skill, scripts_dir)
 
     result = await executor.execute("multiply", {"x": 3, "y": 4})
     assert result["product"] == 12
@@ -92,6 +94,7 @@ result <- list(sum = a + b)
         version="1.0.0",
         category="math",
         runtime={"type": "r"},
+        metadata={"scripts_dir": str(scripts_dir)},
         input_schema=SkillInputSchema(
             type="object",
             properties={
@@ -102,7 +105,6 @@ result <- list(sum = a + b)
         ),
     )
     executor.registry.register(skill)
-    executor.register_file_skill(skill, scripts_dir)
 
     result = await executor.execute("add_r", {"a": 5, "b": 7})
     assert result["sum"] == 12

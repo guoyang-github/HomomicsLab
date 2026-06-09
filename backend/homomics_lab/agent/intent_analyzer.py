@@ -39,15 +39,15 @@ class IntentAnalyzer:
     async def analyze(self, message: str) -> UserIntent:
         text = message.lower()
 
-        # Determine analysis type
-        if any(kw in text for kw in self.SINGLE_CELL_KEYWORDS):
+        # Determine analysis type — QA keywords have highest priority
+        if any(kw in text for kw in self.QA_KEYWORDS):
+            analysis_type = "qa"
+        elif any(kw in text for kw in self.SINGLE_CELL_KEYWORDS):
             analysis_type = "single_cell_analysis"
         elif any(kw in text for kw in self.SPATIAL_KEYWORDS):
             analysis_type = "spatial_analysis"
         elif any(kw in text for kw in self.CONVERSION_KEYWORDS):
             analysis_type = "file_conversion"
-        elif any(kw in text for kw in self.QA_KEYWORDS):
-            analysis_type = "qa"
         else:
             analysis_type = "general"
 

@@ -52,7 +52,15 @@ class SkillDefinition(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def validate_input(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and fill defaults for skill input."""
+        """Validate and fill defaults for skill input.
+
+        If no input schema is defined (empty properties), pass through all data
+        unchanged. This allows skills loaded from external directories without
+        formal parameter schemas to work correctly.
+        """
+        if not self.input_schema.properties:
+            return dict(data)
+
         validated = {}
 
         for key, prop in self.input_schema.properties.items():

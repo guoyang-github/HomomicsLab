@@ -1,7 +1,13 @@
 import pytest
 from pathlib import Path
 
-from homomics_lab.skills.tracker import SkillPerformanceTracker, ExecutionRecord
+from homomics_lab.skills.tracker import (
+    SkillPerformanceTracker,
+    ExecutionRecord,
+    ResourceSampler,
+    CostConfig,
+    ResourceMetrics,
+)
 
 
 @pytest.fixture
@@ -101,3 +107,68 @@ class TestSkillPerformanceTracker:
 
         recent = tracker.get_recent_executions(skill_id="meta-skill")
         assert recent[0].metadata == {"input_rows": 1000, "output_rows": 500}
+
+    def test_record_with_resource_metrics(self, tracker):
+        tracker.record(
+            skill_id="resource-skill",
+            duration_ms=5000.0,
+            success=True,
+            cpu_percent=45.0,
+            memory_mb=512.0,
+            gpu_percent=80.0,
+        )
+
+        stats = tracker.get_stats("resource-skill")
+        assert stats["avg_cpu_percent"] == 45.0
+        assert stats["avg_memory_mb"] == 512.0
+        assert stats["avg_gpu_percent"] == 80.0
+        assert stats["total_cost_usd"] > 0
+
+    def test_cost_summary(self, tracker):
+        tracker.record("skill-a", 3600000.0, True, cpu_percent=50.0, memory_mb=1024.0)
+        tracker.record("skill-b", 1800000.0, True, cpu_percent=30.0, gpu_percent=60.0)
+
+        summary = tracker.get_cost_summary()
+        assert summary["total_executions"] == 2
+        assert summary["total_cost_usd"] > 0
+
+
+class TestResourceSampler:
+    def test_sample_duration(self):
+        sampler = ResourceSampler()
+        with sampler.sample() as metrics:
+            import time
+            time.sleep(0.01)
+
+        assert metrics.duration_ms >= 10
+
+    def test_sample_returns_metrics(self):
+        sampler = ResourceSampler()
+        with sampler.sample() as metrics:
+            pass
+
+        assert isinstance(metrics, ResourceMetrics)
+        assert metrics.duration_ms >= 0
+
+    def test_has_cpu_monitoring(self):
+        sampler = ResourceSampler()
+        # Returns True if psutil is installed, False otherwise
+        assert isinstance(sampler.has_cpu_monitoring(), bool)
+
+    def test_has_gpu(self):
+        sampler = ResourceSampler()
+        # Returns True if pynvml is installed, False otherwise
+        assert isinstance(sampler.has_gpu(), bool)
+
+
+class TestCostConfig:
+    def test_default_pricing(self):
+        config = CostConfig()
+        assert config.cpu_hour_usd > 0
+        assert config.gpu_hour_usd > 0
+        assert config.memory_gb_hour_usd > 0
+
+    def test_custom_pricing(self):
+        config = CostConfig(cpu_hour_usd=0.10, gpu_hour_usd=5.0)
+        assert config.cpu_hour_usd == 0.10
+        assert config.gpu_hour_usd == 5.0

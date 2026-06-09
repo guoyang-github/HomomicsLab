@@ -18,6 +18,8 @@ class LocalSandbox:
         timeout_seconds: float = 60.0,
     ) -> Dict[str, Any]:
         """Execute Python code in a subprocess with resource limits."""
+        import json
+        inputs_json = json.dumps(inputs)
         script = self._build_python_script(code, inputs)
 
         script_path = self.working_dir / "__skill_script__.py"
@@ -41,7 +43,7 @@ class LocalSandbox:
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
-                "python", str(script_path),
+                "python", str(script_path), inputs_json,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),

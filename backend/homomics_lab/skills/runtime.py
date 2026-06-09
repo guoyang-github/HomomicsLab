@@ -1,3 +1,10 @@
+"""Skill runtime executor with unified execution path for all skills.
+
+All skills (builtin and external) now use the same directory-based layout.
+The executor no longer distinguishes between builtin (code strings) and
+external (file-based) skills.
+"""
+
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -10,7 +17,11 @@ from homomics_lab.hpc.scheduler import get_scheduler, BaseScheduler
 
 
 class SkillRuntimeExecutor:
-    """Executes skills in a sandboxed environment with optional HPC backend."""
+    """Executes skills in a sandboxed environment with optional HPC backend.
+
+    Unified execution: all skills are treated equally, whether builtin or external.
+    The skill's metadata["scripts_dir"] determines where code is loaded from.
+    """
 
     def __init__(
         self,
@@ -21,8 +32,6 @@ class SkillRuntimeExecutor:
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
-        self._builtin_code: Dict[str, str] = {}
-        self._file_based_skills: Dict[str, Path] = {}
         self._executor_type = executor_type
         self._scheduler: Optional[BaseScheduler] = None
         self.tracker = tracker
@@ -36,20 +45,20 @@ class SkillRuntimeExecutor:
             )
         return self._scheduler
 
-    def register_builtin(self, skill: SkillDefinition, code: str) -> None:
-        """Register a builtin skill with its Python code."""
+    def register_skill(self, skill: SkillDefinition) -> None:
+        """Register a skill (builtin or external) into the registry.
+
+        All skills are treated uniformly. The skill's scripts_dir in metadata
+        determines where code is loaded from at execution time.
+        """
         self.registry.register(skill)
-        self._builtin_code[skill.id] = code
-
-    def register_file_skill(self, skill: SkillDefinition, scripts_dir: Path) -> None:
-        """Register an external skill from a file system directory."""
-        self._file_based_skills[skill.id] = scripts_dir
-
-    def _register_builtin_code(self, skill_id: str, code: str) -> None:
-        """Internal method for testing."""
-        self._builtin_code[skill_id] = code
 
     async def execute(self, skill_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a skill by ID.
+
+        Looks up the skill in the registry, determines the execution type
+        (python/r), finds scripts_dir from metadata, and delegates to scheduler.
+        """
         skill = self.registry.get(skill_id)
         if skill is None:
             raise ValueError(f"Skill '{skill_id}' not found")
@@ -60,6 +69,11 @@ class SkillRuntimeExecutor:
         # Determine execution strategy
         exec_type = self._resolve_execution_type(skill)
 
+        # Resolve scripts directory
+        scripts_dir = self._resolve_scripts_dir(skill)
+        if scripts_dir is None:
+            raise RuntimeError(f"No scripts directory available for skill '{skill_id}'")
+
         # Track execution metrics
         start_time = time.time()
         success = False
@@ -67,26 +81,7 @@ class SkillRuntimeExecutor:
         result = None
 
         try:
-            # Get skill code based on type
-            if skill.id in self._builtin_code:
-                # Built-in skill: code stored in memory
-                code = self._builtin_code[skill.id]
-                result = await self._execute_builtin(skill, code, validated, exec_type)
-
-            elif skill.id in self._file_based_skills:
-                # File-based skill: code on disk
-                scripts_dir = self._file_based_skills[skill.id]
-                result = await self._execute_file_based(skill, scripts_dir, validated, exec_type)
-
-            elif skill.metadata.get("scripts_dir"):
-                # External skill loaded via loader but not explicitly registered as file-based
-                scripts_dir = Path(skill.metadata["scripts_dir"])
-                if scripts_dir.exists():
-                    result = await self._execute_file_based(skill, scripts_dir, validated, exec_type)
-
-            if result is None:
-                raise RuntimeError(f"No code or scripts directory available for skill '{skill_id}'")
-
+            result = await self._execute_from_dir(skill, scripts_dir, exec_type, validated)
             success = True
             return result
 
@@ -128,26 +123,27 @@ class SkillRuntimeExecutor:
 
         return "python"
 
-    async def _execute_builtin(
-        self,
-        skill: SkillDefinition,
-        code: str,
-        inputs: Dict[str, Any],
-        exec_type: str,
-    ) -> Dict[str, Any]:
-        """Execute a builtin skill via the configured scheduler."""
-        timeout = self._parse_timeout(skill.runtime.resources.time)
-        scheduler = self._get_scheduler()
-        return await scheduler.execute(skill, code, inputs, timeout_seconds=timeout)
+    def _resolve_scripts_dir(self, skill: SkillDefinition) -> Optional[Path]:
+        """Resolve the scripts directory for a skill.
 
-    async def _execute_file_based(
+        Checks metadata['scripts_dir'] first, then falls back to
+        finding scripts relative to the skill definition.
+        """
+        if skill.metadata.get("scripts_dir"):
+            scripts_dir = Path(skill.metadata["scripts_dir"])
+            if scripts_dir.exists():
+                return scripts_dir
+
+        return None
+
+    async def _execute_from_dir(
         self,
         skill: SkillDefinition,
         scripts_dir: Path,
-        inputs: Dict[str, Any],
         exec_type: str,
+        inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute a file-based skill by reading scripts from disk."""
+        """Execute a skill by reading scripts from its directory."""
         timeout = self._parse_timeout(skill.runtime.resources.time)
 
         # Collect all script files
@@ -155,29 +151,19 @@ class SkillRuntimeExecutor:
             script_files = sorted(scripts_dir.glob("*.R"))
             if not script_files:
                 script_files = sorted(scripts_dir.glob("*.r"))
-
             if not script_files:
                 raise RuntimeError(f"No .R files found in {scripts_dir}")
-
-            # Concatenate R scripts
-            code_parts = []
-            for f in script_files:
-                code_parts.append(f"# --- {f.name} ---")
-                code_parts.append(f.read_text(encoding="utf-8"))
-            code = "\n".join(code_parts)
-
         else:
             script_files = sorted(scripts_dir.glob("*.py"))
-
             if not script_files:
                 raise RuntimeError(f"No .py files found in {scripts_dir}")
 
-            # Concatenate Python scripts
-            code_parts = []
-            for f in script_files:
-                code_parts.append(f"# --- {f.name} ---")
-                code_parts.append(f.read_text(encoding="utf-8"))
-            code = "\n".join(code_parts)
+        # Concatenate scripts
+        code_parts = []
+        for f in script_files:
+            code_parts.append(f"# --- {f.name} ---")
+            code_parts.append(f.read_text(encoding="utf-8"))
+        code = "\n".join(code_parts)
 
         scheduler = self._get_scheduler()
         return await scheduler.execute(skill, code, inputs, timeout_seconds=timeout)

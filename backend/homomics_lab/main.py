@@ -28,10 +28,7 @@ async def lifespan(app: FastAPI):
         loader = ExternalSkillLoader(registry=app.state.skill_executor.registry)
         loaded = loader.load_all(settings.external_skills_dir)
         for skill in loaded:
-            if skill.metadata.get("scripts_dir"):
-                app.state.skill_executor.register_file_skill(
-                    skill, Path(skill.metadata["scripts_dir"])
-                )
+            app.state.skill_executor.register_skill(skill)
         print(f"Loaded {len(loaded)} external skills from {settings.external_skills_dir}")
 
     yield
