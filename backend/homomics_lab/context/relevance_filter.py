@@ -22,6 +22,19 @@ class ContextItem:
 class RelevanceFilter:
     """Filter context items based on relevance to current goal."""
 
+    def __init__(self, use_dense_embeddings: bool = False):
+        self.use_dense_embeddings = use_dense_embeddings
+        self._embedding_model = None
+
+    def _get_embedding_model(self):
+        if self._embedding_model is None and self.use_dense_embeddings:
+            try:
+                from sentence_transformers import SentenceTransformer
+                self._embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+            except ImportError:
+                self.use_dense_embeddings = False
+        return self._embedding_model
+
     def score(self, item: ContextItem, current_goal: str) -> float:
         scores = {
             'semantic_similarity': self._semantic_similarity(item, current_goal),
@@ -61,6 +74,17 @@ class RelevanceFilter:
         if not item.content or not goal:
             return 0.0
 
+        # Use dense embeddings if available
+        if self.use_dense_embeddings:
+            model = self._get_embedding_model()
+            if model is not None:
+                import numpy as np
+                embeddings = model.encode([item.content, goal], convert_to_tensor=False)
+                a = embeddings[0] / np.linalg.norm(embeddings[0])
+                b = embeddings[1] / np.linalg.norm(embeddings[1])
+                return float(np.dot(a, b))
+
+        # Fallback to lexical overlap
         has_cjk = bool(_CJK_RE.search(item.content) or _CJK_RE.search(goal))
 
         if has_cjk:
