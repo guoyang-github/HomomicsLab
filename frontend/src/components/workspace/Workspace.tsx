@@ -3,8 +3,9 @@ import { FlowCanvas } from './FlowCanvas'
 import { DetailPanel } from './DetailPanel'
 import { ReportPanel } from '@/components/reports/ReportPanel'
 import { SkillSearch } from '@/components/skills/SkillSearch'
+import { SkillGenerator } from '@/components/skills/SkillGenerator'
 
-type WorkspaceTab = 'workflow' | 'reports' | 'skills'
+type WorkspaceTab = 'workflow' | 'reports' | 'skills' | 'generate'
 
 export function Workspace() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('workflow')
@@ -44,6 +45,16 @@ export function Workspace() {
           >
             Skills
           </button>
+          <button
+            onClick={() => setActiveTab('generate')}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              activeTab === 'generate'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Generate
+          </button>
         </div>
       </div>
 
@@ -64,6 +75,11 @@ export function Workspace() {
         {activeTab === 'skills' && (
           <div className="flex-1">
             <SkillSearch />
+          </div>
+        )}
+        {activeTab === 'generate' && (
+          <div className="flex-1">
+            <SkillGenerator />
           </div>
         )}
       </div>
