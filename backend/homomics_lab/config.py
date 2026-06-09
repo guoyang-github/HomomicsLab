@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./homomics_lab.db"
     data_dir: Path = Path("./data")
     skills_dir: Path = Path("./skills")
+    external_skills_dir: Optional[Path] = None
 
 
 settings = Settings()

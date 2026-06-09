@@ -7,6 +7,8 @@ from homomics_lab.config import settings
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.skills.external_loader import ExternalSkillLoader
+from homomics_lab.skills.tracker import SkillPerformanceTracker
 from homomics_lab.api.router import api_router
 
 
@@ -16,9 +18,21 @@ async def lifespan(app: FastAPI):
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
     create_default_agents()
 
-    # Initialize skills runtime
-    app.state.skill_executor = SkillRuntimeExecutor()
+    # Initialize skills runtime with metrics tracking
+    tracker = SkillPerformanceTracker()
+    app.state.skill_executor = SkillRuntimeExecutor(tracker=tracker)
     register_builtin_skills(app.state.skill_executor)
+
+    # Load external skills if configured
+    if settings.external_skills_dir and settings.external_skills_dir.exists():
+        loader = ExternalSkillLoader(registry=app.state.skill_executor.registry)
+        loaded = loader.load_all(settings.external_skills_dir)
+        for skill in loaded:
+            if skill.metadata.get("scripts_dir"):
+                app.state.skill_executor.register_file_skill(
+                    skill, Path(skill.metadata["scripts_dir"])
+                )
+        print(f"Loaded {len(loaded)} external skills from {settings.external_skills_dir}")
 
     yield
 

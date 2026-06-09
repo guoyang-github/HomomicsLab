@@ -1,0 +1,92 @@
+"""Semantic search for skills using TF-IDF + cosine similarity.
+
+Lightweight, no external vector DB required. Uses scikit-learn.
+"""
+
+from typing import Dict, List, Optional
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+from homomics_lab.skills.models import SkillDefinition
+
+
+class SkillSemanticSearch:
+    """Semantic search over skills using TF-IDF embeddings."""
+
+    def __init__(self):
+        self._skills: Dict[str, SkillDefinition] = {}
+        self._vectorizer = TfidfVectorizer(
+            lowercase=True,
+            stop_words="english",
+            ngram_range=(1, 2),
+            max_features=5000,
+        )
+        self._vectors = None
+        self._dirty = True
+
+    def add(self, skill: SkillDefinition) -> None:
+        """Add a skill to the index."""
+        self._skills[skill.id] = skill
+        self._dirty = True
+
+    def remove(self, skill_id: str) -> None:
+        """Remove a skill from the index."""
+        self._skills.pop(skill_id, None)
+        self._dirty = True
+
+    def _build_index(self) -> None:
+        """Rebuild the TF-IDF index."""
+        if not self._skills:
+            self._vectors = None
+            self._dirty = False
+            return
+
+        texts = []
+        self._skill_ids = []
+        for skill_id, skill in self._skills.items():
+            # Combine name, description, keywords, and category for embedding
+            text_parts = [
+                skill.name,
+                skill.description,
+                skill.category,
+            ]
+            text_parts.extend(skill.metadata.get("keywords", []))
+            text_parts.extend(skill.metadata.get("supported_tools", []))
+            text_parts.append(skill.metadata.get("primary_tool", ""))
+            texts.append(" ".join(filter(None, text_parts)))
+            self._skill_ids.append(skill_id)
+
+        self._vectors = self._vectorizer.fit_transform(texts)
+        self._dirty = False
+
+    def search(self, query: str, top_k: int = 10) -> List[tuple[SkillDefinition, float]]:
+        """Search skills by semantic similarity.
+
+        Returns list of (skill, score) tuples sorted by relevance.
+        """
+        if self._dirty:
+            self._build_index()
+
+        if not self._skills or self._vectors is None:
+            return []
+
+        query_vec = self._vectorizer.transform([query])
+        similarities = cosine_similarity(query_vec, self._vectors).flatten()
+
+        # Get top-k results
+        indexed_scores = list(enumerate(similarities))
+        indexed_scores.sort(key=lambda x: x[1], reverse=True)
+
+        results = []
+        for idx, score in indexed_scores[:top_k]:
+            if score > 0:
+                skill_id = self._skill_ids[idx]
+                results.append((self._skills[skill_id], float(score)))
+
+        return results
+
+    def search_ids(self, query: str, top_k: int = 10) -> List[str]:
+        """Search and return only skill IDs."""
+        results = self.search(query, top_k)
+        return [skill.id for skill, _ in results]
