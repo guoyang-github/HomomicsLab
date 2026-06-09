@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.semantic_search import SkillSemanticSearch
+from homomics_lab.config import settings
 
 
 class SkillRegistry:
@@ -9,7 +10,15 @@ class SkillRegistry:
 
     def __init__(self):
         self._skills: Dict[str, SkillDefinition] = {}
-        self._semantic = SkillSemanticSearch()
+        self._semantic = self._create_search_engine()
+
+    def _create_search_engine(self):
+        """Create the semantic search engine based on config."""
+        if settings.semantic_search_model:
+            from homomics_lab.skills.semantic_search_v2 import SemanticSearchEngine
+
+            return SemanticSearchEngine(model_name=settings.semantic_search_model)
+        return SkillSemanticSearch()
 
     def register(self, skill: SkillDefinition) -> None:
         self._skills[skill.id] = skill
@@ -51,7 +60,7 @@ class SkillRegistry:
 
     def reset(self) -> None:
         self._skills.clear()
-        self._semantic = SkillSemanticSearch()
+        self._semantic = self._create_search_engine()
 
 
 _default_registry = SkillRegistry()

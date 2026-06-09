@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     skills_dir: Path = Path("./skills")
     external_skills_dir: Optional[Path] = None
+    semantic_search_model: Optional[str] = None  # e.g., "all-MiniLM-L6-v2" for dense embeddings
 
 
 settings = Settings()
