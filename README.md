@@ -92,13 +92,13 @@ pytest tests/ -q
 
 ## Configuration
 
-Environment variables (prefix `HOMICS_`):
+Environment variables (prefix `HOMOMICS_`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HOMICS_PORT` | 8080 | API server port |
-| `HOMICS_EXTERNAL_SKILLS_DIR` | — | Path to external skill collection |
-| `HOMICS_SEMANTIC_SEARCH_MODEL` | — | Set to `all-MiniLM-L6-v2` for dense embeddings |
+| `HOMOMICS_PORT` | 8080 | API server port |
+| `HOMOMICS_EXTERNAL_SKILLS_DIR` | — | Path to external skill collection |
+| `HOMOMICS_SEMANTIC_SEARCH_MODEL` | — | Set to `all-MiniLM-L6-v2` for dense embeddings |
 
 ## Tech Stack
 

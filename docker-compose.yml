@@ -8,8 +8,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - HOMICS_DEBUG=false
-      - HOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
+      - HOMOMICS_DEBUG=false
+      - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro

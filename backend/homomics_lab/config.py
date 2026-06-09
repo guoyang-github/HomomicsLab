@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="HOMICS_")
+    model_config = SettingsConfigDict(env_prefix="HOMOMICS_")
 
     app_name: str = "HomomicsLab"
     port: int = 8080

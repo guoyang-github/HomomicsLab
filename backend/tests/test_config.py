@@ -11,7 +11,7 @@ def test_default_port():
 
 
 def test_env_override(monkeypatch):
-    monkeypatch.setenv("HOMICS_PORT", "9000")
+    monkeypatch.setenv("HOMOMICS_PORT", "9000")
     settings = Settings()
     assert settings.port == 9000
 
