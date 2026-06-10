@@ -1,6 +1,7 @@
-import type { ChatMessage, TodoListContent, HITLContent, PlotContent } from '@/types/chat'
+import type { ChatMessage, TodoListContent, HITLContent, PlotContent, PlotDataContent } from '@/types/chat'
 import { TodoList } from './TodoList'
 import { HITLRequest } from './HITLRequest'
+import { PlotChart } from '../shared/PlotChart'
 
 function isTodoListContent(content: unknown): content is TodoListContent {
   return (
@@ -26,6 +27,16 @@ function isPlotContent(content: unknown): content is PlotContent {
     content !== null &&
     'image_base64' in content &&
     'plot_type' in content
+  )
+}
+
+function isPlotDataContent(content: unknown): content is PlotDataContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'data' in content &&
+    'plot_type' in content &&
+    !('image_base64' in content)
   )
 }
 
@@ -64,6 +75,30 @@ export function MessageBubble({ message }: Props) {
                 alt={message.content.plot_type}
                 className="max-w-full rounded-lg border border-slate-200 shadow-sm"
                 style={{ maxHeight: '320px' }}
+              />
+              {message.content.caption && (
+                <div className="text-xs italic text-slate-500">{message.content.caption}</div>
+              )}
+            </div>
+          )
+        }
+        return null
+      case 'plot_data':
+        if (isPlotDataContent(message.content)) {
+          return (
+            <div className="space-y-2 w-full">
+              {message.content.title && (
+                <div className="text-xs font-medium text-slate-600">{message.content.title}</div>
+              )}
+              <PlotChart
+                request={{
+                  plot_type: message.content.plot_type as any,
+                  data: message.content.data,
+                  title: message.content.title,
+                  width: 700,
+                  height: 450,
+                }}
+                className="w-full rounded-lg border border-slate-200"
               />
               {message.content.caption && (
                 <div className="text-xs italic text-slate-500">{message.content.caption}</div>

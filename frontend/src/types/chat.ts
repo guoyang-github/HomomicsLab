@@ -7,6 +7,7 @@ export type MessageType =
   | 'parameter_form'
   | 'file_reference'
   | 'plot'
+  | 'plot_data'
   | 'error'
   | 'system'
 
@@ -40,6 +41,13 @@ export interface PlotContent {
   image_base64: string
   plot_type: string
   title: string
+  caption?: string
+}
+
+export interface PlotDataContent {
+  plot_type: string
+  title: string
+  data: Record<string, unknown>
   caption?: string
 }
 
