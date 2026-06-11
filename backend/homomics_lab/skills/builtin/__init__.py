@@ -10,7 +10,7 @@ All builtin skills now follow the same directory layout as external skills:
 from pathlib import Path
 
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
-from homomics_lab.skills.external_loader import ExternalSkillLoader
+from homomics_lab.skills.loader import SkillLoader
 
 _BUILTIN_DIR = Path(__file__).parent
 
@@ -21,7 +21,7 @@ def register_builtin_skills(executor: SkillRuntimeExecutor) -> None:
     Builtin skills now use the same format as external skills (SKILL.md + scripts/),
     eliminating the distinction between builtin (code strings) and external (file-based).
     """
-    loader = ExternalSkillLoader(executor.registry)
+    loader = SkillLoader(executor.registry)
 
     # Discover all builtin skill directories
     for skill_dir in _BUILTIN_DIR.iterdir():

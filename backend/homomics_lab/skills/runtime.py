@@ -14,6 +14,7 @@ from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 from homomics_lab.skills.sandbox import LocalSandbox
 from homomics_lab.skills.tracker import SkillPerformanceTracker
 from homomics_lab.hpc.scheduler import get_scheduler, BaseScheduler
+from homomics_lab.stability.schema_validator import SchemaValidator
 
 
 class SkillRuntimeExecutor:
@@ -29,12 +30,14 @@ class SkillRuntimeExecutor:
         working_dir: Path = None,
         executor_type: str = "local",
         tracker: SkillPerformanceTracker = None,
+        schema_validator: SchemaValidator = None,
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
         self._executor_type = executor_type
         self._scheduler: Optional[BaseScheduler] = None
         self.tracker = tracker
+        self.schema_validator = schema_validator
 
     def _get_scheduler(self) -> BaseScheduler:
         """Lazy initialization of the scheduler."""
@@ -63,7 +66,16 @@ class SkillRuntimeExecutor:
         if skill is None:
             raise ValueError(f"Skill '{skill_id}' not found")
 
-        # Validate inputs
+        # Schema validation (if validator configured)
+        if self.schema_validator is not None:
+            validation = self.schema_validator.validate_input(skill, inputs)
+            if not validation.passed:
+                raise ValueError(
+                    f"Input validation failed for skill '{skill_id}': "
+                    f"{'; '.join(validation.errors)}"
+                )
+
+        # Validate inputs (schema-based defaults)
         validated = skill.validate_input(inputs)
 
         # Determine execution strategy

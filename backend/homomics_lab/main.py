@@ -7,8 +7,11 @@ from homomics_lab.config import settings
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.builtin import register_builtin_skills
-from homomics_lab.skills.external_loader import ExternalSkillLoader
+from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.tracker import SkillPerformanceTracker
+from homomics_lab.tools.registry import ToolRegistry
+from homomics_lab.tools.builtin import register_all_builtin_tools
+from homomics_lab.stability.schema_validator import SchemaValidator
 from homomics_lab.api.router import api_router
 
 
@@ -18,6 +21,14 @@ async def lifespan(app: FastAPI):
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
     create_default_agents()
 
+    # Initialize ToolRegistry with builtin tools
+    app.state.tool_registry = ToolRegistry()
+    register_all_builtin_tools(app.state.tool_registry)
+    print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
+
+    # Initialize SchemaValidator
+    app.state.schema_validator = SchemaValidator()
+
     # Initialize skills runtime with metrics tracking
     tracker = SkillPerformanceTracker()
     app.state.skill_executor = SkillRuntimeExecutor(tracker=tracker)
@@ -25,7 +36,7 @@ async def lifespan(app: FastAPI):
 
     # Load external skills if configured
     if settings.external_skills_dir and settings.external_skills_dir.exists():
-        loader = ExternalSkillLoader(registry=app.state.skill_executor.registry)
+        loader = SkillLoader(registry=app.state.skill_executor.registry)
         loaded = loader.load_all(settings.external_skills_dir)
         for skill in loaded:
             app.state.skill_executor.register_skill(skill)

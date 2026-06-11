@@ -1,7 +1,8 @@
 import pytest
+
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.agent_registry import AgentRegistry
-from homomics_lab.agent.bioinfo_agent import BioinfoAgent
+from homomics_lab.agent.core import DynamicAgent, RoleDefinition
 from homomics_lab.agent.task_decomposer import TaskTree
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.registry import SkillRegistry
@@ -18,7 +19,13 @@ async def skill_orchestrator(tmp_path):
     executor = SkillRuntimeExecutor(registry=skill_registry, working_dir=tmp_path)
     register_builtin_skills(executor)
 
-    agent = BioinfoAgent(skill_executor=executor)
+    role = RoleDefinition(
+        role_id="bioinfo",
+        name="Bioinfo",
+        agent_type="bioinfo",
+        allowed_skills=["scanpy_qc"],
+    )
+    agent = DynamicAgent(role=role, skill_executor=executor)
     registry.register(agent)
 
     return Orchestrator(registry=registry)
@@ -31,7 +38,13 @@ async def test_orchestrator_executes_skill(tmp_path):
     register_builtin_skills(executor)
 
     registry = AgentRegistry()
-    registry.register(BioinfoAgent(skill_executor=executor))
+    role = RoleDefinition(
+        role_id="bioinfo",
+        name="Bioinfo",
+        agent_type="bioinfo",
+        allowed_skills=["scanpy_qc"],
+    )
+    registry.register(DynamicAgent(role=role, skill_executor=executor))
 
     orchestrator = Orchestrator(registry=registry)
     tree = TaskTree([

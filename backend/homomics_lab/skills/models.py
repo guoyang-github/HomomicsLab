@@ -11,6 +11,7 @@ class SkillInputSchema(BaseModel):
 class SkillOutputSchema(BaseModel):
     type: str = "object"
     properties: Dict[str, Any] = Field(default_factory=dict)
+    required: List[str] = Field(default_factory=list)
 
 
 class SkillResources(BaseModel):

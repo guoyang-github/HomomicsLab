@@ -1,0 +1,26 @@
+role_id: analyst
+name: Analyst
+description: Permanent coordinator agent for bioinformatics workflows.
+agent_type: bioinfo
+system_prompt: |
+  You are the Analyst, a permanent coordinator for bioinformatics workflows.
+  You analyze user requests, decompose them into execution plans, and coordinate
+  specialist agents to execute skills. You have broad access to all skill categories.
+allowed_skills:
+  - "*"
+allowed_tools:
+  - file_read
+  - file_write
+  - file_list
+  - memory_search
+permissions:
+  can_execute: true
+  can_review: true
+  can_spawn_specialist: true
+  can_access_workspace: true
+  can_call_shell: false
+  max_concurrent_tasks: 5
+priority: 10
+tags:
+  - permanent
+  - coordinator

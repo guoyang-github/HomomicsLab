@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from homomics_lab.skills.external_loader import ExternalSkillLoader
+from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.models import SkillDefinition
 
 
@@ -86,9 +86,9 @@ Read and write single-cell data.
     return tmp_path
 
 
-class TestExternalSkillLoader:
+class TestSkillLoader:
     def test_load_single_python_skill(self, sample_skills_dir):
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skill_dir = sample_skills_dir / "bio-single-cell-preprocessing"
 
         skill = loader.load_skill(skill_dir)
@@ -107,7 +107,7 @@ class TestExternalSkillLoader:
         assert skill.category == "single-cell"
 
     def test_load_single_r_skill(self, sample_skills_dir):
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skill_dir = sample_skills_dir / "bio-single-cell-clustering-r"
 
         skill = loader.load_skill(skill_dir)
@@ -117,7 +117,7 @@ class TestExternalSkillLoader:
         assert skill.metadata["scripts_dir"] == str(skill_dir / "scripts" / "r")
 
     def test_load_mixed_skill(self, sample_skills_dir):
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skill_dir = sample_skills_dir / "bio-single-cell-data-io"
 
         skill = loader.load_skill(skill_dir)
@@ -130,7 +130,7 @@ class TestExternalSkillLoader:
         assert skill.metadata["multi_sample"]["supported"] is True
 
     def test_load_all_skills(self, sample_skills_dir):
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
 
         skills = loader.load_all(sample_skills_dir)
 
@@ -146,7 +146,7 @@ class TestExternalSkillLoader:
         from homomics_lab.skills.registry import SkillRegistry
 
         registry = SkillRegistry()
-        loader = ExternalSkillLoader(registry=registry)
+        loader = SkillLoader(registry=registry)
 
         skills = loader.load_all(sample_skills_dir)
 
@@ -169,7 +169,7 @@ keywords: ["test"]
 # Test
 """)
 
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skill = loader.load_skill(skill_dir)
 
         assert skill.metadata["scripts_dir"] is None
@@ -178,7 +178,7 @@ keywords: ["test"]
         """Skills without requirements.txt should have empty dependencies."""
         skill_dir = sample_skills_dir / "bio-single-cell-clustering-r"
 
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skill = loader.load_skill(skill_dir)
 
         assert skill.runtime.dependencies == []
@@ -190,7 +190,7 @@ keywords: ["test"]
         bad_dir.mkdir()
         (bad_dir / "random.txt").write_text("not a skill")
 
-        loader = ExternalSkillLoader()
+        loader = SkillLoader()
         skills = loader.load_all(sample_skills_dir)
 
         assert len(skills) == 3  # Still 3, not 4

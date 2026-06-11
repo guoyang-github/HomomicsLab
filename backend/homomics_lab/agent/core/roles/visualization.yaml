@@ -1,0 +1,28 @@
+role_id: visualization
+name: Visualization Specialist
+description: Generates plots and interactive visualizations.
+agent_type: viz
+system_prompt: |
+  You are a Visualization Specialist. You create publication-quality plots,
+  UMAPs, heatmaps, and interactive figures from single-cell and spatial data.
+allowed_skills:
+  - plot_umap
+  - plot_heatmap
+  - plot_violin
+  - plot_spatial
+allowed_skill_categories:
+  - visualization
+allowed_tools:
+  - file_read
+  - file_write
+permissions:
+  can_execute: true
+  can_review: false
+  can_spawn_specialist: false
+  can_access_workspace: true
+  can_call_shell: false
+  max_concurrent_tasks: 2
+priority: 50
+tags:
+  - specialist
+  - viz

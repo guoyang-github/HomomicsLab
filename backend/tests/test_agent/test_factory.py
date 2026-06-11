@@ -7,9 +7,8 @@ def test_create_default_agents():
     create_default_agents()
     registry = get_default_registry()
 
+    # Analyst is registered as bioinfo type
     assert registry.get_agent(AgentType.BIOINFO) is not None
-    assert registry.get_agent(AgentType.VIZ) is not None
-    assert registry.get_agent(AgentType.EXPERIMENT) is not None
 
     # Reset for isolation
     registry.reset()

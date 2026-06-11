@@ -1,4 +1,14 @@
-"""Load external skills from NanoResearch-Skills compatible directories."""
+"""Unified skill loader for all skills (builtin, external, community, user).
+
+Skills are loaded from directory structures containing:
+  <skill-name>/
+    SKILL.md
+    scripts/python/ or scripts/r/
+      run.py
+
+No distinction is made between builtin and external skills at the loading level.
+The source (builtin/external/community/user) is recorded in skill.metadata["source"].
+"""
 
 import re
 from pathlib import Path
@@ -185,7 +195,7 @@ def _extract_category_from_keywords(keywords: List[str], skill_name: str) -> str
     return "general"
 
 
-class ExternalSkillLoader:
+class SkillLoader:
     """Load skills from external NanoResearch-Skills compatible directories."""
 
     def __init__(self, registry: Optional[SkillRegistry] = None):
