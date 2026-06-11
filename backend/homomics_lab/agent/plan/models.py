@@ -21,6 +21,7 @@ class DataState:
     has_annotation: bool = False
 
     # Data characteristics
+    n_samples: Optional[int] = None
     n_cells: Optional[int] = None
     n_genes: Optional[int] = None
     n_batches: Optional[int] = None

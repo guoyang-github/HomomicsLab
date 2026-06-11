@@ -1,4 +1,4 @@
-# HomomicsLab Architecture Design (v0.4.0)
+# HomomicsLab Architecture Design (v0.4.1)
 
 ## System Overview
 
@@ -262,17 +262,37 @@ PENDING → TRIGGERED → AWAITING_HUMAN → RESPONDED → APPLIED
 
 ## Extension Points
 
-### Adding a New Skill
+### Adding a New Domain (Recommended: v0.4.1+)
+
+The **single-file domain declaration** is the preferred way to extend HomomicsLab to a new bioinformatics sub-discipline.
+
+1. **CLI Scaffold**: `homomics domain init {domain_name} --phases "..."`
+2. **Edit `domain.yaml`**: Define phases, state_checks, intents, dag_seeds, roles, sops
+3. **Add skills**: Create `skills/{skill_id}/SKILL.md + scripts/` in the domain directory
+4. **Validate**: `homomics validate domain.yaml`
+5. **Install**: `homomics install . --domains-dir {path}`
+6. **Done**: DomainLoader auto-registers everything. No Python code changes. No restart.
+
+The `DomainLoader` reads `domain.yaml` and automatically:
+- Registers skills via `SkillLoader`
+- Builds and registers `AnalysisStrategy` via `StrategyLibrary`
+- Registers DAG seeds via `SkillDAG`
+- Registers SOPs via `CBKB`
+- Exposes intent config to `IntentAnalyzer` via `DomainRegistry`
+
+### Adding a New Skill (Legacy)
 
 1. Create directory: `skills/{skill_id}/`
 2. Write `SKILL.md` with YAML frontmatter (input_schema, output_schema, runtime)
 3. Add scripts to `skills/{skill_id}/scripts/python/` or `scripts/r/`
 4. SkillLoader.auto-discovers on restart (or call `SkillRegistry.load_all()`)
 
+**v0.4.1+**: Skills can also be hot-reloaded at runtime via `SkillHotReloader`.
+
 ### Adding a New Agent Role
 
-1. Create `agent/core/roles/{role_id}.yaml`
-2. Define `allowed_skills`, `allowed_tools`, `permissions`, `priority`
+1. Define role in `domain.yaml` under `roles:` (v0.4.1+)
+2. Or create `agent/core/roles/{role_id}.yaml` (legacy)
 3. AgentCore auto-discovers on restart
 
 ### Adding a New Tool
@@ -283,9 +303,8 @@ PENDING → TRIGGERED → AWAITING_HUMAN → RESPONDED → APPLIED
 
 ### Adding a New Plan Strategy
 
-1. Add strategy template to `agent/plan/strategies.py`
-2. Define `DataState` adaptation rules
-3. PlanEngine auto-considers the new strategy
+1. Define strategy in `domain.yaml` under `phases:` + `state_checks:` (v0.4.1+)
+2. Or add strategy template to `agent/plan/strategies.py` (legacy)
 
 ---
 

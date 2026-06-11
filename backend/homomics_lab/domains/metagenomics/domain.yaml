@@ -1,0 +1,219 @@
+domain: metagenomics_16s
+description: Standard 16S amplicon sequencing analysis pipeline (QIIME2 / DADA2 workflow)
+version: "1.0.0"
+
+phases:
+  - id: qc
+    required: true
+    description: QC and adapter trimming for 16S reads
+    skills: [metagenomics_qc]
+    default_skill: metagenomics_qc
+
+  - id: dehost
+    required: false
+    description: Remove host contamination from reads
+    skills: [metagenomics_dehost]
+
+  - id: denoising
+    required: true
+    description: ASV denoising (DADA2/Deblur)
+    skills: [metagenomics_denoise]
+    default_skill: metagenomics_denoise
+
+  - id: taxonomy
+    required: true
+    description: Taxonomic classification (SILVA/Greengenes)
+    skills: [metagenomics_taxonomy]
+    default_skill: metagenomics_taxonomy
+
+  - id: diversity
+    required: false
+    description: Alpha and beta diversity analysis
+    skills: [metagenomics_diversity]
+
+  - id: function
+    required: false
+    description: Functional prediction (PICRUSt2)
+    skills: [metagenomics_function]
+
+  - id: visualization
+    required: false
+    description: Generate diversity plots and taxonomic bar charts
+    skills: [metagenomics_plot]
+
+state_checks:
+  - condition: "host_contamination > 0.1"
+    action: insert
+    target: dehost
+    after: qc
+
+  - condition: "n_samples < 3"
+    action: skip
+    target: diversity
+
+  - condition: "not has_metadata"
+    action: skip
+    target: diversity
+
+  - condition: "low_quality"
+    action: modify_param
+    target: denoising
+    value: {"max_ee": 1, "trunc_len": 200}
+
+  - condition: "n_asvs > 50000"
+    action: modify_param
+    target: denoising
+    value: {"use_pool": true, "n_threads": 8}
+
+intents:
+  - analysis_type: metagenomics_analysis
+    keywords:
+      - "宏基因组"
+      - "16S"
+      - "amplicon"
+      - "microbiome"
+      - "肠道菌群"
+      - "qiime"
+      - "dada2"
+      - "otu"
+      - "asv"
+      - "taxonomy"
+      - "物种注释"
+      - "多样性"
+      - "alpha diversity"
+      - "beta diversity"
+      - "picrust"
+      - "功能预测"
+    complexity_indicators:
+      - "全流程"
+      - "完整分析"
+      - "pipeline"
+    data_scale_patterns:
+      - "(\d+)\s*个样本"
+      - "(\d+)\s*samples"
+
+dag_seeds:
+  - from: metagenomics_qc
+    to: metagenomics_dehost
+    type: followed_by
+    context: "QC → remove host contamination"
+
+  - from: metagenomics_qc
+    to: metagenomics_denoise
+    type: followed_by
+    context: "QC → ASV denoising (if no host contamination)"
+
+  - from: metagenomics_dehost
+    to: metagenomics_denoise
+    type: followed_by
+    context: "Host removal → ASV denoising"
+
+  - from: metagenomics_denoise
+    to: metagenomics_taxonomy
+    type: followed_by
+    context: "ASV table → taxonomic classification"
+
+  - from: metagenomics_taxonomy
+    to: metagenomics_diversity
+    type: followed_by
+    context: "Taxonomy → diversity analysis"
+
+  - from: metagenomics_taxonomy
+    to: metagenomics_function
+    type: followed_by
+    context: "Taxonomy → functional prediction"
+
+  - from: metagenomics_denoise
+    to: metagenomics_qc
+    type: depends_on
+    context: "Denoising requires QC-filtered reads"
+
+  - from: metagenomics_taxonomy
+    to: metagenomics_denoise
+    type: depends_on
+    context: "Taxonomy requires ASV representative sequences"
+
+  - from: metagenomics_function
+    to: metagenomics_taxonomy
+    type: depends_on
+    context: "PICRUSt2 requires taxonomy annotations"
+
+roles:
+  - role_id: metagenomicist
+    name: Metagenomicist
+    description: Specialist in microbiome and metagenomics analysis
+    allowed_skills:
+      - metagenomics_qc
+      - metagenomics_dehost
+      - metagenomics_denoise
+      - metagenomics_taxonomy
+      - metagenomics_function
+      - metagenomics_diversity
+      - metagenomics_plot
+      - data_loader
+    allowed_tools:
+      - file_read
+      - file_write
+      - file_list
+      - shell_exec
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 4
+    priority: 2
+
+sops:
+  - id: sop_16s_qiime2_v1
+    title: 16S Amplicon Analysis SOP (QIIME2)
+    version: "1.0.0"
+    locked: false
+    content: |
+      ## Standard 16S Analysis Workflow
+
+      ### 1. QC and Trimming
+      - Trim adapters with cutadapt
+      - Minimum read length: 100bp
+      - Minimum quality: Q20
+      - Expected pass rate: > 85%
+
+      ### 2. Denoising (DADA2)
+      - trunc_len: auto-determined from quality profile
+      - max_ee: 2
+      - chimera removal: consensus method
+
+      ### 3. Taxonomy
+      - Classifier: SILVA 138 99% OTUs
+      - Confidence threshold: 0.7
+
+      ### 4. Quality Gates
+      - If pass rate < 70% → escalate to user
+      - If n_samples < 3 → skip diversity analysis
+      - If host contamination > 15% → mandatory dehosting
+
+data_state_schema:
+  has_denoising:
+    type: boolean
+  has_taxonomy:
+    type: boolean
+  has_function:
+    type: boolean
+  n_asvs:
+    type: integer
+    description: Number of ASVs after denoising
+  n_otus:
+    type: integer
+    description: Number of OTUs (if using OTU approach)
+  rarefaction_applied:
+    type: boolean
+  paired_end:
+    type: boolean
+  primer_trimmed:
+    type: boolean
+  host_contamination:
+    type: number
+    description: Host contamination rate (0.0 - 1.0)
+  has_metadata:
+    type: boolean
+    description: Whether sample metadata is available
+
+skills_dir: null

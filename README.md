@@ -2,7 +2,7 @@
 
 A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and self-evolving analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.4.0** — End-to-end analysis automation with dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, and complete reproducibility capture.
+> **v0.4.1** — End-to-end analysis automation with **single-file domain declarations**, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, and complete reproducibility capture.
 
 ---
 
@@ -46,14 +46,31 @@ HomomicsLab is part of a rapidly emerging class of **domain-specific agent syste
 
 **What none of the above provide together**: a **bioinformatics-native agent platform** with dynamic roles, self-evolving skill relationships, three-layer stability guards, complete reproducibility bundles, and automated data lineage—running inside a sandboxed workspace with human-in-the-loop checkpoints.
 
+### 0. Single-File Domain Declaration — Extend to Any Omics in 20 Minutes
+
+HomomicsLab is not limited to single-cell or spatial transcriptomics. Any bioinformatics domain—genomics, proteomics, metabolomics, epigenomics, metagenomics—can be added via a **single `domain.yaml` file**.
+
+```bash
+# Initialize a new domain scaffold
+homomics domain init metagenomics --phases "qc,denoising,taxonomy,diversity"
+
+# Or let LLM generate it from natural language
+homomics domain generate "16S amplicon analysis with DADA2 and QIIME2"
+
+# Validate and install
+homomics validate domain.yaml && homomics install .
+```
+
+No Python code changes. No service restart. The `DomainLoader` automatically registers skills, strategies, intents, DAG seeds, roles, and SOPs. See [`docs/domain-extension-guide.md`](docs/domain-extension-guide.md) for the full guide.
+
 ### 1. End-to-End Analysis Closure
 
 From a sentence like *"Analyze my PBMC dataset and find marker genes for each cluster"* to a **self-contained HTML report with UMAPs, DE tables, and method sections**—in one conversation.
 
 HomomicsLab handles the entire lifecycle:
-- **Intent Analysis** — Parses natural language research goals into structured `UserIntent` objects (analysis objectives, data constraints, quality thresholds). Not limited to pre-defined categories — any bioinformatics workflow can be expressed.
-- **Adaptive Planning** — Selects from extensible domain strategy templates and generates plans that adapt to real-time data state. Batch detected → inject integration; low quality → tighten QC; skill fails → auto-swap alternative via SkillDAG.
-- **Execution** — Sandboxed skill runtime with schema validation and resource monitoring
+- **Intent Analysis** — Parses natural language research goals into structured `UserIntent` objects. Dynamically loaded from `domain.yaml` intent declarations—not hardcoded keyword lists. Supports any bioinformatics workflow.
+- **Adaptive Planning** — Selects from extensible domain strategy templates declared in `domain.yaml` and generates plans that adapt to real-time data state. Batch detected → inject integration; low quality → tighten QC; skill fails → auto-swap alternative via SkillDAG.
+- **Execution** — Sandboxed skill runtime with schema validation and resource monitoring. Skills are **source-agnostic**—builtin, external, community, or user-uploaded are treated identically.
 - **Interpretation** — Phase-level result analysis: "QC filtered 12% of cells—within normal range. Next: normalization."
 - **Reporting** — Auto-generated publication-ready HTML/Markdown reports with figures and provenance
 - **Reproducibility** — Every analysis exports a `ReproducibilityBundle`: exact code, plan, HITL decisions, environment lock
@@ -70,7 +87,7 @@ HomomicsLab is not a thin wrapper around GPT-4. It embeds **bioinformatics workf
 
 Skills in HomomicsLab are not plugins you manually install and forget. They are **first-class citizens in a living system**:
 
-- **Self-Evolving Relationships**: The SkillDAG automatically discovers `followed_by`, `conflicts_with`, and `alternative_to` relationships from execution history. Edges graduate from `CANDIDATE` → `CONFIRMED` after repeated success.
+- **Self-Evolving Relationships**: The SkillDAG automatically discovers `followed_by`, `conflicts_with`, and `alternative_to` relationships from execution history and `domain.yaml` seed declarations. Edges graduate from `CANDIDATE` → `CONFIRMED` after repeated success.
 - **Semantic Discovery**: Dual-engine skill search—TF-IDF for exact matching + sentence-transformers for conceptual similarity. A query for "reduce dimensions" finds PCA, UMAP, and t-SNE even if none mention "reduce" in their titles.
 - **Auto-Generation**: Generate new skills from natural language requirements via templated scaffolding.
 - **Unified Format**: Built-in and external skills use the identical `SKILL.md + scripts/` format. No "second-class citizen" external skills.
@@ -237,6 +254,18 @@ npm run dev
 HomomicsLab/
 ├── backend/
 │   ├── homomics_lab/
+│   │   ├── domain/             # Domain declaration system (v0.4.1)
+│   │   │   ├── models.py       # DomainDefinition, Phase, StateCheck Pydantic models
+│   │   │   ├── loader.py       # DomainLoader — reads domain.yaml, auto-registers all
+│   │   │   ├── registry.py     # DomainRegistry — manages loaded domains
+│   │   │   ├── hot_reload.py   # Runtime hot-reload for domains & skills
+│   │   │   └── domains/        # Built-in domain declarations
+│   │   │       ├── single_cell/domain.yaml
+│   │   │       ├── spatial/domain.yaml
+│   │   │       └── metagenomics/domain.yaml
+│   │   ├── cli/                # Command-line tools (v0.4.1)
+│   │   │   ├── main.py         # homomics CLI entry point
+│   │   │   └── commands/       # init, validate, install, generate, list
 │   │   ├── agent/              # Agent orchestration layer
 │   │   │   ├── core/           # AgentCore, DynamicAgent, RoleRegistry, roles/*.yaml
 │   │   │   ├── plan/           # PlanEngine — adaptive strategy generation
@@ -248,7 +277,7 @@ HomomicsLab/
 │   │   │   └── turn_runner.py    # Unified conversational turn loop
 │   │   ├── skills/             # Skill ecosystem
 │   │   │   ├── skill_dag.py    # Self-evolving typed knowledge graph
-│   │   │   ├── loader.py       # Unified SKILL.md + scripts/ loader
+│   │   │   ├── loader.py       # Unified SKILL.md + scripts/ loader (builtin/external/user)
 │   │   │   ├── runtime.py      # Sandbox execution with schema validation
 │   │   │   ├── registry.py     # Skill discovery & registration
 │   │   │   └── models.py       # Pydantic skill definitions
@@ -300,6 +329,9 @@ HomomicsLab/
 | `POST /api/reports/create` | Create analysis report |
 | `GET /api/reports/{id}/html` | Export self-contained HTML report |
 | `POST /api/skill-generator/generate` | Auto-generate skill from requirements |
+| `POST /api/domains/install` | Install domain from upload |
+| `GET /api/domains/` | List installed domains |
+| `POST /api/domains/reload` | Hot-reload a domain |
 
 ---
 
@@ -308,7 +340,7 @@ HomomicsLab/
 ```bash
 cd backend
 pytest tests/ -q
-# 504 tests passing
+# 538+ tests passing
 ```
 
 Coverage spans:
@@ -318,6 +350,7 @@ Coverage spans:
 - **Workspace layer**: Path resolution, artifact registry, lineage graph, snapshots
 - **Reproducibility layer**: Bundle capture, JSON roundtrip, environment lock
 - **Integration layer**: AgentCore + Orchestrator, PlanEngine + AgentCore, Workspace + VersionLocker
+- **Domain layer**: Domain declaration models, loader, registry, validation, hot-reload
 
 ---
 

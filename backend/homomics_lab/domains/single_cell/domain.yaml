@@ -1,0 +1,223 @@
+domain: single_cell_standard
+description: Standard single-cell RNA-seq analysis pipeline (Scanpy/Seurat workflow)
+version: "1.0.0"
+
+phases:
+  - id: qc
+    required: true
+    description: Quality control filtering
+    skills: [scanpy_qc]
+    default_skill: scanpy_qc
+
+  - id: normalization
+    required: true
+    description: Count normalization
+    skills: [scanpy_normalize]
+
+  - id: dim_reduction
+    required: true
+    description: PCA dimensionality reduction
+    skills: [scanpy_pca]
+
+  - id: clustering
+    required: true
+    description: Cell clustering (Louvain/Leiden)
+    skills: [scanpy_cluster]
+
+  - id: annotation
+    required: false
+    description: Cell type annotation
+    skills: [scanpy_annotation]
+
+  - id: differential_expression
+    required: false
+    description: Differential expression analysis
+    skills: [scanpy_de]
+
+  - id: visualization
+    required: false
+    description: Generate UMAP and other plots
+    skills: [plot_umap, plot_heatmap]
+
+state_checks:
+  - condition: "batch_detected"
+    action: insert
+    target: batch_correction
+    after: qc
+
+  - condition: "low_quality"
+    action: insert
+    target: qc_advanced
+    after: qc
+
+  - condition: "large_scale"
+    action: modify_param
+    target: dim_reduction
+    value: {"n_pcs": 50, "method": "incremental_pca"}
+
+  - condition: "has_qc"
+    action: skip
+    target: qc
+
+intents:
+  - analysis_type: single_cell_analysis
+    keywords:
+      - "单细胞"
+      - "single cell"
+      - "scRNA"
+      - "10x"
+      - "scanpy"
+      - "seurat"
+      - "PBMC"
+      - "细胞"
+      - "cell"
+    complexity_indicators:
+      - "分析"
+      - "analysis"
+      - "流程"
+      - "pipeline"
+      - "全流程"
+      - "完整"
+    data_scale_patterns:
+      - "(\d+)\s*个细胞"
+      - "(\d+)\s*cells"
+      - "(\d+)k\s*cells"
+
+  - analysis_type: scRNA
+    keywords:
+      - "scRNA-seq"
+      - "scrna"
+      - "单细胞转录组"
+    complexity_indicators: []
+    data_scale_patterns: []
+
+dag_seeds:
+  - from: scanpy_qc
+    to: scanpy_pca
+    type: followed_by
+    context: "Standard single-cell pipeline: QC → dimensionality reduction"
+
+  - from: scanpy_pca
+    to: scanpy_cluster
+    type: followed_by
+    context: "Standard single-cell pipeline: PCA → clustering"
+
+  - from: scanpy_cluster
+    to: scanpy_annotation
+    type: followed_by
+    context: "Standard single-cell pipeline: clustering → cell type annotation"
+
+  - from: scanpy_cluster
+    to: scanpy_de
+    type: followed_by
+    context: "Differential expression can follow clustering directly"
+
+  - from: scanpy_annotation
+    to: scanpy_de
+    type: followed_by
+    context: "DE analysis is more meaningful after annotation"
+
+  - from: scanpy_cluster
+    to: scanpy_qc
+    type: depends_on
+    context: "Clustering requires QC-filtered data"
+
+  - from: scanpy_pca
+    to: scanpy_qc
+    type: depends_on
+    context: "PCA requires QC-filtered data"
+
+  - from: scanpy_de
+    to: scanpy_cluster
+    type: depends_on
+    context: "DE requires cluster labels"
+
+roles:
+  - role_id: single_cell_specialist
+    name: Single Cell Specialist
+    description: Expert in single-cell RNA-seq analysis
+    allowed_skills:
+      - scanpy_qc
+      - scanpy_normalize
+      - scanpy_pca
+      - scanpy_cluster
+      - scanpy_annotation
+      - scanpy_de
+      - plot_umap
+      - plot_heatmap
+    allowed_tools:
+      - file_read
+      - file_write
+      - shell_exec
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 3
+    priority: 2
+
+sops:
+  - id: sop_single_cell_standard
+    title: Single-Cell RNA-seq Standard Operating Procedure
+    version: "1.0.0"
+    locked: false
+    content: |
+      ## Standard Single-Cell Analysis Workflow
+
+      ### 1. QC Filtering
+      - Filter cells: min_genes ≥ 200, min_cells ≥ 3
+      - MT% threshold: 5%
+      - Expected pass rate: > 85%
+
+      ### 2. Normalization
+      - Total count normalization to 10,000
+      - Log1p transform
+
+      ### 3. Dimensionality Reduction
+      - HVG selection: top 2000 genes
+      - PCA: 50 components
+      - Elbow plot to determine meaningful PCs
+
+      ### 4. Clustering
+      - Neighbors: n_neighbors = 15
+      - Leiden algorithm (default resolution = 0.8)
+
+      ### 5. Quality Gates
+      - If pass rate < 70% → escalate to user
+      - If batch_detected → insert Harmony/scVI integration
+
+data_state_schema:
+  has_qc:
+    type: boolean
+    description: Whether QC has been completed
+  has_normalization:
+    type: boolean
+    description: Whether normalization has been completed
+  has_pca:
+    type: boolean
+    description: Whether PCA has been computed
+  has_clustering:
+    type: boolean
+    description: Whether clustering has been performed
+  has_annotation:
+    type: boolean
+    description: Whether cell types have been annotated
+  n_cells:
+    type: integer
+    description: Number of cells in the dataset
+  n_genes:
+    type: integer
+    description: Number of genes in the dataset
+  n_batches:
+    type: integer
+    description: Number of batches detected
+  batch_detected:
+    type: boolean
+    description: Whether batch effects have been detected
+  low_quality:
+    type: boolean
+    description: Whether data quality is low
+  large_scale:
+    type: boolean
+    description: Whether dataset has > 100k cells
+
+skills_dir: null

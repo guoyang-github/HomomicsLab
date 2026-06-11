@@ -84,6 +84,32 @@ class StrategyLibrary:
         self.register(SINGLE_CELL_STANDARD)
         self.register(SPATIAL_TRANSCRIPTOMICS)
         self.register(QC_ONLY)
+        # Load strategies from domain declarations
+        self._load_domain_strategies()
+
+    def _load_domain_strategies(self) -> None:
+        """Load strategies from domain.yaml declarations.
+
+        Scans the domains/ directory for domain.yaml files and registers
+        their strategies automatically.
+        """
+        from pathlib import Path
+        from homomics_lab.domain.loader import DomainLoader
+        from homomics_lab.skills.registry import get_default_registry
+
+        domains_dir = Path(__file__).parent.parent.parent / "domains"
+        if not domains_dir.exists():
+            return
+
+        skill_registry = get_default_registry()
+        domain_loader = DomainLoader(skill_registry, self)
+
+        for domain_yaml in domains_dir.rglob("domain.yaml"):
+            try:
+                domain = domain_loader.load(domain_yaml)
+            except Exception as e:
+                # Silently skip invalid domains during default loading
+                pass
 
     def register(self, strategy: AnalysisStrategy) -> None:
         self._strategies[strategy.name] = strategy

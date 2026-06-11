@@ -1,0 +1,94 @@
+domain: spatial_transcriptomics
+description: Spatial transcriptomics analysis pipeline (Visium/Xenium/MERFISH)
+version: "1.0.0"
+
+phases:
+  - id: spatial_qc
+    required: true
+    description: Spatial data quality control
+    skills: [spatial_qc]
+
+  - id: spatial_preprocessing
+    required: true
+    description: Preprocessing spatial coordinates and expression
+    skills: [spatial_preprocess]
+
+  - id: spatial_clustering
+    required: true
+    description: Spatially-aware clustering
+    skills: [spatial_cluster]
+
+  - id: spatial_deconvolution
+    required: false
+    description: Cell type deconvolution from spots
+    skills: [spatial_deconvolve]
+
+  - id: visualization
+    required: false
+    description: Generate spatial plots
+    skills: [plot_spatial]
+
+state_checks:
+  - condition: "n_cells is not None and n_cells < 1000"
+    action: skip
+    target: spatial_deconvolution
+
+intents:
+  - analysis_type: spatial_analysis
+    keywords:
+      - "空间"
+      - "spatial"
+      - "visium"
+      - "xenium"
+      - "merfish"
+      - "空间转录组"
+    complexity_indicators:
+      - "分析"
+      - "流程"
+      - "pipeline"
+    data_scale_patterns: []
+
+dag_seeds:
+  - from: spatial_qc
+    to: spatial_clustering
+    type: followed_by
+    context: "Spatial QC → spatial clustering"
+
+  - from: spatial_clustering
+    to: spatial_deconvolution
+    type: followed_by
+    context: "Spatial clustering → deconvolution"
+
+  - from: scanpy_annotation
+    to: spatial_deconvolution
+    type: followed_by
+    context: "Single-cell annotations can guide spatial deconvolution"
+
+roles:
+  - role_id: spatial_specialist
+    name: Spatial Transcriptomics Specialist
+    description: Expert in spatial transcriptomics analysis
+    allowed_skills:
+      - spatial_qc
+      - spatial_preprocess
+      - spatial_cluster
+      - spatial_deconvolve
+      - plot_spatial
+    allowed_tools:
+      - file_read
+      - file_write
+      - shell_exec
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 2
+    priority: 2
+
+data_state_schema:
+  has_spatial_qc:
+    type: boolean
+  n_spots:
+    type: integer
+    description: Number of spatial spots/transcripts
+
+skills_dir: null
