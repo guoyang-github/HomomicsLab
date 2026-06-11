@@ -2,7 +2,7 @@
 
 A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and self-evolving analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.3.0** — End-to-end analysis automation with dynamic agent roles, self-evolving skill knowledge graphs, multi-layer stability guards, and complete reproducibility capture.
+> **v0.4.0** — End-to-end analysis automation with dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, and complete reproducibility capture.
 
 ---
 
@@ -51,8 +51,8 @@ HomomicsLab is part of a rapidly emerging class of **domain-specific agent syste
 From a sentence like *"Analyze my PBMC dataset and find marker genes for each cluster"* to a **self-contained HTML report with UMAPs, DE tables, and method sections**—in one conversation.
 
 HomomicsLab handles the entire lifecycle:
-- **Intent Analysis** — Parses research goals into structured analysis types (single-cell, spatial, QC-only)
-- **Adaptive Planning** — Generates analysis strategies that adapt to data state (batch detected → inject integration; low quality → tighten QC)
+- **Intent Analysis** — Parses natural language research goals into structured `UserIntent` objects (analysis objectives, data constraints, quality thresholds). Not limited to pre-defined categories — any bioinformatics workflow can be expressed.
+- **Adaptive Planning** — Selects from extensible domain strategy templates and generates plans that adapt to real-time data state. Batch detected → inject integration; low quality → tighten QC; skill fails → auto-swap alternative via SkillDAG.
 - **Execution** — Sandboxed skill runtime with schema validation and resource monitoring
 - **Interpretation** — Phase-level result analysis: "QC filtered 12% of cells—within normal range. Next: normalization."
 - **Reporting** — Auto-generated publication-ready HTML/Markdown reports with figures and provenance
@@ -159,6 +159,49 @@ permissions:
 - **Blocked skills**: Explicit denylist for security-sensitive environments
 - **Tool-level access control**: Each role sees only its permitted atomic tools
 
+### 10. Long-Horizon Dynamic Replanning
+
+Plans are not carved in stone. The **DynamicReplanningEngine** monitors execution and replans in real time when reality diverges from expectation:
+
+- **Critical anomaly detected in QC** → automatically insert a re-QC phase with tightened thresholds
+- **Batch effect discovered post-clustering** → dynamically insert integration before differential expression
+- **Skill failure** → swap to an alternative skill via SkillDAG and resume
+- **User intervention changes parameters** → propagate the change downstream through all dependent phases
+
+Unlike static workflow engines (Snakemake, Galaxy), HomomicsLab adapts the plan *while executing* based on data state and intermediate results.
+
+### 11. Multi-Agent Swarm — Parallel Execution + Consensus
+
+HomomicsLab is not limited to a single agent per task. The **AgentSwarm** orchestrates multiple specialists in parallel:
+
+- **Parallel task groups**: Independent tasks fan out to sub-agents with semaphore-controlled concurrency
+- **Consensus voting**: The same task can be assigned to multiple agents; disagreeing opinions are surfaced with confidence scores
+- **Broadcast messaging**: The lead analyst can broadcast context to all matching specialists
+- **SwarmOrchestrator**: Automatically identifies independent task groups in a task tree and executes them in parallel
+
+This is not just "multi-agent" theater—it's disciplined parallelism with conflict detection.
+
+### 12. Agent Self-Evolution
+
+Agents get smarter with every analysis. The **AgentEvolutionEngine** continuously learns from CBKB history:
+
+- **Role evolution**: If `resolution=0.6` consistently yields better clusters across 10+ projects, the system proposes updating the role's default prompt or metadata
+- **Plan pattern mining**: Recurring successful phase sequences are extracted as reusable plan patterns with success-rate statistics
+- **Parameter preference learning**: Per-project and per-lab parameter preferences are automatically distilled from ParameterLore
+- **SOP auto-evolution**: When a successful analysis pattern repeats >3 times, the system proposes a new Lab SOP or a version bump to an existing one
+
+Roles and plans are **living configurations**, not static YAML files.
+
+### 13. CBKB Auto-Curation — The Knowledge Base That Curates Itself
+
+The Computational Biology Knowledge Base does not wait for manual maintenance. The **CBKBCurator** runs automatic curation passes:
+
+- **Nightly distillation**: New experiment bundles are scanned for skill sequences, parameter combinations, and project similarities
+- **Topic clustering**: Experiments are grouped by Jaccard similarity on skills + parameters; each cluster gets a topic name and centroid summary
+- **Narrative reports**: "This month your lab analyzed 12 single-cell datasets. The most common anomaly was batch effect (6 occurrences). The most reliable parameter was `resolution=0.6`."
+- **Auto-linking**: Similar experiments automatically get typed edges (`shares_skill`, `shares_parameter`) in the Experiment Graph
+- **SOP divergence detection**: When existing SOPs no longer match the lab's actual best practices, the system flags them for review
+
 ---
 
 ## Quick Start
@@ -197,8 +240,11 @@ HomomicsLab/
 │   │   ├── agent/              # Agent orchestration layer
 │   │   │   ├── core/           # AgentCore, DynamicAgent, RoleRegistry, roles/*.yaml
 │   │   │   ├── plan/           # PlanEngine — adaptive strategy generation
+│   │   │   ├── replanning.py     # DynamicReplanningEngine — execution-time plan adaptation
 │   │   │   ├── interpretation.py   # InterpretationEngine
+│   │   │   ├── swarm.py            # AgentSwarm — parallel multi-agent execution + consensus
 │   │   │   ├── orchestrator.py     # Task scheduler with retry & HITL
+│   │   │   ├── evolution.py        # AgentEvolutionEngine — role/plan/SOP self-evolution
 │   │   │   └── turn_runner.py    # Unified conversational turn loop
 │   │   ├── skills/             # Skill ecosystem
 │   │   │   ├── skill_dag.py    # Self-evolving typed knowledge graph
@@ -217,12 +263,14 @@ HomomicsLab/
 │   │   │   └── engine.py       # Bundle capture (code, plan, HITL, env)
 │   │   ├── tools/              # Atomic tool registry with role filtering
 │   │   ├── context/            # Working memory, semantic memory, compression
-    │   │   ├── knowledge/          # CBKB: 5-layer domain-specific knowledge base
+│   │   ├── knowledge/          # CBKB: 5-layer domain-specific knowledge base
+│   │   │   ├── cbkb.py             # ExperimentGraph, ParameterLore, AnomalyArchive, LabSOP, SkillEvolutionLog
+│   │   │   └── curator.py        # CBKBCurator — auto-distillation, clustering, narrative reports
 │   │   ├── hpc/                # SLURM, Nextflow, local schedulers
 │   │   ├── viz/                # Plotly-based visualization engine
 │   │   ├── reports/            # HTML/Markdown report generation
 │   │   └── api/                # FastAPI REST + WebSocket endpoints
-│   └── tests/                  # 453 tests
+│   └── tests/                  # 504 tests
 ├── frontend/
 │   └── src/
 │       ├── components/
@@ -234,7 +282,7 @@ HomomicsLab/
 ├── Dockerfile
 ├── docker-compose.yml
 └── docs/
-    ├── architecture.md         # v0.3.0 architecture principles
+    ├── architecture.md         # v0.4.0 architecture principles
     └── setup.md
 ```
 
@@ -260,7 +308,7 @@ HomomicsLab/
 ```bash
 cd backend
 pytest tests/ -q
-# 453 tests passing
+# 504 tests passing
 ```
 
 Coverage spans:
