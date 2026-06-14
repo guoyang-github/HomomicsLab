@@ -2,6 +2,8 @@ export type MessageType =
   | 'text'
   | 'todo_list'
   | 'hitl_request'
+  | 'plan_request'
+  | 'debate_request'
   | 'tool_call'
   | 'result_preview'
   | 'parameter_form'
@@ -33,8 +35,49 @@ export interface HITLContent {
       id: string
       label: string
     }
+    metadata?: Record<string, unknown>
   }
   task_id: string
+}
+
+export interface PlanPhase {
+  phase_type: string
+  description?: string
+  required?: boolean
+  skill_id?: string
+  readonly?: boolean
+  parameters?: Record<string, unknown>
+}
+
+export interface PlanRequestContent {
+  plan_id: string
+  response_text: string
+  plan: {
+    plan_id: string
+    status: string
+    is_fallback: boolean
+    intent_analysis_type: string
+    phases: PlanPhase[]
+    gaps?: Array<Record<string, unknown>>
+    suggestion_text?: string
+    version: number
+  }
+}
+
+export interface DebateOption {
+  id: string
+  label: string
+  description?: string
+  proposer?: string
+  score?: number
+}
+
+export interface DebateRequestContent {
+  debate_id: string
+  topic: string
+  options: DebateOption[]
+  recommendation?: DebateOption
+  round_summaries?: string[]
 }
 
 export interface PlotContent {

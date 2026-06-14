@@ -84,13 +84,21 @@ intents:
       - "beta diversity"
       - "picrust"
       - "功能预测"
+    examples:
+      - "做宏基因组分析"
+      - "16S amplicon sequencing analysis"
+      - "分析肠道菌群多样性"
+      - "run microbiome profiling"
+      - "做物种注释"
+      - "alpha diversity analysis"
+      - "beta diversity analysis"
     complexity_indicators:
       - "全流程"
       - "完整分析"
       - "pipeline"
     data_scale_patterns:
-      - "(\d+)\s*个样本"
-      - "(\d+)\s*samples"
+      - '(\\d+)\\s*个样本'
+      - '(\\d+)\\s*samples'
 
 dag_seeds:
   - from: metagenomics_qc

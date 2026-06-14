@@ -20,6 +20,9 @@ dependencies = [
     "aiosqlite>=0.19.0",
     "python-multipart>=0.0.6",
     "aiofiles>=23.2.0",
+    "redis>=8.0.0",
+    "apscheduler>=3.11.2",
+    "mcp>=1.27.2",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +30,13 @@ dev = ["black", "ruff", "mypy"]
 test = ["pytest>=7.4.0", "pytest-asyncio>=0.21.0", "httpx>=0.26.0"]
 
 [project.scripts]
-homomics-lab = "homomics_lab.cli:main"
+homomics = "homomics_lab.cli.main:main"
+homomics-worker = "homomics_lab.worker:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/homomics_lab"]
+
+[dependency-groups]
+dev = [
+    "fakeredis>=2.36.1",
+]

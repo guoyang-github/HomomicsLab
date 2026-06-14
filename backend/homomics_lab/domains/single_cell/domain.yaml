@@ -71,6 +71,15 @@ intents:
       - "PBMC"
       - "细胞"
       - "cell"
+    examples:
+      - "帮我分析这组单细胞数据"
+      - "做一下 scRNA-seq 质控和聚类"
+      - "run single cell pipeline on PBMC data"
+      - "做 PBMC 细胞分群"
+      - "画一下 UMAP"
+      - "做一下质控"
+      - "跑个 PCA"
+      - "找出差异表达基因"
     complexity_indicators:
       - "分析"
       - "analysis"
@@ -79,15 +88,18 @@ intents:
       - "全流程"
       - "完整"
     data_scale_patterns:
-      - "(\d+)\s*个细胞"
-      - "(\d+)\s*cells"
-      - "(\d+)k\s*cells"
+      - '(\\d+)\\s*个细胞'
+      - '(\\d+)\\s*cells'
+      - '(\\d+)k\\s*cells'
 
   - analysis_type: scRNA
     keywords:
       - "scRNA-seq"
       - "scrna"
       - "单细胞转录组"
+    examples:
+      - "分析 scRNA-seq 数据"
+      - "单细胞转录组测序分析"
     complexity_indicators: []
     data_scale_patterns: []
 

@@ -14,9 +14,12 @@ Core workflow:
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.models.common import PlotAttachment
+from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.skill_dag import SkillDAG
 
 
@@ -40,6 +43,7 @@ class Interpretation:
     key_findings: List[str] = field(default_factory=list)
     quality_assessment: Optional[QualityAssessment] = None
     recommendations: List["Recommendation"] = field(default_factory=list)
+    plots: List[PlotAttachment] = field(default_factory=list)
     confidence: float = 0.8
 
 
@@ -101,15 +105,19 @@ class InterpretationEngine:
             phase, skill_output, quality, data_state
         )
 
+        # 5. Extract visualization plots
+        plots = self._extract_plots(phase, skill_output)
+
         interpretation = Interpretation(
             summary=summary,
             key_findings=findings,
             quality_assessment=quality,
             recommendations=recommendations,
+            plots=plots,
             confidence=0.85 if not quality.has_anomaly() else 0.6,
         )
 
-        # 5. Auto-archive anomalies into CBKB
+        # 6. Auto-archive anomalies into CBKB
         if cbkb is not None and quality.has_anomaly():
             self._archive_to_cbkb(phase, interpretation, cbkb)
 
@@ -359,3 +367,19 @@ class InterpretationEngine:
                 )
 
         return recommendations
+
+    def _extract_plots(
+        self,
+        phase: Phase,
+        skill_output: Dict[str, Any],
+    ) -> List[PlotAttachment]:
+        """Extract visualization plots from skill output.
+
+        Delegates to the shared helper so extraction logic stays consistent
+        across InterpretationEngine, TurnRunner and the chat API.
+        """
+        return extract_plot_attachments(
+            skill_output,
+            default_plot_type=phase.phase_type,
+            default_title=f"{phase.phase_type} visualization",
+        )

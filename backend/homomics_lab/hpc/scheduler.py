@@ -12,8 +12,11 @@ import shutil
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
+from uuid import uuid4
 
+from homomics_lab.hpc.pubsub import ExecutionPubSub, get_default_pubsub
+from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.sandbox import LocalSandbox
 
@@ -51,9 +54,16 @@ class ExecutionResult:
 class BaseScheduler(ABC):
     """Abstract base class for job schedulers."""
 
-    def __init__(self, working_dir: Path = None):
+    def __init__(
+        self,
+        working_dir: Path = None,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        pubsub: Optional[ExecutionPubSub] = None,
+    ):
         self.working_dir = working_dir or Path.cwd()
         self.working_dir.mkdir(parents=True, exist_ok=True)
+        self._pubsub = pubsub or get_default_pubsub()
+        self._progress_callback = progress_callback
 
     @classmethod
     @abstractmethod
@@ -71,6 +81,28 @@ class BaseScheduler(ABC):
     ) -> Dict[str, Any]:
         """Execute a skill and return its output."""
         pass
+
+    def _new_job_id(self, prefix: str = "job") -> str:
+        """Generate a unique job id."""
+        return f"{prefix}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+
+    def _report_progress(self, state: ExecutionState) -> None:
+        """Publish a state update to the default pubsub and optional callback."""
+        self._pubsub.publish(state.job_id, state)
+        if self._progress_callback is not None:
+            try:
+                self._progress_callback(state)
+            except Exception:
+                # Never break execution because of a monitoring callback.
+                pass
+
+    @staticmethod
+    def _tail_logs(path: Path, max_lines: int = 50) -> List[str]:
+        """Return the last N lines of a log file, if it exists."""
+        if not path.exists():
+            return []
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        return lines[-max_lines:] if len(lines) > max_lines else lines
 
     def _parse_time_to_seconds(self, time_str: str) -> int:
         """Parse time string like '30m', '2h', '1d' into seconds."""
@@ -90,8 +122,13 @@ class BaseScheduler(ABC):
 class LocalScheduler(BaseScheduler):
     """Execute skills locally using the sandbox."""
 
-    def __init__(self, working_dir: Path = None):
-        super().__init__(working_dir)
+    def __init__(
+        self,
+        working_dir: Path = None,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        pubsub: Optional[ExecutionPubSub] = None,
+    ):
+        super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.sandbox = LocalSandbox(working_dir=self.working_dir)
 
     @classmethod
@@ -105,6 +142,20 @@ class LocalScheduler(BaseScheduler):
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
     ) -> Dict[str, Any]:
+        job_id = self._new_job_id(f"local_{skill.id}")
+        started_at = datetime.now(timezone.utc)
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="PENDING",
+                current_phase=skill.id,
+                progress_pct=0.0,
+                started_at=started_at,
+                scheduler_type="local",
+            )
+        )
+
         exec_type = skill.runtime.type.lower()
 
         # Mixed defaults to python unless primary_tool suggests R
@@ -116,17 +167,69 @@ class LocalScheduler(BaseScheduler):
             }
             exec_type = "r" if primary in r_tools else "python"
 
-        if exec_type == "r":
-            return await self.sandbox.run_r(code, inputs, timeout_seconds=timeout_seconds)
-        else:
-            return await self.sandbox.run_python(code, inputs, timeout_seconds=timeout_seconds)
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="RUNNING",
+                current_phase=skill.id,
+                progress_pct=10.0,
+                started_at=started_at,
+                scheduler_type="local",
+            )
+        )
+
+        try:
+            if exec_type == "r":
+                result = await self.sandbox.run_r(
+                    code, inputs, timeout_seconds=timeout_seconds
+                )
+            else:
+                result = await self.sandbox.run_python(
+                    code, inputs, timeout_seconds=timeout_seconds
+                )
+        except Exception as exc:
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="FAILED",
+                    current_phase=skill.id,
+                    progress_pct=0.0,
+                    started_at=started_at,
+                    error_message=str(exc),
+                    scheduler_type="local",
+                )
+            )
+            raise
+
+        status = "COMPLETED" if result.get("status") != "error" else "FAILED"
+        error_message = result.get("error") if status == "FAILED" else None
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status=status,
+                current_phase=skill.id,
+                progress_pct=100.0,
+                started_at=started_at,
+                error_message=error_message,
+                scheduler_type="local",
+            )
+        )
+
+        return result
 
 
 class SlurmScheduler(BaseScheduler):
     """Submit skills as SLURM batch jobs."""
 
-    def __init__(self, working_dir: Path = None, partition: str = None):
-        super().__init__(working_dir)
+    def __init__(
+        self,
+        working_dir: Path = None,
+        partition: str = None,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        pubsub: Optional[ExecutionPubSub] = None,
+    ):
+        super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.partition = partition
 
     @classmethod
@@ -174,7 +277,7 @@ class SlurmScheduler(BaseScheduler):
                 lines.append("cat > \"$TMPDIR/skill.R\" << 'RSCRIPT_EOF'")
                 lines.append(code)
                 lines.append("RSCRIPT_EOF")
-                lines.append(f"Rscript \"$TMPDIR/skill.R\"")
+                lines.append("Rscript \"$TMPDIR/skill.R\"")
             else:
                 lines.extend(self._wrap_python(code, job_name))
         else:
@@ -189,7 +292,7 @@ class SlurmScheduler(BaseScheduler):
             "cat > \"$TMPDIR/skill.py\" << 'PYSCRIPT_EOF'",
             code,
             "PYSCRIPT_EOF",
-            f"python \"$TMPDIR/skill.py\"",
+            "python \"$TMPDIR/skill.py\"",
         ]
 
     def _format_slurm_time(self, time_str: str) -> str:
@@ -207,6 +310,7 @@ class SlurmScheduler(BaseScheduler):
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
     ) -> Dict[str, Any]:
+        started_at = datetime.now(timezone.utc)
         job_name = f"homomics_{skill.id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
         # Write inputs to JSON for the job to read
@@ -241,9 +345,22 @@ class SlurmScheduler(BaseScheduler):
         except IndexError:
             job_id = "unknown"
 
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="PENDING",
+                current_phase=skill.id,
+                progress_pct=5.0,
+                started_at=started_at,
+                scheduler_type="slurm",
+            )
+        )
+
         # For MVP, poll until job completes (fire-and-forget for async workflows)
         # In production, this would be async with callbacks
-        result = await self._poll_job(job_id, job_name, timeout_seconds)
+        result = await self._poll_job(
+            job_id, job_name, timeout_seconds, skill.id, started_at
+        )
         return result
 
     def _inject_python_inputs(self, code: str, inputs_path: str) -> str:
@@ -272,10 +389,17 @@ for (var_name in names(skill_inputs)) {{
         job_id: str,
         job_name: str,
         timeout_seconds: float,
+        phase: str = "",
+        started_at: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """Poll SLURM job until completion."""
-        start = datetime.now(timezone.utc)
+        start = started_at or datetime.now(timezone.utc)
         poll_interval = 5  # seconds
+        status_progress = {
+            "PENDING": 10.0,
+            "RUNNING": 50.0,
+            "COMPLETING": 90.0,
+        }
 
         while True:
             await asyncio.sleep(poll_interval)
@@ -284,6 +408,17 @@ for (var_name in names(skill_inputs)) {{
             if elapsed > timeout_seconds:
                 # Cancel job on timeout
                 await self._cancel_job(job_id)
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="CANCELLED",
+                        current_phase=phase,
+                        progress_pct=0.0,
+                        started_at=start,
+                        error_message=f"Timed out after {timeout_seconds}s",
+                        scheduler_type="slurm",
+                    )
+                )
                 raise TimeoutError(f"SLURM job {job_id} timed out after {timeout_seconds}s")
 
             # Check job status
@@ -294,21 +429,58 @@ for (var_name in names(skill_inputs)) {{
             )
             stdout, _ = await proc.communicate()
 
-            status = stdout.decode().strip().split("|")[0].strip() if stdout else "UNKNOWN"
+            slurm_status = stdout.decode().strip().split("|")[0].strip() if stdout else "UNKNOWN"
+            progress_pct = status_progress.get(slurm_status, 10.0)
+            logs = self._tail_logs(self.working_dir / f"{job_name}.out")
 
-            if status in ("COMPLETED",):
+            if slurm_status == "RUNNING":
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="RUNNING",
+                        current_phase=phase,
+                        progress_pct=progress_pct,
+                        started_at=start,
+                        logs=logs,
+                        scheduler_type="slurm",
+                    )
+                )
+            elif slurm_status in ("COMPLETED",):
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="COMPLETED",
+                        current_phase=phase,
+                        progress_pct=100.0,
+                        started_at=start,
+                        logs=logs,
+                        scheduler_type="slurm",
+                    )
+                )
                 # Read output
                 result_path = self.working_dir / f"{job_name}_result.json"
                 if result_path.exists():
                     return json.loads(result_path.read_text())
                 return {"status": "completed", "job_id": job_id}
 
-            elif status in ("FAILED", "CANCELLED", "TIMEOUT"):
+            elif slurm_status in ("FAILED", "CANCELLED", "TIMEOUT"):
                 err_path = self.working_dir / f"{job_name}.err"
-                err_msg = err_path.read_text() if err_path.exists() else f"Job {status}"
-                raise RuntimeError(f"SLURM job {job_id} {status}: {err_msg}")
+                err_msg = err_path.read_text() if err_path.exists() else f"Job {slurm_status}"
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="FAILED" if slurm_status != "CANCELLED" else "CANCELLED",
+                        current_phase=phase,
+                        progress_pct=0.0,
+                        started_at=start,
+                        error_message=err_msg,
+                        logs=logs,
+                        scheduler_type="slurm",
+                    )
+                )
+                raise RuntimeError(f"SLURM job {job_id} {slurm_status}: {err_msg}")
 
-            # Otherwise: PENDING, RUNNING, etc. — keep polling
+            # Otherwise: PENDING, etc. — keep polling
 
     async def _cancel_job(self, job_id: str) -> None:
         """Cancel a running SLURM job."""
@@ -323,8 +495,14 @@ for (var_name in names(skill_inputs)) {{
 class NextflowRunner(BaseScheduler):
     """Execute skills via Nextflow workflow engine."""
 
-    def __init__(self, working_dir: Path = None, config_file: Path = None):
-        super().__init__(working_dir)
+    def __init__(
+        self,
+        working_dir: Path = None,
+        config_file: Path = None,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        pubsub: Optional[ExecutionPubSub] = None,
+    ):
+        super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.config_file = config_file
 
     @classmethod
@@ -439,6 +617,9 @@ Rscript script.R"""
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
     ) -> Dict[str, Any]:
+        job_id = self._new_job_id(f"nf_{skill.id}")
+        started_at = datetime.now(timezone.utc)
+
         script = self._build_nextflow_script(skill, code, inputs)
 
         nf_file = self.working_dir / f"{skill.id.replace('-', '_')}.nf"
@@ -448,11 +629,33 @@ Rscript script.R"""
         if self.config_file:
             cmd.extend(["-c", str(self.config_file)])
 
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="PENDING",
+                current_phase=skill.id,
+                progress_pct=5.0,
+                started_at=started_at,
+                scheduler_type="nextflow",
+            )
+        )
+
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self.working_dir),
+        )
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="RUNNING",
+                current_phase=skill.id,
+                progress_pct=25.0,
+                started_at=started_at,
+                scheduler_type="nextflow",
+            )
         )
 
         try:
@@ -463,10 +666,48 @@ Rscript script.R"""
         except asyncio.TimeoutError:
             if proc.returncode is None:
                 proc.kill()
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="CANCELLED",
+                    current_phase=skill.id,
+                    progress_pct=0.0,
+                    started_at=started_at,
+                    error_message=f"Timed out after {timeout_seconds}s",
+                    scheduler_type="nextflow",
+                )
+            )
             raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
 
+        logs = stdout.decode().splitlines()
+
         if proc.returncode != 0:
-            raise RuntimeError(f"Nextflow failed: {stderr.decode()}")
+            error_message = stderr.decode()
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="FAILED",
+                    current_phase=skill.id,
+                    progress_pct=0.0,
+                    started_at=started_at,
+                    error_message=error_message,
+                    logs=logs,
+                    scheduler_type="nextflow",
+                )
+            )
+            raise RuntimeError(f"Nextflow failed: {error_message}")
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="COMPLETED",
+                current_phase=skill.id,
+                progress_pct=100.0,
+                started_at=started_at,
+                logs=logs,
+                scheduler_type="nextflow",
+            )
+        )
 
         # Read result
         result_path = self.working_dir / "result.json"
@@ -475,10 +716,146 @@ Rscript script.R"""
 
         return {"raw_output": stdout.decode()}
 
+    async def run_project(
+        self,
+        nf_file: Path,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 3600.0,
+        weblog_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run a pre-generated Nextflow project/script.
+
+        Args:
+            nf_file: Path to the Nextflow script (e.g. main.nf).
+            inputs: Input parameters passed via -params-file.
+            timeout_seconds: Maximum runtime.
+            weblog_url: Optional URL to receive Nextflow weblog events.
+
+        Returns:
+            Execution result dict.
+        """
+        job_id = self._new_job_id("nf_project")
+        started_at = datetime.now(timezone.utc)
+
+        cmd = [
+            "nextflow",
+            "run",
+            str(nf_file),
+            "-work-dir",
+            str(self.working_dir / "work"),
+        ]
+        if self.config_file:
+            cmd.extend(["-c", str(self.config_file)])
+
+        # Write inputs as params file
+        params_file = self.working_dir / "params.json"
+        params_file.write_text(json.dumps(inputs))
+        cmd.extend(["-params-file", str(params_file)])
+
+        # Enable native Nextflow monitoring
+        trace_file = self.working_dir / "trace.txt"
+        timeline_file = self.working_dir / "timeline.html"
+        cmd.extend([
+            "-with-trace", str(trace_file),
+            "-with-timeline", str(timeline_file),
+        ])
+        if weblog_url:
+            cmd.extend(["-with-weblog", weblog_url])
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="PENDING",
+                current_phase="workflow",
+                progress_pct=5.0,
+                started_at=started_at,
+                scheduler_type="nextflow",
+            )
+        )
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(self.working_dir),
+        )
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="RUNNING",
+                current_phase="workflow",
+                progress_pct=25.0,
+                started_at=started_at,
+                scheduler_type="nextflow",
+            )
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            if proc.returncode is None:
+                proc.kill()
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="CANCELLED",
+                    current_phase="workflow",
+                    progress_pct=0.0,
+                    started_at=started_at,
+                    error_message=f"Timed out after {timeout_seconds}s",
+                    scheduler_type="nextflow",
+                )
+            )
+            raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
+
+        logs = stdout.decode().splitlines()
+
+        if proc.returncode != 0:
+            error_message = stderr.decode()
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="FAILED",
+                    current_phase="workflow",
+                    progress_pct=0.0,
+                    started_at=started_at,
+                    error_message=error_message,
+                    logs=logs,
+                    scheduler_type="nextflow",
+                )
+            )
+            raise RuntimeError(f"Nextflow failed: {error_message}")
+
+        self._report_progress(
+            ExecutionState(
+                job_id=job_id,
+                status="COMPLETED",
+                current_phase="workflow",
+                progress_pct=100.0,
+                started_at=started_at,
+                logs=logs,
+                scheduler_type="nextflow",
+            )
+        )
+
+        # Collect monitoring artifacts
+        result: Dict[str, Any] = {"raw_output": stdout.decode()}
+        if trace_file.exists():
+            result["trace"] = trace_file.read_text()
+        if timeline_file.exists():
+            result["timeline_path"] = str(timeline_file)
+        return result
+
 
 def get_scheduler(
     executor_type: str = "auto",
     working_dir: Path = None,
+    progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+    pubsub: Optional[ExecutionPubSub] = None,
     **kwargs,
 ) -> BaseScheduler:
     """Factory function to get the appropriate scheduler.
@@ -486,31 +863,40 @@ def get_scheduler(
     Args:
         executor_type: "auto", "local", "slurm", or "nextflow"
         working_dir: Working directory for job files
+        progress_callback: Optional callback for ExecutionState updates
+        pubsub: Optional pubsub instance for execution events
         **kwargs: Additional scheduler-specific options
 
     Returns:
         BaseScheduler instance
     """
     working_dir = working_dir or Path.cwd()
+    scheduler_kwargs = {
+        "working_dir": working_dir,
+        "progress_callback": progress_callback,
+        "pubsub": pubsub,
+    }
 
     if executor_type == "local":
-        return LocalScheduler(working_dir=working_dir)
+        return LocalScheduler(**scheduler_kwargs)
 
     elif executor_type == "slurm":
         partition = kwargs.get("partition")
-        return SlurmScheduler(working_dir=working_dir, partition=partition)
+        return SlurmScheduler(partition=partition, **scheduler_kwargs)
 
     elif executor_type == "nextflow":
         config_file = kwargs.get("config_file")
-        return NextflowRunner(working_dir=working_dir, config_file=config_file)
+        return NextflowRunner(config_file=config_file, **scheduler_kwargs)
 
     elif executor_type == "auto":
         # Prefer SLURM if available, fall back to local
         # Nextflow is only used when explicitly requested (not suitable for single-skill execution)
         if SlurmScheduler.is_available():
-            return SlurmScheduler(working_dir=working_dir, partition=kwargs.get("partition"))
+            return SlurmScheduler(
+                partition=kwargs.get("partition"), **scheduler_kwargs
+            )
         else:
-            return LocalScheduler(working_dir=working_dir)
+            return LocalScheduler(**scheduler_kwargs)
 
     else:
         raise ValueError(f"Unknown executor type: {executor_type}")

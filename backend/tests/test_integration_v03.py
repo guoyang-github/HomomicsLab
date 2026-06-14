@@ -8,16 +8,14 @@ Covers cross-module workflows:
 
 import pytest
 
-from homomics_lab.agent.core import AgentCore, DynamicAgent, RoleDefinition, RoleRegistry
+from homomics_lab.agent.core import AgentCore, RoleDefinition, RoleRegistry
 from homomics_lab.agent.agent_registry import AgentRegistry
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.models import DataState
-from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillOutputSchema, SkillRuntime
 from homomics_lab.skills.registry import SkillRegistry
-from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.workspace.manager import WorkspaceManager
 from homomics_lab.models.common import TaskStatus
 from homomics_lab.tasks.models import TaskNode
@@ -179,9 +177,9 @@ class TestWorkspaceVersionLockIntegration:
 
 class TestPlanEngineAgentCoreIntegration:
 
-    def test_plan_engine_produces_routable_phases(self):
+    @pytest.mark.asyncio
+    async def test_plan_engine_produces_routable_phases(self):
         """PlanEngine output phases should be resolvable by AgentCore."""
-        from homomics_lab.skills.registry import SkillRegistry
         engine = PlanEngine(skill_registry=SkillRegistry())
         intent = UserIntent(
             analysis_type="single_cell",
@@ -189,7 +187,7 @@ class TestPlanEngineAgentCoreIntegration:
             data_scale="medium",
         )
         data_state = DataState()
-        plan = engine.plan(intent, data_state)
+        plan = await engine.plan(intent, data_state)
 
         core = AgentCore(
             role_registry=RoleRegistry(),

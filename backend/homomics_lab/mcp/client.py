@@ -138,3 +138,9 @@ class BioMCPClient:
     async def search_geo(self, query: str, retmax: int = 10) -> Dict[str, Any]:
         """Convenience method: search GEO."""
         return await self.call_tool("geo_search", {"query": query, "retmax": retmax})
+
+    async def close(self) -> None:
+        """Close any open MCP session."""
+        if self._session is not None and hasattr(self._session, "close"):
+            await self._session.close()
+        self._session = None

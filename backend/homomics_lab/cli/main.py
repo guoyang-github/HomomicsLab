@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-from pathlib import Path
 
 from homomics_lab.cli.commands.init import init_domain
 from homomics_lab.cli.commands.validate import validate_domain

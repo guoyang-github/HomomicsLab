@@ -15,8 +15,8 @@ HomomicsLab uses a layered hybrid architecture:
 3. **Intent analyzer** determines query type
 4. **PlanEngine** generates strategy-aware execution plan (NOT SkillDAG traversal)
 5. **AgentCore** resolves the best **DynamicAgent** for each task (1 Analyst + N on-demand Specialists)
-6. **Orchestrator** dispatches tasks via state machine
-7. Agents execute skills in **SkillRuntimeExecutor** sandbox
+6. **Orchestrator** dispatches tasks via state machine; long-running workflows are submitted as background **Job**s
+7. **BackgroundJobRunner** executes jobs and streams progress via **ExecutionPubSub**; Agents execute skills in **SkillRuntimeExecutor** sandbox
 8. **InterpretationEngine** interprets phase results and recommends next steps
 9. **StabilityGuard** validates schemas (L1) and locks versions (L2)
 10. **ReproducibilityEngine** captures code, plans, HITL decisions, and environment lock
@@ -35,6 +35,7 @@ HomomicsLab uses a layered hybrid architecture:
 - `agent/interpretation.py` — **InterpretationEngine**: phase-level result interpretation with anomaly detection
 - `agent/orchestrator.py` — **Orchestrator**: task scheduler with retry, HITL, and progress tracking
 - `agent/turn_runner.py` — **TurnRunner**: unified conversational turn execution loop
+- `jobs/` — **JobService + BackgroundJobRunner**: persistent SQLite-backed job queue and background execution worker
 
 ### Skills Layer (`skills/`)
 - `skills/registry.py` — **SkillRegistry**: discovers and registers skills

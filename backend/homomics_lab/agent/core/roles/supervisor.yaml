@@ -1,0 +1,20 @@
+role_id: supervisor
+name: Supervisor
+agent_type: supervisor
+description: |
+  Top-level supervisor agent. Plans, delegates tasks to workers, reviews
+  outcomes, and triggers replanning or human escalation when needed.
+allowed_skills: []
+permissions:
+  can_execute: false
+  can_review: true
+  can_delegate: true
+  can_spawn_specialist: true
+  can_access_workspace: true
+  can_call_shell: false
+  max_concurrent_tasks: 1
+priority: 5
+tags:
+  - system
+metadata:
+  system: true

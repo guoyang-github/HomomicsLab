@@ -15,6 +15,8 @@ class ExecutionSnapshot:
     plan_version: str
     plan_prompt: str = ""
     plan_llm_model: str = ""
+    plan_id: Optional[str] = None
+    plan_result: Optional[Dict[str, Any]] = None
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 

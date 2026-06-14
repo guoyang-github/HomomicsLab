@@ -1,6 +1,6 @@
 """Models for PlanEngine."""
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.skills.models import SkillDefinition
@@ -8,32 +8,105 @@ from homomics_lab.skills.models import SkillDefinition
 
 @dataclass
 class DataState:
-    """Current state of the data being analyzed.
+    """Current state of the data being analyzed — domain-extensible.
 
     PlanEngine uses this to decide whether to insert, skip, or modify steps.
+
+    Universal fields (all domains):
+      - current_phase: current execution phase
+      - has_qc: whether QC has been completed
+      - low_quality: whether data quality is flagged
+      - n_samples: number of samples
+
+    Domain-specific fields are stored in domain_state[<domain>][<field>].
+    This avoids DataState field proliferation when adding new domains.
+
+    Access patterns:
+      ds.has_qc                    # universal field (direct attribute)
+      ds.get("n_cells")           # tries direct attr, then all domain namespaces
+      ds.get("host_contamination", domain="metagenomics")  # specific namespace
+      ds.set("n_asvs", 5000, domain="metagenomics")        # set in namespace
     """
 
-    current_phase: Optional[str] = None  # e.g., "qc_complete"
+    # ── Universal fields (all domains) ──
+    current_phase: Optional[str] = None
     has_qc: bool = False
+    low_quality: bool = False
+    n_samples: Optional[int] = None
+
+    # ── Legacy single-cell fields (for backward compatibility) ──
+    # These will be deprecated in favor of domain_state["single_cell"]
     has_normalization: bool = False
     has_pca: bool = False
     has_clustering: bool = False
     has_annotation: bool = False
-
-    # Data characteristics
-    n_samples: Optional[int] = None
     n_cells: Optional[int] = None
     n_genes: Optional[int] = None
     n_batches: Optional[int] = None
     batch_detected: bool = False
-    low_quality: bool = False
-    large_scale: bool = False  # > 100k cells
+    large_scale: bool = False
+
+    # ── Domain-specific state storage ──
+    domain_state: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    def get(self, key: str, domain: Optional[str] = None, default: Any = None) -> Any:
+        """Get a state value with flexible lookup.
+
+        Lookup order:
+        1. If domain specified: check domain_state[domain][key]
+        2. Check direct attribute on self
+        3. Search all domain namespaces for key
+        4. Return default
+        """
+        # 1. Specific domain namespace
+        if domain is not None:
+            if domain in self.domain_state and key in self.domain_state[domain]:
+                return self.domain_state[domain][key]
+            return default
+
+        # 2. Direct attribute
+        if hasattr(self, key):
+            val = getattr(self, key)
+            if val is not None:
+                return val
+
+        # 3. Search all domain namespaces
+        for ns_values in self.domain_state.values():
+            if key in ns_values:
+                return ns_values[key]
+
+        # 4. Default
+        return default
+
+    def set(self, key: str, value: Any, domain: Optional[str] = None) -> None:
+        """Set a state value.
+
+        If domain is specified, stores in domain_state[domain][key].
+        Otherwise, tries to set as direct attribute (for universal fields).
+        """
+        if domain is not None:
+            if domain not in self.domain_state:
+                self.domain_state[domain] = {}
+            self.domain_state[domain][key] = value
+        elif hasattr(self, key) and key != "domain_state":
+            setattr(self, key, value)
+        else:
+            # Fallback: store in a "_general" namespace
+            if "_general" not in self.domain_state:
+                self.domain_state["_general"] = {}
+            self.domain_state["_general"][key] = value
 
     def to_context(self) -> str:
         """Generate a human-readable description of the data state."""
         parts = []
         if self.has_qc:
             parts.append("QC completed")
+        if self.low_quality:
+            parts.append("low data quality")
+        if self.n_samples is not None:
+            parts.append(f"{self.n_samples} samples")
+
+        # Single-cell context
         if self.has_normalization:
             parts.append("normalized")
         if self.has_pca:
@@ -44,11 +117,33 @@ class DataState:
             parts.append("cell types annotated")
         if self.batch_detected:
             parts.append("multiple batches detected")
-        if self.low_quality:
-            parts.append("low data quality")
         if self.large_scale:
             parts.append("large dataset")
+
+        # Domain-specific context
+        for domain, fields in self.domain_state.items():
+            if domain.startswith("_"):
+                continue
+            for field_name, value in fields.items():
+                if isinstance(value, bool) and value:
+                    parts.append(f"{domain}.{field_name}")
+                elif value is not None and not isinstance(value, bool):
+                    parts.append(f"{domain}.{field_name}={value}")
+
         return ", ".join(parts) if parts else "raw data"
+
+    def has_field(self, key: str) -> bool:
+        """Check if a field exists (has non-None value)."""
+        return self.get(key) is not None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DataState":
+        """Deserialize from a plain dict."""
+        return cls(**data)
 
 
 @dataclass
@@ -63,6 +158,27 @@ class PlannedGap:
     estimated_complexity: str = "simple"  # "simple" | "moderate" | "complex"
     requires_hitl: bool = False
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PlannedGap":
+        """Deserialize from a plain dict."""
+        return cls(**data)
+
+
+@dataclass
+class SuccessCriterion:
+    """A single success criterion for a phase gate."""
+
+    metric: str  # e.g. "result.qc.pass_rate" or "data_state.n_cells"
+    operator: str  # >, <, ==, >=, <=, in, not_in, contains
+    threshold: Any
+    on_failure: str = "hitl"  # "hitl" | "replan"
+    message: str = ""
+    replan_context: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class Phase:
@@ -74,10 +190,34 @@ class Phase:
     selected_skill: Optional[SkillDefinition] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
     agent_code: Optional[str] = None  # Agent-generated bridging code
+    readonly: bool = False  # True for suggestion-only phases (e.g., LLM-generated code)
+    success_criteria: List[SuccessCriterion] = field(default_factory=list)
+    snapshot_policy: str = "auto"  # "auto" | "always" | "never"
 
     def __post_init__(self):
         if not self.description:
             self.description = f"{self.phase_type} analysis step"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize phase to a plain dict."""
+        data = asdict(self)
+        if self.selected_skill is not None:
+            data["selected_skill"] = self.selected_skill.model_dump(mode="json")
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Phase":
+        """Deserialize phase from a plain dict."""
+        data = dict(data)
+        skill_data = data.get("selected_skill")
+        if skill_data is not None:
+            data["selected_skill"] = SkillDefinition.model_validate(skill_data)
+        criteria_data = data.get("success_criteria")
+        if criteria_data is not None:
+            data["success_criteria"] = [
+                SuccessCriterion(**c) for c in criteria_data
+            ]
+        return cls(**data)
 
 
 @dataclass
@@ -89,6 +229,8 @@ class PlanResult:
     data_state: DataState
     gaps: List[PlannedGap] = field(default_factory=list)
     reproducibility_context: Dict[str, Any] = field(default_factory=dict)
+    is_fallback: bool = False
+    suggestion_text: Optional[str] = None
 
     @property
     def skill_sequence(self) -> List[str]:
@@ -98,3 +240,28 @@ class PlanResult:
             for p in self.phases
             if p.selected_skill is not None
         ]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize plan result to a plain dict."""
+        return {
+            "phases": [p.to_dict() for p in self.phases],
+            "strategy_name": self.strategy_name,
+            "data_state": self.data_state.to_dict(),
+            "gaps": [g.to_dict() for g in self.gaps],
+            "reproducibility_context": self.reproducibility_context,
+            "is_fallback": self.is_fallback,
+            "suggestion_text": self.suggestion_text,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PlanResult":
+        """Deserialize plan result from a plain dict."""
+        return cls(
+            phases=[Phase.from_dict(p) for p in data.get("phases", [])],
+            strategy_name=data.get("strategy_name", "unknown"),
+            data_state=DataState.from_dict(data.get("data_state", {})),
+            gaps=[PlannedGap.from_dict(g) for g in data.get("gaps", [])],
+            reproducibility_context=data.get("reproducibility_context", {}),
+            is_fallback=data.get("is_fallback", False),
+            suggestion_text=data.get("suggestion_text"),
+        )

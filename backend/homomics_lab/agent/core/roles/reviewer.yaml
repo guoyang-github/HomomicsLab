@@ -1,0 +1,20 @@
+role_id: reviewer
+name: Reviewer
+agent_type: reviewer
+description: |
+  Independent reviewer. Validates Worker results and Phase Gate outcomes,
+  and can recommend proceed, replan, or human escalation.
+allowed_skills: []
+permissions:
+  can_execute: false
+  can_review: true
+  can_delegate: false
+  can_spawn_specialist: false
+  can_access_workspace: true
+  can_call_shell: false
+  max_concurrent_tasks: 1
+priority: 1000
+tags:
+  - system
+metadata:
+  system: true

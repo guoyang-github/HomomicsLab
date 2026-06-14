@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 class RolePermissions(BaseModel):
     can_execute: bool = True
     can_review: bool = False
+    can_delegate: bool = False
     can_spawn_specialist: bool = False
     can_access_workspace: bool = True
     can_call_shell: bool = False

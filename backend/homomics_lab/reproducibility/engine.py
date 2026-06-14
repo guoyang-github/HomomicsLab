@@ -3,8 +3,7 @@
 import platform
 import subprocess
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from homomics_lab.reproducibility.bundle import (
     CodeSnippet,
@@ -50,6 +49,8 @@ class ReproducibilityEngine:
         self,
         task_tree: Dict[str, Any],
         plan_context: Dict[str, Any],
+        plan_id: Optional[str] = None,
+        plan_result: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Record the generated execution plan."""
         if self._bundle is None:
@@ -60,6 +61,8 @@ class ReproducibilityEngine:
             plan_version=plan_context.get("plan_engine_version", "unknown"),
             plan_prompt=plan_context.get("prompt", ""),
             plan_llm_model=plan_context.get("llm_model", ""),
+            plan_id=plan_id,
+            plan_result=plan_result,
         )
 
     def record_code(

@@ -308,6 +308,87 @@ The `DomainLoader` reads `domain.yaml` and automatically:
 
 ---
 
+## Domain Extension Architecture (v0.4.1)
+
+### DataState v2
+
+`DataState` (`homomics_lab.agent.plan.models.DataState`) is now domain-extensible to avoid field proliferation.
+
+- **Universal fields** are direct attributes: `current_phase`, `has_qc`, `low_quality`, `n_samples`.
+- **Legacy single-cell fields** remain for backward compatibility: `n_cells`, `batch_detected`, `large_scale`, etc.
+- **Domain-specific fields** live in `domain_state[<domain>][<field>]`.
+
+```python
+from homomics_lab.agent.plan.models import DataState
+
+ds = DataState(n_samples=10)
+ds.set("host_contamination", 0.05, domain="metagenomics")
+ds.set("n_asvs", 5000, domain="metagenomics")
+
+# Lookup order: explicit domain -> direct attr -> any domain namespace -> default
+assert ds.get("host_contamination", domain="metagenomics") == 0.05
+assert ds.get("n_samples") == 10
+assert ds.get("missing_key", default="fallback") == "fallback"
+```
+
+`StateCheck` lambdas in strategies should use `.get()` / `.has_field()` for ambiguous fields so they work across domains.
+
+### DomainLoader
+
+`DomainLoader` reads a single `domain.yaml` and registers all components:
+
+```python
+from homomics_lab.domain.loader import DomainLoader
+from homomics_lab.agent.plan.strategies import StrategyLibrary
+from homomics_lab.skills.registry import get_default_registry
+
+loader = DomainLoader(
+    skill_registry=get_default_registry(),
+    strategy_lib=StrategyLibrary(),
+)
+domain = loader.load(Path("domains/metagenomics/domain.yaml"))
+```
+
+Validation failures raise `DomainLoaderError` with a list of problems.
+
+### DomainRegistry
+
+`DomainRegistry` (`homomics_lab.domain.registry`) is the central store for loaded domains. It provides:
+
+- `register(domain, loader, source_path)`
+- `get(domain_id)` / `list_all()` / `list_ids()`
+- `get_intent_config()` for `IntentAnalyzer`
+- `reload(domain_id)` for hot-reload
+
+The registry is populated during FastAPI startup (`homomics_lab.main.lifespan`) and exposed via `app.state.domain_registry`.
+
+### Hot-Reload
+
+`DomainHotReloader` watches `domain.yaml` files and reloads the domain on change:
+
+```python
+from homomics_lab.domain.hot_reload import DomainHotReloader
+
+reloader = DomainHotReloader(domain_registry, domain_loader)
+reloader.watch_domain(Path("domains/metagenomics/domain.yaml"))
+await reloader.start()
+```
+
+`SkillHotReloader` does the same for external skill directories when `HOMOMICS_EXTERNAL_SKILLS_DIR` is configured. Both are started in `main.py` lifespan and stopped on shutdown.
+
+### LLM Fallback Planning
+
+When `PlanEngine` cannot match a domain strategy (`strategy.name == "generic"`), it delegates to `LLMFallbackPlanner`:
+
+1. Semantic search over `SkillRegistry` for candidate skills.
+2. Prompt LLM to pick only from candidate skill IDs.
+3. Validate each chosen skill exists.
+4. Return a `PlanResult(is_fallback=True, ...)`.
+
+Fallback plans are executable but carry a `HITLCheckpoint` so the user confirms the LLM-chosen skill sequence before execution. If no API key is available, the planner returns a suggestion-only plan.
+
+---
+
 ## Design Principles
 
 1. **SkillDAG is NOT the plan driver**: Plans come from domain strategy templates. SkillDAG only assists selection and validates sequences.

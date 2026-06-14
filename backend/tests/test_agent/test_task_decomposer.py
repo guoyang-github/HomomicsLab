@@ -50,3 +50,34 @@ async def test_task_dependencies(decomposer):
     cluster_task = next(t for t in tree.tasks if t.name == "clustering")
     dr_task = next(t for t in tree.tasks if t.name == "dimensionality_reduction")
     assert dr_task.id in cluster_task.dependencies
+
+
+@pytest.mark.asyncio
+async def test_decompose_sub_intents(decomposer):
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="complex",
+        sub_intents=[
+            UserIntent(analysis_type="qc", complexity="single_step"),
+            UserIntent(analysis_type="clustering", complexity="single_step"),
+        ],
+    )
+
+    tree = await decomposer.decompose(intent, context={})
+    task_names = [t.name for t in tree.tasks]
+    assert "quality_control" in task_names
+    assert "clustering" in task_names
+
+
+@pytest.mark.asyncio
+async def test_decompose_clarification(decomposer):
+    intent = UserIntent(
+        analysis_type="clarification",
+        complexity="direct_response",
+        metadata={"clarification_question": "请问您想分析什么数据？"},
+    )
+
+    tree = await decomposer.decompose(intent, context={})
+    assert len(tree.tasks) == 1
+    assert tree.tasks[0].phase == "clarification"
+    assert "想分析什么" in tree.tasks[0].description

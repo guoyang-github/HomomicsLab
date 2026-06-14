@@ -1,83 +1,53 @@
-import re
-from dataclasses import dataclass, field
-from typing import Optional
+"""Backward-compatible shim for intent analysis.
+
+The real implementation now lives in ``homomics_lab.agent.intent``. This file
+keeps the old ``IntentAnalyzer`` and ``UserIntent`` names importable so existing
+code does not break.
+"""
+
+from pathlib import Path
+from typing import Any, List, Optional
+
+from homomics_lab.agent.intent import CascadeIntentAnalyzer, UserIntent
 
 
-@dataclass
-class UserIntent:
-    analysis_type: str
-    complexity: str  # direct_response, single_step, complex
-    data_scale: Optional[str] = None
-    urgency: str = "normal"
-    domain_knowledge: list[str] = field(default_factory=list)
+class IntentAnalyzer(CascadeIntentAnalyzer):
+    """Backward-compatible intent analyzer.
 
+    Supports the original constructor signature ``(intents_dir, use_domain_registry)``
+    while delegating all behavior to the cascade analyzer.
+    """
 
-class IntentAnalyzer:
-    """Rule-based intent analyzer (LLM-enhanced in Phase 2)."""
+    def __init__(
+        self,
+        intents_dir: Optional[Path] = None,
+        use_domain_registry: bool = True,
+        **kwargs: Any,
+    ):
+        # Load legacy YAML intent definitions if intents_dir is provided.
+        definitions: List[Any] = []
+        if intents_dir is not None and intents_dir.exists():
+            import yaml
+            for yaml_file in intents_dir.glob("*.yaml"):
+                try:
+                    with open(yaml_file, "r", encoding="utf-8") as f:
+                        config = yaml.safe_load(f)
+                    if isinstance(config, dict) and "analysis_type" in config:
+                        definitions.append(config)
+                except Exception:
+                    continue
 
-    SINGLE_CELL_KEYWORDS = [
-        "单细胞", "single cell", "scRNA", "10x", "scanpy", "seurat",
-        "PBMC", "细胞", "cell"
-    ]
-
-    SPATIAL_KEYWORDS = [
-        "空间", "spatial", "visium", "xenium", "merfish"
-    ]
-
-    CONVERSION_KEYWORDS = [
-        "转换", "convert", "格式", "format", "变成", "转成"
-    ]
-
-    QA_KEYWORDS = [
-        "什么是", "how to", "怎么", "如何", "explain"
-    ]
-
-    COMPLEX_KEYWORDS = [
-        "分析", "analysis", "流程", "pipeline", "全流程", "完整"
-    ]
-
-    async def analyze(self, message: str) -> UserIntent:
-        text = message.lower()
-
-        # Determine analysis type — QA keywords have highest priority
-        if any(kw in text for kw in self.QA_KEYWORDS):
-            analysis_type = "qa"
-        elif any(kw in text for kw in self.SINGLE_CELL_KEYWORDS):
-            analysis_type = "single_cell_analysis"
-        elif any(kw in text for kw in self.SPATIAL_KEYWORDS):
-            analysis_type = "spatial_analysis"
-        elif any(kw in text for kw in self.CONVERSION_KEYWORDS):
-            analysis_type = "file_conversion"
-        else:
-            analysis_type = "general"
-
-        # Determine complexity
-        if analysis_type == "qa":
-            complexity = "direct_response"
-        elif analysis_type == "file_conversion":
-            complexity = "single_step"
-        elif any(kw in text for kw in self.COMPLEX_KEYWORDS):
-            complexity = "complex"
-        else:
-            complexity = "single_step"
-
-        # Extract data scale hint
-        data_scale = self._extract_data_scale(text)
-
-        return UserIntent(
-            analysis_type=analysis_type,
-            complexity=complexity,
-            data_scale=data_scale,
+        super().__init__(
+            definitions=definitions or None,
+            use_domain_registry=use_domain_registry,
+            **kwargs,
         )
 
-    def _extract_data_scale(self, text: str) -> Optional[str]:
-        patterns = [
-            r'(\d+)\s*个细胞',
-            r'(\d+)\s*cells',
-            r'(\d+)k\s*cells',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, text)
-            if match:
-                return match.group(0)
-        return None
+        # Register any legacy YAML definitions at runtime.
+        for config in definitions:
+            analysis_type = config.get("analysis_type")
+            if analysis_type:
+                self.register_intent(analysis_type, config)
+
+
+__all__ = ["IntentAnalyzer", "UserIntent"]

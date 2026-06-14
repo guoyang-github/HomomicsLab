@@ -15,6 +15,7 @@ from homomics_lab.skills.sandbox import LocalSandbox
 from homomics_lab.skills.tracker import SkillPerformanceTracker
 from homomics_lab.hpc.scheduler import get_scheduler, BaseScheduler
 from homomics_lab.stability.schema_validator import SchemaValidator
+from homomics_lab.tools.registry import ToolRegistry, get_default_tool_registry
 
 
 class SkillRuntimeExecutor:
@@ -31,6 +32,7 @@ class SkillRuntimeExecutor:
         executor_type: str = "local",
         tracker: SkillPerformanceTracker = None,
         schema_validator: SchemaValidator = None,
+        tool_registry: Optional[ToolRegistry] = None,
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
@@ -38,6 +40,7 @@ class SkillRuntimeExecutor:
         self._scheduler: Optional[BaseScheduler] = None
         self.tracker = tracker
         self.schema_validator = schema_validator
+        self.tool_registry = tool_registry or get_default_tool_registry()
 
     def _get_scheduler(self) -> BaseScheduler:
         """Lazy initialization of the scheduler."""
@@ -81,6 +84,10 @@ class SkillRuntimeExecutor:
         # Determine execution strategy
         exec_type = self._resolve_execution_type(skill)
 
+        # MCP-backed skills delegate to the ToolRegistry
+        if exec_type == "mcp":
+            return await self._execute_mcp_skill(skill, validated)
+
         # Resolve scripts directory
         scripts_dir = self._resolve_scripts_dir(skill)
         if scripts_dir is None:
@@ -116,10 +123,10 @@ class SkillRuntimeExecutor:
                 )
 
     def _resolve_execution_type(self, skill: SkillDefinition) -> str:
-        """Determine the execution type (python or r) for a skill."""
+        """Determine the execution type (python, r, or mcp) for a skill."""
         runtime_type = skill.runtime.type.lower()
 
-        if runtime_type in ("python", "r"):
+        if runtime_type in ("python", "r", "mcp"):
             return runtime_type
 
         if runtime_type == "mixed":
@@ -134,6 +141,22 @@ class SkillRuntimeExecutor:
             return "python"
 
         return "python"
+
+    async def _execute_mcp_skill(
+        self,
+        skill: SkillDefinition,
+        inputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute an MCP-backed skill by delegating to the ToolRegistry."""
+        tool_name = skill.metadata.get("tool_name")
+        if not tool_name:
+            raise RuntimeError(f"MCP skill '{skill.id}' is missing metadata.tool_name")
+        result = await self.tool_registry.invoke_async(tool_name, inputs)
+        return {
+            "success": result.success,
+            "output": result.output,
+            "error_message": result.error_message,
+        }
 
     def _resolve_scripts_dir(self, skill: SkillDefinition) -> Optional[Path]:
         """Resolve the scripts directory for a skill.

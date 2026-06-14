@@ -106,8 +106,8 @@ class StrategyLibrary:
 
         for domain_yaml in domains_dir.rglob("domain.yaml"):
             try:
-                domain = domain_loader.load(domain_yaml)
-            except Exception as e:
+                domain_loader.load(domain_yaml)
+            except Exception:
                 # Silently skip invalid domains during default loading
                 pass
 
@@ -149,25 +149,25 @@ SINGLE_CELL_STANDARD = AnalysisStrategy(
     ],
     state_checks=[
         StateCheck(
-            condition=lambda ds: ds.batch_detected,
+            condition=lambda ds: ds.get("batch_detected", default=False),
             action="insert",
             target="batch_correction",
             after="qc",
         ),
         StateCheck(
-            condition=lambda ds: ds.low_quality,
+            condition=lambda ds: ds.get("low_quality", default=False),
             action="insert",
             target="qc_advanced",
             after="qc",
         ),
         StateCheck(
-            condition=lambda ds: ds.large_scale,
+            condition=lambda ds: ds.get("large_scale", default=False),
             action="modify_param",
             target="dim_reduction",
             value={"n_pcs": 50, "method": "incremental_pca"},
         ),
         StateCheck(
-            condition=lambda ds: ds.has_qc,
+            condition=lambda ds: ds.get("has_qc", default=False),
             action="skip",
             target="qc",
         ),
@@ -187,7 +187,7 @@ SPATIAL_TRANSCRIPTOMICS = AnalysisStrategy(
     ],
     state_checks=[
         StateCheck(
-            condition=lambda ds: ds.n_cells is not None and ds.n_cells < 1000,
+            condition=lambda ds: ds.get("n_cells") is not None and ds.get("n_cells") < 1000,
             action="skip",
             target="spatial_deconvolution",
         ),

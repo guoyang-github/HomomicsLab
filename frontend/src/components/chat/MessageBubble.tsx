@@ -1,6 +1,8 @@
-import type { ChatMessage, TodoListContent, HITLContent, PlotContent, PlotDataContent } from '@/types/chat'
+import type { ChatMessage, TodoListContent, HITLContent, PlotContent, PlotDataContent, PlanRequestContent, DebateRequestContent } from '@/types/chat'
 import { TodoList } from './TodoList'
 import { HITLRequest } from './HITLRequest'
+import { PlanApproval } from './PlanApproval'
+import { DebateRequest } from './DebateRequest'
 import { PlotChart } from '../shared/PlotChart'
 
 function isTodoListContent(content: unknown): content is TodoListContent {
@@ -18,6 +20,24 @@ function isHITLContent(content: unknown): content is HITLContent {
     content !== null &&
     'checkpoint' in content &&
     'task_id' in content
+  )
+}
+
+function isPlanRequestContent(content: unknown): content is PlanRequestContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'plan_id' in content &&
+    'plan' in content
+  )
+}
+
+function isDebateRequestContent(content: unknown): content is DebateRequestContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'debate_id' in content &&
+    'options' in content
   )
 }
 
@@ -61,6 +81,16 @@ export function MessageBubble({ message }: Props) {
       case 'hitl_request':
         if (isHITLContent(message.content)) {
           return <HITLRequest checkpoint={message.content.checkpoint} taskId={message.content.task_id} />
+        }
+        return null
+      case 'plan_request':
+        if (isPlanRequestContent(message.content)) {
+          return <PlanApproval content={message.content} />
+        }
+        return null
+      case 'debate_request':
+        if (isDebateRequestContent(message.content)) {
+          return <DebateRequest content={message.content} />
         }
         return null
       case 'plot':

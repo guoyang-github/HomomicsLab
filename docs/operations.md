@@ -5,7 +5,8 @@
 1. [Quick Start](#quick-start)
 2. [Installation](#installation)
 3. [Configuration](#configuration)
-4. [Project Management](#project-management)
+4. [Domain Extension via CLI](#domain-extension-via-cli)
+5. [Project Management](#project-management)
 5. [Running Analyses](#running-analyses)
 6. [Agent Swarm Usage](#agent-swarm-usage)
 7. [HITL Interactions](#hitl-interactions)
@@ -112,9 +113,53 @@ RANDOM_SEED=42
 # Swarm
 MAX_PARALLELISM=3
 
-# CBKB Curation (cron expression for nightly)
-CURATION_SCHEDULE=0 2 * * *
+# Scheduled Tasks (APScheduler)
+HOMOMICS_CURATION_ENABLED=true
+HOMOMICS_CURATION_SCHEDULE=0 2 * * *
+HOMOMICS_NARRATIVE_REPORT_ENABLED=true
+HOMOMICS_NARRATIVE_REPORT_SCHEDULE=0 6 * * *
+HOMOMICS_SOP_PROPOSAL_ENABLED=true
+HOMOMICS_SOP_PROPOSAL_SCHEDULE=0 3 * * 0
+HOMOMICS_SCHEDULER_TIMEZONE=UTC
+# For development: run enabled jobs once shortly after startup
+HOMOMICS_SCHEDULER_RUN_AT_STARTUP=false
 ```
+
+Scheduled tasks run inside the API process. You can also trigger them manually:
+
+```bash
+curl -X POST http://localhost:8080/api/scheduler/jobs/cbkb_full_curation/run
+```
+
+And inspect recent runs:
+
+```bash
+curl http://localhost:8080/api/scheduler/runs?limit=10
+```
+
+### MCP Tools
+
+HomomicsLab ships with embedded MCP tools for public bioinformatics databases:
+
+- `pubmed_search` / `pubmed_fetch`
+- `uniprot_search`
+- `geo_search`
+
+Configuration:
+
+```env
+HOMOMICS_MCP_ENABLED=true
+HOMOMICS_MCP_MODE=embedded  # "embedded" is built-in; "stdio"/"sse" are planned
+```
+
+When enabled, agents will automatically invoke these tools for requests like:
+
+- "搜索 PubMed 单细胞 RNA-seq"
+- "查一下 UniProt p53"
+- "找 GEO 里的肿瘤表达数据集"
+
+MCP tools are also registered as lightweight skills, so the planner can include
+them in multi-step workflows.
 
 ### Frontend Config
 
@@ -146,6 +191,89 @@ permissions:
   - modify_workspace
 priority: 2
 ```
+
+---
+
+## Domain Extension via CLI
+
+HomomicsLab ships with a `homomics` command-line tool for managing domain extensions.
+
+### Installation
+
+After installing the package, the CLI is available as:
+
+```bash
+homomics --help
+```
+
+The console script is registered as `homomics` (not `homomics-lab`).
+
+### Commands
+
+#### `homomics init <name>`
+
+Scaffold a new domain directory.
+
+```bash
+homomics init metagenomics --phases qc,denoising,taxonomy --output ./domains
+```
+
+This creates:
+
+```
+domains/metagenomics/
+├── domain.yaml
+├── skills/
+│   └── .gitkeep
+└── README.md
+```
+
+#### `homomics validate <domain.yaml>`
+
+Validate a domain declaration before loading it.
+
+```bash
+homomics validate domains/metagenomics/domain.yaml --strict
+```
+
+#### `homomics install <source>`
+
+Install a domain from a local directory or a git repository.
+
+```bash
+# Local directory
+homomics install ./domains/metagenomics --domains-dir ./domains
+
+# Git repository
+homomics install https://github.com/example/homomics-metagenomics.git --domains-dir ./domains
+```
+
+#### `homomics generate --description "..."`
+
+Generate a domain scaffold from a natural-language description (LLM-assisted).
+
+```bash
+homomics generate \
+  "A spatial transcriptomics domain with QC, clustering, and deconvolution phases" \
+  --output ./domains \
+  --model gpt-4o
+```
+
+Requires `OPENAI_API_KEY` to be set.
+
+#### `homomics list`
+
+List all installed domains.
+
+```bash
+homomics list --domains-dir ./domains --verbose
+```
+
+### Domain Hot-Reload
+
+Domains declared in `backend/homomics_lab/domains/` are automatically loaded when the FastAPI server starts. Changes to `domain.yaml` files are detected and reloaded without restarting the server.
+
+External domains placed in `HOMOMICS_EXTERNAL_SKILLS_DIR` are also watched when that directory is configured.
 
 ---
 

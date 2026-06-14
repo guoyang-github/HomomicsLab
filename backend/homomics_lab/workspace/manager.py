@@ -17,7 +17,7 @@ import hashlib
 import json
 import shutil
 import sqlite3
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -332,6 +332,24 @@ class WorkspaceManager:
             )
             conn.commit()
 
+        # Copy files into the snapshot directory for true restore capability.
+        snapshot_files_dir = (
+            self.workspace_dir
+            / self.METADATA_SUBDIR
+            / "snapshots"
+            / snapshot_id
+            / "files"
+        )
+        for root, _dirs, files in self.workspace_dir.walk():
+            for f in files:
+                fp = Path(root) / f
+                if self.METADATA_SUBDIR in str(fp.relative_to(self.workspace_dir)):
+                    continue
+                rel = fp.relative_to(self.workspace_dir)
+                dest = snapshot_files_dir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(fp, dest)
+
         return snapshot_id
 
     def list_snapshots(self) -> List[WorkspaceSnapshot]:
@@ -367,7 +385,7 @@ class WorkspaceManager:
             if row is None:
                 raise ValueError(f"Snapshot not found: {snapshot_id}")
 
-            manifest = json.loads(row["manifest"])
+            _manifest = json.loads(row["manifest"])
 
         # Remove all files except metadata dir
         for subdir in (
@@ -381,9 +399,26 @@ class WorkspaceManager:
                 shutil.rmtree(path)
             path.mkdir(parents=True, exist_ok=True)
 
-        # Restore from manifest — note: this only records what existed,
-        # actual restoration would need the files stored somewhere.
-        # For MVP, we just clear and leave it to the caller to recreate.
+        # If a full file copy was saved, restore it; otherwise fall back to
+        # the manifest-only behaviour and let the caller recreate files.
+        snapshot_files_dir = (
+            self.workspace_dir
+            / self.METADATA_SUBDIR
+            / "snapshots"
+            / snapshot_id
+            / "files"
+        )
+        if snapshot_files_dir.exists():
+            for root, _dirs, files in snapshot_files_dir.walk():
+                for f in files:
+                    fp = Path(root) / f
+                    rel = fp.relative_to(snapshot_files_dir)
+                    dest = self.workspace_dir / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(fp, dest)
+            return
+
+        # Restore from manifest only (MVP fallback).
 
     # ─────────────────────────────────────────
     # Data lineage

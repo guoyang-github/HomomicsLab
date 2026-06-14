@@ -12,9 +12,10 @@ This separation ensures that:
   - The system remains interpretable and auditable
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
 from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.skills.registry import SkillRegistry
@@ -37,12 +38,14 @@ class PlanEngine:
         self,
         skill_registry: SkillRegistry,
         skill_dag: Optional[SkillDAG] = None,
+        llm_fallback: Optional[LLMFallbackPlanner] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
         self.strategy_library = StrategyLibrary()
+        self.llm_fallback = llm_fallback or LLMFallbackPlanner(skill_registry)
 
-    def plan(
+    async def plan(
         self,
         intent: UserIntent,
         data_state: Optional[DataState] = None,
@@ -57,19 +60,23 @@ class PlanEngine:
         # 1. Select strategy based on intent
         strategy = self.strategy_library.select(intent.analysis_type)
 
-        # 2. Generate skeleton (domain knowledge + state adaptation)
+        # 2. If no domain strategy matches, use LLM fallback to build an executable plan
+        if strategy.name == "generic":
+            return await self.llm_fallback.generate_plan(intent, data_state)
+
+        # 3. Generate skeleton (domain knowledge + state adaptation)
         phases = strategy.generate_skeleton(data_state)
 
-        # 3. Select skills for each phase (SkillDAG assists here)
+        # 4. Select skills for each phase (SkillDAG assists here)
         for phase in phases:
             if not phase.required:
                 continue
             phase.selected_skill = self._select_skill_for_phase(phase, data_state)
 
-        # 4. Detect gaps between phases
+        # 5. Detect gaps between phases
         gaps = self._detect_gaps(phases)
 
-        # 5. Build reproducibility context
+        # 6. Build reproducibility context
         reproducibility_context = {
             "plan_engine_version": "0.3.0",
             "strategy": strategy.name,

@@ -15,15 +15,59 @@ interface Props {
     context_summary: string
     options: Option[]
     default_option?: Option
+    metadata?: Record<string, unknown>
   }
   taskId: string
 }
 
+const triggerStyles: Record<string, { icon: string; border: string; bg: string; text: string }> = {
+  reviewer_reject: {
+    icon: '🔍',
+    border: 'border-orange-300',
+    bg: 'bg-orange-50',
+    text: 'text-orange-900',
+  },
+  worker_failure: {
+    icon: '⚠️',
+    border: 'border-red-300',
+    bg: 'bg-red-50',
+    text: 'text-red-900',
+  },
+  phase_gate_fail: {
+    icon: '🚧',
+    border: 'border-yellow-300',
+    bg: 'bg-yellow-50',
+    text: 'text-yellow-900',
+  },
+  high_cost: {
+    icon: '💰',
+    border: 'border-purple-300',
+    bg: 'bg-purple-50',
+    text: 'text-purple-900',
+  },
+  high_risk: {
+    icon: '🛡️',
+    border: 'border-red-300',
+    bg: 'bg-red-50',
+    text: 'text-red-900',
+  },
+}
+
 export function HITLRequest({ checkpoint, taskId }: Props) {
-  const [selectedOption, setSelectedOption] = useState(checkpoint.default_option?.id || '')
+  const recommendedAction = (checkpoint.metadata?.recommended_action as string) || checkpoint.default_option?.id
+  const riskLevel = (checkpoint.metadata?.risk_level as string) || 'medium'
+
+  const [selectedOption, setSelectedOption] = useState(recommendedAction || checkpoint.default_option?.id || '')
   const [parameters, setParameters] = useState('{}')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { currentSessionId, addMessage } = useChatStore()
+
+  const style = triggerStyles[checkpoint.trigger_reason] || {
+    icon: '⚠️',
+    border: 'border-warning',
+    bg: 'bg-yellow-50',
+    text: 'text-yellow-900',
+  }
 
   const handleSubmit = async () => {
     if (!selectedOption) return
@@ -51,7 +95,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
       addMessage({
         id: `msg_${Date.now()}`,
         type: 'system',
-        content: `已确认：${checkpoint.options.find(o => o.id === selectedOption)?.label}`,
+        content: `已确认：${checkpoint.options.find((o) => o.id === selectedOption)?.label}`,
         sender: 'system',
         timestamp: new Date().toISOString(),
       })
@@ -61,18 +105,32 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-warning bg-yellow-50 p-3">
-      <p className="mb-2 text-sm font-medium text-yellow-900">
-        ⚠️ 需要您确认
+    <div className={`rounded-lg border ${style.border} ${style.bg} p-3`}>
+      <p className={`mb-2 text-sm font-medium ${style.text}`}>
+        {style.icon} 需要您确认
+        {riskLevel && (
+          <span className="ml-2 rounded px-1.5 py-0.5 text-xs capitalize text-white bg-black/20">
+            风险：{riskLevel}
+          </span>
+        )}
       </p>
-      <p className="mb-3 text-sm text-yellow-800">{checkpoint.context_summary}</p>
+      <p className={`mb-1 text-sm ${style.text} opacity-90`}>
+        原因：{checkpoint.trigger_reason}
+      </p>
+      <p className={`mb-3 text-sm ${style.text} opacity-80`}>{checkpoint.context_summary}</p>
+
+      {recommendedAction && (
+        <p className="mb-2 text-xs font-medium text-slate-600">
+          推荐操作：{checkpoint.options.find((o) => o.id === recommendedAction)?.label}
+        </p>
+      )}
 
       <div className="mb-3 space-y-2">
         {checkpoint.options.map((option) => (
           <label
             key={option.id}
             className={`flex cursor-pointer items-start gap-2 rounded p-2 text-sm ${
-              selectedOption === option.id ? 'bg-yellow-100' : 'hover:bg-yellow-100'
+              selectedOption === option.id ? 'bg-white/60' : 'hover:bg-white/40'
             }`}
           >
             <input
@@ -86,7 +144,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
             <div>
               <div className="font-medium">{option.label}</div>
               {option.description && (
-                <div className="text-xs text-yellow-700">{option.description}</div>
+                <div className="text-xs opacity-75">{option.description}</div>
               )}
             </div>
           </label>
@@ -94,14 +152,14 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
       </div>
 
       <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-yellow-800">
+        <label className={`mb-1 block text-xs font-medium ${style.text}`}>
           参数 (JSON)
         </label>
         <textarea
           value={parameters}
           onChange={(e) => setParameters(e.target.value)}
           rows={2}
-          className="w-full rounded border border-yellow-300 px-2 py-1 text-xs"
+          className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
           placeholder='{"n_neighbors": 15}'
         />
       </div>

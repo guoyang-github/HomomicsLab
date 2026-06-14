@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import chat, projects, files, skills, viz, reports, skill_generator, health
+from . import chat, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
@@ -10,3 +10,6 @@ api_router.include_router(viz.router, prefix="/viz", tags=["visualization"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(skill_generator.router, prefix="/skill-generator", tags=["skill-generator"])
 api_router.include_router(health.router, tags=["health"])
+api_router.include_router(execution.router, prefix="/execution", tags=["execution"])
+api_router.include_router(plan.router, prefix="/plan", tags=["plan"])
+api_router.include_router(scheduler.router, prefix="/scheduler", tags=["scheduler"])

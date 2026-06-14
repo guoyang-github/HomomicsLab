@@ -116,6 +116,14 @@ class AgentCore:
         skill_category = None
         if getattr(task, "skills_required", None):
             skill_id = task.skills_required[0]
+        elif self.skill_dag is not None and getattr(task, "description", None):
+            # Use semantic search to discover the best skill from task description
+            results = self.skill_dag.registry.semantic_search(
+                task.description,
+                top_k=3,
+            )
+            if results:
+                skill_id = results[0][0].id
 
         # DAG conflict check (before agent resolution)
         if self.skill_dag and skill_id and executed_skills:
@@ -138,12 +146,22 @@ class AgentCore:
         if skill_id:
             roles = self.role_registry.find_for_skill(skill_id, skill_category)
             if roles:
-                # Skip analyst if it was the only match
+                # Skip analyst and system roles
                 for role in roles:
-                    if role.role_id != self.ANALYST_ROLE_ID:
-                        return self.spawn_specialist(role.role_id)
+                    if role.role_id == self.ANALYST_ROLE_ID:
+                        continue
+                    if self._is_system_role(role):
+                        continue
+                    return self.spawn_specialist(role.role_id)
 
         return None
+
+    @staticmethod
+    def _is_system_role(role: RoleDefinition) -> bool:
+        """Return True if the role is a system role (supervisor/worker/reviewer)."""
+        if "system" in role.tags:
+            return True
+        return bool(role.metadata.get("system", False))
 
     def recommend_next_skills(self, last_skill_id: str, min_confidence: float = 0.6) -> List[tuple]:
         """Recommend next skills based on SkillDAG followed_by edges."""

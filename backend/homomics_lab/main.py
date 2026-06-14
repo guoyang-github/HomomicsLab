@@ -3,46 +3,56 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from homomics_lab.bootstrap import bootstrap_worker_context
 from homomics_lab.config import settings
-from homomics_lab.agent.factory import create_default_agents
-from homomics_lab.skills.runtime import SkillRuntimeExecutor
-from homomics_lab.skills.builtin import register_builtin_skills
-from homomics_lab.skills.loader import SkillLoader
-from homomics_lab.skills.tracker import SkillPerformanceTracker
-from homomics_lab.tools.registry import ToolRegistry
-from homomics_lab.tools.builtin import register_all_builtin_tools
-from homomics_lab.stability.schema_validator import SchemaValidator
+from homomics_lab.jobs import JobService
+from homomics_lab.plan import PlanStore
+from homomics_lab.scheduler import HomomicsScheduler
 from homomics_lab.api.router import api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    settings.skills_dir.mkdir(parents=True, exist_ok=True)
-    create_default_agents()
+    ctx = await bootstrap_worker_context(enable_hot_reload=True)
 
-    # Initialize ToolRegistry with builtin tools
-    app.state.tool_registry = ToolRegistry()
-    register_all_builtin_tools(app.state.tool_registry)
+    # Expose initialized registries for API endpoints
+    app.state.tool_registry = ctx["tool_registry"]
+    app.state.schema_validator = ctx["schema_validator"]
+    app.state.skill_executor = ctx["skill_executor"]
+    app.state.domain_registry = ctx["domain_registry"]
+    app.state.strategy_library = ctx["strategy_library"]
+    app.state.domain_reloader = ctx["domain_reloader"]
+    app.state.skill_reloader = ctx["skill_reloader"]
+    app.state.mcp_client = ctx["mcp_client"]
+
     print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
+    external_skills = getattr(settings, "external_skills_dir", None)
+    if external_skills and external_skills.exists():
+        print(f"Loaded external skills from {external_skills}")
 
-    # Initialize SchemaValidator
-    app.state.schema_validator = SchemaValidator()
+    # Plan store for persisted, versioned execution plans
+    app.state.plan_store = PlanStore()
 
-    # Initialize skills runtime with metrics tracking
-    tracker = SkillPerformanceTracker()
-    app.state.skill_executor = SkillRuntimeExecutor(tracker=tracker)
-    register_builtin_skills(app.state.skill_executor)
+    # Start background job worker only when worker_mode is enabled
+    app.state.job_service = JobService()
+    app.state.execution_pubsub = app.state.job_service.pubsub
+    app.state.job_service.start_worker()
 
-    # Load external skills if configured
-    if settings.external_skills_dir and settings.external_skills_dir.exists():
-        loader = SkillLoader(registry=app.state.skill_executor.registry)
-        loaded = loader.load_all(settings.external_skills_dir)
-        for skill in loaded:
-            app.state.skill_executor.register_skill(skill)
-        print(f"Loaded {len(loaded)} external skills from {settings.external_skills_dir}")
+    # Start scheduled task scheduler (curation, reports, etc.)
+    app.state.scheduler = HomomicsScheduler()
+    await app.state.scheduler.start()
 
     yield
+
+    # Shutdown: stop scheduler, background worker, and hot-reload watchers
+    await app.state.scheduler.shutdown()
+    await app.state.job_service.close()
+    if app.state.mcp_client is not None:
+        await app.state.mcp_client.close()
+    if app.state.domain_reloader is not None:
+        await app.state.domain_reloader.stop()
+    if app.state.skill_reloader is not None:
+        await app.state.skill_reloader.stop()
 
 
 app = FastAPI(

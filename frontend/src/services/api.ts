@@ -20,6 +20,38 @@ export const chatApi = {
 
   respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown> }) =>
     api.post('/chat/hitl/respond', data),
+
+  respondToDebate: (data: { session_id: string; debate_id: string; choice_id: string; parameters?: Record<string, unknown> }) =>
+    api.post('/chat/debate/respond', data),
+}
+
+export const planApi = {
+  approve: (plan_id: string) =>
+    api.post(`/plan/${plan_id}/approve`, { approved: true, modifications: [] }),
+
+  reject: (plan_id: string) =>
+    api.post(`/plan/${plan_id}/reject`),
+
+  modify: (plan_id: string, approved: boolean, modifications: Array<{
+    phase_type: string
+    parameter?: string
+    old_value?: unknown
+    new_value?: unknown
+    action?: string
+  }>) =>
+    api.post(`/plan/${plan_id}/modify`, { approved, modifications }),
+
+  getPlan: (plan_id: string) =>
+    api.get(`/plan/${plan_id}`),
+
+  listPlans: (session_id: string) =>
+    api.get(`/plan/session/${session_id}`),
+
+  diff: (plan_id: string, other_plan_id?: string) =>
+    api.get(`/plan/${plan_id}/diff`, { params: other_plan_id ? { other: other_plan_id } : undefined }),
+
+  getJob: (plan_id: string) =>
+    api.get(`/plan/${plan_id}/job`),
 }
 
 export const projectApi = {

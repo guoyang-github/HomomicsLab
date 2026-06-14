@@ -1,6 +1,5 @@
 """Tests for ReproducibilityEngine."""
 
-import json
 from unittest.mock import patch
 
 from homomics_lab.reproducibility.bundle import EnvironmentLock, ReproducibilityBundle
@@ -43,6 +42,26 @@ class TestReproducibilityEngine:
         assert engine._bundle.execution_snapshot is not None
         assert engine._bundle.execution_snapshot.plan_version == "0.3.0"
 
+    def test_record_plan_with_plan_id(self, tmp_path):
+        ws = WorkspaceManager(base_dir=tmp_path, project_id="proj_1")
+        engine = ReproducibilityEngine(ws)
+        with patch.object(engine, "_capture_environment", _fast_capture):
+            engine.start_analysis(project_id="proj_1")
+
+        engine.record_plan(
+            task_tree={"tasks": [{"id": "qc_1"}]},
+            plan_context={"plan_engine_version": "0.5.0"},
+            plan_id="plan_123",
+            plan_result={"phases": [{"phase_type": "qc"}]},
+        )
+
+        assert engine._bundle.execution_snapshot.plan_id == "plan_123"
+        assert engine._bundle.execution_snapshot.plan_result is not None
+        assert (
+            engine._bundle.execution_snapshot.plan_result["phases"][0]["phase_type"]
+            == "qc"
+        )
+
     def test_record_code(self, tmp_path):
         ws = WorkspaceManager(base_dir=tmp_path, project_id="proj_1")
         engine = ReproducibilityEngine(ws)
@@ -80,7 +99,7 @@ class TestReproducibilityEngine:
             engine.start_analysis(project_id="proj_1", random_seed=123)
         engine.record_code(phase="qc", code="print('hello')")
 
-        bundle = engine.finalize()
+        engine.finalize()
 
         # Verify bundle was saved to workspace
         bundle_path = ws.get_path(".metadata/reproducibility_bundle.json")

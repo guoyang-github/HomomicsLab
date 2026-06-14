@@ -54,6 +54,10 @@ class DomainIntent(BaseModel):
         default_factory=list,
         description="Keywords that trigger this intent",
     )
+    examples: List[str] = Field(
+        default_factory=list,
+        description="Natural-language examples for semantic intent matching",
+    )
     complexity_indicators: List[str] = Field(
         default_factory=list,
         description="Keywords indicating complex (multi-step) analysis",

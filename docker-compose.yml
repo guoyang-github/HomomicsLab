@@ -1,6 +1,12 @@
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -10,9 +16,33 @@ services:
     environment:
       - HOMOMICS_DEBUG=false
       - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
+      - HOMOMICS_DATABASE_URL=sqlite+aiosqlite:///./data/homics_lab.db
+      - HOMOMICS_QUEUE_BACKEND=redis
+      - HOMOMICS_REDIS_URL=redis://redis:6379/0
+      - HOMOMICS_WORKER_MODE=false
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["homomics-worker"]
+    environment:
+      - HOMOMICS_DEBUG=false
+      - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
+      - HOMOMICS_DATABASE_URL=sqlite+aiosqlite:///./data/homics_lab.db
+      - HOMOMICS_QUEUE_BACKEND=redis
+      - HOMOMICS_REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+      - ./external_skills:/app/external_skills:ro
+    depends_on:
+      - redis
     restart: unless-stopped
 
   frontend:

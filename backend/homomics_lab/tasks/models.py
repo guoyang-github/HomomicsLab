@@ -23,6 +23,12 @@ class TaskNode(BaseModel):
     estimated_duration_minutes: int = 10
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     parameters: Dict[str, Any] = Field(default_factory=dict)
+    success_criteria: List[Dict[str, Any]] = Field(default_factory=list)
+    pre_snapshot_id: Optional[str] = None
+    post_snapshot_id: Optional[str] = None
+    gate_result: Optional[Dict[str, Any]] = None
+    replan_attempt_count: int = 0
+    max_replan_attempts: int = 2
     result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     started_at: Optional[datetime] = None

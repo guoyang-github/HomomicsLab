@@ -42,6 +42,13 @@ intents:
       - "xenium"
       - "merfish"
       - "空间转录组"
+    examples:
+      - "分析空间转录组数据"
+      - "run spatial transcriptomics analysis"
+      - "处理 visium 数据"
+      - "画空间表达图"
+      - "xenium 细胞分割"
+      - "merfish 数据分析"
     complexity_indicators:
       - "分析"
       - "流程"
