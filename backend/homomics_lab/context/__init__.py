@@ -5,6 +5,7 @@ from .summarizer import ContextSummarizer as ContextSummarizer
 from .summarizer import ContextSummary as ContextSummary
 from .compressor import ContextCompressor as ContextCompressor
 from .session_store import SessionStore, SQLiteSessionStore
+from .memory_manager import MemoryManager
 
 __all__ = ["WorkingMemory", "RelevanceFilter", "ContextItem", "ContextSummarizer",
-           "ContextSummary", "ContextCompressor", "SessionStore", "SQLiteSessionStore"]
+           "ContextSummary", "ContextCompressor", "SessionStore", "SQLiteSessionStore", "MemoryManager"]
