@@ -1,10 +1,10 @@
 from typing import List
+from pydantic import BaseModel
 from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
-class TaskTree:
-    def __init__(self, tasks: List[TaskNode] = None):
-        self.tasks = tasks or []
+class TaskTree(BaseModel):
+    tasks: List[TaskNode] = []
 
     def get_task(self, task_id: str) -> TaskNode:
         for task in self.tasks:
