@@ -1,6 +1,7 @@
 """Cascade intent analyzer — combines keyword, embedding, and LLM classifiers."""
 
 import re
+import weakref
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,10 @@ from homomics_lab.agent.intent.models import (
 )
 from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.context.working_memory import WorkingMemory
+
+
+# Track live analyzer instances so domain hot-reload can refresh intent definitions.
+_analyzer_instances: weakref.WeakSet = weakref.WeakSet()
 
 
 class CascadeIntentAnalyzer:
@@ -56,6 +61,18 @@ class CascadeIntentAnalyzer:
 
         if use_domain_registry:
             self._load_domain_definitions()
+
+        _analyzer_instances.add(self)
+
+    @classmethod
+    def reload_all(cls) -> None:
+        """Reload intent definitions in all live analyzer instances."""
+        for analyzer in list(_analyzer_instances):
+            try:
+                analyzer.reload()
+            except Exception:
+                # Hot-reload errors should not break the caller.
+                pass
 
     def _load_builtin_definitions(self) -> None:
         """Load built-in domain-agnostic intent definitions."""
@@ -206,9 +223,10 @@ class CascadeIntentAnalyzer:
         self,
         message: str,
         working_memory: Optional[WorkingMemory] = None,
+        extra_context: Optional[Dict[str, Any]] = None,
     ) -> UserIntent:
         """Analyze user message and return structured intent."""
-        context = self._build_context(working_memory)
+        context = self._build_context(working_memory, extra_context)
 
         # Layer 1: keyword fast path
         keyword_matches = await self.keyword_classifier.classify(
@@ -246,19 +264,24 @@ class CascadeIntentAnalyzer:
     def _build_context(
         self,
         working_memory: Optional[WorkingMemory],
+        extra_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Build context dict from working memory."""
         if working_memory is None:
-            return {}
-        recent = working_memory.get_recent_messages(5)
-        return {
-            "recent_messages": [
-                {"role": msg.sender, "content": msg.content}
-                for msg in recent
-            ],
-            "current_task_id": working_memory.current_task_id,
-            "pinned_items": working_memory.pinned_items,
-        }
+            context = {}
+        else:
+            recent = working_memory.get_recent_messages(5)
+            context = {
+                "recent_messages": [
+                    {"role": msg.sender, "content": msg.content}
+                    for msg in recent
+                ],
+                "current_task_id": working_memory.current_task_id,
+                "pinned_items": working_memory.pinned_items,
+            }
+        if extra_context is not None:
+            context["extra_context"] = extra_context
+        return context
 
     def _fuse_matches(
         self,
