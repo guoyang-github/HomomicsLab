@@ -103,3 +103,26 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/memory")
+async def health_memory(request: Request):
+    mm = getattr(request.app.state, "memory_manager", None)
+    if mm is None:
+        return {
+            "session_store": "not_configured",
+            "semantic_memory": "not_configured",
+        }
+
+    session_ok = True
+    try:
+        await mm.session_store.get("__health_check__")
+    except Exception:
+        session_ok = False
+
+    semantic_ok = mm.semantic_memory is not None
+
+    return {
+        "session_store": "ok" if session_ok else "error",
+        "semantic_memory": "ok" if semantic_ok else "disabled",
+    }
