@@ -1,14 +1,22 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from homomics_lab.bootstrap import bootstrap_worker_context
 from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
+from homomics_lab.logging_config import (
+    configure_logging,
+    new_correlation_id,
+    set_correlation_id,
+)
 from homomics_lab.plan import PlanStore
 from homomics_lab.scheduler import HomomicsScheduler
 from homomics_lab.api.router import api_router
+
+
+configure_logging(level="INFO" if not settings.debug else "DEBUG", json_format=True)
 
 
 @asynccontextmanager
@@ -19,27 +27,31 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry = ctx["tool_registry"]
     app.state.schema_validator = ctx["schema_validator"]
     app.state.skill_executor = ctx["skill_executor"]
+    app.state.skill_store = ctx["skill_store"]
     app.state.domain_registry = ctx["domain_registry"]
     app.state.strategy_library = ctx["strategy_library"]
     app.state.domain_reloader = ctx["domain_reloader"]
     app.state.skill_reloader = ctx["skill_reloader"]
     app.state.mcp_client = ctx["mcp_client"]
+    app.state.memory_manager = ctx["memory_manager"]
 
     print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
-    external_skills = getattr(settings, "external_skills_dir", None)
-    if external_skills and external_skills.exists():
-        print(f"Loaded external skills from {external_skills}")
+    for external_skills in settings.external_skills_dirs:
+        if external_skills.exists():
+            print(f"Loaded external skills from {external_skills}")
 
     # Plan store for persisted, versioned execution plans
     app.state.plan_store = PlanStore()
 
-    # Start background job worker only when worker_mode is enabled
+    # Start background job worker only when worker_mode is enabled.
+    # Queued jobs persisted before a restart are recovered into the queue.
     app.state.job_service = JobService()
     app.state.execution_pubsub = app.state.job_service.pubsub
-    app.state.job_service.start_worker()
+    await app.state.job_service.start_worker()
 
-    # Start scheduled task scheduler (curation, reports, etc.)
+    # Start scheduled task scheduler (curation, reports, evolution, etc.)
     app.state.scheduler = HomomicsScheduler()
+    app.state.scheduler.set_context(ctx)
     await app.state.scheduler.start()
 
     yield
@@ -61,6 +73,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    """Propagate or generate a correlation id for every request."""
+    cid = request.headers.get("X-Correlation-ID") or new_correlation_id()
+    set_correlation_id(cid)
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = cid
+    return response
+
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -80,3 +103,26 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/memory")
+async def health_memory(request: Request):
+    mm = getattr(request.app.state, "memory_manager", None)
+    if mm is None:
+        return {
+            "session_store": "not_configured",
+            "semantic_memory": "not_configured",
+        }
+
+    session_ok = True
+    try:
+        await mm.session_store.get("__health_check__")
+    except Exception:
+        session_ok = False
+
+    semantic_ok = mm.semantic_memory is not None
+
+    return {
+        "session_store": "ok" if session_ok else "error",
+        "semantic_memory": "ok" if semantic_ok else "disabled",
+    }

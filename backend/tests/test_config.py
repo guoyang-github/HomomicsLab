@@ -19,3 +19,10 @@ def test_env_override(monkeypatch):
 def test_app_name_default():
     settings = Settings()
     assert settings.app_name == "HomomicsLab"
+
+
+def test_session_memory_settings():
+    settings = Settings()
+    assert settings.session_store_url == "sqlite+aiosqlite:///./data/sessions.db"
+    assert settings.session_ttl_days == 90
+    assert settings.enable_semantic_memory is True

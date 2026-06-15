@@ -1,10 +1,15 @@
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel, Field
 from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
-class TaskTree:
-    def __init__(self, tasks: List[TaskNode] = None):
-        self.tasks = tasks or []
+class TaskTree(BaseModel):
+    tasks: List[TaskNode] = Field(default_factory=list)
+
+    def __init__(self, tasks: Optional[List[TaskNode]] = None, **data):
+        if tasks is not None and "tasks" not in data:
+            data["tasks"] = tasks
+        super().__init__(**data)
 
     def get_task(self, task_id: str) -> TaskNode:
         for task in self.tasks:

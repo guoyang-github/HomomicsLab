@@ -1,20 +1,15 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 
 from homomics_lab.agent.turn_runner import TurnRunner
-from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.jobs import JobService, JobStatus
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.plan import PlanPresenter, PlanStore
-from homomics_lab.tasks.task_tree import TaskTree
 
 router = APIRouter()
 
-# In-memory session store for MVP
-_sessions: dict[str, WorkingMemory] = {}
-_task_trees: dict[str, TaskTree] = {}
-_session_project_ids: dict[str, str] = {}
 _debates: dict[str, dict] = {}
 
 
@@ -67,10 +62,10 @@ async def send_message(
     request: SendMessageRequest,
     http_request: Request,
 ):
-    # Get or create session memory
-    wm = _sessions.get(request.session_id, WorkingMemory())
-    _sessions[request.session_id] = wm
-    _session_project_ids[request.session_id] = request.project_id
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    working_memory, task_tree = await memory_manager.load_session(
+        request.session_id, request.project_id
+    )
 
     job_service: JobService = getattr(
         http_request.app.state, "job_service", None
@@ -80,19 +75,19 @@ async def send_message(
     ) or PlanStore()
 
     # Use TurnRunner for consistent handling of all intents, including LLM fallback.
-    runner = TurnRunner(tool_registry=getattr(http_request.app.state, "tool_registry", None))
+    runner = TurnRunner(
+        tool_registry=getattr(http_request.app.state, "tool_registry", None),
+        memory_manager=memory_manager,
+    )
     result = await runner.run_turn(
         session_id=request.session_id,
         user_message=request.message,
-        working_memory=wm,
+        working_memory=working_memory,
         project_id=request.project_id,
         job_service=job_service,
         enqueue_skills=True,
         plan_store=plan_store,
     )
-
-    if result.task_tree is not None:
-        _task_trees[request.session_id] = result.task_tree
 
     # Extract plot attachments produced during execution
     plot_messages = result.attachments
@@ -101,12 +96,12 @@ async def send_message(
     agent_msg = result.agent_message
     if agent_msg is None:
         agent_msg = ChatMessage(
-            id=f"msg_{len(wm.messages)}",
+            id=f"msg_{len(working_memory.messages)}",
             type=MessageType.TEXT,
             content=response_text,
             sender="agent",
         )
-        wm.add_message(agent_msg)
+        working_memory.add_message(agent_msg)
 
     status = "completed"
     job_id = None
@@ -129,7 +124,7 @@ async def send_message(
     return SendMessageResponse(
         response=response_text,
         task_tree={"tasks": [t.model_dump() for t in result.task_tree.tasks]} if result.task_tree else {},
-        messages=[m.model_dump() for m in wm.get_recent_messages()],
+        messages=[m.model_dump() for m in working_memory.get_recent_messages()],
         attachments=[m.model_dump() for m in plot_messages],
         job_id=job_id,
         plan_id=plan_id,
@@ -139,11 +134,10 @@ async def send_message(
 
 
 @router.get("/messages")
-async def get_messages(session_id: str) -> List[dict]:
-    wm = _sessions.get(session_id)
-    if not wm:
-        return []
-    return [m.model_dump() for m in wm.get_recent_messages()]
+async def get_messages(session_id: str, http_request: Request) -> List[dict]:
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    working_memory, _ = await memory_manager.load_session(session_id, "")
+    return [m.model_dump() for m in working_memory.get_recent_messages()]
 
 
 @router.post("/hitl/respond", response_model=HITLResponseResponse)
@@ -185,9 +179,8 @@ async def respond_to_debate(
     request: DebateResponseRequest,
     http_request: Request,
 ):
-    wm = _sessions.get(request.session_id)
-    if wm is None:
-        raise HTTPException(status_code=404, detail="Session not found")
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    working_memory, _ = await memory_manager.load_session(request.session_id, "")
 
     debate = _debates.get(request.session_id)
     if debate is None or debate.get("debate_id") != request.debate_id:
@@ -205,13 +198,17 @@ async def respond_to_debate(
         http_request.app.state, "plan_store", None
     ) or PlanStore()
 
-    runner = TurnRunner()
+    project_id = await memory_manager.get_project_id(request.session_id)
+    if project_id is None:
+        project_id = "default"
+
+    runner = TurnRunner(memory_manager=memory_manager)
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(
         session_id=request.session_id,
         user_message=user_message,
-        working_memory=wm,
-        project_id=_session_project_ids.get(request.session_id, "default"),
+        working_memory=working_memory,
+        project_id=project_id,
         job_service=job_service,
         enqueue_skills=True,
         plan_store=plan_store,
@@ -220,9 +217,6 @@ async def respond_to_debate(
             "parameters": request.parameters,
         },
     )
-
-    if result.task_tree is not None:
-        _task_trees[request.session_id] = result.task_tree
 
     status = "completed"
     if result.mode == "queued":
@@ -255,7 +249,8 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
     and pushes back the agent reply together with any plot attachments.
     """
     await websocket.accept()
-    runner = TurnRunner()
+    memory_manager: MemoryManager = websocket.app.state.memory_manager
+    runner = TurnRunner(memory_manager=memory_manager)
 
     try:
         while True:
@@ -263,18 +258,14 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             project_id = data.get("project_id", "default")
             user_message = data.get("message", "")
 
-            wm = _sessions.get(session_id, WorkingMemory())
-            _sessions[session_id] = wm
+            working_memory, _ = await memory_manager.load_session(session_id, project_id)
 
             result = await runner.run_turn(
                 session_id=session_id,
                 user_message=user_message,
-                working_memory=wm,
+                working_memory=working_memory,
                 project_id=project_id,
             )
-
-            if result.task_tree is not None:
-                _task_trees[session_id] = result.task_tree
 
             # Push back the main agent message
             if result.agent_message is not None:

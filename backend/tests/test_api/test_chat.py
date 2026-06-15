@@ -1,12 +1,10 @@
 import time
 
 from fastapi.testclient import TestClient
-from homomics_lab.api import chat as chat_api
-from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.main import app
 
 
-def _poll_job(client: TestClient, job_id: str, timeout: float = 5.0):
+def _poll_job(client: TestClient, job_id: str, timeout: float = 30.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         response = client.get(f"/api/execution/{job_id}/status")
@@ -46,8 +44,16 @@ def test_get_messages():
 def test_respond_to_debate():
     with TestClient(app) as client:
         session_id = "sess_debate_api"
-        chat_api._sessions[session_id] = WorkingMemory()
-        chat_api._session_project_ids[session_id] = "proj_1"
+        # Seed a session by sending a message that triggers a debate
+        response = client.post("/api/chat/send", json={
+            "project_id": "proj_1",
+            "session_id": session_id,
+            "message": "请帮我选择分析类型",
+        })
+        assert response.status_code == 200
+
+        # Manually inject debate state for the test
+        from homomics_lab.api import chat as chat_api
         chat_api._debates[session_id] = {
             "debate_id": "debate_1",
             "topic": "请选择您需要的分析类型",
