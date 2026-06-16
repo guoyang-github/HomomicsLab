@@ -1,6 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { clsx } from 'clsx'
+import { Search, X, Loader2, Code2, Tags, Box } from 'lucide-react'
 import { skillsApi } from '@/services/api'
 import type { SkillSummary, SkillDetail } from '@/types/api'
+import { Input, Badge, Button, EmptyState, Skeleton } from '@/components/ui'
+
+const categoryColors: Record<string, string> = {
+  'single-cell': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'spatial-transcriptomics': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  'workflows': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  'genomics': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  'proteomics': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+}
+
+const runtimeColors: Record<string, string> = {
+  python: 'border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400',
+  r: 'border-green-200 text-green-600 dark:border-green-800 dark:text-green-400',
+  mixed: 'border-amber-200 text-amber-600 dark:border-amber-800 dark:text-amber-400',
+}
 
 export function SkillSearch() {
   const [query, setQuery] = useState('')
@@ -17,9 +34,8 @@ export function SkillSearch() {
       const response = await skillsApi.listSkills()
       setSkills(response.data)
       setError('')
-    } catch (err) {
-      setError('Failed to load skills')
-      console.error(err)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '加载 Skills 失败')
     } finally {
       setLoading(false)
     }
@@ -31,10 +47,7 @@ export function SkillSearch() {
 
   const handleSearch = (value: string) => {
     setQuery(value)
-
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current)
-    }
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
 
     if (!value.trim()) {
       loadAllSkills()
@@ -47,9 +60,8 @@ export function SkillSearch() {
         const response = await skillsApi.searchSkills(value.trim())
         setSkills(response.data)
         setError('')
-      } catch (err) {
-        setError('Search failed')
-        console.error(err)
+      } catch (err: any) {
+        setError(err?.response?.data?.detail || '搜索失败')
       } finally {
         setLoading(false)
       }
@@ -61,119 +73,95 @@ export function SkillSearch() {
       setDetailLoading(true)
       const response = await skillsApi.getSkill(skillId)
       setSelectedSkill(response.data)
-    } catch (err) {
-      console.error('Failed to load skill detail:', err)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '加载详情失败')
     } finally {
       setDetailLoading(false)
     }
   }
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'single-cell': 'bg-purple-100 text-purple-700',
-      'spatial-transcriptomics': 'bg-emerald-100 text-emerald-700',
-      'workflows': 'bg-blue-100 text-blue-700',
-      'genomics': 'bg-amber-100 text-amber-700',
-      'proteomics': 'bg-rose-100 text-rose-700',
-    }
-    return colors[category] || 'bg-slate-100 text-slate-600'
-  }
-
-  const getRuntimeBadge = (runtimeType: string) => {
-    const colors: Record<string, string> = {
-      python: 'bg-blue-50 text-blue-600 border-blue-200',
-      r: 'bg-green-50 text-green-600 border-green-200',
-      mixed: 'bg-amber-50 text-amber-600 border-amber-200',
-    }
-    return colors[runtimeType] || 'bg-slate-50 text-slate-600 border-slate-200'
-  }
-
   return (
     <div className="flex h-full flex-col">
-      {/* Search header */}
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
+      <div className="border-b border-border bg-card px-4 py-3">
         <div className="relative">
-          <input
-            type="text"
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search skills (e.g., UMAP, Seurat, QC)..."
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="搜索 Skills（如 UMAP、Seurat、QC）..."
+            className="pl-9 pr-9"
           />
-          <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
           {query && (
             <button
               onClick={() => { setQuery(''); loadAllSkills(); }}
-              className="absolute right-3 top-2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
-        <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-          <span>{skills.length} skills found</span>
-          {query && <span className="text-primary">Searching: "{query}"</span>}
+        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>{skills.length} 个 Skills</span>
+          {query && <span className="text-primary">搜索："{query}"</span>}
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Skills list */}
-        <div className={`${selectedSkill ? 'w-1/2' : 'w-full'} overflow-y-auto border-r border-slate-200`}>
+        <div className={clsx('overflow-y-auto border-r border-border', selectedSkill ? 'w-1/2' : 'w-full')}>
           {loading && skills.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-sm text-slate-500">Loading skills...</div>
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-border p-4">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="mt-2 h-3 w-3/4" />
+                </div>
+              ))}
             </div>
           )}
 
-          {error && (
+          {error && !loading && (
             <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
-              <div className="text-sm text-red-500">{error}</div>
-              <button
-                onClick={loadAllSkills}
-                className="rounded bg-primary px-3 py-1 text-xs text-white hover:bg-primary/90"
-              >
-                Retry
-              </button>
+              <p className="text-sm text-error">{error}</p>
+              <Button onClick={loadAllSkills} size="sm">重试</Button>
             </div>
           )}
 
-          {!loading && skills.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-              <div className="mb-2 text-3xl">🔧</div>
-              <div className="text-sm font-medium text-slate-700">No skills found</div>
-              <div className="mt-1 text-xs text-slate-500">Try a different search term</div>
-            </div>
+          {!loading && skills.length === 0 && !error && (
+            <EmptyState
+              icon={Search}
+              title="未找到 Skills"
+              description="尝试其他关键词，或在管理页面导入 Skills"
+              action={{ label: '刷新', onClick: loadAllSkills }}
+            />
           )}
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {skills.map((skill) => (
               <button
                 key={skill.id}
                 onClick={() => handleSelectSkill(skill.id)}
-                className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
-                  selectedSkill?.id === skill.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''
-                }`}
+                className={clsx(
+                  'w-full px-4 py-3 text-left transition-colors hover:bg-muted/50',
+                  selectedSkill?.id === skill.id && 'bg-primary/5 ring-1 ring-inset ring-primary/20'
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800">{skill.name}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryColor(skill.category)}`}>
+                      <span className="truncate text-sm font-medium text-foreground">{skill.name}</span>
+                      <Badge className={categoryColors[skill.category] || 'bg-slate-100 text-slate-600'} size="sm">
                         {skill.category}
-                      </span>
+                      </Badge>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{skill.description}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{skill.description}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${getRuntimeBadge(skill.runtime_type)}`}>
+                  <Badge variant="outline" className={runtimeColors[skill.runtime_type]} size="sm">
                     {skill.runtime_type.toUpperCase()}
-                  </span>
+                  </Badge>
                   {skill.primary_tool && (
-                    <span className="text-xs text-slate-400">
-                      {skill.primary_tool}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{skill.primary_tool}</span>
                   )}
                 </div>
               </button>
@@ -181,91 +169,73 @@ export function SkillSearch() {
           </div>
         </div>
 
-        {/* Detail panel */}
         {selectedSkill && (
-          <div className="w-1/2 overflow-y-auto bg-slate-50">
+          <div className="w-1/2 overflow-y-auto bg-muted/30">
             {detailLoading ? (
               <div className="flex h-full items-center justify-center">
-                <div className="text-sm text-slate-500">Loading detail...</div>
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-800">{selectedSkill.name}</h3>
-                  <button
-                    onClick={() => setSelectedSkill(null)}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                  >
-                    ✕
-                  </button>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{selectedSkill.name}</h3>
+                    <p className="text-xs text-muted-foreground">{selectedSkill.id} · v{selectedSkill.version}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedSkill(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                <p className="mb-4 text-sm text-slate-600">{selectedSkill.description}</p>
+                <p className="mb-4 text-sm text-muted-foreground">{selectedSkill.description}</p>
 
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Category</div>
-                    <div className="mt-1 text-sm text-slate-800">{selectedSkill.category}</div>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Runtime</div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`rounded border px-2 py-0.5 text-xs font-medium ${getRuntimeBadge(selectedSkill.runtime_type)}`}>
-                        {selectedSkill.runtime_type.toUpperCase()}
-                      </span>
-                      {selectedSkill.primary_tool && (
-                        <span className="text-sm text-slate-600">Primary: {selectedSkill.primary_tool}</span>
-                      )}
-                    </div>
-                  </div>
-
+                  <DetailCard icon={Tags} title="分类" value={selectedSkill.category} />
+                  <DetailCard icon={Box} title="运行时" value={selectedSkill.runtime_type.toUpperCase()} />
+                  {selectedSkill.primary_tool && (
+                    <DetailCard icon={Code2} title="主要工具" value={selectedSkill.primary_tool} />
+                  )}
                   {selectedSkill.keywords.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Keywords</div>
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">关键词</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {selectedSkill.keywords.map((kw) => (
-                          <span key={kw} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                            {kw}
-                          </span>
+                        {selectedSkill.keywords.map((kw, idx) => (
+                          <Badge key={`${kw}-${idx}`} variant="secondary" size="sm">{kw}</Badge>
                         ))}
                       </div>
                     </div>
                   )}
-
                   {selectedSkill.supported_tools.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Supported Tools</div>
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">支持工具</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {selectedSkill.supported_tools.map((tool) => (
-                          <span key={tool} className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
-                            {tool}
-                          </span>
+                        {selectedSkill.supported_tools.map((tool, idx) => (
+                          <Badge key={`${tool}-${idx}`} variant="outline" size="sm">{tool}</Badge>
                         ))}
                       </div>
                     </div>
                   )}
-
                   {selectedSkill.dependencies.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Dependencies</div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {selectedSkill.dependencies.join(', ')}
-                      </div>
-                    </div>
+                    <DetailCard icon={Code2} title="依赖" value={selectedSkill.dependencies.join(', ')} />
                   )}
-
-                  <div className="rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source</div>
-                    <div className="mt-1 text-sm text-slate-600">{selectedSkill.source}</div>
-                    <div className="mt-1 text-xs text-slate-400">Version: {selectedSkill.version}</div>
-                  </div>
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function DetailCard({ icon: Icon, title, value }: { icon: React.ElementType; title: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        {title}
+      </div>
+      <div className="mt-1 text-sm text-foreground">{value}</div>
     </div>
   )
 }

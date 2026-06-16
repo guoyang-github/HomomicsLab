@@ -1,9 +1,21 @@
-import type { ChatMessage, TodoListContent, HITLContent, PlotContent, PlotDataContent, PlanRequestContent, DebateRequestContent } from '@/types/chat'
+import { useState } from 'react'
+import { clsx } from 'clsx'
+import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { TodoList } from './TodoList'
 import { HITLRequest } from './HITLRequest'
 import { PlanApproval } from './PlanApproval'
 import { DebateRequest } from './DebateRequest'
 import { PlotChart } from '../shared/PlotChart'
+import type {
+  ChatMessage,
+  TodoListContent,
+  HITLContent,
+  PlotContent,
+  PlotDataContent,
+  PlanRequestContent,
+  DebateRequestContent,
+} from '@/types/chat'
 
 function isTodoListContent(content: unknown): content is TodoListContent {
   return (
@@ -62,14 +74,23 @@ function isPlotDataContent(content: unknown): content is PlotDataContent {
 
 interface Props {
   message: ChatMessage
+  onRegenerate?: () => void
 }
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, onRegenerate }: Props) {
   const isUser = message.sender === 'user'
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    const text = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2)
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const renderContent = () => {
     if (typeof message.content === 'string') {
-      return <p className="text-sm">{message.content}</p>
+      return <MarkdownRenderer content={message.content} />
     }
 
     switch (message.type) {
@@ -80,7 +101,12 @@ export function MessageBubble({ message }: Props) {
         return null
       case 'hitl_request':
         if (isHITLContent(message.content)) {
-          return <HITLRequest checkpoint={message.content.checkpoint} taskId={message.content.task_id} />
+          return (
+            <HITLRequest
+              checkpoint={message.content.checkpoint}
+              taskId={message.content.task_id}
+            />
+          )
         }
         return null
       case 'plan_request':
@@ -98,16 +124,18 @@ export function MessageBubble({ message }: Props) {
           return (
             <div className="space-y-2">
               {message.content.title && (
-                <div className="text-xs font-medium text-slate-600">{message.content.title}</div>
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {message.content.title}
+                </div>
               )}
               <img
                 src={`data:image/png;base64,${message.content.image_base64}`}
                 alt={message.content.plot_type}
-                className="max-w-full rounded-lg border border-slate-200 shadow-sm"
+                className="max-w-full rounded-lg border border-border shadow-card"
                 style={{ maxHeight: '320px' }}
               />
               {message.content.caption && (
-                <div className="text-xs italic text-slate-500">{message.content.caption}</div>
+                <div className="text-xs italic text-muted-foreground">{message.content.caption}</div>
               )}
             </div>
           )
@@ -116,9 +144,11 @@ export function MessageBubble({ message }: Props) {
       case 'plot_data':
         if (isPlotDataContent(message.content)) {
           return (
-            <div className="space-y-2 w-full">
+            <div className="w-full space-y-2">
               {message.content.title && (
-                <div className="text-xs font-medium text-slate-600">{message.content.title}</div>
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {message.content.title}
+                </div>
               )}
               <PlotChart
                 request={{
@@ -128,35 +158,78 @@ export function MessageBubble({ message }: Props) {
                   width: 700,
                   height: 450,
                 }}
-                className="w-full rounded-lg border border-slate-200"
+                className="w-full rounded-lg border border-border"
               />
               {message.content.caption && (
-                <div className="text-xs italic text-slate-500">{message.content.caption}</div>
+                <div className="text-xs italic text-muted-foreground">{message.content.caption}</div>
               )}
             </div>
           )
         }
         return null
       case 'error':
-        return <p className="text-sm text-error">{String(message.content)}</p>
+        return (
+          <div className="rounded-lg border border-error/20 bg-error/10 p-3 text-sm text-error">
+            {String(message.content)}
+          </div>
+        )
       default:
-        return <pre className="text-xs">{JSON.stringify(message.content, null, 2)}</pre>
+        return (
+          <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+            {JSON.stringify(message.content, null, 2)}
+          </pre>
+        )
     }
   }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={clsx('group mb-6 flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
-        className={`max-w-[90%] rounded-lg px-4 py-3 ${
+        className={clsx(
+          'relative max-w-[92%] rounded-2xl px-5 py-4 shadow-card transition-shadow hover:shadow-soft sm:max-w-[85%]',
           isUser
             ? 'bg-primary text-white'
-            : 'bg-white border border-slate-200 text-slate-800'
-        }`}
+            : 'border border-border bg-card text-card-foreground'
+        )}
       >
-        <div className="text-xs opacity-75 mb-1">
-          {isUser ? 'You' : 'Agent'} • {new Date(message.timestamp).toLocaleTimeString()}
+        <div
+          className={clsx(
+            'mb-2 flex items-center justify-between gap-4 text-xs',
+            isUser ? 'text-primary-100' : 'text-muted-foreground'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <span className={clsx('font-semibold', isUser ? 'text-white' : 'text-foreground')}>
+              {isUser ? 'You' : 'Homomics Agent'}
+            </span>
+            <span>•</span>
+            <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
+          </div>
+          {!isUser && message.type !== 'hitl_request' && message.type !== 'plan_request' && message.type !== 'debate_request' && (
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={handleCopy}
+                className="rounded p-1 hover:bg-muted"
+                title="复制"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+              {onRegenerate && (
+                <button onClick={onRegenerate} className="rounded p-1 hover:bg-muted" title="重新生成">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button className="rounded p-1 hover:bg-muted" title="有用">
+                <ThumbsUp className="h-3.5 w-3.5" />
+              </button>
+              <button className="rounded p-1 hover:bg-muted" title="无用">
+                <ThumbsDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
-        {renderContent()}
+
+        <div className={clsx(isUser && 'prose-invert')}>{renderContent()}</div>
       </div>
     </div>
   )

@@ -1,6 +1,10 @@
 import { useState } from 'react'
+import { clsx } from 'clsx'
+import { MessagesSquare, Check, Star } from 'lucide-react'
 import { chatApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Textarea } from '@/components/ui'
+import { toastError, toastSuccess } from '@/stores/toastStore'
 import type { DebateRequestContent, DebateOption } from '@/types/chat'
 
 interface Props {
@@ -24,7 +28,7 @@ export function DebateRequest({ content }: Props) {
         try {
           parsedParams = JSON.parse(parameters)
         } catch {
-          alert('参数 JSON 格式无效，请检查输入')
+          toastError('参数 JSON 格式无效')
           setIsSubmitting(false)
           return
         }
@@ -38,6 +42,7 @@ export function DebateRequest({ content }: Props) {
       })
 
       const chosen = options.find((o) => o.id === selectedOption)
+      toastSuccess(`已选择：${chosen?.label || selectedOption}`)
       addMessage({
         id: `msg_${Date.now()}`,
         type: 'system',
@@ -45,6 +50,8 @@ export function DebateRequest({ content }: Props) {
         sender: 'system',
         timestamp: new Date().toISOString(),
       })
+    } catch (error: any) {
+      toastError(error?.response?.data?.detail || '提交失败')
     } finally {
       setIsSubmitting(false)
     }
@@ -55,11 +62,12 @@ export function DebateRequest({ content }: Props) {
     return (
       <label
         key={option.id}
-        className={`flex cursor-pointer items-start gap-2 rounded border p-2 text-sm transition-colors ${
+        className={clsx(
+          'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors',
           selectedOption === option.id
             ? 'border-primary bg-primary/5'
-            : 'border-slate-200 hover:bg-slate-50'
-        }`}
+            : 'border-border bg-card hover:bg-muted/50'
+        )}
       >
         <input
           type="radio"
@@ -67,20 +75,23 @@ export function DebateRequest({ content }: Props) {
           value={option.id}
           checked={selectedOption === option.id}
           onChange={() => setSelectedOption(option.id)}
-          className="mt-1"
+          className="mt-1 h-4 w-4 accent-primary"
         />
         <div className="flex-1">
-          <div className="flex items-center gap-2 font-medium">
-            {option.label}
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{option.label}</span>
             {isRecommended && (
-              <span className="rounded bg-success px-1.5 py-0.5 text-xs text-white">推荐</span>
+              <Badge variant="success" size="sm">
+                <Star className="mr-1 h-3 w-3" />
+                推荐
+              </Badge>
             )}
           </div>
           {option.description && (
-            <div className="mt-0.5 text-xs text-slate-500">{option.description}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{option.description}</div>
           )}
           {option.score !== undefined && (
-            <div className="mt-0.5 text-xs text-slate-400">得分：{option.score.toFixed(2)}</div>
+            <div className="mt-1 text-xs text-muted-foreground">得分：{option.score.toFixed(2)}</div>
           )}
         </div>
       </label>
@@ -88,40 +99,41 @@ export function DebateRequest({ content }: Props) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-      <div>
-        <p className="text-sm font-medium text-slate-800">🗣️ {topic}</p>
+    <Card className="border-primary/20 bg-primary/5">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <MessagesSquare className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">{topic}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
         {round_summaries && round_summaries.length > 0 && (
-          <div className="mt-1 space-y-0.5">
+          <div className="space-y-1">
             {round_summaries.map((summary, idx) => (
-              <p key={idx} className="text-xs text-slate-500">
+              <p key={idx} className="text-xs text-muted-foreground">
                 {summary}
               </p>
             ))}
           </div>
         )}
-      </div>
 
-      <div className="space-y-2">{options.map(renderOption)}</div>
+        <div className="space-y-2">{options.map(renderOption)}</div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">参数 (JSON)</label>
-        <textarea
-          value={parameters}
-          onChange={(e) => setParameters(e.target.value)}
-          rows={2}
-          className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs"
-          placeholder='{"n_neighbors": 15}'
-        />
-      </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">参数（JSON）</label>
+          <Textarea
+            value={parameters}
+            onChange={(e) => setParameters(e.target.value)}
+            rows={2}
+            placeholder='{"n_neighbors": 15}'
+          />
+        </div>
 
-      <button
-        onClick={handleSubmit}
-        disabled={!selectedOption || isSubmitting}
-        className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-      >
-        {isSubmitting ? '提交中...' : '确认选择'}
-      </button>
-    </div>
+        <Button onClick={handleSubmit} loading={isSubmitting} disabled={!selectedOption}>
+          <Check className="mr-1.5 h-4 w-4" />
+          确认选择
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

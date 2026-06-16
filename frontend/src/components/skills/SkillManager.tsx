@@ -1,6 +1,48 @@
 import { useState, useEffect, useCallback } from 'react'
+import { clsx } from 'clsx'
+import {
+  Loader2,
+  X,
+  Lock,
+  Play,
+  ShieldCheck,
+  Trash2,
+  Power,
+  PowerOff,
+  Save,
+  Download,
+} from 'lucide-react'
 import { skillsApi } from '@/services/api'
 import type { SkillDetail, SkillTestResponse, SkillValidationResponse } from '@/types/api'
+import {
+  Button,
+  Input,
+  Badge,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  EmptyState,
+  Select,
+} from '@/components/ui'
+import { toastError, toastSuccess } from '@/stores/toastStore'
+
+const categoryColors: Record<string, string> = {
+  'single-cell': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'spatial-transcriptomics': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  'workflows': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  'genomics': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  'agent_core': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+}
+
+const runtimeColors: Record<string, string> = {
+  python: 'border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400',
+  r: 'border-green-200 text-green-600 dark:border-green-800 dark:text-green-400',
+  mixed: 'border-amber-200 text-amber-600 dark:border-amber-800 dark:text-amber-400',
+  cli: 'border-rose-200 text-rose-600 dark:border-rose-800 dark:text-rose-400',
+  workflow: 'border-cyan-200 text-cyan-600 dark:border-cyan-800 dark:text-cyan-400',
+  container: 'border-violet-200 text-violet-600 dark:border-violet-800 dark:text-violet-400',
+}
 
 export function SkillManager() {
   const [skills, setSkills] = useState<SkillDetail[]>([])
@@ -23,9 +65,8 @@ export function SkillManager() {
       const response = await skillsApi.listSkills()
       setSkills(response.data as SkillDetail[])
       setError('')
-    } catch (err) {
-      setError('Failed to load skills')
-      console.error(err)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '加载 Skills 失败')
     } finally {
       setLoading(false)
     }
@@ -46,9 +87,11 @@ export function SkillManager() {
         enable: true,
       })
       setImportSource('')
+      toastSuccess('Skill 导入成功')
       await loadSkills()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Import failed')
+      setError(err?.response?.data?.detail || '导入失败')
+      toastError(err?.response?.data?.detail || '导入失败')
     } finally {
       setActionLoading(null)
     }
@@ -62,23 +105,25 @@ export function SkillManager() {
       } else {
         await skillsApi.enableSkill(skill.id, skill.namespace)
       }
+      toastSuccess(`${skill.name} 已${skill.enabled ? '禁用' : '启用'}`)
       await loadSkills()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Toggle failed')
+      toastError(err?.response?.data?.detail || '切换失败')
     } finally {
       setActionLoading(null)
     }
   }
 
   const handleRemove = async (skill: SkillDetail) => {
-    if (!confirm(`Remove skill "${skill.name}" from namespace "${skill.namespace}"?`)) return
+    if (!confirm(`确定要移除 Skill "${skill.name}" 吗？`)) return
     setActionLoading(skill.id)
     try {
       await skillsApi.removeSkill(skill.id, skill.namespace)
       setSelectedSkill(null)
+      toastSuccess('Skill 已移除')
       await loadSkills()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Remove failed')
+      toastError(err?.response?.data?.detail || '移除失败')
     } finally {
       setActionLoading(null)
     }
@@ -89,8 +134,9 @@ export function SkillManager() {
     try {
       const response = await skillsApi.validateSkill(skill.id, skill.namespace)
       setValidationResult(response.data)
+      toastSuccess(response.data.valid ? '验证通过' : '验证未通过')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Validation failed')
+      toastError(err?.response?.data?.detail || '验证失败')
     } finally {
       setActionLoading(null)
     }
@@ -102,8 +148,9 @@ export function SkillManager() {
     try {
       const response = await skillsApi.testSkill(skill.id, skill.namespace)
       setTestResult(response.data)
+      toastSuccess(response.data.success ? '测试通过' : '测试失败')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Test failed')
+      toastError(err?.response?.data?.detail || '测试失败')
     } finally {
       setActionLoading(null)
     }
@@ -115,8 +162,9 @@ export function SkillManager() {
       const projectId = prompt('Project ID for lock file:', 'default-project') || 'default-project'
       const response = await skillsApi.lockSkills(projectId)
       setLockResult(JSON.stringify(response.data, null, 2))
+      toastSuccess('版本已锁定')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Lock failed')
+      toastError(err?.response?.data?.detail || '锁定失败')
     } finally {
       setActionLoading(null)
     }
@@ -134,141 +182,110 @@ export function SkillManager() {
       })
       setPromoteSourceDir('')
       setPromoteName('')
+      toastSuccess('CodeAct 运行已升级为 Skill')
       await loadSkills()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Promotion failed')
+      setError(err?.response?.data?.detail || '升级失败')
+      toastError(err?.response?.data?.detail || '升级失败')
     } finally {
       setActionLoading(null)
     }
   }
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'single-cell': 'bg-purple-100 text-purple-700',
-      'spatial-transcriptomics': 'bg-emerald-100 text-emerald-700',
-      'workflows': 'bg-blue-100 text-blue-700',
-      'genomics': 'bg-amber-100 text-amber-700',
-      'agent_core': 'bg-indigo-100 text-indigo-700',
-    }
-    return colors[category] || 'bg-slate-100 text-slate-600'
-  }
-
-  const getRuntimeBadge = (runtimeType: string) => {
-    const colors: Record<string, string> = {
-      python: 'bg-blue-50 text-blue-600 border-blue-200',
-      r: 'bg-green-50 text-green-600 border-green-200',
-      mixed: 'bg-amber-50 text-amber-600 border-amber-200',
-      cli: 'bg-rose-50 text-rose-600 border-rose-200',
-      workflow: 'bg-cyan-50 text-cyan-600 border-cyan-200',
-      container: 'bg-violet-50 text-violet-600 border-violet-200',
-    }
-    return colors[runtimeType] || 'bg-slate-50 text-slate-600 border-slate-200'
-  }
-
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
+      <div className="border-b border-border bg-card px-4 py-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-800">Skill Management</h2>
-          <button
-            onClick={handleLock}
-            disabled={actionLoading === 'lock'}
-            className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-          >
-            {actionLoading === 'lock' ? 'Locking...' : 'Lock Versions'}
-          </button>
+          <h2 className="text-lg font-semibold text-foreground">Skill 管理</h2>
+          <Button onClick={handleLock} loading={actionLoading === 'lock'} variant="secondary">
+            <Lock className="mr-1.5 h-4 w-4" />
+            锁定版本
+          </Button>
         </div>
 
         <div className="flex gap-2">
-          <input
-            type="text"
+          <Input
             value={importSource}
             onChange={(e) => setImportSource(e.target.value)}
-            placeholder="Path, git URL, or zip archive..."
-            className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="路径、Git URL 或 zip 压缩包..."
+            className="flex-1"
           />
-          <input
-            type="text"
+          <Input
             value={importNamespace}
             onChange={(e) => setImportNamespace(e.target.value)}
-            placeholder="Namespace"
-            className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="命名空间"
+            className="w-32"
           />
-          <button
-            onClick={handleImport}
-            disabled={actionLoading === 'import' || !importSource.trim()}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-          >
-            {actionLoading === 'import' ? 'Importing...' : 'Import'}
-          </button>
+          <Button onClick={handleImport} loading={actionLoading === 'import'} disabled={!importSource.trim()}>
+            导入
+          </Button>
         </div>
 
-        <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3">
-          <div className="mb-2 text-xs font-medium text-slate-700">Promote CodeAct run to skill</div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="text"
+        <Card className="mt-3">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">将 CodeAct 运行升级为 Skill</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 sm:flex-row">
+            <Input
               value={promoteSourceDir}
               onChange={(e) => setPromoteSourceDir(e.target.value)}
-              placeholder="CodeAct workdir path (contains __code_act_source__.py)..."
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              placeholder="CodeAct 工作目录路径..."
+              className="flex-1"
             />
-            <input
-              type="text"
+            <Input
               value={promoteName}
               onChange={(e) => setPromoteName(e.target.value)}
-              placeholder="Skill name (optional)"
-              className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              placeholder="Skill 名称（可选）"
+              className="w-48"
             />
-            <select
+            <Select
               value={promoteCategory}
+              options={[
+                { value: 'generated', label: 'Generated' },
+                { value: 'single-cell', label: 'Single Cell' },
+                { value: 'spatial-transcriptomics', label: 'Spatial' },
+                { value: 'genomics', label: 'Genomics' },
+                { value: 'workflows', label: 'Workflows' },
+              ]}
               onChange={(e) => setPromoteCategory(e.target.value)}
-              className="w-36 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-            >
-              <option value="generated">Generated</option>
-              <option value="single-cell">Single Cell</option>
-              <option value="spatial-transcriptomics">Spatial</option>
-              <option value="genomics">Genomics</option>
-              <option value="workflows">Workflows</option>
-            </select>
-            <button
+              className="w-40"
+            />
+            <Button
               onClick={handlePromote}
-              disabled={actionLoading === 'promote' || !promoteSourceDir.trim()}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              loading={actionLoading === 'promote'}
+              disabled={!promoteSourceDir.trim()}
+              className="bg-success hover:bg-success-700"
             >
-              {actionLoading === 'promote' ? 'Promoting...' : 'Save as Skill'}
-            </button>
-          </div>
-        </div>
+              <Save className="mr-1.5 h-4 w-4" />
+              保存为 Skill
+            </Button>
+          </CardContent>
+        </Card>
 
-        {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
+        {error && <p className="mt-2 text-xs text-error">{error}</p>}
         {lockResult && (
-          <pre className="mt-2 max-h-32 overflow-auto rounded bg-slate-50 p-2 text-xs text-slate-700">
-            {lockResult}
-          </pre>
+          <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted p-3 text-xs">{lockResult}</pre>
         )}
       </div>
 
-      {/* Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Skills list */}
-        <div className={`${selectedSkill ? 'w-1/2' : 'w-full'} overflow-y-auto border-r border-slate-200`}>
+        <div className={clsx('overflow-y-auto border-r border-border', selectedSkill ? 'w-1/2' : 'w-full')}>
           {loading && skills.length === 0 && (
             <div className="flex h-full items-center justify-center">
-              <div className="text-sm text-slate-500">Loading skills...</div>
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           )}
 
           {!loading && skills.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-              <div className="mb-2 text-3xl">🔧</div>
-              <div className="text-sm font-medium text-slate-700">No skills found</div>
-              <div className="mt-1 text-xs text-slate-500">Import or enable skills to get started</div>
-            </div>
+            <EmptyState
+              icon={Download}
+              title="暂无 Skills"
+              description="导入或启用 Skills 以开始使用"
+              action={{ label: '刷新', onClick: loadSkills }}
+            />
           )}
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {skills.map((skill) => (
               <button
                 key={`${skill.namespace}:${skill.id}`}
@@ -277,165 +294,143 @@ export function SkillManager() {
                   setTestResult(null)
                   setValidationResult(null)
                 }}
-                className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+                className={clsx(
+                  'w-full px-4 py-3 text-left transition-colors hover:bg-muted/50',
                   selectedSkill?.id === skill.id && selectedSkill?.namespace === skill.namespace
-                    ? 'bg-blue-50 ring-1 ring-inset ring-blue-200'
+                    ? 'bg-primary/5 ring-1 ring-inset ring-primary/20'
                     : ''
-                }`}
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800">{skill.name}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryColor(skill.category)}`}>
+                      <span className="truncate text-sm font-medium text-foreground">{skill.name}</span>
+                      <Badge className={categoryColors[skill.category] || 'bg-slate-100 text-slate-600'} size="sm">
                         {skill.category}
-                      </span>
-                      {!skill.enabled && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">disabled</span>
-                      )}
+                      </Badge>
+                      {!skill.enabled && <Badge variant="secondary" size="sm">已禁用</Badge>}
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{skill.description}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{skill.description}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${getRuntimeBadge(skill.runtime_type)}`}>
+                  <Badge variant="outline" className={runtimeColors[skill.runtime_type]} size="sm">
                     {skill.runtime_type.toUpperCase()}
-                  </span>
-                  <span className="text-xs text-slate-400">{skill.namespace}</span>
-                  <span className="text-xs text-slate-400">v{skill.version}</span>
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{skill.namespace}</span>
+                  <span className="text-xs text-muted-foreground">v{skill.version}</span>
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Detail panel */}
         {selectedSkill && (
-          <div className="w-1/2 overflow-y-auto bg-slate-50 p-4">
+          <div className="w-1/2 overflow-y-auto bg-muted/30 p-4">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-800">{selectedSkill.name}</h3>
-                <div className="mt-1 text-xs text-slate-500">{selectedSkill.namespace} / {selectedSkill.id}</div>
+                <h3 className="text-lg font-semibold text-foreground">{selectedSkill.name}</h3>
+                <p className="text-xs text-muted-foreground">{selectedSkill.namespace} / {selectedSkill.id}</p>
               </div>
-              <button
-                onClick={() => setSelectedSkill(null)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-              >
-                ✕
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedSkill(null)}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="mb-4 flex flex-wrap gap-2">
-              <button
+              <Button
+                size="sm"
+                variant={selectedSkill.enabled ? 'outline' : 'default'}
                 onClick={() => handleToggle(selectedSkill)}
-                disabled={actionLoading === selectedSkill.id}
-                className={`rounded px-3 py-1.5 text-xs font-medium ${
-                  selectedSkill.enabled
-                    ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
-                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                } disabled:opacity-50`}
+                loading={actionLoading === selectedSkill.id}
               >
-                {actionLoading === selectedSkill.id
-                  ? 'Working...'
-                  : selectedSkill.enabled
-                  ? 'Disable'
-                  : 'Enable'}
-              </button>
-              <button
+                {selectedSkill.enabled ? <PowerOff className="mr-1.5 h-3.5 w-3.5" /> : <Power className="mr-1.5 h-3.5 w-3.5" />}
+                {selectedSkill.enabled ? '禁用' : '启用'}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
                 onClick={() => handleValidate(selectedSkill)}
-                disabled={actionLoading === `${selectedSkill.id}:validate`}
-                className="rounded bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 disabled:opacity-50"
+                loading={actionLoading === `${selectedSkill.id}:validate`}
               >
-                Validate
-              </button>
-              <button
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                验证
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
                 onClick={() => handleTest(selectedSkill)}
-                disabled={actionLoading === `${selectedSkill.id}:test`}
-                className="rounded bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-100 disabled:opacity-50"
+                loading={actionLoading === `${selectedSkill.id}:test`}
               >
-                Test
-              </button>
-              <button
+                <Play className="mr-1.5 h-3.5 w-3.5" />
+                测试
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
                 onClick={() => handleRemove(selectedSkill)}
-                disabled={actionLoading === selectedSkill.id}
-                className="rounded bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
+                loading={actionLoading === selectedSkill.id}
               >
-                Remove
-              </button>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                移除
+              </Button>
             </div>
 
             {validationResult && (
-              <div className="mb-4 rounded border border-slate-200 bg-white p-3">
-                <div className={`text-sm font-medium ${validationResult.valid ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {validationResult.valid ? 'Valid' : 'Invalid'}
-                </div>
-                {validationResult.errors.length > 0 && (
-                  <ul className="mt-2 list-inside list-disc text-xs text-red-600">
-                    {validationResult.errors.map((e, i) => <li key={i}>{e}</li>)}
-                  </ul>
-                )}
-                {validationResult.warnings.length > 0 && (
-                  <ul className="mt-2 list-inside list-disc text-xs text-amber-600">
-                    {validationResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
-                  </ul>
-                )}
-              </div>
+              <Card className={clsx('mb-4', validationResult.valid ? 'border-success/30' : 'border-error/30')}>
+                <CardContent className="py-3">
+                  <div className={clsx('text-sm font-medium', validationResult.valid ? 'text-success' : 'text-error')}>
+                    {validationResult.valid ? '验证通过' : '验证失败'}
+                  </div>
+                  {validationResult.errors.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc text-xs text-error">
+                      {validationResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  )}
+                  {validationResult.warnings.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc text-xs text-warning">
+                      {validationResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {testResult && (
-              <div className="mb-4 rounded border border-slate-200 bg-white p-3">
-                <div className={`text-sm font-medium ${testResult.success ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {testResult.success ? 'Tests passed' : 'Tests failed'}
-                  {testResult.tests_run > 0 && (
-                    <span className="ml-2 text-xs text-slate-500">
-                      {testResult.tests_passed}/{testResult.tests_run}
-                    </span>
+              <Card className={clsx('mb-4', testResult.success ? 'border-success/30' : 'border-error/30')}>
+                <CardContent className="py-3">
+                  <div className={clsx('text-sm font-medium', testResult.success ? 'text-success' : 'text-error')}>
+                    {testResult.success ? '测试通过' : '测试失败'}
+                    {testResult.tests_run > 0 && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {testResult.tests_passed}/{testResult.tests_run}
+                      </span>
+                    )}
+                  </div>
+                  {testResult.stdout && (
+                    <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted p-2 text-xs">{testResult.stdout}</pre>
                   )}
-                </div>
-                {testResult.stdout && (
-                  <pre className="mt-2 max-h-32 overflow-auto rounded bg-slate-50 p-2 text-xs text-slate-700">
-                    {testResult.stdout}
-                  </pre>
-                )}
-                {testResult.stderr && (
-                  <pre className="mt-2 max-h-32 overflow-auto rounded bg-slate-50 p-2 text-xs text-red-700">
-                    {testResult.stderr}
-                  </pre>
-                )}
-              </div>
+                  {testResult.stderr && (
+                    <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-error/10 p-2 text-xs text-error">{testResult.stderr}</pre>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
-            <div className="space-y-3 rounded border border-slate-200 bg-white p-3 text-sm">
-              <div>
-                <span className="text-xs font-medium text-slate-500">Version</span>
-                <div className="text-slate-800">{selectedSkill.version}</div>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-slate-500">Source</span>
-                <div className="text-slate-800">{selectedSkill.source}</div>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-slate-500">Runtime</span>
-                <div className="text-slate-800">{selectedSkill.runtime_type}</div>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-slate-500">Primary Tool</span>
-                <div className="text-slate-800">{selectedSkill.primary_tool || 'N/A'}</div>
-              </div>
+            <div className="space-y-3 rounded-lg border border-border bg-card p-4 text-sm">
+              <InfoRow label="版本" value={selectedSkill.version} />
+              <InfoRow label="来源" value={selectedSkill.source} />
+              <InfoRow label="运行时" value={selectedSkill.runtime_type} />
+              <InfoRow label="主要工具" value={selectedSkill.primary_tool || 'N/A'} />
               {selectedSkill.dependencies.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-slate-500">Dependencies</span>
-                  <div className="text-slate-800">{selectedSkill.dependencies.join(', ')}</div>
-                </div>
+                <InfoRow label="依赖" value={selectedSkill.dependencies.join(', ')} />
               )}
               {selectedSkill.keywords.length > 0 && (
                 <div>
-                  <span className="text-xs font-medium text-slate-500">Keywords</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {selectedSkill.keywords.map((k) => (
-                      <span key={k} className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                        {k}
-                      </span>
+                  <span className="text-xs font-medium text-muted-foreground">关键词</span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {selectedSkill.keywords.map((k, idx) => (
+                      <Badge key={`${k}-${idx}`} variant="secondary" size="sm">{k}</Badge>
                     ))}
                   </div>
                 </div>
@@ -444,6 +439,15 @@ export function SkillManager() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="mt-0.5 text-foreground">{value}</div>
     </div>
   )
 }

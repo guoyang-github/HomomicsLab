@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { clsx } from 'clsx'
+import { ArrowLeft, Download, FileCode, List, FileText } from 'lucide-react'
 import { reportApi } from '@/services/api'
 import type { ReportDetail } from '@/types/api'
+import { Button, Badge, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 
 interface ReportViewerProps {
   reportId: string
@@ -31,9 +34,8 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
       setReport(detailRes.data)
       setHtmlContent(htmlRes.data.html)
       setError('')
-    } catch (err) {
-      setError('Failed to load report')
-      console.error(err)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '加载报告失败')
     } finally {
       setLoading(false)
     }
@@ -46,9 +48,7 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
     const a = document.createElement('a')
     a.href = url
     a.download = `${report.title.replace(/\s+/g, '_')}.html`
-    document.body.appendChild(a)
     a.click()
-    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
@@ -61,9 +61,7 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
       const a = document.createElement('a')
       a.href = url
       a.download = `${report.title.replace(/\s+/g, '_')}.md`
-      document.body.appendChild(a)
       a.click()
-      document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Failed to download markdown:', err)
@@ -72,18 +70,18 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      completed: 'bg-emerald-100 text-emerald-700',
-      failed: 'bg-red-100 text-red-700',
-      running: 'bg-amber-100 text-amber-700',
-      pending: 'bg-slate-100 text-slate-600',
+      completed: 'bg-success/10 text-success',
+      failed: 'bg-error/10 text-error',
+      running: 'bg-warning/10 text-warning',
+      pending: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
     }
-    return styles[status] || 'bg-slate-100 text-slate-600'
+    return styles[status] || styles.pending
   }
 
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-sm text-slate-500">Loading report...</div>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
@@ -91,14 +89,12 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
   if (error || !report) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
-        <div className="text-sm text-red-500">{error || 'Report not found'}</div>
+        <div className="text-sm text-error">{error || '报告不存在'}</div>
         {onBack && (
-          <button
-            onClick={onBack}
-            className="rounded bg-primary px-3 py-1 text-xs text-white hover:bg-primary/90"
-          >
-            Back to List
-          </button>
+          <Button onClick={onBack} size="sm">
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            返回列表
+          </Button>
         )}
       </div>
     )
@@ -106,60 +102,53 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
           {onBack && (
-            <button
-              onClick={onBack}
-              className="rounded p-1 text-slate-500 hover:bg-slate-100"
-              title="Back to list"
-            >
-              ←
-            </button>
+            <Button variant="ghost" size="icon" onClick={onBack} title="返回列表">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
           )}
           <div>
-            <h3 className="text-sm font-semibold text-slate-800">{report.title}</h3>
-            <div className="text-xs text-slate-500">
+            <h3 className="text-sm font-semibold text-foreground">{report.title}</h3>
+            <div className="text-xs text-muted-foreground">
               {report.metadata.project_name && `${report.metadata.project_name} · `}
-              {report.metadata.analysis_type || 'Analysis'}
+              {report.metadata.analysis_type || '分析'}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* View mode tabs */}
-          <div className="flex rounded-lg bg-slate-100 p-0.5">
-            {(['html', 'json', 'steps'] as ViewMode[]).map((mode) => (
+          <div className="hidden items-center gap-1 rounded-lg border border-border p-0.5 sm:flex">
+            {[
+              { mode: 'html' as ViewMode, label: '报告', icon: FileText },
+              { mode: 'json' as ViewMode, label: 'JSON', icon: FileCode },
+              { mode: 'steps' as ViewMode, label: '步骤', icon: List },
+            ].map(({ mode, label, icon: Icon }) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                   viewMode === mode
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
+                    ? 'bg-primary text-white'
+                    : 'text-muted-foreground hover:bg-muted'
+                )}
               >
-                {mode === 'html' ? 'Report' : mode === 'json' ? 'JSON' : 'Steps'}
+                <Icon className="h-3.5 w-3.5" />
+                {label}
               </button>
             ))}
           </div>
-          <div className="mx-1 h-4 w-px bg-slate-200" />
-          <button
-            onClick={handleDownloadHtml}
-            className="rounded bg-primary px-2.5 py-1 text-xs text-white hover:bg-primary/90"
-          >
-            Download HTML
-          </button>
-          <button
-            onClick={handleDownloadMarkdown}
-            className="rounded border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
-          >
-            Download MD
-          </button>
+          <Button size="sm" onClick={handleDownloadHtml}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            HTML
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleDownloadMarkdown}>
+            MD
+          </Button>
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-hidden">
         {viewMode === 'html' && (
           <iframe
@@ -172,49 +161,53 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
         )}
 
         {viewMode === 'json' && (
-          <div className="h-full overflow-auto bg-slate-50 p-4">
-            <pre className="rounded-lg bg-white p-4 text-xs leading-relaxed text-slate-700 shadow-sm">
+          <div className="h-full overflow-auto bg-muted/30 p-4">
+            <pre className="rounded-xl border border-border bg-card p-4 text-xs leading-relaxed shadow-card">
               {JSON.stringify(report, null, 2)}
             </pre>
           </div>
         )}
 
         {viewMode === 'steps' && (
-          <div className="h-full overflow-auto bg-slate-50 p-4">
-            <div className="mx-auto max-w-2xl space-y-3">
+          <div className="h-full overflow-auto bg-muted/30 p-4">
+            <div className="mx-auto max-w-3xl space-y-3">
               {report.analysis_steps.length === 0 && (
-                <div className="text-center text-sm text-slate-500">No analysis steps recorded</div>
+                <div className="text-center text-sm text-muted-foreground">未记录分析步骤</div>
               )}
               {report.analysis_steps.map((step) => (
-                <div
-                  key={step.step_number}
-                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                        {step.step_number}
-                      </span>
-                      <span className="text-sm font-medium text-slate-800">{step.name}</span>
+                <Card key={step.step_number}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                          {step.step_number}
+                        </span>
+                        <CardTitle className="text-sm">{step.name}</CardTitle>
+                      </div>
+                      <Badge className={getStatusBadge(step.status)} size="sm">
+                        {step.status || 'unknown'}
+                      </Badge>
                     </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadge(
-                        step.status
-                      )}`}
-                    >
-                      {step.status || 'unknown'}
-                    </span>
-                  </div>
-                  {step.description && (
-                    <p className="mt-2 text-xs text-slate-600">{step.description}</p>
-                  )}
-                  <div className="mt-2 flex items-center gap-4 text-xs text-slate-400">
-                    {step.skill_id && <span>Skill: <code className="rounded bg-slate-100 px-1 py-0.5">{step.skill_id}</code></span>}
-                    {step.duration_seconds !== null && (
-                      <span>Duration: {step.duration_seconds.toFixed(1)}s</span>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {step.description && (
+                      <p className="text-sm text-muted-foreground">{step.description}</p>
                     )}
-                  </div>
-                </div>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      {step.skill_id && (
+                        <span>
+                          Skill: <code className="rounded bg-muted px-1 py-0.5">{step.skill_id}</code>
+                        </span>
+                      )}
+                      {step.duration_seconds !== null && (
+                        <span>耗时：{step.duration_seconds.toFixed(1)}s</span>
+                      )}
+                      {step.started_at && (
+                        <span>开始：{new Date(step.started_at).toLocaleString()}</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

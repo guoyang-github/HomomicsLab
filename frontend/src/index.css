@@ -1,11 +1,215 @@
+@import 'katex/dist/katex.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', system-ui, sans-serif;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 224 76% 48%;
+  }
 }
 
-code, pre {
-  font-family: 'JetBrains Mono', monospace;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  code, pre {
+    @apply font-mono;
+  }
+
+  ::selection {
+    @apply bg-primary/20;
+  }
+}
+
+@layer utilities {
+  .bg-background {
+    background-color: hsl(var(--background));
+  }
+  .text-foreground {
+    color: hsl(var(--foreground));
+  }
+  .bg-card {
+    background-color: hsl(var(--card));
+  }
+  .text-card-foreground {
+    color: hsl(var(--card-foreground));
+  }
+  .bg-muted {
+    background-color: hsl(var(--muted));
+  }
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+  .bg-secondary {
+    background-color: hsl(var(--secondary));
+  }
+  .text-secondary-foreground {
+    color: hsl(var(--secondary-foreground));
+  }
+  .border-border {
+    border-color: hsl(var(--border));
+  }
+  .bg-primary-foreground {
+    background-color: hsl(var(--primary-foreground));
+  }
+  .text-primary-foreground {
+    color: hsl(var(--primary-foreground));
+  }
+  .bg-destructive {
+    background-color: hsl(var(--destructive));
+  }
+  .text-destructive-foreground {
+    color: hsl(var(--destructive-foreground));
+  }
+  .ring-ring {
+    --tw-ring-color: hsl(var(--ring));
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-300 dark:bg-slate-700;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-600;
+}
+
+/* Highlight.js github theme (light) */
+.hljs {
+  @apply bg-slate-50 text-slate-800;
+}
+
+.dark .hljs {
+  @apply bg-slate-900 text-slate-100;
+}
+
+.hljs-comment,
+.hljs-quote {
+  @apply text-slate-500 italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  @apply text-purple-600 dark:text-purple-400 font-medium;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  @apply text-blue-600 dark:text-blue-400;
+}
+
+.hljs-string,
+.hljs-doctag {
+  @apply text-green-600 dark:text-green-400;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  @apply text-red-600 dark:text-red-400 font-medium;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  @apply text-yellow-600 dark:text-yellow-400 font-medium;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  @apply text-cyan-600 dark:text-cyan-400;
+}
+
+.hljs-regexp,
+.hljs-link {
+  @apply text-orange-600 dark:text-orange-400;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  @apply text-pink-600 dark:text-pink-400;
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  @apply text-indigo-600 dark:text-indigo-400;
+}
+
+.hljs-meta {
+  @apply text-slate-400;
+}
+
+.hljs-emphasis {
+  @apply italic;
+}
+
+.hljs-strong {
+  @apply font-bold;
 }

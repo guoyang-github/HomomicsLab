@@ -1,4 +1,16 @@
 import { useState } from 'react'
+import { Wand2, Sparkles, FileCode2, Check } from 'lucide-react'
+import {
+  Button,
+  Input,
+  Textarea,
+  Select,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from '@/components/ui'
+import { toastError, toastSuccess } from '@/stores/toastStore'
 
 interface GeneratedFile {
   path: string
@@ -40,13 +52,13 @@ export function SkillGenerator() {
 
   const handleGenerate = async () => {
     if (!name.trim() || !description.trim()) {
-      setError('Name and description are required')
+      setError('名称和描述为必填项')
       return
     }
 
+    setLoading(true)
+    setError('')
     try {
-      setLoading(true)
-      setError('')
       const response = await fetch('/api/skill-generator/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,17 +68,15 @@ export function SkillGenerator() {
           category,
           tool_type: toolType,
           primary_tool: primaryTool,
-          supported_tools: supportedTools.split(',').map(s => s.trim()).filter(Boolean),
-          keywords: keywords.split(',').map(s => s.trim()).filter(Boolean),
-          dependencies: dependencies.split(',').map(s => s.trim()).filter(Boolean),
+          supported_tools: supportedTools.split(',').map((s) => s.trim()).filter(Boolean),
+          keywords: keywords.split(',').map((s) => s.trim()).filter(Boolean),
+          dependencies: dependencies.split(',').map((s) => s.trim()).filter(Boolean),
           inputs: [{ name: 'input_file', description: 'Input data file' }],
           outputs: ['output_file'],
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Generation failed')
-      }
+      if (!response.ok) throw new Error('Generation failed')
 
       const data = await response.json()
       setSkillId(data.skill_id)
@@ -75,9 +85,10 @@ export function SkillGenerator() {
         content: content as string,
       }))
       setGeneratedFiles(files)
+      toastSuccess('Skill 生成成功')
     } catch (err) {
-      setError('Failed to generate skill')
-      console.error(err)
+      setError('生成 Skill 失败')
+      toastError('生成 Skill 失败')
     } finally {
       setLoading(false)
     }
@@ -85,156 +96,122 @@ export function SkillGenerator() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-800">Skill Generator</h2>
-        <p className="text-xs text-slate-500">Generate new skills from requirements</p>
+      <div className="border-b border-border bg-card px-4 py-4">
+        <div className="flex items-center gap-2">
+          <Wand2 className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Skill 生成器</h2>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">根据需求描述生成新的 Skill</p>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Form */}
-        <div className="w-1/2 overflow-y-auto border-r border-slate-200 p-4">
+        <div className="w-1/2 overflow-y-auto border-r border-border p-4">
           <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Name *</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Seurat Clustering"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-              />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">名称 *</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：Seurat 聚类" />
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Description *</label>
-              <textarea
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">描述 *</label>
+                <Button type="button" variant="ghost" size="sm" onClick={handleSuggest}>
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  自动建议
+                </Button>
+              </div>
+              <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What does this skill do?"
+                placeholder="这个 Skill 做什么？"
                 rows={3}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               />
-              <button
-                onClick={handleSuggest}
-                className="mt-1 text-xs text-primary hover:underline"
-              >
-                🤖 Auto-suggest parameters
-              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Category</label>
-                <select
+              <div className="space-y-2">
+                <label className="text-sm font-medium">分类</label>
+                <Select
                   value={category}
+                  options={[
+                    { value: 'custom', label: 'Custom' },
+                    { value: 'single-cell', label: 'Single Cell' },
+                    { value: 'spatial-transcriptomics', label: 'Spatial' },
+                    { value: 'genomics', label: 'Genomics' },
+                    { value: 'proteomics', label: 'Proteomics' },
+                    { value: 'workflows', label: 'Workflows' },
+                  ]}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-                >
-                  <option value="custom">Custom</option>
-                  <option value="single-cell">Single Cell</option>
-                  <option value="spatial-transcriptomics">Spatial</option>
-                  <option value="genomics">Genomics</option>
-                  <option value="proteomics">Proteomics</option>
-                  <option value="workflows">Workflows</option>
-                </select>
+                />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">Tool Type</label>
-                <select
+              <div className="space-y-2">
+                <label className="text-sm font-medium">工具类型</label>
+                <Select
                   value={toolType}
+                  options={[
+                    { value: 'python', label: 'Python' },
+                    { value: 'r', label: 'R' },
+                    { value: 'mixed', label: 'Mixed' },
+                  ]}
                   onChange={(e) => setToolType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-                >
-                  <option value="python">Python</option>
-                  <option value="r">R</option>
-                  <option value="mixed">Mixed</option>
-                </select>
+                />
               </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Primary Tool</label>
-              <input
-                type="text"
-                value={primaryTool}
-                onChange={(e) => setPrimaryTool(e.target.value)}
-                placeholder="e.g., scanpy, Seurat"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-              />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">主要工具</label>
+              <Input value={primaryTool} onChange={(e) => setPrimaryTool(e.target.value)} placeholder="例如：scanpy, Seurat" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">支持工具（逗号分隔）</label>
+              <Input value={supportedTools} onChange={(e) => setSupportedTools(e.target.value)} placeholder="scanpy, anndata, numpy" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">关键词（逗号分隔）</label>
+              <Input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="qc, filtering, single-cell" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">依赖（逗号分隔）</label>
+              <Input value={dependencies} onChange={(e) => setDependencies(e.target.value)} placeholder="scanpy, anndata, matplotlib" />
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Supported Tools (comma-separated)</label>
-              <input
-                type="text"
-                value={supportedTools}
-                onChange={(e) => setSupportedTools(e.target.value)}
-                placeholder="scanpy, anndata, numpy"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            </div>
+            {error && <p className="text-sm text-error">{error}</p>}
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Keywords (comma-separated)</label>
-              <input
-                type="text"
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                placeholder="qc, filtering, single-cell"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Dependencies (comma-separated)</label>
-              <input
-                type="text"
-                value={dependencies}
-                onChange={(e) => setDependencies(e.target.value)}
-                placeholder="scanpy, anndata, matplotlib"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-lg bg-red-50 p-2 text-xs text-red-600">{error}</div>
-            )}
-
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="w-full rounded-lg bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
-            >
-              {loading ? 'Generating...' : 'Generate Skill'}
-            </button>
+            <Button onClick={handleGenerate} loading={loading} className="w-full">
+              {loading ? '生成中...' : '生成 Skill'}
+            </Button>
           </div>
         </div>
 
-        {/* Preview */}
-        <div className="w-1/2 overflow-hidden bg-slate-50">
+        <div className="w-1/2 overflow-hidden bg-muted/30">
           {generatedFiles.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
-                <div className="mb-2 text-3xl">🛠️</div>
-                <div className="text-sm text-slate-500">Fill the form and click Generate</div>
+                <FileCode2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">填写表单并点击生成</p>
               </div>
             </div>
           ) : (
             <div className="flex h-full flex-col">
-              <div className="border-b border-slate-200 bg-white px-4 py-2">
-                <div className="text-sm font-medium text-slate-800">Generated: {skillId}</div>
+              <div className="border-b border-border bg-card px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Check className="h-4 w-4 text-success" />
+                  已生成：{skillId}
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 <div className="space-y-3">
                   {generatedFiles.map((file) => (
-                    <div key={file.path} className="rounded-lg border border-slate-200 bg-white">
-                      <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
-                        {file.path}
-                      </div>
-                      <pre className="overflow-x-auto p-3 text-xs leading-relaxed text-slate-700">
-                        <code>{file.content}</code>
-                      </pre>
-                    </div>
+                    <Card key={file.path}>
+                      <CardHeader className="border-b border-border bg-muted/50 py-2">
+                        <CardTitle className="text-xs font-medium text-muted-foreground">{file.path}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <pre className="max-h-64 overflow-auto p-4 text-xs leading-relaxed">
+                          <code>{file.content}</code>
+                        </pre>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </div>
