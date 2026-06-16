@@ -1,5 +1,7 @@
 """Analysis strategy templates — domain knowledge for plan generation."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -34,6 +36,7 @@ class AnalysisStrategy:
     code_templates: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     data_sources: List[Dict[str, Any]] = field(default_factory=list)
     fallback_rules: List[Dict[str, str]] = field(default_factory=list)
+    phase_transitions: List[Dict[str, str]] = field(default_factory=list)
 
     def generate_skeleton(self, data_state: DataState) -> List[Phase]:
         """Generate the base skeleton, applying state-based modifications."""
@@ -86,17 +89,30 @@ class AnalysisStrategy:
 class StrategyLibrary:
     """Library of built-in analysis strategies."""
 
-    def __init__(self):
+    def __init__(self, skill_registry: Optional[Any] = None):
         self._strategies: Dict[str, AnalysisStrategy] = {}
+        self._skill_registry = skill_registry
         self._register_defaults()
 
     def _register_defaults(self) -> None:
-        """Register default strategies."""
-        self.register(SINGLE_CELL_STANDARD)
-        self.register(SPATIAL_TRANSCRIPTOMICS)
-        self.register(QC_ONLY)
-        # Load strategies from domain declarations
+        """Register default strategies.
+
+        Domain declarations take precedence over hard-coded defaults. Defaults
+        are only registered for intents not already covered by a loaded domain.
+        """
+        # 1. Load domain strategies first so they take priority.
         self._load_domain_strategies()
+
+        # 2. Register hard-coded defaults as fallback for uncovered intents.
+        covered_intents = {
+            intent
+            for strategy in self._strategies.values()
+            for intent in strategy.applicable_intents
+        }
+        defaults = [SINGLE_CELL_STANDARD, SPATIAL_TRANSCRIPTOMICS, QC_ONLY, GENERIC_ANALYSIS]
+        for strategy in defaults:
+            if not any(intent in covered_intents for intent in strategy.applicable_intents):
+                self.register(strategy)
 
     def _load_domain_strategies(self) -> None:
         """Load strategies from domain.yaml declarations.
@@ -112,7 +128,7 @@ class StrategyLibrary:
         if not domains_dir.exists():
             return
 
-        skill_registry = get_default_registry()
+        skill_registry = self._skill_registry or get_default_registry()
         domain_loader = DomainLoader(skill_registry, self)
 
         for domain_yaml in domains_dir.rglob("domain.yaml"):
@@ -154,7 +170,7 @@ SINGLE_CELL_STANDARD = AnalysisStrategy(
         Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy"),
         Phase(phase_type="dim_reduction", required=True, description="PCA principal component analysis dimensionality reduction single-cell scanpy"),
         Phase(phase_type="clustering", required=True, description="Cell clustering Louvain Leiden single-cell scanpy"),
-        Phase(phase_type="annotation", required=False, description="Cell type annotation marker genes single-cell"),
+        Phase(phase_type="annotation", required=True, description="Cell type annotation marker genes single-cell"),
         Phase(phase_type="differential_expression", required=False, description="Differential expression analysis single-cell DE"),
         Phase(phase_type="visualization", required=False, description="Generate UMAP heatmap plots single-cell visualization"),
     ],

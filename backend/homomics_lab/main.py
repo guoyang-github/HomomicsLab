@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from homomics_lab.api.audit import audit_middleware
-from homomics_lab.api.auth import require_auth
+from homomics_lab.api.auth import get_current_user, require_auth
 from homomics_lab.api.rate_limit import rate_limit_dependency, update_limiter_config
 from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context
@@ -19,9 +19,11 @@ from homomics_lab.logging_config import (
 from homomics_lab.plan import PlanStore
 from homomics_lab.scheduler import HomomicsScheduler
 from homomics_lab.api.router import api_router
+from homomics_lab.tracing import instrument_fastapi, setup_tracing
 
 
 configure_logging(level="INFO" if not settings.debug else "DEBUG", json_format=True)
+setup_tracing(service_name=settings.otel_service_name)
 
 
 @asynccontextmanager
@@ -78,6 +80,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+instrument_fastapi(app)
+
 
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
@@ -109,7 +113,11 @@ app.middleware("http")(prometheus_middleware)
 
 # Rate limiting applies globally. In production this should be backed by Redis.
 update_limiter_config()
-app.include_router(api_router, dependencies=[Depends(rate_limit_dependency)])
+# Auth is opt-in; when disabled get_current_user returns "anonymous" transparently.
+app.include_router(
+    api_router,
+    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
+)
 
 # CORS: default to localhost for development; override via environment for production.
 _allow_origins = getattr(settings, "cors_origins", None) or [

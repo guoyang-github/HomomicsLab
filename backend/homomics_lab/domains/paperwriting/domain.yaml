@@ -1,0 +1,158 @@
+domain: paperwriting
+display_name: Scientific Paper Writing
+description: Best-practice scientific writing and research communication. Phases form a DAG of research lifecycle stages; orchestrator skills are invoked for broad or end-to-end requests.
+version: "3.0.0"
+
+orchestrator_skills:
+  - scientific-orchestrator
+
+phases:
+  - id: ideation
+    required: false
+    description: Generate and refine research ideas and hypotheses
+    skills: [scientific-ideation]
+    default_skill: scientific-ideation
+
+  - id: literature_review
+    required: false
+    description: Conduct systematic literature review and evidence synthesis
+    skills: [scientific-literature-review]
+    default_skill: scientific-literature-review
+
+  - id: research_design
+    required: false
+    description: Design experiments and analysis plans
+    skills: [scientific-research-design]
+    default_skill: scientific-research-design
+
+  - id: data_analysis_plan
+    required: false
+    description: Plan data collection, processing and statistical analysis
+    skills: [scientific-research-design]
+    default_skill: scientific-research-design
+
+  - id: visualization
+    required: false
+    description: Generate data visualizations and summary plots
+    skills: [scientific-visualization]
+    default_skill: scientific-visualization
+
+  - id: illustration
+    required: false
+    description: Create publication-ready figures, diagrams and posters
+    skills: [scientific-illustration, scientific-visualization]
+    default_skill: scientific-illustration
+
+  - id: manuscript
+    required: false
+    description: Draft and refine scientific manuscripts
+    skills: [scientific-manuscript]
+    default_skill: scientific-manuscript
+
+  - id: peer_review
+    required: false
+    description: Perform critical peer review of manuscripts and proposals
+    skills: [scientific-peer-review]
+    default_skill: scientific-peer-review
+
+  - id: communication
+    required: false
+    description: Prepare presentations, posters and public communication materials
+    skills: [scientific-communication]
+    default_skill: scientific-communication
+
+  - id: grant_writing
+    required: false
+    description: Write competitive research proposals and grant applications
+    skills: [scientific-grant-writing]
+    default_skill: scientific-grant-writing
+
+phase_transitions:
+  - from: ideation
+    to: literature_review
+    type: followed_by
+  - from: literature_review
+    to: research_design
+    type: followed_by
+  - from: research_design
+    to: data_analysis_plan
+    type: followed_by
+  - from: data_analysis_plan
+    to: visualization
+    type: followed_by
+  - from: visualization
+    to: illustration
+    type: followed_by
+  - from: illustration
+    to: manuscript
+    type: followed_by
+  - from: manuscript
+    to: peer_review
+    type: followed_by
+  - from: peer_review
+    to: communication
+    type: followed_by
+  - from: research_design
+    to: grant_writing
+    type: alternative_to
+  - from: peer_review
+    to: manuscript
+    type: alternative_to
+
+state_checks:
+  - condition: "funding_request"
+    action: insert
+    target: grant_writing
+    after: research_design
+
+  - condition: "figures_required"
+    action: insert
+    target: illustration
+    after: data_analysis_plan
+
+intents:
+  - analysis_type: paperwriting_analysis
+    keywords:
+      - paper writing
+      - manuscript
+      - grant
+      - literature review
+      - peer review
+      - scientific illustration
+      - research design
+      - 论文写作
+      - 文献综述
+      - 基金
+
+roles:
+  - role_id: paperwriting_specialist
+    name: Scientific Writing Specialist
+    allowed_skills:
+      - scientific-communication
+      - scientific-grant-writing
+      - scientific-ideation
+      - scientific-illustration
+      - scientific-literature-review
+      - scientific-manuscript
+      - scientific-orchestrator
+      - scientific-peer-review
+      - scientific-research-design
+      - scientific-visualization
+    allowed_tools: [file_read, file_write, shell_exec]
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 3
+
+sops:
+  - id: sop_paperwriting_v3
+    title: Scientific Paper Writing SOP
+    steps:
+      - "Use scientific-orchestrator as the entry point for broad/multi-stage requests"
+      - "Ideation and hypothesis generation"
+      - "Literature review and gap analysis"
+      - "Research design and analysis planning"
+      - "Data visualization and illustration"
+      - "Manuscript drafting"
+      - "Peer review and revision"
+      - "Science communication and grant writing"

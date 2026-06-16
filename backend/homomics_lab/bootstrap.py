@@ -5,6 +5,7 @@ and the distributed worker need, so both can start with the same agents,
 tools, skills, and domain registry.
 """
 
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -38,16 +39,41 @@ def _discover_external_skill_dirs() -> List[Path]:
     canonical community skill repositories next to the project root:
       - ../NanoResearch-Skills/skills
       - ../Genomics-Skills/skills
+      - ../paperwriting-Skills/skills
+      - ../database-Skills/skills
+      - ../mRNAseq-Skills/skills
+      - ../riboseq-Skills/skills
     """
     # bootstrap.py is at backend/homomics_lab/bootstrap.py
     # project root is two levels up: backend/homomics_lab -> backend -> HomomicsLab
     project_root = Path(__file__).parent.parent.parent
     candidates: List[Path] = []
-    for name in ("NanoResearch-Skills", "Genomics-Skills", "Utils-Skills"):
+    for name in (
+        "NanoResearch-Skills",
+        "Genomics-Skills",
+        "Utils-Skills",
+        "paperwriting-Skills",
+        "database-Skills",
+        "mRNAseq-Skills",
+        "riboseq-Skills",
+    ):
         candidate = project_root.parent / name / "skills"
         if candidate.exists() and candidate.is_dir():
             candidates.append(candidate)
     return candidates
+
+
+def _namespace_for_external_dir(external_skills_dir: Path) -> str:
+    """Derive a clean namespace from an external skill collection path.
+
+    Examples:
+      - ../NanoResearch-Skills/skills -> nanoresearch
+      - ../Genomics-Skills/skills -> genomics
+      - ../paperwriting-Skills/skills -> paperwriting
+    """
+    raw = external_skills_dir.parent.name
+    ns = raw.lower().removesuffix("-skills")
+    return ns or "external"
 
 
 async def _ensure_database_schema() -> None:
@@ -129,29 +155,50 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             enabled=True,
         )
 
-    # Load external skill directories at DISCOVERY level: only frontmatter is
-    # loaded into the runtime registry at startup. Full SKILL.md bodies are
-    # activated lazily on first execution (OpenClaw-style progressive disclosure).
-    loader = SkillLoader(registry=skill_executor.registry)
+    # Import external skill directories into the canonical skill store path.
+    # Each skill subdirectory is copied to data/skill_store/imported/<namespace>/
+    # so the runtime no longer depends on the original external location.
+    discovery_loader = SkillLoader(registry=skill_executor.registry)
     external_dirs = settings.external_skills_dirs or _discover_external_skill_dirs()
+
+    # Normalize collection folder names to clean namespaces and remove stale
+    # imported directories (e.g. old "external" or renamed collections).
+    expected_namespaces = {
+        _namespace_for_external_dir(d)
+        for d in external_dirs
+        if d.exists()
+    }
+    if skill_store.imported_dir.exists():
+        for subdir in skill_store.imported_dir.iterdir():
+            if subdir.is_dir() and subdir.name not in expected_namespaces:
+                shutil.rmtree(subdir)
+
     for external_skills_dir in external_dirs:
-        if external_skills_dir.exists():
-            loaded = loader.load_all(external_skills_dir, disclosure="discovery")
-            for skill in loaded:
-                # Builtin/legacy skills take precedence over external discovery.
-                if skill_executor.registry.get(skill.id) is not None:
+        if not external_skills_dir.exists():
+            continue
+        namespace = _namespace_for_external_dir(external_skills_dir)
+        for skill_path in external_skills_dir.iterdir():
+            if not skill_path.is_dir():
+                continue
+            skill_md = skill_path / "SKILL.md"
+            if not skill_md.exists():
+                continue
+            try:
+                # Peek at the skill to check for builtin collisions before copying.
+                preview = discovery_loader.load_skill(skill_path)
+                if skill_executor.registry.get(preview.id) is not None:
                     continue
-                skill.metadata["namespace"] = "external"
+                # Copy into the canonical skill store and register.
+                skill = skill_store.import_skill(
+                    source=str(skill_path),
+                    namespace=namespace,
+                    enable=True,
+                )
+                skill.metadata["namespace"] = namespace
                 skill.metadata["trusted"] = False
                 skill_executor.register_skill(skill)
-                skill_store._record_meta(
-                    skill=skill,
-                    namespace="external",
-                    source=skill.metadata.get("source", "external"),
-                    source_dir=Path(skill.metadata.get("source_dir", ".")),
-                    enabled=True,
-                    trusted=False,
-                )
+            except Exception as exc:
+                print(f"Warning: Failed to import skill from {skill_path}: {exc}")
 
     # Wrap MCP tools as skills so the planner can orchestrate them
     if mcp_client is not None:

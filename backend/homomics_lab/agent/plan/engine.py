@@ -63,7 +63,7 @@ class PlanEngine:
             literature_retriever=literature_retriever,
         )
         self.plan_validator = PlanValidator(skill_registry=skill_registry)
-        self.strategy_library = StrategyLibrary()
+        self.strategy_library = StrategyLibrary(skill_registry=skill_registry)
         self.llm_fallback = llm_fallback or LLMFallbackPlanner(skill_registry)
         self.cbkb = cbkb
 
@@ -128,6 +128,7 @@ class PlanEngine:
             data_state=data_state,
             gaps=gaps,
             reproducibility_context=reproducibility_context,
+            phase_transitions=strategy.phase_transitions,
         )
 
         validation_report = self.plan_validator.validate(plan_result)

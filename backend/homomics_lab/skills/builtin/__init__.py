@@ -32,6 +32,7 @@ def _register_skill_dir(
     # Use directory name as canonical skill ID (underscores, no hyphens)
     skill.id = skill_dir.name
     skill.metadata["source"] = source
+    skill.metadata["namespace"] = source
     skill.metadata["trusted"] = source in {"builtin", "legacy"}
     executor.registry.register(skill)
 

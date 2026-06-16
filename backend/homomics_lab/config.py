@@ -82,9 +82,25 @@ class Settings(BaseSettings):
     audit_log_enabled: bool = False
     audit_log_path: Optional[Path] = None
 
+    # Secrets manager
+    secrets_db_path: Optional[Path] = None
+    secrets_master_key: Optional[str] = None
+    secrets_plaintext_fallback: bool = False  # dangerous; only for local dev without cryptography
+
     # Cost control
     monthly_budget_usd: Optional[float] = None  # per-user/tenant budget (enforced when auth enabled)
     max_llm_cost_per_request_usd: Optional[float] = None
+
+    # LLM routing
+    llm_provider: Optional[str] = None  # e.g. openai, deepseek, qwen, zhipu, moonshot, ollama
+    llm_model: Optional[str] = None
+    llm_fallback_models: Optional[str] = None  # comma-separated list
+
+    # OpenTelemetry tracing
+    otel_enabled: bool = False
+    otel_exporter: str = "console"  # console | otlp
+    otel_otlp_endpoint: Optional[str] = "http://localhost:4317"
+    otel_service_name: str = "homomicslab"
 
     # CORS / host security
     cors_origins: Optional[List[str]] = None  # e.g. ["https://app.homomics.lab"]

@@ -1,101 +1,253 @@
-domain: spatial_transcriptomics
-description: Spatial transcriptomics analysis pipeline (Visium/Xenium/MERFISH)
-version: "1.0.0"
+domain: spatial
+display_name: Spatial Transcriptomics Analysis
+description: Best-practice spatial transcriptomics analysis covering 10x Visium, Xenium, MerFish/SeqFish, stereo-seq and DBiT-seq. Phases form a DAG of preprocessing, domain identification, deconvolution, spatial statistics, communication and microenvironment analysis.
+version: "3.0.0"
+
+orchestrator_skills: []
 
 phases:
-  - id: spatial_qc
+  - id: data_io
     required: true
-    description: Spatial data quality control
-    skills: [spatial_qc]
+    description: Load spatial transcriptomics data and images
+    skills: [bio-spatial-transcriptomics-data-io]
+    default_skill: bio-spatial-transcriptomics-data-io
 
-  - id: spatial_preprocessing
-    required: true
-    description: Preprocessing spatial coordinates and expression
-    skills: [spatial_preprocess]
-
-  - id: spatial_clustering
-    required: true
-    description: Spatially-aware clustering
-    skills: [spatial_cluster]
-
-  - id: spatial_deconvolution
+  - id: fastq_processing
     required: false
-    description: Cell type deconvolution from spots
-    skills: [spatial_deconvolve]
+    description: Convert raw FASTQ to spatial count matrix
+    skills: [bio-spatial-transcriptomics-fastq2spatial]
+    default_skill: bio-spatial-transcriptomics-fastq2spatial
+
+  - id: qc
+    required: true
+    description: Quality control for spots/cells and tissue layers
+    skills: [bio-spatial-transcriptomics-preprocessing]
+    default_skill: bio-spatial-transcriptomics-preprocessing
+
+  - id: normalization
+    required: true
+    description: Normalization and variance stabilization
+    skills: [bio-spatial-transcriptomics-preprocessing]
+    default_skill: bio-spatial-transcriptomics-preprocessing
+
+  - id: dimensionality_reduction
+    required: true
+    description: PCA and spatial-aware dimensionality reduction
+    skills: [bio-spatial-transcriptomics-preprocessing]
+    default_skill: bio-spatial-transcriptomics-preprocessing
+
+  - id: clustering
+    required: true
+    description: Clustering of spots/cells
+    skills: [bio-spatial-transcriptomics-preprocessing]
+    default_skill: bio-spatial-transcriptomics-preprocessing
+
+  - id: spatial_domains
+    required: false
+    description: Identify spatial domains and tissue regions
+    skills: [bio-spatial-transcriptomics-domains-bayesspace-r, bio-spatial-transcriptomics-domains-graphst, bio-spatial-transcriptomics-domains-spagcn, bio-spatial-transcriptomics-domains-stagate]
+    default_skill: bio-spatial-transcriptomics-domains-stagate
+
+  - id: batch_integration
+    required: false
+    description: Batch correction and integration across multiple sections
+    skills: [bio-spatial-transcriptomics-batch-integration]
+    default_skill: bio-spatial-transcriptomics-batch-integration
+
+  - id: deconvolution
+    required: false
+    description: Cell-type deconvolution for spot-based data
+    skills: [bio-spatial-transcriptomics-deconvolution-cell2location, bio-spatial-transcriptomics-deconvolution-spotlight-r, bio-spatial-transcriptomics-deconvolution-rctd-r, bio-spatial-transcriptomics-deconvolution-card-r, bio-spatial-transcriptomics-deconvolution-tangram]
+    default_skill: bio-spatial-transcriptomics-deconvolution-cell2location
+
+  - id: spatially_variable_genes
+    required: false
+    description: Detect spatially variable genes and patterns
+    skills: [bio-spatial-transcriptomics-statistics]
+    default_skill: bio-spatial-transcriptomics-statistics
+
+  - id: differential_abundance
+    required: false
+    description: Differential abundance across spatial domains or conditions
+    skills: [bio-spatial-transcriptomics-differential-abundance-roe-r]
+    default_skill: bio-spatial-transcriptomics-differential-abundance-roe-r
+
+  - id: cell_cell_communication
+    required: false
+    description: Spatially aware cell-cell communication inference
+    skills: [bio-spatial-transcriptomics-communication-cellchat-r, bio-spatial-transcriptomics-communication-commot, bio-spatial-transcriptomics-communication-fastccc, bio-spatial-transcriptomics-communication-liana]
+    default_skill: bio-spatial-transcriptomics-communication-cellchat-r
+
+  - id: microenvironment
+    required: false
+    description: Tissue microenvironment and niche analysis
+    skills: [bio-spatial-transcriptomics-microenvironment-misty-r, bio-spatial-transcriptomics-niches, bio-spatial-transcriptomics-neighbors]
+    default_skill: bio-spatial-transcriptomics-microenvironment-misty-r
+
+  - id: layers
+    required: false
+    description: Cortical layer or tissue layer analysis
+    skills: [bio-spatial-transcriptomics-layers]
+    default_skill: bio-spatial-transcriptomics-layers
+
+  - id: cnv
+    required: false
+    description: Copy number variation inference from spatial data
+    skills: [bio-spatial-transcriptomics-cnv-fastcnv-r, bio-spatial-transcriptomics-cnv-numbat-r]
+    default_skill: bio-spatial-transcriptomics-cnv-fastcnv-r
+
+  - id: integration_single_cell
+    required: false
+    description: Integrate spatial and single-cell reference data
+    skills: [bio-spatial-transcriptomics-integration-spclue]
+    default_skill: bio-spatial-transcriptomics-integration-spclue
 
   - id: visualization
     required: false
-    description: Generate spatial plots
-    skills: [plot_spatial]
+    description: Generate spatial plots and statistics
+    skills: [bio-spatial-transcriptomics-statistics]
+    default_skill: bio-spatial-transcriptomics-statistics
+
+phase_transitions:
+  - from: data_io
+    to: qc
+  - from: fastq_processing
+    to: qc
+  - from: qc
+    to: normalization
+  - from: normalization
+    to: dimensionality_reduction
+  - from: dimensionality_reduction
+    to: clustering
+  - from: clustering
+    to: spatial_domains
+  - from: spatial_domains
+    to: deconvolution
+    type: depends_on
+  - from: spatial_domains
+    to: spatially_variable_genes
+  - from: spatial_domains
+    to: differential_abundance
+  - from: spatial_domains
+    to: layers
+    type: alternative_to
+  - from: deconvolution
+    to: cell_cell_communication
+  - from: deconvolution
+    to: microenvironment
+  - from: clustering
+    to: visualization
+  - from: spatial_domains
+    to: cnv
+    type: alternative_to
+  - from: normalization
+    to: integration_single_cell
+    type: depends_on
 
 state_checks:
-  - condition: "n_cells is not None and n_cells < 1000"
-    action: skip
-    target: spatial_deconvolution
+  - condition: "spot_based"
+    action: insert
+    target: deconvolution
+    after: clustering
+
+  - condition: "multiple_sections"
+    action: insert
+    target: batch_integration
+    after: data_io
+
+  - condition: "has_single_cell_reference"
+    action: insert
+    target: integration_single_cell
+    after: normalization
 
 intents:
-  - analysis_type: spatial_analysis
+  - analysis_type: spatial_transcriptomics_analysis
     keywords:
-      - "空间"
-      - "spatial"
+      - "空间转录组"
+      - "spatial transcriptomics"
       - "visium"
       - "xenium"
       - "merfish"
-      - "空间转录组"
-    examples:
-      - "分析空间转录组数据"
-      - "run spatial transcriptomics analysis"
-      - "处理 visium 数据"
-      - "画空间表达图"
-      - "xenium 细胞分割"
-      - "merfish 数据分析"
-    complexity_indicators:
-      - "分析"
-      - "流程"
-      - "pipeline"
-    data_scale_patterns: []
-
-dag_seeds:
-  - from: spatial_qc
-    to: spatial_clustering
-    type: followed_by
-    context: "Spatial QC → spatial clustering"
-
-  - from: spatial_clustering
-    to: spatial_deconvolution
-    type: followed_by
-    context: "Spatial clustering → deconvolution"
-
-  - from: scanpy_annotation
-    to: spatial_deconvolution
-    type: followed_by
-    context: "Single-cell annotations can guide spatial deconvolution"
+      - "seqfish"
+      - "stereo-seq"
+      - "dbit-seq"
+      - "空间表达"
+      - "空间域"
+      - "spot deconvolution"
 
 roles:
-  - role_id: spatial_specialist
+  - role_id: spatial_transcriptomics_specialist
     name: Spatial Transcriptomics Specialist
-    description: Expert in spatial transcriptomics analysis
     allowed_skills:
-      - spatial_qc
-      - spatial_preprocess
-      - spatial_cluster
-      - spatial_deconvolve
-      - plot_spatial
-    allowed_tools:
-      - file_read
-      - file_write
-      - shell_exec
+      - bio-spatial-transcriptomics-data-io
+      - bio-spatial-transcriptomics-fastq2spatial
+      - bio-spatial-transcriptomics-preprocessing
+      - bio-spatial-transcriptomics-batch-integration
+      - bio-spatial-transcriptomics-domains-bayesspace-r
+      - bio-spatial-transcriptomics-domains-graphst
+      - bio-spatial-transcriptomics-domains-spagcn
+      - bio-spatial-transcriptomics-domains-stagate
+      - bio-spatial-transcriptomics-deconvolution-cell2location
+      - bio-spatial-transcriptomics-deconvolution-spotlight-r
+      - bio-spatial-transcriptomics-deconvolution-rctd-r
+      - bio-spatial-transcriptomics-deconvolution-card-r
+      - bio-spatial-transcriptomics-deconvolution-tangram
+      - bio-spatial-transcriptomics-statistics
+      - bio-spatial-transcriptomics-differential-abundance-roe-r
+      - bio-spatial-transcriptomics-communication-cellchat-r
+      - bio-spatial-transcriptomics-communication-commot
+      - bio-spatial-transcriptomics-communication-fastccc
+      - bio-spatial-transcriptomics-communication-liana
+      - bio-spatial-transcriptomics-microenvironment-misty-r
+      - bio-spatial-transcriptomics-niches
+      - bio-spatial-transcriptomics-neighbors
+      - bio-spatial-transcriptomics-layers
+      - bio-spatial-transcriptomics-cnv-fastcnv-r
+      - bio-spatial-transcriptomics-cnv-numbat-r
+      - bio-spatial-transcriptomics-integration-spclue
+      - bio-workflows-spatial-pipeline
+    allowed_tools: [file_read, file_write, shell_exec]
     permissions:
       can_execute: true
       can_spawn_specialist: false
-      max_concurrent_tasks: 2
-    priority: 2
+      max_concurrent_tasks: 4
 
-data_state_schema:
-  has_spatial_qc:
-    type: boolean
-  n_spots:
-    type: integer
-    description: Number of spatial spots/transcripts
+dag_seeds:
+  - from: bio-spatial-transcriptomics-data-io
+    to: bio-spatial-transcriptomics-preprocessing
+    type: followed_by
+    context: "Load spatial data before QC"
 
-skills_dir: null
+  - from: bio-spatial-transcriptomics-preprocessing
+    to: bio-spatial-transcriptomics-domains-stagate
+    type: followed_by
+    context: "Identify spatial domains after preprocessing"
+
+  - from: bio-spatial-transcriptomics-domains-stagate
+    to: bio-spatial-transcriptomics-deconvolution-cell2location
+    type: followed_by
+    context: "Deconvolve domains to cell types"
+
+  - from: bio-spatial-transcriptomics-deconvolution-cell2location
+    to: bio-spatial-transcriptomics-communication-cellchat-r
+    type: followed_by
+    context: "Communication after cell-type deconvolution"
+
+  - from: bio-spatial-transcriptomics-deconvolution-cell2location
+    to: bio-spatial-transcriptomics-microenvironment-misty-r
+    type: followed_by
+    context: "Microenvironment after cell-type mapping"
+
+sops:
+  - id: sop_spatial_v3
+    title: Spatial Transcriptomics Analysis SOP
+    steps:
+      - "Load spatial data (data-io / fastq2spatial)"
+      - "Preprocessing, QC, and normalization"
+      - "Dimensionality reduction and clustering"
+      - "Spatial domain identification"
+      - "Spot deconvolution (for spot-based platforms)"
+      - "Spatially variable gene and layer analysis"
+      - "Differential abundance and communication"
+      - "Microenvironment and niche analysis"
+      - "Visualization and reporting"

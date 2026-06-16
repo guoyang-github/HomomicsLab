@@ -8,9 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
+from homomics_lab.api.auth import get_current_user
 from homomics_lab.database.connection import get_async_session
-from homomics_lab.database.models import ProjectRecord
+from homomics_lab.database.models import ProjectMember, ProjectRecord
 from homomics_lab.projects import ProjectExporter, ProjectImporter
+from homomics_lab.projects.permissions import (
+    add_project_member,
+    require_project_permission,
+)
 from homomics_lab.security import validate_project_id
 
 router = APIRouter()
@@ -39,6 +44,7 @@ def _generate_project_id() -> str:
 async def create_project(
     project: ProjectCreate,
     db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     now = datetime.now(timezone.utc)
     project_id = _generate_project_id()
@@ -46,6 +52,7 @@ async def create_project(
         project_id=project_id,
         name=project.name,
         description=project.description,
+        owner_id=user_id,
         created_at=now,
         updated_at=now,
     )
@@ -62,8 +69,22 @@ async def create_project(
 
 
 @router.get("", response_model=List[ProjectResponse])
-async def list_projects(db: AsyncSession = Depends(get_async_session)):
-    result = await db.execute(select(ProjectRecord).order_by(ProjectRecord.created_at.desc()))
+async def list_projects(
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """List projects the current user owns or is a member of."""
+    from homomics_lab.config import settings
+
+    stmt = select(ProjectRecord).order_by(ProjectRecord.created_at.desc())
+    if settings.auth_enabled:
+        # Owned or member of.
+        member_stmt = select(ProjectMember.project_id).where(ProjectMember.user_id == user_id)
+        stmt = stmt.where(
+            (ProjectRecord.owner_id == user_id) | (ProjectRecord.project_id.in_(member_stmt))
+        )
+
+    result = await db.execute(stmt)
     records = result.scalars().all()
     return [
         ProjectResponse(
@@ -81,11 +102,14 @@ async def list_projects(db: AsyncSession = Depends(get_async_session)):
 async def get_project(
     project_id: str,
     db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     try:
         validate_project_id(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
 
     result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
     record = result.scalar_one_or_none()
@@ -104,12 +128,15 @@ async def get_project(
 async def export_project(
     project_id: str,
     db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     """Export a project as a .homomics archive file."""
     try:
         validate_project_id(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
 
     result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
     record = result.scalar_one_or_none()
@@ -130,6 +157,7 @@ async def export_project(
 async def import_project(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     """Import a project from a .homomics archive file."""
     if not file.filename or not file.filename.endswith(".homomics"):
@@ -149,6 +177,7 @@ async def import_project(
             project_id=imported_id,
             name=f"Imported {file.filename[:-9]}",
             description="Imported from archive",
+            owner_id=user_id,
             created_at=now,
             updated_at=now,
         )
@@ -160,3 +189,46 @@ async def import_project(
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+class MemberCreate(BaseModel):
+    user_id: str
+    role: str = "member"
+
+
+class MemberResponse(BaseModel):
+    project_id: str
+    user_id: str
+    role: str
+
+
+@router.post("/{project_id}/members")
+async def add_member(
+    project_id: str,
+    body: MemberCreate,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    await require_project_permission(project_id, "admin", db, user_id)
+    try:
+        await add_project_member(project_id, body.user_id, body.role, db, added_by=user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return MemberResponse(project_id=project_id, user_id=body.user_id, role=body.role)
+
+
+@router.get("/{project_id}/members", response_model=List[MemberResponse])
+async def list_members(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    await require_project_permission(project_id, "read", db, user_id)
+    result = await db.execute(
+        select(ProjectMember).where(ProjectMember.project_id == project_id)
+    )
+    members = result.scalars().all()
+    return [
+        MemberResponse(project_id=m.project_id, user_id=m.user_id, role=m.role)
+        for m in members
+    ]

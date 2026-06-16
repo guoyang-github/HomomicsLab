@@ -7,7 +7,8 @@ HomomicsLab is a **domain-native agent platform** for computational biology. It 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              USER INTERFACE                                  │
-│         React + TypeScript + Zustand + WebSocket/REST                        │
+│  React 18 + TypeScript + Zustand + ReactFlow + Tailwind CSS                  │
+│  components/ui library · light/dark theme · command palette · settings panel │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -91,10 +92,11 @@ HomomicsLab is a **domain-native agent platform** for computational biology. It 
 │  │  data/ (read-only) · intermediate/ · outputs/ · logs/ · .metadata/     │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 │                                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
-│  │  LineageGraph │  │  Snapshot    │  │  HPC Scheduler│                     │
-│  │  (provenance) │  │  (checkpoint)│  │ (SLURM/local)│                     │
-│  └──────────────┘  └──────────────┘  └──────────────┘                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────────────────┐│
+│  │  LineageGraph │  │  Snapshot    │  │     HPC & Workflow Orchestration  ││
+│  │  (provenance) │  │  (checkpoint)│  │  LocalScheduler · SlurmScheduler  ││
+│  └──────────────┘  └──────────────┘  │  NextflowRunner · NFCoreManager   ││
+│                                       └────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -183,6 +185,32 @@ def test_against_baseline(skill_id, test_case_id, actual_output) -> RegressionRe
 ```
 
 **Key invariant**: A ReproducibilityBundle is JSON-serializable and self-contained. No external references required for replay.
+
+### 5. Execution Scheduler + NFCoreManager
+
+**Execution Scheduler** abstracts where and how skill code runs.
+**NFCoreManager** wraps nf-core pipelines into the same abstraction.
+
+```python
+# BaseScheduler
+async def execute(skill, code, inputs, timeout_seconds=3600.0) -> Dict[str, Any]
+
+# LocalScheduler
+# Runs in local subprocess / sandbox; default for small data and development.
+
+# SlurmScheduler
+# Generates sbatch script, submits via sbatch, polls via squeue/sacct, streams stdout/stderr.
+
+# NextflowRunner
+# Renders a Nextflow DSL2 template (or invokes nf-core) and runs with -profile/-executor.
+
+# NFCoreManager
+def list_pipelines(use_cache=False) -> List[NFCorePipeline]
+def download_pipeline(name: str, version=None) -> Path
+def run_pipeline(name, params, version=None, profiles=None) -> Dict[str, Any]
+```
+
+**Key invariant**: The orchestrator calls `scheduler.execute(...)` without knowing whether the backend is local, SLURM, or Nextflow. Backend selection is carried in the execution context or requested explicitly by the user/plan.
 
 ---
 
@@ -421,3 +449,4 @@ Fallback plans are executable but carry a `HITLCheckpoint` so the user confirms 
 5. **Phase-level interpretation**: InterpretationEngine triggers at phase boundaries, not every step.
 6. **Bundle-level reproducibility**: ReproducibilityBundle captures exact agent code, not just skill names.
 7. **Domain-native knowledge base**: CBKB is structured around experiments, parameters, anomalies, SOPs—not generic chat logs.
+8. **Pluggable execution backends**: The agent layer decides *what* to run; the scheduler layer decides *where* to run it. Local, SLURM, and Nextflow/nf-core are interchangeable backends.

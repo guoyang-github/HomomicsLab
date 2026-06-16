@@ -1,19 +1,22 @@
-"""Minimal async LLM client for runtime use.
+"""Async LLM client with multi-provider support, fallback, and cost governance.
 
-Currently wraps OpenAI's async API and reads OPENAI_API_KEY from the
-environment. If no key is available, the client degrades gracefully so that
-tests and offline usage do not crash.
+Supports OpenAI, Anthropic, Azure, and domestic OpenAI-compatible providers:
+DeepSeek, Qwen (DashScope), Zhipu GLM, Moonshot (Kimi), and Ollama/local.
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
+
+from homomics_lab.llm.cost import estimate_cost_usd
+from homomics_lab.llm.providers import get_provider_registry
+from homomics_lab.llm.router import LLMRouter
 
 
 class LLMClient:
-    """Async LLM client for generating text completions.
+    """Async LLM client with automatic provider selection and fallback.
 
     Usage:
-        client = LLMClient(model="gpt-4o-mini")
+        client = LLMClient()
         response = await client.chat_completion([
             {"role": "system", "content": "You are a bioinformatics assistant."},
             {"role": "user", "content": "Plan a single-cell analysis."},
@@ -26,38 +29,50 @@ class LLMClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: float = 60.0,
+        router: Optional[LLMRouter] = None,
     ):
-        self.model = model or os.environ.get("HOMOMICS_LLM_MODEL", "gpt-4o-mini")
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        self.base_url = base_url or os.environ.get("OPENAI_BASE_URL")
         self.timeout = timeout
-        self._client: Optional[Any] = None
-        # Aggregated usage counters.
+        self._router = router or LLMRouter()
+        self._clients: Dict[str, Any] = {}
+        self._init_usage()
+        # Legacy overrides: if api_key/base_url are explicitly passed, build a
+        # synthetic provider config for them. This keeps the old interface working.
+        self._legacy_model = model or self._router.primary_model
+        self._legacy_api_key = api_key
+        self._legacy_base_url = base_url
+
+    def _init_usage(self) -> None:
+        """Initialize aggregated usage counters."""
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
         self.total_tokens = 0
         self.estimated_cost_usd = 0.0
 
-    def _get_client(self) -> Any:
-        """Lazy-load the OpenAI async client."""
-        if self._client is None:
-            if not self.api_key:
-                raise RuntimeError(
-                    "OPENAI_API_KEY is not set. Configure it to enable LLM fallback."
-                )
-            try:
-                from openai import AsyncOpenAI
-            except ImportError as e:
-                raise RuntimeError(
-                    "openai package is required for LLM fallback. "
-                    "Install it with: pip install openai"
-                ) from e
+    def _get_client(self, provider) -> Any:
+        """Lazy-load an OpenAI-compatible async client for the provider."""
+        if provider.name in self._clients:
+            return self._clients[provider.name]
 
-            kwargs: Dict[str, Any] = {"api_key": self.api_key, "timeout": self.timeout}
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            self._client = AsyncOpenAI(**kwargs)
-        return self._client
+        api_key = self._legacy_api_key or provider.resolve_api_key()
+        if not api_key:
+            raise RuntimeError(
+                f"API key for provider '{provider.name}' is not set. "
+                f"Configure {provider.api_key_env} or secrets manager."
+            )
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as e:
+            raise RuntimeError(
+                "openai package is required for LLM calls. Install it with: pip install openai"
+            ) from e
+
+        kwargs: Dict[str, Any] = {"api_key": api_key, "timeout": self.timeout}
+        base_url = self._legacy_base_url or provider.base_url
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = AsyncOpenAI(**kwargs)
+        self._clients[provider.name] = client
+        return client
 
     async def chat_completion(
         self,
@@ -65,24 +80,30 @@ class LLMClient:
         temperature: float = 0.3,
         max_tokens: int = 2000,
         response_format: Optional[Dict[str, str]] = None,
+        model: Optional[str] = None,
+        prefer_cheap: bool = False,
     ) -> str:
-        """Send a chat completion request and return the generated text.
+        """Send a chat completion request with automatic provider routing.
 
-        Raises:
-            RuntimeError: if the LLM is not configured or the request fails.
+        Args:
+            messages: OpenAI-compatible message list.
+            temperature: Sampling temperature.
+            max_tokens: Max output tokens.
+            response_format: Optional response format dict.
+            model: Explicit model override.
+            prefer_cheap: If True, pick the cheapest configured model.
         """
-        client = self._get_client()
+        route = self._router.select(model=model or self._legacy_model, prefer_cheap=prefer_cheap)
+        client = self._get_client(route.provider)
+
         kwargs: Dict[str, Any] = {
-            "model": self.model,
+            "model": route.model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
         if response_format:
             kwargs["response_format"] = response_format
-
-        # Enforce monthly budget before incurring more cost.
-        self._check_budget()
 
         response = await client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content.strip()
@@ -92,80 +113,43 @@ class LLMClient:
             prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
             completion_tokens = getattr(usage, "completion_tokens", 0) or 0
             total_tokens = getattr(usage, "total_tokens", 0) or 0
-            self._record_usage(prompt_tokens, completion_tokens, total_tokens)
-            self._persist_cost(prompt_tokens, completion_tokens, total_tokens)
+            self._record_usage(route.model, prompt_tokens, completion_tokens, total_tokens)
 
         return content
 
-    def _record_usage(self, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+    def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
         """Record token usage and update cost estimate."""
+        cost = estimate_cost_usd(model, prompt_tokens, completion_tokens)
         self.total_prompt_tokens += prompt_tokens
         self.total_completion_tokens += completion_tokens
         self.total_tokens += total_tokens
-        self.estimated_cost_usd += self._estimate_cost_usd(prompt_tokens, completion_tokens)
+        self.estimated_cost_usd += cost
 
-    def _persist_cost(self, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
-        """Persist the cost record to the shared cost controller and metrics."""
-        cost = self._estimate_cost_usd(prompt_tokens, completion_tokens)
         try:
             from homomics_lab.cost_control import get_cost_controller
 
             get_cost_controller().record_llm_cost(
-                model=self.model,
+                model=model,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
                 cost_usd=cost,
             )
-            # Per-request cap is enforced after the fact; future work can
-            # estimate an upper bound before the call.
             get_cost_controller().check_request_budget(cost)
         except Exception:
-            # Never fail a request because of cost-bookkeeping issues.
             pass
 
         try:
             from homomics_lab.metrics import record_llm_usage
-            record_llm_usage(self.model, prompt_tokens, completion_tokens, cost)
+
+            record_llm_usage(model, prompt_tokens, completion_tokens, cost)
         except Exception:
             pass
-
-    def _check_budget(self) -> None:
-        """Raise if the monthly budget is already exhausted before a new call."""
-        try:
-            from homomics_lab.cost_control import BudgetExceeded, get_cost_controller
-
-            get_cost_controller().check_request_budget(0.0)
-        except BudgetExceeded:
-            raise
-        except Exception:
-            # Never fail a request because of cost-bookkeeping issues.
-            pass
-
-    @staticmethod
-    def _estimate_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
-        """Return a rough cost estimate in USD based on known model prices.
-
-        Prices are per 1M tokens. Unknown models fall back to gpt-4o-mini rates.
-        """
-        model_lower = (os.environ.get("HOMOMICS_LLM_MODEL", "gpt-4o-mini")).lower()
-        # (input_rate, output_rate) per 1M tokens.
-        rates = {
-            "gpt-4o": (2.50, 10.00),
-            "gpt-4o-mini": (0.15, 0.60),
-            "gpt-4-turbo": (10.00, 30.00),
-            "gpt-4": (30.00, 60.00),
-            "gpt-3.5-turbo": (0.50, 1.50),
-        }
-        rate = next((r for k, r in rates.items() if k in model_lower), rates["gpt-4o-mini"])
-        prompt_cost = prompt_tokens * rate[0] / 1_000_000
-        completion_cost = completion_tokens * rate[1] / 1_000_000
-        return prompt_cost + completion_cost
 
     def get_usage_summary(self) -> Dict[str, Any]:
         """Return aggregated usage and cost estimate."""
         return {
-            "model": self.model,
+            "model": self._router.primary_model,
             "prompt_tokens": self.total_prompt_tokens,
             "completion_tokens": self.total_completion_tokens,
             "total_tokens": self.total_tokens,
@@ -173,8 +157,16 @@ class LLMClient:
         }
 
     def is_configured(self) -> bool:
-        """Return True if the client has an API key available."""
-        return bool(self.api_key)
+        """Return True if any configured provider is available."""
+        try:
+            self._router.select()
+            return True
+        except Exception:
+            return False
+
+    def list_available_models(self) -> List[Dict[str, str]]:
+        """Return all available models across configured providers."""
+        return self._router.list_available_models()
 
 
 class FakeLLMClient(LLMClient):
@@ -182,12 +174,17 @@ class FakeLLMClient(LLMClient):
 
     def __init__(self, response: str = "", model: str = "fake"):
         # Bypass real client initialization.
-        self.model = model
-        self.api_key = "fake"
-        self.base_url = None
+        self._router = LLMRouter(registry=get_provider_registry())
+        self._legacy_model = model
+        self._legacy_api_key = "fake"
+        self._legacy_base_url = None
         self.timeout = 0.0
-        self._client = None
+        self._clients = {}
         self._response = response
+        self._init_usage()
+
+    def is_configured(self) -> bool:
+        return True
 
     async def chat_completion(
         self,
@@ -195,5 +192,7 @@ class FakeLLMClient(LLMClient):
         temperature: float = 0.0,
         max_tokens: int = 0,
         response_format: Optional[Dict[str, str]] = None,
+        model: Optional[str] = None,
+        prefer_cheap: bool = False,
     ) -> str:
         return self._response

@@ -24,6 +24,7 @@ HomomicsLab 是一个**让自然语言请求能够安全、可复现地驱动生
 | **StabilityGuard** | 免疫系统 | 防止错误执行造成损害 |
 | **ReproducibilityEngine** | 海马体 / 实验记录本 | 记住完整执行过程，能重放 |
 | **Workspace / DataStore** | 工作台和档案柜 | 存放数据、产物和血缘 |
+| **Execution Scheduler** | 交通调度中心 | 决定任务走本地、集群还是 Nextflow |
 
 这个类比的关键是：**大模型只负责“想”，系统负责“做”和“记”。**
 
@@ -244,7 +245,70 @@ skill_id/
 
 ---
 
-### 3.5 单文件领域声明
+### 3.5 执行调度层：本地、SLURM、Nextflow
+
+#### 为什么需要多种执行后端？
+
+生物信息学任务的规模差异极大：
+
+- 开发调试：几百 MB 的单细胞数据，本地几分钟跑完
+- 常规分析：几十 GB 的转录组数据，需要多核服务器
+- 生产流程：上百样本的全基因组/单细胞项目，必须上 HPC 或云
+
+HomomicsLab 把"执行什么"和"在哪里执行"解耦。Agent 负责生成计划，**Execution Scheduler** 负责把同一份计划分发到合适的后端。
+
+#### 三种后端
+
+| 后端 | 对应类 | 适用场景 |
+|---|---|---|
+| **本地执行** | `LocalScheduler` | 开发、小数据、快速验证 |
+| **SLURM 集群** | `SlurmScheduler` | HPC 长时任务、多核并行 |
+| **Nextflow 流程** | `NextflowRunner` | 可复现流程、nf-core 工作流 |
+
+#### 执行流程
+
+```
+AgentCore 生成 skill 代码
+        ↓
+Orchestrator 选择 scheduler
+        ↓
+LocalScheduler  →  子进程 / 沙盒运行
+SlurmScheduler  →  渲染 sbatch → sbatch → squeue/sacct 监控
+NextflowRunner  →  渲染 DSL2 模板 → nextflow run
+        ↓
+执行结果 + stdout/stderr 回流
+        ↓
+DataStore 卸载大结果
+```
+
+#### nf-core 集成
+
+`NFCoreManager` 把 nf-core 的数百个流程变成 Agent 可调用的能力：
+
+1. **发现**：调用 `nf-core pipelines list`，缓存元数据
+2. **下载**：把流程拉到本地缓存，避免每次都联网
+3. **加载 schema**：读取 `nextflow_schema.json`，知道哪些参数必填、哪些可选
+4. **检测 profile**：自动判断 `docker` / `singularity` / `conda` / `slurm` 是否可用
+5. **执行**：生成 `nextflow run` 命令并提交
+
+这样用户不需要手写 Nextflow DSL，只需要说：
+
+> “对我的 FASTQ 数据跑 nf-core/rnaseq，用 GRCh38 参考基因组。”
+
+Agent 自动完成参数填充、profile 选择、结果监控。
+
+#### 对可复现性的意义
+
+Nextflow 和 nf-core 本身强调容器化、版本锁定；HomomicsLab 再叠加自己的 `ReproducibilityBundle`，记录：
+
+- Agent 生成的代码
+- 实际提交的 sbatch / nextflow 命令
+- 执行器版本（Nextflow、SLURM、容器镜像）
+- 输出产物和血缘
+
+---
+
+### 3.6 单文件领域声明
 
 #### 核心思想
 
@@ -309,7 +373,7 @@ domain.yaml
 
 ---
 
-### 3.6 多层稳定性防线
+### 3.7 多层稳定性防线
 
 #### 为什么需要这么多层？
 
@@ -361,7 +425,7 @@ VersionLockMismatch → 提醒用户环境变了
 
 ---
 
-### 3.7 可复现性：ReproducibilityBundle
+### 3.8 可复现性：ReproducibilityBundle
 
 #### 为什么 Git commit 不够？
 
@@ -398,7 +462,7 @@ ReproducibilityBundle/
 
 ---
 
-### 3.8 数据工程：DataStore 与缓存
+### 3.9 数据工程：DataStore 与缓存
 
 #### 生信数据的问题
 
@@ -433,7 +497,7 @@ DataStore.save(result) → 返回 ResultReference
 
 ---
 
-### 3.9 CBKB：结构化的领域记忆
+### 3.10 CBKB：结构化的领域记忆
 
 #### 不是普通向量数据库
 
@@ -461,7 +525,7 @@ CBKB：按生信分析本体组织，每条记录有明确类型和来源。
 
 ---
 
-### 3.10 动态角色与多智能体
+### 3.11 动态角色与多智能体
 
 #### 为什么不硬编码 Agent 类？
 

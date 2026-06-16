@@ -1,11 +1,46 @@
 import pytest
+import yaml
+from pathlib import Path
+
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.registry import SkillRegistry
 
 
 @pytest.fixture
 def decomposer():
     return TaskDecomposer()
+
+
+def _domain_skill_registry() -> SkillRegistry:
+    """Build a registry containing every skill referenced by the single_cell domain."""
+    registry = SkillRegistry()
+    domain_file = Path(__file__).parent.parent.parent / "homomics_lab" / "domains" / "single_cell" / "domain.yaml"
+    with open(domain_file, "r", encoding="utf-8") as f:
+        domain = yaml.safe_load(f)
+    skill_ids = {
+        skill_id
+        for phase in domain.get("phases", [])
+        for skill_id in phase.get("skills", [])
+    }
+    for skill_id in skill_ids:
+        registry.register(
+            SkillDefinition(
+                id=skill_id,
+                name=skill_id,
+                version="1.0",
+                category="single_cell",
+                description=f"Domain skill {skill_id}",
+                input_schema=SkillInputSchema(),
+            )
+        )
+    return registry
+
+
+@pytest.fixture
+def domain_decomposer():
+    return TaskDecomposer(skill_registry=_domain_skill_registry())
 
 
 @pytest.mark.asyncio
@@ -18,10 +53,10 @@ async def test_decompose_single_cell_pipeline(decomposer):
     tree = await decomposer.decompose(intent, context={"sample_count": 1})
 
     task_names = [t.name for t in tree.tasks]
-    assert "quality_control" in task_names
-    assert "dimensionality_reduction" in task_names
+    assert "qc" in task_names
+    assert "dim_reduction" in task_names
     assert "clustering" in task_names
-    assert "cell_annotation" in task_names
+    assert "annotation" in task_names
 
 
 @pytest.mark.asyncio
@@ -46,9 +81,9 @@ async def test_task_dependencies(decomposer):
 
     tree = await decomposer.decompose(intent, context={})
 
-    # Clustering should depend on dimensionality_reduction
+    # Clustering should depend on dim_reduction
     cluster_task = next(t for t in tree.tasks if t.name == "clustering")
-    dr_task = next(t for t in tree.tasks if t.name == "dimensionality_reduction")
+    dr_task = next(t for t in tree.tasks if t.name == "dim_reduction")
     assert dr_task.id in cluster_task.dependencies
 
 
@@ -65,7 +100,7 @@ async def test_decompose_sub_intents(decomposer):
 
     tree = await decomposer.decompose(intent, context={})
     task_names = [t.name for t in tree.tasks]
-    assert "quality_control" in task_names
+    assert "qc" in task_names
     assert "clustering" in task_names
 
 
@@ -81,3 +116,59 @@ async def test_decompose_clarification(decomposer):
     assert len(tree.tasks) == 1
     assert tree.tasks[0].phase == "clarification"
     assert "想分析什么" in tree.tasks[0].description
+
+
+@pytest.mark.asyncio
+async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
+    """When domain skills are present, the single_cell domain.yaml drives execution."""
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="complex",
+    )
+
+    plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.strategy_name == "single_cell"
+    task_names = [t.name for t in tree.tasks]
+    # Domain-specific phases that are not in the hard-coded fallback.
+    assert "fastq_processing" in task_names
+    assert "data_io" in task_names
+    assert "doublet_removal" in task_names
+    assert "qc" in task_names
+    assert "normalization" in task_names
+    assert "dim_reduction" in task_names
+    assert "clustering" in task_names
+    assert "annotation" in task_names
+
+    # Dependencies should come from phase_transitions, not a linear fallback.
+    qc_task = next(t for t in tree.tasks if t.name == "qc")
+    data_io_task = next(t for t in tree.tasks if t.name == "data_io")
+    assert data_io_task.id in qc_task.dependencies
+
+    cluster_task = next(t for t in tree.tasks if t.name == "clustering")
+    dr_task = next(t for t in tree.tasks if t.name == "dim_reduction")
+    assert dr_task.id in cluster_task.dependencies
+
+
+@pytest.mark.asyncio
+async def test_decompose_sub_intents_uses_domain_template(domain_decomposer):
+    """Sub-intents filter the domain DAG to the requested phases + prerequisites."""
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="complex",
+        sub_intents=[
+            UserIntent(analysis_type="clustering", complexity="single_step"),
+        ],
+    )
+
+    plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.strategy_name == "single_cell"
+    task_names = set(t.name for t in tree.tasks)
+    assert "clustering" in task_names
+    assert "dim_reduction" in task_names
+    assert "normalization" in task_names
+    assert "qc" in task_names
+    # Optional downstream phases should be omitted.
+    assert "annotation" not in task_names
+    assert "differential_expression" not in task_names

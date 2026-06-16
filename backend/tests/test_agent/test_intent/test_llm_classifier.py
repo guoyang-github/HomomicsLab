@@ -6,7 +6,20 @@ import pytest
 
 from homomics_lab.agent.intent.classifiers import LLMIntentClassifier
 from homomics_lab.agent.intent.models import IntentDefinition
+from homomics_lab.config import settings
 from homomics_lab.llm_client import FakeLLMClient
+from homomics_lab.secrets import reset_secrets_manager
+
+
+@pytest.fixture(autouse=True)
+def isolate_llm_config(tmp_path, monkeypatch):
+    """Ensure LLMClient is not accidentally configured from persistent secrets."""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    monkeypatch.setattr(settings, "secrets_master_key", None)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    reset_secrets_manager()
+    yield
+    reset_secrets_manager()
 
 
 @pytest.fixture

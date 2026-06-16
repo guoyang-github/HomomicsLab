@@ -1,0 +1,18 @@
+# Workflow configuration
+# Edit sample names and paths for your data
+
+samples:
+  SAMPLE1: data/SAMPLE1
+  SAMPLE2: data/SAMPLE2
+  SAMPLE3: data/SAMPLE3
+
+reference:
+  salmon_index: "ref/salmon_index"
+
+params:
+  fastp_args: ""
+  salmon_args: "--validateMappings"
+
+resources:
+  default_threads: 4
+  default_mem_mb: 4000

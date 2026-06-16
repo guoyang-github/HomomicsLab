@@ -102,6 +102,19 @@ class ProjectRecord(Base):
     )
 
 
+class ProjectMember(Base):
+    """Many-to-many membership between users and projects with RBAC role."""
+
+    __tablename__ = "project_members"
+
+    project_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    role: Mapped[str] = mapped_column(String, default="member")  # owner / admin / member / viewer
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class TraceRecord(Base):
     """Persistent execution trace for a job or plan."""
 

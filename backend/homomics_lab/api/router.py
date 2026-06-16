@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import chat, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler
+from . import chat, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
@@ -16,3 +16,6 @@ api_router.include_router(execution.router, prefix="/execution", tags=["executio
 api_router.include_router(plan.router, prefix="/plan", tags=["plan"])
 api_router.include_router(scheduler.router, prefix="/scheduler", tags=["scheduler"])
 api_router.include_router(domains.router, prefix="/domains", tags=["domains"])
+api_router.include_router(secrets.router, prefix="/secrets", tags=["secrets"])
+api_router.include_router(checkpoints.router, prefix="/jobs", tags=["checkpoints"])
+api_router.include_router(llm.router, prefix="/llm", tags=["llm"])

@@ -1,0 +1,228 @@
+domain: genomics
+display_name: Genomics
+description: Best-practice germline and somatic DNA-seq analysis covering WGS/WES/targeted sequencing, including alignment, BAM QC, variant calling (SNP/Indel/SV/CNV), annotation, interpretation, and reporting. Phases form a DAG; orchestrator skills provide end-to-end workflow shortcuts.
+version: "3.0.0"
+
+orchestrator_skills: []
+
+phases:
+  - id: reads_qc
+    required: true
+    description: Raw reads quality control and preprocessing
+    skills: [bio-genomics-reads-qc, bio-genomics-reads-preprocess]
+    default_skill: bio-genomics-reads-qc
+
+  - id: alignment
+    required: true
+    description: Map reads to the reference genome
+    skills: [bio-genomics-alignment, bio-genomics-alignment-gpu]
+    default_skill: bio-genomics-alignment
+
+  - id: bam_qc
+    required: true
+    description: BAM quality control, duplicate marking, BQSR and recalibration
+    skills: [bio-genomics-bam-qc-recalibration]
+    default_skill: bio-genomics-bam-qc-recalibration
+
+  - id: variant_snp_indel
+    required: false
+    description: Germline SNP and small indel calling
+    skills: [bio-genomics-variant-snp-indel, bio-genomics-variant-germline-gpu]
+    default_skill: bio-genomics-variant-snp-indel
+
+  - id: variant_filter_norm
+    required: false
+    description: Variant filtering, normalization and quality control
+    skills: [bio-genomics-variant-filter-norm]
+    default_skill: bio-genomics-variant-filter-norm
+
+  - id: variant_cnv
+    required: false
+    description: Copy number variation detection
+    skills: [bio-genomics-variant-cnv]
+    default_skill: bio-genomics-variant-cnv
+
+  - id: variant_structural
+    required: false
+    description: Structural variant calling
+    skills: [bio-genomics-variant-structural]
+    default_skill: bio-genomics-variant-structural
+
+  - id: variant_somatic
+    required: false
+    description: Somatic variant calling (SNV/Indel) for tumor-normal pairs
+    skills: [bio-genomics-variant-somatic, bio-genomics-variant-somatic-gpu]
+    default_skill: bio-genomics-variant-somatic
+
+  - id: variant_interpretation
+    required: false
+    description: Variant annotation, prioritization and clinical interpretation
+    skills: [bio-genomics-variant-interpretation]
+    default_skill: bio-genomics-variant-interpretation
+
+  - id: methylation
+    required: false
+    description: DNA methylation analysis with GPU acceleration
+    skills: [bio-genomics-methylation-gpu]
+    default_skill: bio-genomics-methylation-gpu
+
+  - id: pangenome
+    required: false
+    description: Pangenome-aware alignment and variant calling with GPU acceleration
+    skills: [bio-genomics-pangenome-gpu]
+    default_skill: bio-genomics-pangenome-gpu
+
+  - id: longread
+    required: false
+    description: Long-read sequencing analysis with GPU acceleration
+    skills: [bio-genomics-longread-gpu]
+    default_skill: bio-genomics-longread-gpu
+
+  - id: rna_fusion
+    required: false
+    description: RNA fusion detection with GPU acceleration
+    skills: [bio-mrna-seq-fusion-gpu]
+    default_skill: bio-mrna-seq-fusion-gpu
+
+phase_transitions:
+  - from: reads_qc
+    to: alignment
+  - from: alignment
+    to: bam_qc
+  - from: bam_qc
+    to: variant_snp_indel
+  - from: variant_snp_indel
+    to: variant_filter_norm
+  - from: bam_qc
+    to: variant_cnv
+    type: alternative_to
+  - from: bam_qc
+    to: variant_structural
+    type: alternative_to
+  - from: bam_qc
+    to: variant_somatic
+    type: depends_on
+  - from: variant_filter_norm
+    to: variant_interpretation
+  - from: variant_cnv
+    to: variant_interpretation
+  - from: bam_qc
+    to: methylation
+    type: alternative_to
+  - from: bam_qc
+    to: pangenome
+    type: alternative_to
+  - from: bam_qc
+    to: longread
+    type: alternative_to
+
+state_checks:
+  - condition: "tumor_normal_pair"
+    action: insert
+    target: variant_somatic
+    after: bam_qc
+
+  - condition: "low_coverage"
+    action: modify_param
+    target: alignment
+    value: {"duplicate_marking": true, "min_mapq": 20}
+
+intents:
+  - analysis_type: genomics_analysis
+    keywords:
+      - genomics
+      - WES
+      - WGS
+      - variant calling
+      - SNP
+      - indel
+      - CNV
+      - structural variant
+      - somatic
+      - germline
+      - DNA-seq
+
+roles:
+  - role_id: genomics_specialist
+    name: Genomics Specialist
+    allowed_skills:
+      - bio-genomics-alignment
+      - bio-genomics-alignment-gpu
+      - bio-genomics-bam-qc-recalibration
+      - bio-genomics-longread-gpu
+      - bio-genomics-methylation-gpu
+      - bio-genomics-pangenome-gpu
+      - bio-genomics-reads-preprocess
+      - bio-genomics-reads-qc
+      - bio-genomics-variant-cnv
+      - bio-genomics-variant-filter-norm
+      - bio-genomics-variant-germline-gpu
+      - bio-genomics-variant-interpretation
+      - bio-genomics-variant-snp-indel
+      - bio-genomics-variant-somatic
+      - bio-genomics-variant-somatic-gpu
+      - bio-genomics-variant-structural
+      - bio-genomics-workflow-wes-germline
+      - bio-genomics-workflow-wes-germline-gpu
+      - bio-genomics-workflow-wgs-germline
+      - bio-genomics-workflow-wgs-germline-gpu
+      - bio-mrna-seq-fusion-gpu
+    allowed_tools: [file_read, file_write, shell_exec]
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 3
+
+dag_seeds:
+  - from: bio-genomics-reads-qc
+    to: bio-genomics-alignment
+    type: followed_by
+    context: "Align after raw reads QC"
+
+  - from: bio-genomics-alignment
+    to: bio-genomics-bam-qc-recalibration
+    type: followed_by
+    context: "BQSR after alignment"
+
+  - from: bio-genomics-bam-qc-recalibration
+    to: bio-genomics-variant-snp-indel
+    type: followed_by
+    context: "Call SNP/Indel after recalibration"
+
+  - from: bio-genomics-variant-snp-indel
+    to: bio-genomics-variant-filter-norm
+    type: followed_by
+    context: "Filter and normalize variants"
+
+  - from: bio-genomics-bam-qc-recalibration
+    to: bio-genomics-variant-cnv
+    type: followed_by
+    context: "CNV calling from BAM"
+
+  - from: bio-genomics-bam-qc-recalibration
+    to: bio-genomics-variant-structural
+    type: followed_by
+    context: "SV calling from BAM"
+
+  - from: bio-genomics-variant-filter-norm
+    to: bio-genomics-variant-interpretation
+    type: followed_by
+    context: "Interpret after filtering"
+
+  - from: bio-genomics-variant-cnv
+    to: bio-genomics-variant-interpretation
+    type: followed_by
+    context: "Interpret CNV results"
+
+sops:
+  - id: sop_genomics_v3
+    title: Genomics Analysis SOP
+    steps:
+      - "Raw reads QC and preprocessing"
+      - "Alignment to reference genome"
+      - "BAM QC, duplicate marking and BQSR"
+      - "Variant calling (SNP/Indel, CNV, SV)"
+      - "Variant filtering and normalization"
+      - "Variant annotation and interpretation"
+      - "Optional: methylation, pangenome, long-read, fusion"
+      - "Reporting"

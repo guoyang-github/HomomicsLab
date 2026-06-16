@@ -59,7 +59,15 @@ class DomainValidator:
                     f"StateCheck references unknown 'after' phase '{check.after}'"
                 )
 
-        # 3. Check that DAG seeds reference known skills
+        # 3. Check that phase transitions reference known phases
+        phase_ids = {p.id for p in domain.phases}
+        for transition in domain.phase_transitions:
+            if transition.from_phase not in phase_ids:
+                errors.append(f"Phase transition from unknown phase '{transition.from_phase}'")
+            if transition.to_phase not in phase_ids:
+                errors.append(f"Phase transition to unknown phase '{transition.to_phase}'")
+
+        # 4. Check that DAG seeds reference known skills
         all_skill_ids = {s.id for s in self.skill_registry.list_all()}
         for seed in domain.dag_seeds:
             if seed.from_skill not in all_skill_ids:
@@ -67,12 +75,24 @@ class DomainValidator:
             if seed.to_skill not in all_skill_ids:
                 errors.append(f"DAG seed references unknown skill '{seed.to_skill}'")
 
-        # 4. Check that intent analysis_types are unique
+        # 5. Check that orchestrator skills exist and are not also listed as phase skills
+        phase_skill_ids = set()
+        for phase in domain.phases:
+            phase_skill_ids.update(phase.skills)
+        for orch_id in domain.orchestrator_skills:
+            if self.skill_registry.get(orch_id) is None:
+                errors.append(f"Orchestrator skill '{orch_id}' not found in registry")
+            if orch_id in phase_skill_ids:
+                errors.append(
+                    f"Orchestrator skill '{orch_id}' should not also be listed in a phase"
+                )
+
+        # 6. Check that intent analysis_types are unique
         intent_types = [i.analysis_type for i in domain.intents]
         if len(intent_types) != len(set(intent_types)):
             errors.append("Duplicate analysis_type in intents")
 
-        # 5. Check that condition expressions are syntactically valid
+        # 7. Check that condition expressions are syntactically valid
         for check in domain.state_checks:
             try:
                 compile(check.condition, "<string>", "eval")
@@ -220,6 +240,10 @@ class DomainLoader:
             code_templates=domain.code_templates,
             data_sources=domain.data_sources,
             fallback_rules=domain.fallback_rules,
+            phase_transitions=[
+                {"from": t.from_phase, "to": t.to_phase, "type": t.type, "context": t.context}
+                for t in domain.phase_transitions
+            ],
         )
 
     def _build_state_check(self, check: DomainStateCheck) -> StateCheck:

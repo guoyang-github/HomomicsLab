@@ -98,6 +98,25 @@ class JobService:
         await self._publish_state(job.job_id, JobStatus.QUEUED, "Resume job queued")
         return job
 
+    async def create_checkpoint_resume_job(
+        self,
+        session_id: str,
+        project_id: str,
+        checkpoint_payload: Dict[str, Any],
+        plan_id: Optional[str] = None,
+    ) -> Job:
+        job = Job(
+            session_id=session_id,
+            project_id=project_id,
+            status=JobStatus.QUEUED,
+            mode=JobMode.CHECKPOINT_RESUME,
+            plan_id=plan_id,
+        )
+        await self._repository.create(job)
+        await self._queue.enqueue(job.job_id)
+        await self._publish_state(job.job_id, JobStatus.QUEUED, "Checkpoint resume job queued")
+        return job
+
     async def get_job(self, job_id: str) -> Optional[Job]:
         return await self._repository.get(job_id)
 

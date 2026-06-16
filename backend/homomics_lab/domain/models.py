@@ -21,6 +21,25 @@ class DomainPhase(BaseModel):
     )
 
 
+class DomainPhaseTransition(BaseModel):
+    """A directed edge between two phases in the domain workflow.
+
+    Phases are organized as a DAG rather than a strict linear pipeline.
+    Transitions declare allowed handoffs; the planner/executor chooses the
+    actual path based on user intent and data state.
+    """
+
+    from_phase: str = Field(alias="from")
+    to_phase: str = Field(alias="to")
+    type: str = Field(
+        default="followed_by",
+        description="followed_by | alternative_to | depends_on | parallel_to",
+    )
+    context: str = Field(default="", description="Human-readable explanation")
+
+    model_config = {"populate_by_name": True}
+
+
 class DomainStateCheck(BaseModel):
     """A conditional check on data state that may modify the plan.
 
@@ -112,9 +131,22 @@ class DomainDefinition(BaseModel):
     description: str = Field(default="", description="Human-readable description")
     version: str = Field(default="1.0.0")
 
-    # Analysis strategy
+    # Analysis strategy: phases form a DAG; orchestrator skills are shortcuts
+    # that execute whole workflows over that DAG.
     phases: List[DomainPhase] = Field(default_factory=list)
+    phase_transitions: List[DomainPhaseTransition] = Field(
+        default_factory=list,
+        description="Directed edges between phases",
+    )
     state_checks: List[DomainStateCheck] = Field(default_factory=list)
+
+    # Orchestrator / workflow skills for the domain. These are invoked when the
+    # user asks for an end-to-end workflow or when the request spans multiple
+    # phases. They are NOT listed as phase skills.
+    orchestrator_skills: List[str] = Field(
+        default_factory=list,
+        description="Skill IDs that orchestrate multi-phase workflows",
+    )
 
     # Intent analysis
     intents: List[DomainIntent] = Field(default_factory=list)

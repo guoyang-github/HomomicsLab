@@ -231,6 +231,7 @@ class PlanResult:
     reproducibility_context: Dict[str, Any] = field(default_factory=dict)
     is_fallback: bool = False
     suggestion_text: Optional[str] = None
+    phase_transitions: List[Dict[str, str]] = field(default_factory=list)
 
     @property
     def skill_sequence(self) -> List[str]:
@@ -251,6 +252,7 @@ class PlanResult:
             "reproducibility_context": self.reproducibility_context,
             "is_fallback": self.is_fallback,
             "suggestion_text": self.suggestion_text,
+            "phase_transitions": self.phase_transitions,
         }
 
     @classmethod
@@ -264,4 +266,5 @@ class PlanResult:
             reproducibility_context=data.get("reproducibility_context", {}),
             is_fallback=data.get("is_fallback", False),
             suggestion_text=data.get("suggestion_text"),
+            phase_transitions=data.get("phase_transitions", []),
         )

@@ -10,12 +10,13 @@
 5. [Running Analyses](#running-analyses)
 6. [Agent Swarm Usage](#agent-swarm-usage)
 7. [HITL Interactions](#hitl-interactions)
-8. [Skill Development](#skill-development)
-9. [CBKB Curation](#cbkb-curation)
-10. [Monitoring & Observability](#monitoring--observability)
-11. [Troubleshooting](#troubleshooting)
-12. [Production Deployment](#production-deployment)
-13. [API Quick Reference](#api-quick-reference)
+8. [HPC & Nextflow Execution](#hpc--nextflow-execution)
+9. [Skill Development](#skill-development)
+10. [CBKB Curation](#cbkb-curation)
+11. [Monitoring & Observability](#monitoring--observability)
+12. [Troubleshooting](#troubleshooting)
+13. [Production Deployment](#production-deployment)
+14. [API Quick Reference](#api-quick-reference)
 
 ---
 
@@ -710,6 +711,115 @@ for project, info in status.items():
 
 ---
 
+## HPC & Nextflow Execution
+
+HomomicsLab can dispatch analyses to three execution backends. The default is local sandbox execution; for cluster or pipeline workloads, configure SLURM or Nextflow.
+
+| Backend | Environment | Best For |
+|---|---|---|
+| **LocalScheduler** | Default | Development, small data, quick iteration |
+| **SlurmScheduler** | `SLURM_*` env vars or scheduler config | HPC clusters, long-running jobs, many cores |
+| **NextflowRunner** | Nextflow installed (`nextflow` on PATH) | Reproducible DSL2 pipelines, nf-core workflows |
+
+### Configuration
+
+```env
+# General execution backend selection
+HOMOMICS_EXECUTION_BACKEND=local   # local | slurm | nextflow
+
+# SLURM (optional)
+HOMOMICS_SLURM_PARTITION=cpu
+HOMOMICS_SLURM_ACCOUNT=lab
+HOMOMICS_SLURM_TIME=04:00:00
+HOMOMICS_SLURM_MEM=16G
+HOMOMICS_SLURM_CPUS_PER_TASK=4
+
+# Nextflow / nf-core (optional)
+HOMOMICS_NFCORE_PROFILES=docker,slurm   # comma-separated Nextflow profiles
+HOMOMICS_NFCORE_WORKDIR=./work/nfcore
+```
+
+### Running a Nextflow Template from the Agent
+
+When the plan resolves to an intent with a registered Nextflow template (e.g., `rnaseq_analysis`), the `NextflowRunner` renders the template and submits it:
+
+```bash
+curl -X POST http://localhost:8080/api/chat/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "message": "Run an nf-core rnaseq pipeline on my FASTQ files",
+    "execution_backend": "nextflow"
+  }'
+```
+
+### Listing and Running nf-core Pipelines
+
+```bash
+# List available nf-core pipelines
+curl http://localhost:8080/api/nfcore/pipelines?refresh=false
+
+# Run a pipeline with schema-validated parameters
+curl -X POST http://localhost:8080/api/nfcore/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "nf-core/rnaseq",
+    "version": "3.14.0",
+    "params": {
+      "input": "samplesheet.csv",
+      "outdir": "./results",
+      "genome": "GRCh38"
+    },
+    "profiles": ["docker"]
+  }'
+```
+
+### SLURM Submission
+
+With `HOMOMICS_EXECUTION_BACKEND=slurm`, skill code is wrapped in an `sbatch` script. The backend:
+
+1. Renders a job script using configured partition/account/resources.
+2. Submits via `sbatch` and captures the job ID.
+3. Polls `squeue` / `sacct` until completion.
+4. Streams `stdout`/`stderr` back through the execution log panel.
+
+You can also submit directly via API:
+
+```bash
+curl -X POST http://localhost:8080/api/chat/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "message": "Differential expression on the counts matrix",
+    "execution_backend": "slurm",
+    "slurm_options": {"partition": "cpu", "time": "02:00:00"}
+  }'
+```
+
+### Execution Logs
+
+The frontend **Execution Log Panel** streams real-time logs for all backends. Logs include:
+
+- `info` — scheduler-level events (submit, start, complete)
+- `stdout` — tool/pipeline standard output
+- `stderr` — warnings and errors
+- `error` — fatal failures
+- `success` — completion events
+
+Logs are persisted in `workspaces/{project_id}/logs/` alongside the reproducibility bundle.
+
+### Troubleshooting HPC/Nextflow
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `NextflowNotFoundError` | `nextflow` not on PATH | Install Nextflow or set `NEXTFLOW_HOME` |
+| `SlurmCommandNotFound` | `sbatch`/`squeue` not available | Verify SLURM client tools, or use local backend |
+| `NFCoreSchemaValidationError` | Pipeline params mismatch schema | Check the pipeline's `nextflow_schema.json` |
+| `ProfileNotDetected` | Missing container/engine profile | Add `docker`, `singularity`, or `conda` to profiles |
+| Pipeline hangs | Executor queue full | Check `squeue`; increase `time` or choose another partition |
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -851,6 +961,14 @@ sqlite3 homomics_lab.db ".backup '$BACKUP_DIR/cbkb_backup.db'"
 |--------|----------|-------------|
 | POST | `/viz/plot` | Generate plot |
 | POST | `/reports/generate` | Generate report (HTML/PDF) |
+
+### nf-core / Nextflow
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/nfcore/pipelines` | List available nf-core pipelines |
+| POST | `/api/nfcore/run` | Run an nf-core pipeline |
+| GET | `/api/nfcore/status/{run_id}` | Get pipeline run status |
 
 ### Health
 

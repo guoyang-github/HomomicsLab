@@ -4,8 +4,9 @@
 
 HomomicsLab uses a layered hybrid architecture:
 - **Core**: Python/FastAPI modular monolith
-- **Frontend**: React + TypeScript + Zustand + ReactFlow
+- **Frontend**: React 18 + TypeScript + Zustand + ReactFlow + Tailwind CSS, with a reusable `components/ui` library and light/dark theme system
 - **Skills**: Local subprocess sandbox execution (Python / R), with optional container/Firejail backends
+- **HPC/Orchestration**: Pluggable execution backends (`LocalScheduler`, `SlurmScheduler`, `NextflowRunner`) and nf-core integration for cluster/cloud reproducible workflows
 - **Storage**: SQLite + filesystem + Parquet/H5AD/pickle offloading for large results
 
 ## Data Flow
@@ -75,6 +76,22 @@ HomomicsLab uses a layered hybrid architecture:
 - `tools/approval.py` — **ToolApprovalStore**: interactive approval flow for high-risk tool calls when `HOMOMICS_INTERACTIVE_MODE=true`
 - `tools/invoke_tool.py` — **cross-process tool invocation protocol**: executes atomic tools in isolated subprocesses/sandboxes (`local`, `bubblewrap`, `container`) so high-risk operations never run inside the API process
 
+### HPC & Workflow Orchestration Layer (`hpc/`)
+- `hpc/scheduler.py` — **BaseScheduler / LocalScheduler / SlurmScheduler / NextflowRunner**: pluggable execution backends that let the same agent plan run locally, on a SLURM cluster, or as a Nextflow workflow
+- `hpc/template_registry.py` — **NextflowTemplateRegistry**: maps analysis intents (e.g., `rnaseq_analysis`, `single_cell_analysis`) to curated Nextflow DSL2 templates
+- `nfcore_integration.py` — **NFCoreManager**: discovers, downloads, caches, schemas, profiles, and executes nf-core pipelines
+- `api/nfcore.py` — REST endpoints exposing nf-core pipelines and run operations to the frontend
+
+### Frontend Layer (`frontend/`)
+- `components/ui/` — reusable component library (Button, Input, Card, Modal, Tabs, Toast, CommandPalette, etc.)
+- `components/layout/` — sidebar + top-bar app shell
+- `components/settings/` — settings panel for LLM, execution backend, search, budget, and general preferences
+- `components/chat/` — chat with Markdown/LaTeX/code rendering, sessions, drag-drop uploads, HITL forms
+- `components/workspace/` — React Flow workflow canvas, execution log panel, detail sidebars
+- `components/skills/`, `components/domains/`, `components/reports/` — skill manager, domain marketplace, report viewer
+- `hooks/` — theme, keyboard shortcuts, command palette
+- `stores/` — Zustand global state (chat, workspace, settings, execution logs)
+
 ### Domain Layer (`domain/`)
 - `domain/loader.py` — **DomainLoader**: reads a single `domain.yaml` and registers skills, strategies, intents, DAG seeds, roles, and SOPs
 - `domain/registry.py` — **DomainRegistry**: central store for loaded domains with hot-reload support
@@ -114,3 +131,5 @@ HomomicsLab uses a layered hybrid architecture:
 10. **Reproducibility per job**: Every background job produces a finalized `ReproducibilityBundle`, and outcomes are ingested into CBKB for self-evolution.
 
 11. **Auto-regression baselines**: Successful CodeAct executions automatically record baselines so future runs can be checked for drift.
+
+12. **Pluggable execution backends**: The same agent plan can be dispatched to `LocalScheduler`, `SlurmScheduler`, or `NextflowRunner`. Nextflow templates and nf-core pipelines provide reproducible, containerized execution at scale.

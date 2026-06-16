@@ -1,0 +1,236 @@
+domain: database
+display_name: Bioinformatics Databases
+description: Best-practice bioinformatics database query and integration domain covering sequence, gene annotation, expression, pathway, structure, disease, clinical variant, drug, and literature resources. Phases form a DAG of query types.
+version: "3.0.0"
+
+phases:
+  - id: sequence_query
+    required: true
+    description: Query sequence and gene annotation databases
+    skills: [bio-database-sequence-uniprot, bio-database-sequence-ncbi-gene, bio-database-sequence-ensembl, bio-database-sequence-ena]
+    default_skill: bio-database-sequence-uniprot
+
+  - id: gene_annotation
+    required: false
+    description: Retrieve gene-level functional annotations
+    skills: [bio-database-sequence-ncbi-gene, bio-database-sequence-ensembl]
+    default_skill: bio-database-sequence-ensembl
+
+  - id: expression_query
+    required: false
+    description: Query gene expression and transcriptomics databases
+    skills: [bio-database-expression-geo, bio-database-expression-gtex]
+    default_skill: bio-database-expression-geo
+
+  - id: pathway_query
+    required: false
+    description: Query pathway, interaction and regulatory databases
+    skills: [bio-database-pathway-reactome, bio-database-pathway-string, bio-database-pathway-interpro, bio-database-pathway-jaspar]
+    default_skill: bio-database-pathway-reactome
+
+  - id: structure_query
+    required: false
+    description: Query protein structure databases
+    skills: [bio-database-structure-pdb, bio-database-structure-alphafold]
+    default_skill: bio-database-structure-pdb
+
+  - id: chemistry_query
+    required: false
+    description: Query chemical and enzyme databases
+    skills: [bio-database-chemistry-pubchem, bio-database-chemistry-brenda]
+    default_skill: bio-database-chemistry-pubchem
+
+  - id: disease_query
+    required: false
+    description: Query disease and target databases
+    skills: [bio-database-disease-gwas, bio-database-disease-opentargets]
+    default_skill: bio-database-disease-opentargets
+
+  - id: clinical_variant_query
+    required: false
+    description: Query clinical variant and pharmacogenomic databases
+    skills: [clinical-database-variant-clinvar, clinical-database-variant-dbsnp, clinical-database-variant-gnomad, clinical-database-variant-pharmgkb]
+    default_skill: clinical-database-variant-clinvar
+
+  - id: clinical_trial_query
+    required: false
+    description: Query clinical trial and cancer databases
+    skills: [clinical-database-clinicaltrials, clinical-database-cbioportal, clinical-database-clinpgx, clinical-database-clinvar, clinical-database-fda, clinical-database-gnomad]
+    default_skill: clinical-database-clinicaltrials
+
+  - id: drug_query
+    required: false
+    description: Query drug and compound databases
+    skills: [drug-database-chembl, drug-database-zinc]
+    default_skill: drug-database-chembl
+
+  - id: literature_query
+    required: false
+    description: Query scientific literature and preprint databases
+    skills: [lit-database-pubmed, lit-database-arxiv, lit-database-biorxiv, lit-database-openalex]
+    default_skill: lit-database-pubmed
+
+  - id: data_integration
+    required: false
+    description: Integrate results across multiple database queries
+    skills: [bio-database-disease-opentargets, bio-database-pathway-string]
+    default_skill: bio-database-disease-opentargets
+
+phase_transitions:
+  - from: sequence_query
+    to: gene_annotation
+    type: followed_by
+  - from: sequence_query
+    to: expression_query
+    type: followed_by
+  - from: gene_annotation
+    to: pathway_query
+    type: followed_by
+  - from: expression_query
+    to: pathway_query
+    type: followed_by
+  - from: pathway_query
+    to: disease_query
+    type: followed_by
+  - from: sequence_query
+    to: structure_query
+    type: alternative_to
+  - from: sequence_query
+    to: chemistry_query
+    type: alternative_to
+  - from: disease_query
+    to: clinical_variant_query
+    type: followed_by
+  - from: disease_query
+    to: clinical_trial_query
+    type: followed_by
+  - from: disease_query
+    to: drug_query
+    type: followed_by
+  - from: clinical_variant_query
+    to: drug_query
+    type: followed_by
+  - from: pathway_query
+    to: literature_query
+    type: followed_by
+  - from: disease_query
+    to: data_integration
+    type: followed_by
+
+state_checks:
+  - condition: "variant_input"
+    action: insert
+    target: clinical_variant_query
+    after: sequence_query
+
+  - condition: "drug_target_request"
+    action: insert
+    target: drug_query
+    after: disease_query
+
+intents:
+  - analysis_type: database_analysis
+    keywords:
+      - database
+      - query
+      - annotation
+      - search
+      - UniProt
+      - NCBI
+      - Ensembl
+      - GEO
+      - GTEx
+      - Reactome
+      - STRING
+      - PDB
+      - AlphaFold
+      - PubChem
+      - ChEMBL
+      - ClinVar
+      - gnomAD
+      - PubMed
+
+roles:
+  - role_id: database_specialist
+    name: Database Specialist
+    allowed_skills:
+      - bio-database-chemistry-brenda
+      - bio-database-chemistry-pubchem
+      - bio-database-disease-gwas
+      - bio-database-disease-opentargets
+      - bio-database-expression-geo
+      - bio-database-expression-gtex
+      - bio-database-pathway-interpro
+      - bio-database-pathway-jaspar
+      - bio-database-pathway-reactome
+      - bio-database-pathway-string
+      - bio-database-sequence-ena
+      - bio-database-sequence-ensembl
+      - bio-database-sequence-ncbi-gene
+      - bio-database-sequence-uniprot
+      - bio-database-structure-alphafold
+      - bio-database-structure-pdb
+      - clinical-database-cbioportal
+      - clinical-database-clinicaltrials
+      - clinical-database-clinpgx
+      - clinical-database-clinvar
+      - clinical-database-fda
+      - clinical-database-gnomad
+      - clinical-database-variant-clinvar
+      - clinical-database-variant-dbsnp
+      - clinical-database-variant-gnomad
+      - clinical-database-variant-pharmgkb
+      - drug-database-chembl
+      - drug-database-zinc
+      - lit-database-arxiv
+      - lit-database-biorxiv
+      - lit-database-openalex
+      - lit-database-pubmed
+    allowed_tools: [file_read, file_write, shell_exec]
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 3
+
+dag_seeds:
+  - from: bio-database-sequence-uniprot
+    to: bio-database-sequence-ncbi-gene
+    type: followed_by
+    context: "Cross-reference protein with gene annotation"
+
+  - from: bio-database-sequence-ncbi-gene
+    to: bio-database-expression-gtex
+    type: followed_by
+    context: "Expression context after gene identification"
+
+  - from: bio-database-expression-gtex
+    to: bio-database-pathway-reactome
+    type: followed_by
+    context: "Pathway context after expression"
+
+  - from: bio-database-pathway-reactome
+    to: bio-database-disease-opentargets
+    type: followed_by
+    context: "Disease association after pathway"
+
+  - from: bio-database-disease-opentargets
+    to: clinical-database-variant-clinvar
+    type: followed_by
+    context: "Clinical variants for disease targets"
+
+  - from: clinical-database-variant-clinvar
+    to: drug-database-chembl
+    type: followed_by
+    context: "Drug information for clinical variants"
+
+sops:
+  - id: sop_database_v2
+    title: Bioinformatics Database Query SOP
+    steps:
+      - "Identify query type (sequence, gene, expression, variant, drug, etc.)"
+      - "Query primary sequence and annotation databases"
+      - "Query expression and pathway databases"
+      - "Query structure and chemistry databases when applicable"
+      - "Query disease, clinical variant and drug databases"
+      - "Query literature for evidence"
+      - "Integrate and summarize results"

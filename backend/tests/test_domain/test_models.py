@@ -8,6 +8,7 @@ from homomics_lab.domain.models import (
     DomainDefinition,
     DomainIntent,
     DomainPhase,
+    DomainPhaseTransition,
     DomainRole,
     DomainSOP,
     DomainStateCheck,
@@ -118,6 +119,11 @@ class TestDomainDefinition:
                 DomainPhase(id="qc", required=True),
                 DomainPhase(id="denoising", required=True),
             ],
+            phase_transitions=[
+                DomainPhaseTransition(
+                    **{"from": "qc", "to": "denoising", "type": "followed_by"}
+                ),
+            ],
             state_checks=[
                 DomainStateCheck(
                     condition="host_contamination > 0.1",
@@ -143,13 +149,16 @@ class TestDomainDefinition:
             sops=[
                 DomainSOP(id="sop_1", title="Test SOP"),
             ],
+            orchestrator_skills=["metagenomics_orchestrator"],
         )
         assert len(domain.phases) == 2
+        assert len(domain.phase_transitions) == 1
         assert len(domain.state_checks) == 1
         assert len(domain.intents) == 1
         assert len(domain.dag_seeds) == 1
         assert len(domain.roles) == 1
         assert len(domain.sops) == 1
+        assert domain.orchestrator_skills == ["metagenomics_orchestrator"]
 
     def test_get_intent_keywords(self):
         domain = DomainDefinition(
@@ -187,3 +196,10 @@ class TestDomainDefinition:
                 action="invalid_action",
                 target="phase",
             )
+
+    def test_orchestrator_skills_field(self):
+        domain = DomainDefinition(
+            domain="test",
+            orchestrator_skills=["test_orchestrator"],
+        )
+        assert domain.orchestrator_skills == ["test_orchestrator"]

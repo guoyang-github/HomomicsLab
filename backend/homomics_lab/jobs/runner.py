@@ -16,6 +16,7 @@ from homomics_lab.plan.store import PlanStore
 from homomics_lab.reproducibility.engine import ReproducibilityEngine
 from homomics_lab.workspace.manager import WorkspaceManager
 
+from .checkpoint import CheckpointRepository
 from .models import Job, JobMode, JobStatus
 from .repository import JobRepository
 
@@ -135,7 +136,20 @@ class BackgroundJobRunner:
 
             try:
                 timeout = settings.default_job_timeout_seconds
-                if job.mode == JobMode.RESUME_HITL:
+                if job.mode == JobMode.CHECKPOINT_RESUME:
+                    cp = CheckpointRepository().get_latest(job_id, status="success")
+                    if cp is None:
+                        raise RuntimeError(f"No success checkpoint found for job {job_id}")
+                    job.working_memory = cp.payload.get("working_memory")
+                    job.task_tree = cp.payload.get("task_tree")
+                    self._publish_state(job_id, JobStatus.RUNNING, f"Resumed from checkpoint {cp.checkpoint_id}")
+                    coro = runner.execute_tree(
+                        tree=job.task_tree,
+                        working_memory=job.working_memory,
+                        project_id=job.project_id,
+                        trace_id=job_id,
+                    )
+                elif job.mode == JobMode.RESUME_HITL:
                     coro = runner.resume_hitl(
                         session_id=job.session_id,
                         task_id=job.resume_task_id,

@@ -1,288 +1,315 @@
-domain: single_cell_standard
-description: Standard single-cell RNA-seq analysis pipeline (Scanpy/Seurat workflow)
-version: "1.0.0"
+domain: single_cell
+display_name: Single-Cell Analysis
+description: Standard single-cell and single-nucleus RNA-seq analysis following best practices (Scanpy/Seurat workflow), including scATAC-seq, CNV, cell-cell communication, trajectory, and functional enrichment. Phases form a DAG; orchestrator skills provide end-to-end shortcuts.
+version: "3.0.0"
+
+orchestrator_skills: []
 
 phases:
+  - id: fastq_processing
+    required: true
+    description: Convert raw FASTQ to count matrix
+    skills: [bio-single-cell-fastq2mtx]
+    default_skill: bio-single-cell-fastq2mtx
+
+  - id: data_io
+    required: true
+    description: Load and prepare single-cell data objects
+    skills: [bio-single-cell-data-io]
+    default_skill: bio-single-cell-data-io
+
   - id: qc
     required: true
     description: Quality control filtering for single-cell RNA-seq
-    skills: [scanpy_qc]
-    default_skill: scanpy_qc
+    skills: [bio-single-cell-preprocessing, bio-single-cell-doublet-scrublet, bio-single-cell-doublet-solo]
+    default_skill: bio-single-cell-preprocessing
+
+  - id: doublet_removal
+    required: true
+    description: Detect and remove doublet/multiplet cells
+    skills: [bio-single-cell-doublet-scrublet, bio-single-cell-doublet-solo, bio-single-cell-doublet-doubletfinder-r, bio-single-cell-doublet-scdblfinder-r]
+    default_skill: bio-single-cell-doublet-scrublet
 
   - id: normalization
     required: true
-    description: Count normalization and log transformation
-    skills: [scanpy_normalize]
+    description: Count normalization, log transformation, and feature selection
+    skills: [bio-single-cell-preprocessing]
+    default_skill: bio-single-cell-preprocessing
+
+  - id: batch_integration
+    required: false
+    description: Batch correction and data integration across samples
+    skills: [bio-single-cell-batch-integration]
+    default_skill: bio-single-cell-batch-integration
 
   - id: dim_reduction
     required: true
-    description: PCA dimensionality reduction
-    skills: [scanpy_pca]
+    description: PCA and nonlinear dimensionality reduction
+    skills: [bio-single-cell-preprocessing, bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
 
   - id: clustering
     required: true
-    description: Cell clustering with Louvain or Leiden
-    skills: [scanpy_cluster]
+    description: Cell clustering with graph-based methods
+    skills: [bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
 
   - id: annotation
-    required: false
-    description: Cell type annotation with marker genes
-    skills: [scanpy_annotation]
+    required: true
+    description: Cell type annotation with marker genes or reference atlases
+    skills: [bio-single-cell-annotation-markers, bio-single-cell-annotation-celltypist, bio-single-cell-annotation-sctype-r, bio-single-cell-annotation-singler-r, bio-single-cell-markers]
+    default_skill: bio-single-cell-annotation-markers
 
   - id: differential_expression
     required: false
-    description: Differential expression analysis between clusters
-    skills: [scanpy_de]
+    description: Differential expression analysis between clusters/conditions
+    skills: [bio-single-cell-differential-abundance-milor-r, bio-single-cell-differential-abundance-roe-r, bio-single-cell-differential-abundance-sccoda]
+    default_skill: bio-single-cell-differential-abundance-roe-r
+
+  - id: cnv
+    required: false
+    description: Copy number variation inference from scRNA-seq
+    skills: [bio-single-cell-cnv-infercnv-r, bio-single-cell-cnv-infercnvpy, bio-single-cell-cnv-fastcnv-r, bio-single-cell-cnv-scevan-r]
+    default_skill: bio-single-cell-cnv-infercnvpy
+
+  - id: trajectory
+    required: false
+    description: Trajectory inference and pseudotime analysis
+    skills: [bio-single-cell-trajectory-monocle3-r, bio-single-cell-trajectory-scvelo]
+    default_skill: bio-single-cell-trajectory-scvelo
+
+  - id: communication
+    required: false
+    description: Cell-cell communication analysis
+    skills: [bio-single-cell-communication-cellchat-r, bio-single-cell-communication-nichenet-r]
+    default_skill: bio-single-cell-communication-cellchat-r
+
+  - id: enrichment
+    required: false
+    description: Pathway and functional enrichment analysis
+    skills: [bio-single-cell-enrichment-gseapy, bio-single-cell-enrichment-decoupler-r, bio-single-cell-enrichment-clusterprofiler-r, bio-single-cell-enrichment-aucell-r, bio-single-cell-enrichment-progeny-r, bio-single-cell-enrichment-ucell-r, bio-single-cell-enrichment-irgsea-r]
+    default_skill: bio-single-cell-enrichment-gseapy
+
+  - id: metabolism
+    required: false
+    description: Single-cell metabolic pathway activity estimation
+    skills: [bio-single-cell-metabolism-compass, bio-single-cell-metabolism-scmetabolism-r]
+    default_skill: bio-single-cell-metabolism-compass
+
+  - id: regulatory
+    required: false
+    description: Gene regulatory network inference
+    skills: [bio-single-cell-regulatory-pyscenic, bio-single-cell-regulatory-scenic-r]
+    default_skill: bio-single-cell-regulatory-pyscenic
+
+  - id: splicing
+    required: false
+    description: Alternative splicing analysis
+    skills: [bio-single-cell-splicing-brie2]
+    default_skill: bio-single-cell-splicing-brie2
+
+  - id: perturbation
+    required: false
+    description: Perturbation effect and screen analysis
+    skills: [bio-single-cell-perturbation-pertpy, bio-single-cell-perturbation-augur-r, bio-single-cell-perturbation-scgen, bio-single-cell-perturbation-sctenifoldknk-r]
+    default_skill: bio-single-cell-perturbation-pertpy
+
+  - id: tcr_analysis
+    required: false
+    description: T-cell receptor repertoire analysis
+    skills: [bio-single-cell-tcr-startrac-r]
+    default_skill: bio-single-cell-tcr-startrac-r
+
+  - id: scatac
+    required: false
+    description: Single-cell ATAC-seq analysis
+    skills: [bio-single-cell-atac-archr-r, bio-single-cell-atac-signac-r, bio-single-cell-atac-chromvar-r]
+    default_skill: bio-single-cell-atac-signac-r
 
   - id: visualization
     required: false
-    description: Generate UMAP and heatmap plots
-    skills: [plot_umap, plot_heatmap]
+    description: Generate UMAP, heatmap, and other visualizations
+    skills: [bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
+
+phase_transitions:
+  - from: fastq_processing
+    to: data_io
+  - from: data_io
+    to: qc
+  - from: qc
+    to: doublet_removal
+  - from: doublet_removal
+    to: normalization
+  - from: normalization
+    to: batch_integration
+    type: depends_on
+  - from: normalization
+    to: dim_reduction
+  - from: batch_integration
+    to: dim_reduction
+  - from: dim_reduction
+    to: clustering
+  - from: clustering
+    to: annotation
+  - from: annotation
+    to: differential_expression
+  - from: differential_expression
+    to: enrichment
+  - from: annotation
+    to: cnv
+    type: alternative_to
+  - from: annotation
+    to: trajectory
+    type: alternative_to
+  - from: annotation
+    to: communication
+    type: alternative_to
+  - from: annotation
+    to: metabolism
+    type: alternative_to
+  - from: annotation
+    to: regulatory
+    type: alternative_to
+  - from: annotation
+    to: splicing
+    type: alternative_to
+  - from: annotation
+    to: perturbation
+    type: alternative_to
+  - from: annotation
+    to: tcr_analysis
+    type: alternative_to
+  - from: annotation
+    to: scatac
+    type: alternative_to
+  - from: clustering
+    to: visualization
+    type: followed_by
 
 state_checks:
   - condition: "batch_detected"
     action: insert
-    target: batch_correction
-    after: qc
+    target: batch_integration
+    after: normalization
 
   - condition: "low_quality"
     action: insert
-    target: qc_advanced
-    after: qc
+    target: qc
+    after: data_io
 
   - condition: "large_scale"
     action: modify_param
     target: dim_reduction
     value: {"n_pcs": 50, "method": "incremental_pca"}
 
-  - condition: "has_qc"
-    action: skip
-    target: qc
-
 intents:
   - analysis_type: single_cell_analysis
     keywords:
       - "单细胞"
       - "single cell"
-      - "scRNA"
-      - "10x"
-      - "scanpy"
-      - "seurat"
-      - "PBMC"
-      - "细胞"
-      - "cell"
-    examples:
-      - "帮我分析这组单细胞数据"
-      - "做一下 scRNA-seq 质控和聚类"
-      - "run single cell pipeline on PBMC data"
-      - "做 PBMC 细胞分群"
-      - "画一下 UMAP"
-      - "做一下质控"
-      - "跑个 PCA"
-      - "找出差异表达基因"
-    complexity_indicators:
-      - "分析"
-      - "analysis"
-      - "流程"
-      - "pipeline"
-      - "全流程"
-      - "完整"
-    data_scale_patterns:
-      - '(\\d+)\\s*个细胞'
-      - '(\\d+)\\s*cells'
-      - '(\\d+)k\\s*cells'
-
-  - analysis_type: scRNA
-    keywords:
+      - "scrna-seq"
       - "scRNA-seq"
-      - "scrna"
-      - "单细胞转录组"
-    examples:
-      - "分析 scRNA-seq 数据"
-      - "单细胞转录组测序分析"
-    complexity_indicators: []
-    data_scale_patterns: []
-
-dag_seeds:
-  - from: scanpy_qc
-    to: scanpy_pca
-    type: followed_by
-    context: "Standard single-cell pipeline: QC → dimensionality reduction"
-
-  - from: scanpy_pca
-    to: scanpy_cluster
-    type: followed_by
-    context: "Standard single-cell pipeline: PCA → clustering"
-
-  - from: scanpy_cluster
-    to: scanpy_annotation
-    type: followed_by
-    context: "Standard single-cell pipeline: clustering → cell type annotation"
-
-  - from: scanpy_cluster
-    to: scanpy_de
-    type: followed_by
-    context: "Differential expression can follow clustering directly"
-
-  - from: scanpy_annotation
-    to: scanpy_de
-    type: followed_by
-    context: "DE analysis is more meaningful after annotation"
-
-  - from: scanpy_cluster
-    to: scanpy_qc
-    type: depends_on
-    context: "Clustering requires QC-filtered data"
-
-  - from: scanpy_pca
-    to: scanpy_qc
-    type: depends_on
-    context: "PCA requires QC-filtered data"
-
-  - from: scanpy_de
-    to: scanpy_cluster
-    type: depends_on
-    context: "DE requires cluster labels"
+      - "10x"
+      - "cell clustering"
+      - "cell type annotation"
+      - "umap"
+      - "seurat"
+      - "scanpy"
 
 roles:
   - role_id: single_cell_specialist
     name: Single Cell Specialist
-    description: Expert in single-cell RNA-seq analysis
     allowed_skills:
-      - scanpy_qc
-      - scanpy_normalize
-      - scanpy_pca
-      - scanpy_cluster
-      - scanpy_annotation
-      - scanpy_de
-      - plot_umap
-      - plot_heatmap
-    allowed_tools:
-      - file_read
-      - file_write
-      - shell_exec
+      - bio-single-cell-fastq2mtx
+      - bio-single-cell-data-io
+      - bio-single-cell-preprocessing
+      - bio-single-cell-doublet-scrublet
+      - bio-single-cell-doublet-solo
+      - bio-single-cell-doublet-doubletfinder-r
+      - bio-single-cell-doublet-scdblfinder-r
+      - bio-single-cell-batch-integration
+      - bio-single-cell-clustering
+      - bio-single-cell-annotation-markers
+      - bio-single-cell-annotation-celltypist
+      - bio-single-cell-annotation-sctype-r
+      - bio-single-cell-annotation-singler-r
+      - bio-single-cell-markers
+      - bio-single-cell-differential-abundance-milor-r
+      - bio-single-cell-differential-abundance-roe-r
+      - bio-single-cell-differential-abundance-sccoda
+      - bio-single-cell-cnv-infercnv-r
+      - bio-single-cell-cnv-infercnvpy
+      - bio-single-cell-cnv-fastcnv-r
+      - bio-single-cell-cnv-scevan-r
+      - bio-single-cell-trajectory-monocle3-r
+      - bio-single-cell-trajectory-scvelo
+      - bio-single-cell-communication-cellchat-r
+      - bio-single-cell-communication-nichenet-r
+      - bio-single-cell-enrichment-gseapy
+      - bio-single-cell-enrichment-decoupler-r
+      - bio-single-cell-enrichment-clusterprofiler-r
+      - bio-single-cell-enrichment-aucell-r
+      - bio-single-cell-enrichment-progeny-r
+      - bio-single-cell-enrichment-ucell-r
+      - bio-single-cell-enrichment-irgsea-r
+      - bio-single-cell-metabolism-compass
+      - bio-single-cell-metabolism-scmetabolism-r
+      - bio-single-cell-regulatory-pyscenic
+      - bio-single-cell-regulatory-scenic-r
+      - bio-single-cell-splicing-brie2
+      - bio-single-cell-perturbation-pertpy
+      - bio-single-cell-perturbation-augur-r
+      - bio-single-cell-perturbation-scgen
+      - bio-single-cell-perturbation-sctenifoldknk-r
+      - bio-single-cell-tcr-startrac-r
+      - bio-single-cell-atac-archr-r
+      - bio-single-cell-atac-signac-r
+      - bio-single-cell-atac-chromvar-r
+      - bio-workflows-scrnaseq-pipeline
+    allowed_tools: [file_read, file_write, shell_exec]
     permissions:
       can_execute: true
       can_spawn_specialist: false
-      max_concurrent_tasks: 3
-    priority: 2
+      max_concurrent_tasks: 4
+
+dag_seeds:
+  - from: bio-single-cell-fastq2mtx
+    to: bio-single-cell-preprocessing
+    type: followed_by
+    context: "Generate count matrix before QC"
+
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-clustering
+    type: followed_by
+    context: "Normalize and reduce dimensions before clustering"
+
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-annotation-markers
+    type: followed_by
+    context: "Annotate clusters after identification"
+
+  - from: bio-single-cell-annotation-markers
+    to: bio-single-cell-differential-abundance-roe-r
+    type: followed_by
+    context: "DE analysis after annotation"
+
+  - from: bio-single-cell-differential-abundance-roe-r
+    to: bio-single-cell-enrichment-gseapy
+    type: followed_by
+    context: "Functional enrichment after DE"
 
 sops:
-  - id: sop_single_cell_standard
-    title: Single-Cell RNA-seq Standard Operating Procedure
-    version: "1.0.0"
-    locked: false
-    content: |
-      ## Standard Single-Cell Analysis Workflow
-
-      ### 1. QC Filtering
-      - Filter cells: min_genes ≥ 200, min_cells ≥ 3
-      - MT% threshold: 5%
-      - Expected pass rate: > 85%
-
-      ### 2. Normalization
-      - Total count normalization to 10,000
-      - Log1p transform
-
-      ### 3. Dimensionality Reduction
-      - HVG selection: top 2000 genes
-      - PCA: 50 components
-      - Elbow plot to determine meaningful PCs
-
-      ### 4. Clustering
-      - Neighbors: n_neighbors = 15
-      - Leiden algorithm (default resolution = 0.8)
-
-      ### 5. Quality Gates
-      - If pass rate < 70% → escalate to user
-      - If batch_detected → insert Harmony/scVI integration
-
-data_state_schema:
-  has_qc:
-    type: boolean
-    description: Whether QC has been completed
-  has_normalization:
-    type: boolean
-    description: Whether normalization has been completed
-  has_pca:
-    type: boolean
-    description: Whether PCA has been computed
-  has_clustering:
-    type: boolean
-    description: Whether clustering has been performed
-  has_annotation:
-    type: boolean
-    description: Whether cell types have been annotated
-  n_cells:
-    type: integer
-    description: Number of cells in the dataset
-  n_genes:
-    type: integer
-    description: Number of genes in the dataset
-  n_batches:
-    type: integer
-    description: Number of batches detected
-  batch_detected:
-    type: boolean
-    description: Whether batch effects have been detected
-  low_quality:
-    type: boolean
-    description: Whether data quality is low
-  large_scale:
-    type: boolean
-    description: Whether dataset has > 100k cells
-
-preferred_libraries:
-  python:
-    - scanpy
-    - pandas
-    - numpy
-    - scipy
-    - scikit-learn
-    - leidenalg
-    - python-igraph
-  r:
-    - Seurat
-    - SingleR
-    - harmony
-    - scran
-
-code_templates:
-  single_cell_qc:
-    language: python
-    skeleton: |
-      import scanpy as sc
-      adata = sc.read_h5ad("{input.h5ad}")
-      adata.var['mt'] = adata.var_names.str.startswith('MT-')
-      sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
-      adata = adata[adata.obs.n_genes_by_counts > 200, :]
-      adata = adata[adata.obs.pct_counts_mt < 5, :]
-      adata.write("{output.h5ad}")
-      result = {"cells": int(adata.n_obs), "genes": int(adata.n_vars)}
-
-  single_cell_clustering:
-    language: python
-    skeleton: |
-      import scanpy as sc
-      adata = sc.read_h5ad("{input.h5ad}")
-      sc.pp.highly_variable_genes(adata, n_top_genes=2000)
-      sc.tl.pca(adata)
-      sc.pp.neighbors(adata)
-      sc.tl.umap(adata)
-      sc.tl.leiden(adata)
-      adata.write("{output.h5ad}")
-      result = {"clusters": int(adata.obs['leiden'].nunique())}
-
-data_sources:
-  - id: pbmc3k
-    path: data/pbmc3k_raw.h5ad
-    format: h5ad
-    description: 10x PBMC 3k demo dataset
-
-fallback_rules:
-  - when: "no_skill_match > 0.8"
-    action: "code_from_retrieval"
-  - when: "intent == single_cell_analysis"
-    action: "generated_from_template"
-
-skills_dir: null
+  - id: sop_single_cell_v3
+    title: Single-Cell RNA-seq Analysis SOP
+    steps:
+      - "FASTQ to count matrix (fastq2mtx)"
+      - "Load data and metadata (data-io)"
+      - "QC filtering and doublet removal"
+      - "Normalization and feature selection"
+      - "Batch integration (if multi-sample)"
+      - "Dimensionality reduction and clustering"
+      - "Cell type annotation"
+      - "Differential expression and functional enrichment"
+      - "Optional: trajectory, communication, CNV, metabolism"
+      - "Visualization and reporting"

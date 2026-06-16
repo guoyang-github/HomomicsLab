@@ -70,6 +70,22 @@ HomomicsLab is best understood as a **production-ready agent framework** with a 
 - New `frontend/src/components/domains/DomainMarketplace.tsx` UI tab for browsing, importing, and exporting domain templates.
 - Backend endpoints: `GET /api/domains/`, `POST /api/domains/import`, `POST /api/domains/{id}/export`, `POST /api/domains/import-zip`.
 
+### Modern Frontend UI/UX Overhaul
+- New component library in `frontend/src/components/ui/` (Button, Input, Card, Modal, Tabs, Toast, CommandPalette, etc.).
+- Light/dark theme system with system-aware auto-switching and persistent user preference.
+- Sidebar + top-bar navigation layout with keyboard shortcuts and command palette (`Ctrl+K` / `Cmd+K`).
+- Settings panel for LLM provider/model, execution backend, search, budget, and general preferences.
+- Chat: Markdown + LaTeX + syntax-highlighted code rendering, drag-and-drop file uploads, session switching, and HITL inline forms.
+- Workflow canvas with real-time execution log panel, node status badges, zoom-to-fit, and detail sidebars.
+- Consistent empty states, skeleton loaders, and toast notifications across all views.
+
+### Task Orchestration & Resource Scheduling
+- New `backend/homomics_lab/hpc/` module with pluggable execution backends: `LocalScheduler`, `SlurmScheduler`, and `NextflowRunner`.
+- Nextflow DSL2 template registry maps analysis intents (`rnaseq_analysis`, `single_cell_analysis`, etc.) to curated workflow templates.
+- nf-core integration (`backend/homomics_lab/nfcore_integration.py`) supports pipeline discovery, download, schema-driven parameter loading, profile selection, and execution.
+- SLURM support via `sbatch`/`squeue`/`sacct` integration for submitting long-running analyses to HPC clusters.
+- Execution backend is selectable per request so the same agent plan can run locally, on a cluster, or as a Nextflow workflow.
+
 ---
 
 ## What Makes HomomicsLab Different
@@ -206,6 +222,31 @@ HOMOMICS_LLM_MODEL=qwen2.5:14b
 
 ---
 
+## Task Orchestration & Resource Scheduling
+
+HomomicsLab is not limited to single-process skill execution. The same agent plan can be dispatched to multiple execution backends depending on scale, environment, and reproducibility requirements.
+
+| Backend | Use Case | How It Works |
+|---|---|---|
+| **Local** | Fast iteration, small data, laptop/WSL | Python/R/Bash skills run in the API process or a local subprocess sandbox |
+| **SLURM** | HPC clusters, long-running jobs, many cores | `SlurmScheduler` translates skill code into `sbatch` scripts, monitors via `squeue`/`sacct`, and streams results back |
+| **Nextflow** | Reproducible pipelines, nf-core workflows, cloud/HPC | `NextflowRunner` renders DSL2 templates or invokes nf-core pipelines with schema-driven parameters and profiles |
+
+### Nextflow & nf-core Integration
+
+- **Template Registry** (`hpc/template_registry.py`): maps high-level intents like `rnaseq_analysis` or `single_cell_analysis` to curated Nextflow DSL2 templates.
+- **NFCoreManager** (`nfcore_integration.py`): discovers available nf-core pipelines, caches them locally, loads their JSON parameter schemas, detects executor profiles (`docker`, `singularity`, `conda`, `slurm`), and runs them.
+- **API Endpoints** (`api/nfcore.py`): `GET /api/nfcore/pipelines`, `POST /api/nfcore/run`, and execution-status endpoints expose nf-core directly to the frontend.
+- **Parameter Safety**: nf-core pipeline parameters are validated against their published schemas before submission, reducing the "rigid pipeline breaks on one parameter" problem.
+
+### Why This Matters
+
+- **One agent, many executors**: A natural-language request can become a local sandbox test, a SLURM batch job, or a containerized Nextflow pipeline without rewriting the plan.
+- **Production scale**: Long-running bioinformatics workloads (alignment, quantification, variant calling) can be offloaded to cluster or cloud executors while the agent continues to monitor, interpret, and report.
+- **Reproducibility by default**: Nextflow and nf-core bring containerized, version-locked execution; HomomicsLab layers its own reproducibility bundle on top.
+
+---
+
 ## Project Structure
 
 ```
@@ -237,6 +278,10 @@ HomomicsLab/
 │   │   │   ├── code_act.py     # CodeAct execution engine
 │   │   │   ├── code_cache.py   # CodeAct similarity cache
 │   │   │   └── code_safety.py  # Static safety audit for generated code
+│   │   ├── hpc/                # Task orchestration & resource scheduling
+│   │   │   ├── scheduler.py    # Local / SLURM / Nextflow runners
+│   │   │   └── template_registry.py  # Intent → Nextflow DSL2 templates
+│   │   ├── nfcore_integration.py  # nf-core pipeline discovery & execution
 │   │   ├── skills/             # Skill ecosystem
 │   │   │   ├── skill_dag.py    # Self-evolving typed knowledge graph
 │   │   │   ├── loader.py       # Unified SKILL.md + scripts/ loader
@@ -262,11 +307,15 @@ HomomicsLab/
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── chat/           # Chat panel, HITL forms, plot rendering
-│       │   ├── workspace/      # Workflow canvas, tabs
+│       │   ├── ui/             # Reusable UI component library + theme system
+│       │   ├── layout/         # Sidebar, top bar, app shell
+│       │   ├── settings/       # Settings panel (LLM, execution, search, budget)
+│       │   ├── chat/           # Chat panel, HITL forms, plot rendering, sessions
+│       │   ├── workspace/      # Workflow canvas, execution log panel, detail sidebars
 │       │   ├── reports/        # Report list + viewer
 │       │   ├── skills/         # Skill search + manager + generator
 │       │   └── domains/        # Domain marketplace
+│       ├── hooks/              # Theme, keyboard shortcuts, command palette
 │       └── stores/             # Zustand state management
 ├── Dockerfile
 ├── docker-compose.yml

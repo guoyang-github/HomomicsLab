@@ -5,171 +5,41 @@ from typing import Any, Dict, List, Optional, Tuple
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
-from homomics_lab.models.common import AgentType, HITLCheckpoint, Option
+from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
 
-# Map sub-intent types to concrete pipeline steps for single-cell workflows.
-SUB_INTENT_STEP_MAP = {
-    "qc": {
-        "name": "quality_control",
-        "description": "Filter low-quality cells and genes",
-        "phase": "preprocessing",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_qc"],
-    },
-    "quality_control": {
-        "name": "quality_control",
-        "description": "Filter low-quality cells and genes",
-        "phase": "preprocessing",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_qc"],
-    },
-    "normalization": {
-        "name": "normalization",
-        "description": "Normalize gene expression counts",
-        "phase": "preprocessing",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_normalize"],
-    },
-    "dim_reduction": {
-        "name": "dimensionality_reduction",
-        "description": "Compute PCA on normalized data",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_pca"],
-    },
-    "pca": {
-        "name": "dimensionality_reduction",
-        "description": "Compute PCA on normalized data",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_pca"],
-    },
-    "clustering": {
-        "name": "clustering",
-        "description": "Compute neighbors and UMAP embedding",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_cluster"],
-        "hitl": ["n_neighbors", "resolution"],
-    },
-    "annotation": {
-        "name": "cell_annotation",
-        "description": "Annotate cell clusters with marker genes",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_annotation"],
-    },
-    "cell_annotation": {
-        "name": "cell_annotation",
-        "description": "Annotate cell clusters with marker genes",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_annotation"],
-    },
-    "differential_expression": {
-        "name": "differential_expression",
-        "description": "Find marker genes for each cluster",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_de"],
-    },
-    "de": {
-        "name": "differential_expression",
-        "description": "Find marker genes for each cluster",
-        "phase": "analysis",
-        "agent": AgentType.BIOINFO,
-        "skills": ["scanpy_de"],
-    },
-    "visualization": {
-        "name": "visualization",
-        "description": "Generate UMAP plots and heatmaps",
-        "phase": "reporting",
-        "agent": AgentType.VIZ,
-        "skills": ["plot_umap", "plot_heatmap"],
-    },
-    "umap": {
-        "name": "visualization",
-        "description": "Generate UMAP plots and heatmaps",
-        "phase": "reporting",
-        "agent": AgentType.VIZ,
-        "skills": ["plot_umap", "plot_heatmap"],
-    },
+# Map common sub-intent analysis types to the phase IDs declared in domain
+# templates. The decomposer uses the domain strategy skeleton and keeps the
+# prefix up to and including the requested phases (so prerequisites are run).
+SUB_INTENT_PHASE_MAP = {
+    "qc": "qc",
+    "quality_control": "qc",
+    "normalization": "normalization",
+    "dim_reduction": "dim_reduction",
+    "dimensionality_reduction": "dim_reduction",
+    "pca": "dim_reduction",
+    "clustering": "clustering",
+    "annotation": "annotation",
+    "cell_annotation": "annotation",
+    "differential_expression": "differential_expression",
+    "de": "differential_expression",
+    "visualization": "visualization",
+    "umap": "visualization",
 }
 
 
 class TaskDecomposer:
     """Decomposes user intent into executable task trees.
 
-    For well-known intents (single-cell, file conversion, QA) the decomposer
-    uses fast, hard-coded templates. For everything else it delegates to
-    ``PlanEngine``, which can either use a registered domain strategy or the
-    LLM fallback planner for unknown domains.
+    Well-known single-step intents (file conversion, QA) use tiny hard-coded
+    tasks. All other intents are routed through ``PlanEngine``, which picks a
+    registered domain strategy (loaded from ``domains/<domain>/domain.yaml``)
+    or falls back to the LLM planner for unknown domains.
     """
-
-    SINGLE_CELL_PIPELINE = [
-        {
-            "name": "quality_control",
-            "description": "Filter low-quality cells and genes",
-            "phase": "preprocessing",
-            "agent": AgentType.BIOINFO,
-            "skills": ["scanpy_qc"],
-            "success_criteria": [
-                {
-                    "metric": "result.qc.pass_rate",
-                    "operator": ">=",
-                    "threshold": 0.4,
-                    "on_failure": "hitl",
-                    "message": "QC 过滤率异常（{actual}），请确认是否继续。",
-                }
-            ],
-        },
-        {
-            "name": "dimensionality_reduction",
-            "description": "Compute PCA on normalized data",
-            "phase": "analysis",
-            "agent": AgentType.BIOINFO,
-            "skills": ["scanpy_pca"],
-            "dependencies": ["quality_control"],
-        },
-        {
-            "name": "clustering",
-            "description": "Compute neighbors and UMAP embedding",
-            "phase": "analysis",
-            "agent": AgentType.BIOINFO,
-            "skills": ["scanpy_cluster"],
-            "dependencies": ["dimensionality_reduction"],
-            "hitl": ["n_neighbors", "resolution"],
-        },
-        {
-            "name": "cell_annotation",
-            "description": "Annotate cell clusters with marker genes",
-            "phase": "analysis",
-            "agent": AgentType.BIOINFO,
-            "skills": ["scanpy_annotation"],
-            "dependencies": ["clustering"],
-        },
-        {
-            "name": "differential_expression",
-            "description": "Find marker genes for each cluster",
-            "phase": "analysis",
-            "agent": AgentType.BIOINFO,
-            "skills": ["scanpy_de"],
-            "dependencies": ["cell_annotation"],
-        },
-        {
-            "name": "visualization",
-            "description": "Generate UMAP plots and heatmaps",
-            "phase": "reporting",
-            "agent": AgentType.VIZ,
-            "skills": ["plot_umap", "plot_heatmap"],
-            "dependencies": ["clustering", "cell_annotation"],
-        },
-    ]
 
     def __init__(
         self,
@@ -211,15 +81,8 @@ class TaskDecomposer:
                 tree, intent, strategy_name="clarification"
             ), tree
 
-        # Fast path: hard-coded templates for the most common known intents.
-        # Any concrete single-cell request (even a short one) maps to the standard
-        # pipeline so that agent assignments and required skills are explicit.
-        if intent.analysis_type == "single_cell_analysis":
-            tree = self._build_single_cell_pipeline(context)
-            return self._task_tree_to_plan_result(
-                tree, intent, strategy_name="single_cell_standard"
-            ), tree
-
+        # Fast path: hard-coded templates for the most common known single-step
+        # intents. These are too trivial to warrant a dedicated domain strategy.
         if intent.analysis_type == "file_conversion":
             tree = self._build_single_step(
                 "convert_file", "Convert file format", ["data_loader"]
@@ -236,16 +99,15 @@ class TaskDecomposer:
                 tree, intent, strategy_name="qa"
             ), tree
 
-        # If sub-intents are present, build a tailored pipeline.
-        if intent.sub_intents and intent.analysis_type in ("single_cell_analysis",):
-            tree = self._build_sub_intent_pipeline(intent, context)
-            return self._task_tree_to_plan_result(
-                tree, intent, strategy_name="single_cell_standard"
-            ), tree
-
         # General path: use PlanEngine (domain strategy or LLM fallback).
         plan_engine = self._get_plan_engine()
         plan = await plan_engine.plan(intent)
+
+        # If sub-intents are present, filter the generated plan to the requested
+        # phases (keeping prerequisites) instead of running the full domain DAG.
+        if intent.sub_intents and not plan.is_fallback:
+            plan, tree = self._filter_plan_by_sub_intents(plan, intent)
+            return plan, tree
 
         if plan.is_fallback and not plan.phases:
             # LLM fallback produced only a suggestion with no executable skills.
@@ -253,47 +115,6 @@ class TaskDecomposer:
             return plan, tree
 
         return plan, self._plan_result_to_task_tree(plan)
-
-    def _build_single_cell_pipeline(self, context: Dict[str, Any]) -> TaskTree:
-        """Build the hard-coded single-cell analysis pipeline."""
-        tasks = []
-        id_map = {}
-
-        for step in self.SINGLE_CELL_PIPELINE:
-            task_id = str(uuid.uuid4())[:8]
-            id_map[step["name"]] = task_id
-
-            dependencies = [
-                id_map[dep] for dep in step.get("dependencies", [])
-                if dep in id_map
-            ]
-
-            hitl_checkpoints = []
-            if "hitl" in step:
-                hitl_checkpoints.append(HITLCheckpoint(
-                    id=f"hitl_{task_id}",
-                    trigger_reason="policy",
-                    context_summary=f"Please confirm parameters for {step['name']}: {', '.join(step['hitl'])}",
-                    options=[
-                        Option(id="default", label="Use defaults", description="Use recommended parameter values"),
-                        Option(id="custom", label="Customize", description="Set custom parameter values"),
-                    ],
-                ))
-
-            task = TaskNode(
-                id=task_id,
-                name=step["name"],
-                description=step["description"],
-                phase=step["phase"],
-                agent_assignment=step["agent"],
-                skills_required=step["skills"],
-                dependencies=dependencies,
-                hitl_checkpoints=hitl_checkpoints,
-                success_criteria=step.get("success_criteria", []),
-            )
-            tasks.append(task)
-
-        return TaskTree(tasks)
 
     def _build_single_step(
         self,
@@ -312,19 +133,23 @@ class TaskDecomposer:
         return TaskTree([task])
 
     def _plan_result_to_task_tree(self, plan: PlanResult) -> TaskTree:
-        """Convert a PlanResult into an executable TaskTree."""
+        """Convert a PlanResult into an executable TaskTree.
+
+        Task dependencies are derived from ``plan.phase_transitions`` when they
+        are available. Only ``followed_by`` and ``depends_on`` edges become
+        execution dependencies; ``alternative_to`` and ``parallel_to`` edges are
+        ignored. If no transitions are declared, the tasks fall back to a linear
+        chain.
+        """
         tasks: List[TaskNode] = []
-        task_ids: List[str] = []
+        phase_to_task_id: Dict[str, str] = {}
 
         for phase in plan.phases:
             if not phase.required:
                 continue
 
             task_id = str(uuid.uuid4())[:8]
-            task_ids.append(task_id)
-
-            # Linear dependency on the previous required phase.
-            dependencies = [task_ids[-2]] if len(task_ids) > 1 else []
+            phase_to_task_id[phase.phase_type] = task_id
 
             skill_id = phase.selected_skill.id if phase.selected_skill else None
             skills_required = [skill_id] if skill_id else []
@@ -335,7 +160,7 @@ class TaskDecomposer:
                 hitl_checkpoints.append(
                     HITLCheckpoint(
                         id=f"hitl_{task_id}",
-                        trigger_reason="policy",
+                        trigger_reason=HITLTrigger.POLICY,
                         context_summary=(
                             f"This step was suggested by the LLM fallback planner: {phase.description}. "
                             "Please confirm before execution."
@@ -356,12 +181,32 @@ class TaskDecomposer:
                 description=phase.description,
                 phase=phase.phase_type,
                 skills_required=skills_required,
-                dependencies=dependencies,
+                dependencies=[],
                 parameters=phase.parameters,
                 hitl_checkpoints=hitl_checkpoints,
                 success_criteria=success_criteria,
             )
             tasks.append(task)
+
+        # Build dependencies from phase transitions.
+        task_ids_in_order = [t.id for t in tasks]
+        if plan.phase_transitions:
+            incoming: Dict[str, List[str]] = {t.id: [] for t in tasks}
+            for transition in plan.phase_transitions:
+                edge_type = transition.get("type", "followed_by")
+                if edge_type in ("alternative_to", "parallel_to"):
+                    continue
+                from_id = phase_to_task_id.get(transition.get("from", ""))
+                to_id = phase_to_task_id.get(transition.get("to", ""))
+                if from_id and to_id and from_id != to_id:
+                    incoming[to_id].append(from_id)
+            for task in tasks:
+                task.dependencies = list(dict.fromkeys(incoming.get(task.id, [])))
+        else:
+            # No transitions declared: fall back to a linear chain.
+            for i, task in enumerate(tasks):
+                if i > 0:
+                    task.dependencies = [task_ids_in_order[i - 1]]
 
         return TaskTree(tasks)
 
@@ -437,67 +282,93 @@ class TaskDecomposer:
         )
         return TaskTree([task])
 
-    def _build_sub_intent_pipeline(
+    def _filter_plan_by_sub_intents(
         self,
+        plan: PlanResult,
         intent: UserIntent,
-        context: Dict[str, Any],
-    ) -> TaskTree:
-        """Build a pipeline from explicit sub-intents (e.g., QC then cluster)."""
-        steps = []
-        seen_names = set()
+    ) -> Tuple[PlanResult, TaskTree]:
+        """Filter a generated plan to only the phases requested by sub-intents.
 
-        # Primary intent itself may imply a starting step.
-        if intent.analysis_type == "single_cell_analysis":
-            steps.append(SUB_INTENT_STEP_MAP.get("qc", SUB_INTENT_STEP_MAP["quality_control"]))
+        For each recognized sub-intent we map it to a phase ID, then collect that
+        phase plus all of its required prerequisites using the domain's
+        ``phase_transitions`` DAG. Requested phases are forced to ``required=True``
+        so they appear in the resulting task tree even if they are optional in
+        the full domain strategy.
+        """
+        if not plan.phases:
+            return plan, self._plan_result_to_task_tree(plan)
 
+        target_phase_ids = set()
         for sub in intent.sub_intents:
-            step = SUB_INTENT_STEP_MAP.get(sub.analysis_type)
-            if step is None:
+            phase_id = SUB_INTENT_PHASE_MAP.get(sub.analysis_type)
+            if phase_id is not None:
+                target_phase_ids.add(phase_id)
+
+        if not target_phase_ids:
+            return plan, self._plan_result_to_task_tree(plan)
+
+        # Build prerequisite map from execution-oriented transitions.
+        prereqs: Dict[str, set] = {
+            phase.phase_type: set() for phase in plan.phases
+        }
+        for transition in plan.phase_transitions:
+            edge_type = transition.get("type", "followed_by")
+            if edge_type in ("alternative_to", "parallel_to"):
                 continue
-            if step["name"] in seen_names:
+            to_phase = transition.get("to")
+            from_phase = transition.get("from")
+            if to_phase and from_phase:
+                prereqs.setdefault(to_phase, set()).add(from_phase)
+
+        # Determine which phases to keep: targets + required prerequisites.
+        kept_phase_ids: set = set()
+        for target in target_phase_ids:
+            if target not in prereqs:
                 continue
-            steps.append(step)
-            seen_names.add(step["name"])
+            stack = [target]
+            while stack:
+                current = stack.pop()
+                if current in kept_phase_ids:
+                    continue
+                kept_phase_ids.add(current)
+                for prerequisite in prereqs.get(current, set()):
+                    if prerequisite not in kept_phase_ids:
+                        stack.append(prerequisite)
 
-        if not steps:
-            # Fall back to full pipeline if no recognized sub-intents.
-            return self._build_single_cell_pipeline(context)
+        if not kept_phase_ids:
+            return plan, self._plan_result_to_task_tree(plan)
 
-        tasks = []
-        id_map = {}
+        # Preserve topological order from the original plan.
+        filtered_phases: List[Phase] = []
+        for phase in plan.phases:
+            if phase.phase_type not in kept_phase_ids:
+                continue
+            # Force requested phases (which may be optional in the domain) to run.
+            if phase.phase_type in target_phase_ids and not phase.required:
+                phase = dataclasses.replace(phase, required=True)
+            filtered_phases.append(phase)
 
-        for step in steps:
-            task_id = str(uuid.uuid4())[:8]
-            id_map[step["name"]] = task_id
+        filtered_transitions = [
+            t
+            for t in plan.phase_transitions
+            if t.get("from") in kept_phase_ids and t.get("to") in kept_phase_ids
+        ]
 
-            dependencies = [
-                id_map[dep] for dep in step.get("dependencies", [])
-                if dep in id_map
-            ]
-
-            hitl_checkpoints = []
-            if "hitl" in step:
-                hitl_checkpoints.append(HITLCheckpoint(
-                    id=f"hitl_{task_id}",
-                    trigger_reason="policy",
-                    context_summary=f"Please confirm parameters for {step['name']}: {', '.join(step['hitl'])}",
-                    options=[
-                        Option(id="default", label="Use defaults", description="Use recommended parameter values"),
-                        Option(id="custom", label="Customize", description="Set custom parameter values"),
-                    ],
-                ))
-
-            task = TaskNode(
-                id=task_id,
-                name=step["name"],
-                description=step["description"],
-                phase=step["phase"],
-                agent_assignment=step["agent"],
-                skills_required=step["skills"],
-                dependencies=dependencies,
-                hitl_checkpoints=hitl_checkpoints,
-                success_criteria=step.get("success_criteria", []),
-            )
-            tasks.append(task)
-
-        return TaskTree(tasks)
+        filtered_plan = PlanResult(
+            phases=filtered_phases,
+            strategy_name=plan.strategy_name,
+            data_state=plan.data_state,
+            gaps=[
+                g
+                for g in plan.gaps
+                if g.from_phase in kept_phase_ids and g.to_phase in kept_phase_ids
+            ],
+            reproducibility_context={
+                **plan.reproducibility_context,
+                "sub_intents": [sub.analysis_type for sub in intent.sub_intents],
+            },
+            is_fallback=plan.is_fallback,
+            suggestion_text=plan.suggestion_text,
+            phase_transitions=filtered_transitions,
+        )
+        return filtered_plan, self._plan_result_to_task_tree(filtered_plan)
