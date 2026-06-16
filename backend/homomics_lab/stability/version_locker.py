@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import homomics_lab
 
@@ -53,18 +53,16 @@ def _compute_scripts_checksum(scripts_dir: Path) -> str:
 
 
 def _capture_pip_freeze() -> str:
-    """Capture current pip freeze output."""
-    import subprocess
-    import sys
+    """Capture current environment packages.
 
+    Uses ``importlib.metadata`` so the lock works even in venvs without
+    ``pip`` installed (e.g. uv-managed environments).
+    """
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "freeze"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        return result.stdout
+        from importlib.metadata import distributions
+
+        lines = [f"{d.metadata['Name']}=={d.version}" for d in distributions()]
+        return "\n".join(sorted(lines))
     except Exception:
         return ""
 

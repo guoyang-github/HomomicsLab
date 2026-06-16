@@ -1,0 +1,11 @@
+# Spatial Transcriptomics Batch Integration
+
+## R
+Seurat>=5.0.0
+harmony
+batchelor
+SingleCellExperiment
+
+## Python
+# For spatial batch integration in Python, use bio-single-cell-batch-integration
+# (squidpy/scanpy batch correction works identically for spatial and single-cell)

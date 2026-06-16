@@ -1,0 +1,123 @@
+version: "3.8"
+
+# Production deployment template for HomomicsLab.
+# Usage:
+#   cp .env.example .env
+#   # edit .env with real secrets
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Notes:
+# - Backend and worker do NOT share a SQLite file; use PostgreSQL.
+# - Redis is used only for the job queue, not exposed to the host.
+# - TLS termination is assumed to happen at an external reverse proxy / LB.
+# - force_sandbox is enabled: bubblewrap or a container runtime must be available.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: homomics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: homicslab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homomics -d homicslab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Not exposed to host; only internal services connect.
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Use gunicorn with uvicorn workers for production concurrency.
+    command:
+      - gunicorn
+      - homomics_lab.main:app
+      - -k
+      - uvicorn.workers.UvicornWorker
+      - --bind
+      - 0.0.0.0:8080
+      - --workers
+      - "2"
+      - --timeout
+      - "120"
+    env_file:
+      - .env
+    environment:
+      HOMOMICS_DATABASE_URL: postgresql+asyncpg://homomics:${POSTGRES_PASSWORD:-changeme}@db:5432/homicslab
+      HOMOMICS_QUEUE_BACKEND: redis
+      HOMOMICS_REDIS_URL: redis://redis:6379/0
+      HOMOMICS_WORKER_MODE: "false"
+      HOMOMICS_AUTH_ENABLED: "true"
+      HOMOMICS_FORCE_SANDBOX: "true"
+      HOMOMICS_RATE_LIMIT_ENABLED: "true"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    # bubblewrap/container engine should be available on the host for sandboxing.
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - SYS_ADMIN
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["homomics-worker"]
+    env_file:
+      - .env
+    environment:
+      HOMOMICS_DATABASE_URL: postgresql+asyncpg://homomics:${POSTGRES_PASSWORD:-changeme}@db:5432/homicslab
+      HOMOMICS_QUEUE_BACKEND: redis
+      HOMOMICS_REDIS_URL: redis://redis:6379/0
+      HOMOMICS_WORKER_MODE: "true"
+      HOMOMICS_FORCE_SANDBOX: "true"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - SYS_ADMIN
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      # The nginx config proxies /api to the backend service.
+      NGINX_BACKEND_HOST: backend
+      NGINX_BACKEND_PORT: "8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

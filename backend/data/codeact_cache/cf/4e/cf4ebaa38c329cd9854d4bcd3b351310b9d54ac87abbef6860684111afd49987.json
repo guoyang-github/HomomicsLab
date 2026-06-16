@@ -1,0 +1,6 @@
+{
+  "key": "cf4ebaa38c329cd9854d4bcd3b351310b9d54ac87abbef6860684111afd49987",
+  "task": "do something",
+  "language": "cpp",
+  "code": "print('Unsupported language: cpp')\nresult = {\"error\": \"unsupported language cpp\", \"task\": \"do something\"}\n"
+}

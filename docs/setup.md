@@ -5,7 +5,7 @@
 ```bash
 # 1. Clone and install
 git clone <repo-url>
-cd homomics-lab
+cd HomomicsLab
 make install
 
 # 2. Start backend (terminal 1)
@@ -22,7 +22,7 @@ make dev-frontend
 
 ```bash
 # SQLite is used by default
-HOMICS_DATABASE_URL="sqlite+aiosqlite:///./homomics_lab.db" homomics-lab start
+HOMOMICS_DATABASE_URL="sqlite+aiosqlite:///./homomics_lab.db" homomics start
 ```
 
 ## Running Tests
@@ -36,9 +36,9 @@ make test-frontend
 
 ```bash
 # Check version
-homomics-lab version
+homomics --version
 
 # Start server
-homomics-lab start
-homomics-lab start --port 9000 --reload
+homomics start
+homomics start --port 9000 --reload
 ```

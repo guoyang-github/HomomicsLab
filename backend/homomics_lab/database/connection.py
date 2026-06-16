@@ -4,12 +4,20 @@ from sqlalchemy.pool import NullPool
 from homomics_lab.config import settings
 
 
+# ``check_same_thread`` is SQLite-only. PostgreSQL/MySQL connectors will raise
+# if unknown connect_args are passed, so we only include it for SQLite URLs.
+_connect_args = (
+    {"check_same_thread": False}
+    if settings.database_url.startswith("sqlite")
+    else {}
+)
+
 async_engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     future=True,
     poolclass=NullPool,
-    connect_args={"check_same_thread": False},
+    connect_args=_connect_args,
 )
 
 AsyncSessionLocal = sessionmaker(

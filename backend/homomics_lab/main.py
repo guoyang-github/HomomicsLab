@@ -1,8 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from homomics_lab.api.audit import audit_middleware
+from homomics_lab.api.auth import require_auth
+from homomics_lab.api.rate_limit import rate_limit_dependency, update_limiter_config
+from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context
 from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
@@ -84,15 +89,47 @@ async def correlation_id_middleware(request: Request, call_next):
     return response
 
 
-app.include_router(api_router)
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Add baseline security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
+
+# Request audit logging (rotating file). Enabled via HOMOMICS_AUDIT_LOG_ENABLED.
+app.middleware("http")(audit_middleware)
+
+# Prometheus metrics middleware.
+app.middleware("http")(prometheus_middleware)
+
+
+# Rate limiting applies globally. In production this should be backed by Redis.
+update_limiter_config()
+app.include_router(api_router, dependencies=[Depends(rate_limit_dependency)])
+
+# CORS: default to localhost for development; override via environment for production.
+_allow_origins = getattr(settings, "cors_origins", None) or [
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=_allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Optional trusted-host enforcement in production.
+if getattr(settings, "trusted_hosts", None):
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.trusted_hosts,
+    )
 
 
 @app.get("/")
@@ -126,3 +163,18 @@ async def health_memory(request: Request):
         "session_store": "ok" if session_ok else "error",
         "semantic_memory": "ok" if semantic_ok else "disabled",
     }
+
+
+@app.get("/health/usage")
+async def health_usage(request: Request):
+    """Return LLM usage summary for the running process."""
+    llm_client = getattr(request.app.state, "llm_client", None)
+    if llm_client is None:
+        return {"llm_usage": "not_configured"}
+    return llm_client.get_usage_summary()
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return metrics_endpoint()

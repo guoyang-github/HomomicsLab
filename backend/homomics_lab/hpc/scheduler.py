@@ -17,8 +17,9 @@ from uuid import uuid4
 
 from homomics_lab.hpc.pubsub import ExecutionPubSub, get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
+from homomics_lab.config import settings
 from homomics_lab.skills.models import SkillDefinition
-from homomics_lab.skills.sandbox import LocalSandbox
+from homomics_lab.skills.sandbox import Sandbox
 
 
 class ExecutionResult:
@@ -127,9 +128,14 @@ class LocalScheduler(BaseScheduler):
         working_dir: Path = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
+        sandbox: Optional[Sandbox] = None,
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
-        self.sandbox = LocalSandbox(working_dir=self.working_dir)
+        self.sandbox = sandbox or Sandbox.create(
+            settings.skill_sandbox_backend,
+            self.working_dir,
+            container_image=settings.skill_container_image,
+        )
 
     @classmethod
     def is_available(cls) -> bool:
@@ -178,14 +184,32 @@ class LocalScheduler(BaseScheduler):
             )
         )
 
+        def _progress_callback(state: ExecutionState) -> None:
+            # Ensure the state carries this scheduler's metadata.
+            state.job_id = job_id
+            state.current_phase = skill.id
+            state.started_at = started_at
+            state.scheduler_type = "local"
+            self._report_progress(state)
+
         try:
             if exec_type == "r":
                 result = await self.sandbox.run_r(
-                    code, inputs, timeout_seconds=timeout_seconds
+                    code,
+                    inputs,
+                    timeout_seconds=timeout_seconds,
+                    progress_callback=_progress_callback,
+                    job_id=job_id,
+                    current_phase=skill.id,
                 )
             else:
                 result = await self.sandbox.run_python(
-                    code, inputs, timeout_seconds=timeout_seconds
+                    code,
+                    inputs,
+                    timeout_seconds=timeout_seconds,
+                    progress_callback=_progress_callback,
+                    job_id=job_id,
+                    current_phase=skill.id,
                 )
         except Exception as exc:
             self._report_progress(
@@ -400,6 +424,7 @@ for (var_name in names(skill_inputs)) {{
             "RUNNING": 50.0,
             "COMPLETING": 90.0,
         }
+        pending_reported = False
 
         while True:
             await asyncio.sleep(poll_interval)
@@ -438,6 +463,19 @@ for (var_name in names(skill_inputs)) {{
                     ExecutionState(
                         job_id=job_id,
                         status="RUNNING",
+                        current_phase=phase,
+                        progress_pct=progress_pct,
+                        started_at=start,
+                        logs=logs,
+                        scheduler_type="slurm",
+                    )
+                )
+            elif slurm_status == "PENDING" and not pending_reported:
+                pending_reported = True
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="PENDING",
                         current_phase=phase,
                         progress_pct=progress_pct,
                         started_at=start,
@@ -501,9 +539,11 @@ class NextflowRunner(BaseScheduler):
         config_file: Path = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
+        weblog_url: Optional[str] = None,
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.config_file = config_file
+        self.weblog_url = weblog_url
 
     @classmethod
     def is_available(cls) -> bool:
@@ -625,96 +665,35 @@ Rscript script.R"""
         nf_file = self.working_dir / f"{skill.id.replace('-', '_')}.nf"
         nf_file.write_text(script)
 
-        cmd = ["nextflow", "run", str(nf_file), "-work-dir", str(self.working_dir / "work")]
+        cmd = [
+            "nextflow", "run", str(nf_file),
+            "-work-dir", str(self.working_dir / "work"),
+        ]
         if self.config_file:
             cmd.extend(["-c", str(self.config_file)])
 
-        self._report_progress(
-            ExecutionState(
-                job_id=job_id,
-                status="PENDING",
-                current_phase=skill.id,
-                progress_pct=5.0,
-                started_at=started_at,
-                scheduler_type="nextflow",
-            )
+        trace_file = self.working_dir / f"{skill.id.replace('-', '_')}_trace.txt"
+        timeline_file = self.working_dir / f"{skill.id.replace('-', '_')}_timeline.html"
+        cmd.extend([
+            "-with-trace", str(trace_file),
+            "-with-timeline", str(timeline_file),
+        ])
+        if self.weblog_url:
+            cmd.extend(["-with-weblog", self.weblog_url])
+
+        result = await self._run_with_streaming(
+            cmd=cmd,
+            job_id=job_id,
+            current_phase=skill.id,
+            started_at=started_at,
+            timeout_seconds=timeout_seconds,
+            result_path=self.working_dir / "result.json",
         )
-
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(self.working_dir),
-        )
-
-        self._report_progress(
-            ExecutionState(
-                job_id=job_id,
-                status="RUNNING",
-                current_phase=skill.id,
-                progress_pct=25.0,
-                started_at=started_at,
-                scheduler_type="nextflow",
-            )
-        )
-
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout_seconds,
-            )
-        except asyncio.TimeoutError:
-            if proc.returncode is None:
-                proc.kill()
-            self._report_progress(
-                ExecutionState(
-                    job_id=job_id,
-                    status="CANCELLED",
-                    current_phase=skill.id,
-                    progress_pct=0.0,
-                    started_at=started_at,
-                    error_message=f"Timed out after {timeout_seconds}s",
-                    scheduler_type="nextflow",
-                )
-            )
-            raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
-
-        logs = stdout.decode().splitlines()
-
-        if proc.returncode != 0:
-            error_message = stderr.decode()
-            self._report_progress(
-                ExecutionState(
-                    job_id=job_id,
-                    status="FAILED",
-                    current_phase=skill.id,
-                    progress_pct=0.0,
-                    started_at=started_at,
-                    error_message=error_message,
-                    logs=logs,
-                    scheduler_type="nextflow",
-                )
-            )
-            raise RuntimeError(f"Nextflow failed: {error_message}")
-
-        self._report_progress(
-            ExecutionState(
-                job_id=job_id,
-                status="COMPLETED",
-                current_phase=skill.id,
-                progress_pct=100.0,
-                started_at=started_at,
-                logs=logs,
-                scheduler_type="nextflow",
-            )
-        )
-
-        # Read result
-        result_path = self.working_dir / "result.json"
-        if result_path.exists():
-            return json.loads(result_path.read_text())
-
-        return {"raw_output": stdout.decode()}
+        if trace_file.exists():
+            result["trace"] = trace_file.read_text()
+        if timeline_file.exists():
+            result["timeline_path"] = str(timeline_file)
+        return result
 
     async def run_project(
         self,
@@ -759,14 +738,37 @@ Rscript script.R"""
             "-with-trace", str(trace_file),
             "-with-timeline", str(timeline_file),
         ])
-        if weblog_url:
-            cmd.extend(["-with-weblog", weblog_url])
+        if weblog_url or self.weblog_url:
+            cmd.extend(["-with-weblog", weblog_url or self.weblog_url])
 
+        result = await self._run_with_streaming(
+            cmd=cmd,
+            job_id=job_id,
+            current_phase="workflow",
+            started_at=started_at,
+            timeout_seconds=timeout_seconds,
+        )
+        if trace_file.exists():
+            result["trace"] = trace_file.read_text()
+        if timeline_file.exists():
+            result["timeline_path"] = str(timeline_file)
+        return result
+
+    async def _run_with_streaming(
+        self,
+        cmd: List[str],
+        job_id: str,
+        current_phase: str,
+        started_at: datetime,
+        timeout_seconds: float,
+        result_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Run a Nextflow command and stream stdout/stderr progress updates."""
         self._report_progress(
             ExecutionState(
                 job_id=job_id,
                 status="PENDING",
-                current_phase="workflow",
+                current_phase=current_phase,
                 progress_pct=5.0,
                 started_at=started_at,
                 scheduler_type="nextflow",
@@ -784,26 +786,64 @@ Rscript script.R"""
             ExecutionState(
                 job_id=job_id,
                 status="RUNNING",
-                current_phase="workflow",
+                current_phase=current_phase,
                 progress_pct=25.0,
                 started_at=started_at,
                 scheduler_type="nextflow",
             )
         )
 
+        stdout_lines: List[str] = []
+        stderr_lines: List[str] = []
+
+        async def _read_stream(stream, lines: List[str]) -> None:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                lines.append(line.decode(errors="replace").rstrip("\n"))
+
+        stdout_task = asyncio.create_task(_read_stream(proc.stdout, stdout_lines))
+        stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_lines))
+
+        async def _progress_reporter() -> None:
+            while proc.returncode is None:
+                await asyncio.sleep(2.0)
+                if proc.returncode is not None:
+                    break
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="RUNNING",
+                        current_phase=current_phase,
+                        progress_pct=min(25.0 + len(stdout_lines) * 2.0, 90.0),
+                        started_at=started_at,
+                        logs=(stdout_lines + stderr_lines)[-50:],
+                        scheduler_type="nextflow",
+                    )
+                )
+
+        reporter_task = asyncio.create_task(_progress_reporter())
+
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout_seconds,
-            )
+            await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
         except asyncio.TimeoutError:
+            reporter_task.cancel()
+            try:
+                await reporter_task
+            except asyncio.CancelledError:
+                pass
             if proc.returncode is None:
                 proc.kill()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    pass
             self._report_progress(
                 ExecutionState(
                     job_id=job_id,
                     status="CANCELLED",
-                    current_phase="workflow",
+                    current_phase=current_phase,
                     progress_pct=0.0,
                     started_at=started_at,
                     error_message=f"Timed out after {timeout_seconds}s",
@@ -812,19 +852,25 @@ Rscript script.R"""
             )
             raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
 
-        logs = stdout.decode().splitlines()
+        reporter_task.cancel()
+        try:
+            await reporter_task
+        except asyncio.CancelledError:
+            pass
+
+        await asyncio.gather(stdout_task, stderr_task)
 
         if proc.returncode != 0:
-            error_message = stderr.decode()
+            error_message = "\n".join(stderr_lines)
             self._report_progress(
                 ExecutionState(
                     job_id=job_id,
                     status="FAILED",
-                    current_phase="workflow",
+                    current_phase=current_phase,
                     progress_pct=0.0,
                     started_at=started_at,
                     error_message=error_message,
-                    logs=logs,
+                    logs=stdout_lines,
                     scheduler_type="nextflow",
                 )
             )
@@ -834,20 +880,181 @@ Rscript script.R"""
             ExecutionState(
                 job_id=job_id,
                 status="COMPLETED",
-                current_phase="workflow",
+                current_phase=current_phase,
                 progress_pct=100.0,
                 started_at=started_at,
-                logs=logs,
+                logs=stdout_lines,
                 scheduler_type="nextflow",
             )
         )
 
-        # Collect monitoring artifacts
-        result: Dict[str, Any] = {"raw_output": stdout.decode()}
+        if result_path is not None and result_path.exists():
+            return json.loads(result_path.read_text())
+
+        return {"raw_output": "\n".join(stdout_lines)}
+
+    async def run_plan(
+        self,
+        plan,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 3600.0,
+        weblog_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Translate a PlanResult into a Nextflow project and run it.
+
+        Args:
+            plan: A PlanResult (or any object with a ``phases`` attribute).
+            inputs: Top-level inputs for the workflow.
+            timeout_seconds: Maximum runtime.
+            weblog_url: Optional URL for Nextflow weblog events.
+
+        Returns:
+            Execution result dict including the generated ``main.nf`` path.
+        """
+        from homomics_lab.hpc.nf_translator import SimpleNFTranslator
+
+        translator = SimpleNFTranslator(working_dir=self.working_dir)
+        nf_file = translator.translate(plan, inputs)
+        result = await self.run_project(
+            nf_file,
+            inputs,
+            timeout_seconds=timeout_seconds,
+            weblog_url=weblog_url or self.weblog_url,
+        )
+        result["nf_file"] = str(nf_file)
+        return result
+
+    async def run_pipeline_dir(
+        self,
+        pipeline_dir: Path,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 3600.0,
+        weblog_url: Optional[str] = None,
+        profiles: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run a full Nextflow pipeline directory (e.g. nf-core pipeline).
+
+        Unlike ``run_project``, this keeps all relative imports/modules intact
+        by pointing Nextflow at the directory instead of copying ``main.nf``.
+        """
+        job_id = self._new_job_id("nf_pipeline")
+        started_at = datetime.now(timezone.utc)
+
+        main_nf = pipeline_dir / "main.nf"
+        if not main_nf.exists():
+            raise FileNotFoundError(f"No main.nf found in {pipeline_dir}")
+
+        cmd = [
+            "nextflow",
+            "run",
+            str(pipeline_dir),
+            "-work-dir",
+            str(self.working_dir / "work"),
+        ]
+        if self.config_file:
+            cmd.extend(["-c", str(self.config_file)])
+        if profiles:
+            cmd.extend(["-profile", ",".join(profiles)])
+
+        params_file = self.working_dir / "params.json"
+        params_file.write_text(json.dumps(inputs))
+        cmd.extend(["-params-file", str(params_file)])
+
+        trace_file = self.working_dir / "trace.txt"
+        timeline_file = self.working_dir / "timeline.html"
+        cmd.extend([
+            "-with-trace", str(trace_file),
+            "-with-timeline", str(timeline_file),
+        ])
+        if weblog_url or self.weblog_url:
+            cmd.extend(["-with-weblog", weblog_url or self.weblog_url])
+
+        result = await self._run_with_streaming(
+            cmd=cmd,
+            job_id=job_id,
+            current_phase="workflow",
+            started_at=started_at,
+            timeout_seconds=timeout_seconds,
+        )
         if trace_file.exists():
             result["trace"] = trace_file.read_text()
         if timeline_file.exists():
             result["timeline_path"] = str(timeline_file)
+        result["pipeline_dir"] = str(pipeline_dir)
+
+        # Auto-ingest nf-core results into the workspace when a project is known.
+        if result.get("status") == "completed" and project_id:
+            try:
+                from homomics_lab.workspace.manager import WorkspaceManager
+                from homomics_lab.nfcore_results import NFCoreResultIngester
+
+                outdir = None
+                if isinstance(inputs, dict):
+                    outdir = inputs.get("outdir")
+                if outdir:
+                    output_dir = Path(outdir)
+                else:
+                    output_dir = self.working_dir / "results"
+                    if not output_dir.exists():
+                        output_dir = self.working_dir
+
+                workspace = WorkspaceManager(
+                    base_dir=settings.data_dir,
+                    project_id=project_id,
+                )
+                ingester = NFCoreResultIngester(workspace)
+                artifacts = ingester.ingest(
+                    output_dir=output_dir,
+                    task_id=job_id,
+                    source_task=str(pipeline_dir.name),
+                )
+                result["ingested_artifacts"] = artifacts
+                multiqc_summary = ingester.ingest_multiqc_summary(output_dir)
+                if multiqc_summary:
+                    result["multiqc_summary"] = multiqc_summary
+            except Exception as exc:
+                # Ingestion failure must not mask pipeline success.
+                result["ingestion_error"] = str(exc)
+
+        return result
+
+    async def run_template(
+        self,
+        template_path,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 3600.0,
+        weblog_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Run a curated Nextflow template with user inputs.
+
+        Args:
+            template_path: Path to the template ``main.nf``.
+            inputs: Top-level inputs for the workflow (becomes params).
+            timeout_seconds: Maximum runtime.
+            weblog_url: Optional URL for Nextflow weblog events.
+
+        Returns:
+            Execution result dict.
+        """
+        import shutil
+
+        project_dir = self.working_dir / "nf_project"
+        if project_dir.exists():
+            shutil.rmtree(project_dir)
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        nf_file = project_dir / "main.nf"
+        nf_file.write_text(template_path.read_text(), encoding="utf-8")
+
+        result = await self.run_project(
+            nf_file,
+            inputs,
+            timeout_seconds=timeout_seconds,
+            weblog_url=weblog_url or self.weblog_url,
+        )
+        result["nf_file"] = str(nf_file)
+        result["template"] = str(template_path)
         return result
 
 
@@ -865,7 +1072,12 @@ def get_scheduler(
         working_dir: Working directory for job files
         progress_callback: Optional callback for ExecutionState updates
         pubsub: Optional pubsub instance for execution events
-        **kwargs: Additional scheduler-specific options
+        **kwargs: Additional scheduler-specific options. Supported:
+            - partition: SLURM partition
+            - config_file: Nextflow config file
+            - weblog_url: URL for Nextflow weblog events
+            - plan: PlanResult for auto backend selection
+            - data_state: DataState for auto backend selection
 
     Returns:
         BaseScheduler instance
@@ -877,26 +1089,34 @@ def get_scheduler(
         "pubsub": pubsub,
     }
 
-    if executor_type == "local":
+    resolved_type = executor_type
+    if executor_type == "auto":
+        plan = kwargs.get("plan")
+        data_state = kwargs.get("data_state")
+        if plan is not None and data_state is not None:
+            from homomics_lab.hpc.router import select_execution_backend
+
+            resolved_type = select_execution_backend(plan, data_state)
+        elif SlurmScheduler.is_available():
+            resolved_type = "slurm"
+        else:
+            resolved_type = "local"
+
+    if resolved_type == "local":
         return LocalScheduler(**scheduler_kwargs)
 
-    elif executor_type == "slurm":
+    elif resolved_type == "slurm":
         partition = kwargs.get("partition")
         return SlurmScheduler(partition=partition, **scheduler_kwargs)
 
-    elif executor_type == "nextflow":
+    elif resolved_type == "nextflow":
         config_file = kwargs.get("config_file")
-        return NextflowRunner(config_file=config_file, **scheduler_kwargs)
-
-    elif executor_type == "auto":
-        # Prefer SLURM if available, fall back to local
-        # Nextflow is only used when explicitly requested (not suitable for single-skill execution)
-        if SlurmScheduler.is_available():
-            return SlurmScheduler(
-                partition=kwargs.get("partition"), **scheduler_kwargs
-            )
-        else:
-            return LocalScheduler(**scheduler_kwargs)
+        weblog_url = kwargs.get("weblog_url")
+        return NextflowRunner(
+            config_file=config_file,
+            weblog_url=weblog_url,
+            **scheduler_kwargs,
+        )
 
     else:
-        raise ValueError(f"Unknown executor type: {executor_type}")
+        raise ValueError(f"Unknown executor type: {resolved_type}")

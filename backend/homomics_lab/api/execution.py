@@ -4,12 +4,13 @@ import asyncio
 import json
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from homomics_lab.hpc.pubsub import get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs import JobService
+from homomics_lab.observability.trace_store import TraceStore
 
 router = APIRouter(tags=["execution"])
 
@@ -48,6 +49,37 @@ async def execution_status(
         "error_message": job.error_message,
         "latest_state": latest.to_dict() if latest else None,
     }
+
+
+@router.post("/{job_id}/cancel")
+async def cancel_job(
+    job_id: str,
+    request: Request,
+) -> Dict[str, Any]:
+    """Cancel a queued or running background job."""
+    job_service: JobService = getattr(
+        request.app.state, "job_service", None
+    ) or JobService()
+    job = await job_service.cancel_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return {
+        "job_id": job.job_id,
+        "status": job.status.value,
+        "cancelled": job.status.value == "cancelled",
+    }
+
+
+@router.get("/{job_id}/trace")
+async def get_job_trace(
+    job_id: str,
+    request: Request,
+) -> Dict[str, Any]:
+    """Return the persisted execution trace for a job."""
+    trace = await TraceStore().get_trace(job_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail=f"Trace for job '{job_id}' not found")
+    return trace.model_dump(mode="json")
 
 
 @router.get("/{job_id}/events")

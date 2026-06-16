@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from homomics_lab.config import settings
 from homomics_lab.models.common import AgentType
 from homomics_lab.tools.models import ToolDefinition
 from homomics_lab.tools.registry import ToolRegistry
@@ -127,6 +128,11 @@ class TestToolRegistry:
 
 
 class TestBuiltinTools:
+    @pytest.fixture(autouse=True)
+    def _use_tmp_workspace(self, tmp_path: Path, monkeypatch):
+        """Point the workspace root to a temp dir so file tools can be tested."""
+        monkeypatch.setattr(settings, "data_dir", tmp_path)
+
     def test_file_read(self, tmp_path: Path):
         from homomics_lab.tools.builtin import file_read
 
@@ -157,9 +163,22 @@ class TestBuiltinTools:
         files = file_list(str(tmp_path))
         assert len(files) == 2
 
-    def test_shell_exec_echo(self):
+    def test_shell_exec_echo(self, tmp_path: Path, monkeypatch):
         from homomics_lab.tools.builtin import shell_exec
 
-        result = shell_exec("echo hello")
+        # In CI there is usually no bubblewrap/container, so allow the legacy
+        # local path for this unit test only.
+        monkeypatch.setattr(settings, "force_sandbox", False)
+        monkeypatch.setattr(settings, "interactive_mode", False)
+        monkeypatch.setattr(settings, "skill_sandbox_backend", "local")
+
+        result = shell_exec("echo hello", cwd=str(tmp_path))
         assert result["returncode"] == 0
         assert "hello" in result["stdout"]
+
+    def test_path_escape_rejected(self, tmp_path: Path):
+        from homomics_lab.security import PathSecurityError
+        from homomics_lab.tools.builtin import file_read
+
+        with pytest.raises(PathSecurityError):
+            file_read("/etc/passwd")

@@ -29,6 +29,8 @@ class TaskNode(BaseModel):
     gate_result: Optional[Dict[str, Any]] = None
     replan_attempt_count: int = 0
     max_replan_attempts: int = 2
+    adaptive_replan_count: int = 0
+    max_adaptive_replan_attempts: int = 2
     result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     started_at: Optional[datetime] = None

@@ -66,6 +66,7 @@ async def test_scheduler_start_shutdown_with_no_jobs(monkeypatch):
     monkeypatch.setattr("homomics_lab.config.settings.curation_enabled", False)
     monkeypatch.setattr("homomics_lab.config.settings.narrative_report_enabled", False)
     monkeypatch.setattr("homomics_lab.config.settings.sop_proposal_enabled", False)
+    monkeypatch.setattr("homomics_lab.config.settings.evolution_enabled", False)
 
     sched = HomomicsScheduler()
     await sched.start()
@@ -78,6 +79,7 @@ async def test_scheduler_registers_jobs_when_enabled(monkeypatch):
     monkeypatch.setattr("homomics_lab.config.settings.curation_enabled", True)
     monkeypatch.setattr("homomics_lab.config.settings.narrative_report_enabled", True)
     monkeypatch.setattr("homomics_lab.config.settings.sop_proposal_enabled", True)
+    monkeypatch.setattr("homomics_lab.config.settings.evolution_enabled", True)
     monkeypatch.setattr("homomics_lab.config.settings.scheduler_run_at_startup", False)
 
     sched = HomomicsScheduler()
@@ -86,6 +88,7 @@ async def test_scheduler_registers_jobs_when_enabled(monkeypatch):
     assert "cbkb_full_curation" in job_ids
     assert "narrative_report" in job_ids
     assert "sop_proposal" in job_ids
+    assert "evolution_pass" in job_ids
     await sched.shutdown()
 
 

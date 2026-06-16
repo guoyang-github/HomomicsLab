@@ -209,3 +209,45 @@ def test_resolve_execution_type(executor):
         metadata={"primary_tool": "scanpy"},
     )
     assert executor._resolve_execution_type(mixed_py) == "python"
+
+
+@pytest.mark.asyncio
+async def test_execute_declarative_workflow_skill_returns_knowledge(executor):
+    """A workflow skill without scripts should not fail; it returns instructions."""
+    skill = SkillDefinition(
+        id="utils-workflow-management-nextflow",
+        name="Nextflow Workflow Architect",
+        version="1.0",
+        category="workflows",
+        runtime={"type": "workflow"},
+        metadata={
+            "instructions": "Generate a production-grade Nextflow DSL2 pipeline.",
+            "allowed_tools": ["file_read", "file_write", "shell_exec"],
+        },
+        input_schema=SkillInputSchema(),
+    )
+    executor.registry.register(skill)
+
+    result = await executor.execute("utils-workflow-management-nextflow", {"task": "build QC pipeline"})
+    assert result["success"] is True
+    assert result["mode"] == "knowledge"
+    assert "instructions" in result
+
+
+@pytest.mark.asyncio
+async def test_execute_python_skill_without_scripts_returns_knowledge(executor):
+    """A python skill missing scripts_dir is treated as knowledge/agentic instead of crashing."""
+    skill = SkillDefinition(
+        id="declarative_python",
+        name="Declarative Python",
+        version="1.0",
+        category="test",
+        runtime={"type": "python"},
+        metadata={},
+        input_schema=SkillInputSchema(),
+    )
+    executor.registry.register(skill)
+
+    result = await executor.execute("declarative_python", {})
+    assert result["success"] is True
+    assert result["mode"] == "knowledge"

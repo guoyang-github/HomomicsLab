@@ -1,26 +1,18 @@
 """DomainLoader: reads a domain.yaml and registers everything into HomomicsLab."""
 
-import json
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
 
 from homomics_lab.domain.models import (
-    DomainDAGSeed,
     DomainDefinition,
-    DomainIntent,
-    DomainPhase,
-    DomainRole,
-    DomainSOP,
     DomainStateCheck,
 )
 from homomics_lab.agent.plan.models import DataState, Phase
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StateCheck, StrategyLibrary
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
-from homomics_lab.skills.skill_dag import SkillDAG
 
 
 class DomainLoaderError(Exception):
@@ -51,7 +43,14 @@ class DomainValidator:
         # 2. Check that state_check targets exist in phases
         phase_ids = {p.id for p in domain.phases}
         for check in domain.state_checks:
-            if check.target not in phase_ids and check.action != "modify_param":
+            # insert actions create a new phase dynamically, so the target does
+            # not need to exist in the static skeleton. skip/modify_param still
+            # require the target phase to be present.
+            if (
+                check.target not in phase_ids
+                and check.action != "insert"
+                and check.action != "modify_param"
+            ):
                 errors.append(
                     f"StateCheck targets unknown phase '{check.target}'"
                 )
@@ -217,6 +216,10 @@ class DomainLoader:
             applicable_intents=unique_intents,
             skeleton=skeleton,
             state_checks=state_checks,
+            preferred_libraries=domain.preferred_libraries,
+            code_templates=domain.code_templates,
+            data_sources=domain.data_sources,
+            fallback_rules=domain.fallback_rules,
         )
 
     def _build_state_check(self, check: DomainStateCheck) -> StateCheck:

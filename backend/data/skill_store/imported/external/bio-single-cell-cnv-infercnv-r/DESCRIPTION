@@ -1,0 +1,16 @@
+Package: bio.single.cell.cnv.infercnv.r
+Type: Skill
+Title: inferCNV CNV Inference from Single-Cell Data (R)
+Version: 1.0.1
+Authors@R: person("Yang", "Guo", email = "guo@example.com", role = c("aut", "cre"))
+Description: Copy number variation inference from single-cell RNA-seq using inferCNV. Provides Seurat integration, automatic gene order generation via biomaRt, and result export utilities.
+License: MIT
+Depends:
+    R (>= 4.0.0)
+Imports:
+    infercnv (>= 1.14.0),
+    Seurat (>= 4.3.0),
+    biomaRt (>= 2.54.0),
+    ComplexHeatmap
+Encoding: UTF-8
+LazyData: true

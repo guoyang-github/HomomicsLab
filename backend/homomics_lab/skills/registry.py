@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.semantic_search import SkillSemanticSearch
@@ -26,6 +26,36 @@ class SkillRegistry:
 
     def get(self, skill_id: str) -> Optional[SkillDefinition]:
         return self._skills.get(skill_id)
+
+    def activate(
+        self,
+        skill_id: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[SkillDefinition]:
+        """Activate (load full body) a discovery-level skill.
+
+        Progressive disclosure: the runtime registry may only hold
+        name/description for a skill until it is actually used. Calling
+        ``activate`` loads the full SKILL.md body, scripts, requirements, etc.
+        into the existing SkillDefinition object.
+
+        Args:
+            skill_id: Skill to activate.
+            context: Optional execution context for rendering dynamic content
+                (``arguments``, ``inputs``, etc.).
+        """
+        skill = self._skills.get(skill_id)
+        if skill is None:
+            return None
+        if skill.metadata.get("disclosure_level") == "activated":
+            return skill
+
+        from homomics_lab.skills.loader import SkillLoader
+
+        SkillLoader().activate(skill, context=context)
+        # Re-add to the semantic index so it picks up the full metadata.
+        self._semantic.add(skill)
+        return skill
 
     def list_all(self) -> List[SkillDefinition]:
         return list(self._skills.values())

@@ -15,6 +15,7 @@ Directory layout:
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 from dataclasses import dataclass, field
@@ -307,7 +308,7 @@ class WorkspaceManager:
 
         # Build file manifest
         manifest = []
-        for root, _dirs, files in self.workspace_dir.walk():
+        for root, _dirs, files in os.walk(self.workspace_dir):
             for f in files:
                 fp = Path(root) / f
                 if self.METADATA_SUBDIR in str(fp.relative_to(self.workspace_dir)):
@@ -340,7 +341,7 @@ class WorkspaceManager:
             / snapshot_id
             / "files"
         )
-        for root, _dirs, files in self.workspace_dir.walk():
+        for root, _dirs, files in os.walk(self.workspace_dir):
             for f in files:
                 fp = Path(root) / f
                 if self.METADATA_SUBDIR in str(fp.relative_to(self.workspace_dir)):
@@ -409,7 +410,7 @@ class WorkspaceManager:
             / "files"
         )
         if snapshot_files_dir.exists():
-            for root, _dirs, files in snapshot_files_dir.walk():
+            for root, _dirs, files in os.walk(snapshot_files_dir):
                 for f in files:
                     fp = Path(root) / f
                     rel = fp.relative_to(snapshot_files_dir)

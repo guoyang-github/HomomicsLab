@@ -1,24 +1,124 @@
+"""Skill sandbox implementations.
+
+Provides a uniform abstraction for executing Python/R skill code and shell
+commands with varying isolation levels:
+
+- ``LocalSandbox``: subprocess with resource limits (dev/default)
+- ``BubblewrapSandbox``: Linux namespace filesystem/network isolation using ``bwrap``
+- ``ContainerSandbox``: Docker/Podman container isolation
+
+Selection is controlled by ``settings.skill_sandbox_backend`` (``auto`` picks
+the most secure available backend).
+"""
+
 import asyncio
+import json
+import shutil
 import tempfile
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict, List, Optional
+
+from homomics_lab.hpc.state import ExecutionState
 
 
-class LocalSandbox:
+class Sandbox(ABC):
+    """Abstract protocol for skill execution sandboxes."""
+
+    def __init__(self, working_dir: Path):
+        self.working_dir = Path(working_dir)
+        self.working_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    @abstractmethod
+    def is_available(cls) -> bool:
+        """Return True if this sandbox backend can be used on the host."""
+        pass
+
+    @abstractmethod
+    async def run_python(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute Python code and return its result dictionary."""
+        pass
+
+    @abstractmethod
+    async def run_r(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute R code and return its result dictionary."""
+        pass
+
+    @abstractmethod
+    async def run_command(
+        self,
+        command: str,
+        cwd: Optional[Path] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: float = 30.0,
+    ) -> str:
+        """Run a shell command and return stdout/stderr text."""
+        pass
+
+    @staticmethod
+    def create(backend: str, working_dir: Path, container_image: Optional[str] = None) -> "Sandbox":
+        """Factory for sandboxes.
+
+        Args:
+            backend: ``auto``, ``local``, ``bubblewrap``, ``container``.
+            working_dir: Directory for inputs/outputs.
+            container_image: Image for ``container`` backend.
+        """
+        if backend == "auto":
+            for cls in (BubblewrapSandbox, ContainerSandbox, LocalSandbox):
+                candidate = cls(working_dir)
+                if candidate.is_available():
+                    return candidate
+            return LocalSandbox(working_dir)
+
+        mapping: Dict[str, type] = {
+            "local": LocalSandbox,
+            "bubblewrap": BubblewrapSandbox,
+            "container": ContainerSandbox,
+        }
+        try:
+            return mapping[backend](working_dir, container_image=container_image)
+        except KeyError as exc:
+            raise ValueError(f"Unknown sandbox backend: {backend}") from exc
+
+
+class LocalSandbox(Sandbox):
     """Execute Python or R code in a subprocess with resource limits."""
 
-    def __init__(self, working_dir: Path = None):
-        self.working_dir = working_dir or Path(tempfile.mkdtemp())
-        self.working_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, working_dir: Path = None, container_image: Optional[str] = None):
+        super().__init__(working_dir or Path(tempfile.mkdtemp()))
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return True
 
     async def run_python(
         self,
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute Python code in a subprocess with resource limits."""
-        import json
         inputs_json = json.dumps(inputs)
         script = self._build_python_script(code, inputs)
 
@@ -50,27 +150,21 @@ class LocalSandbox:
                 preexec_fn=_set_limits,
             )
 
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(),
-                    timeout=timeout_seconds,
-                )
-            except asyncio.TimeoutError:
-                if proc.returncode is None:
-                    proc.kill()
-                    try:
-                        await asyncio.wait_for(proc.wait(), timeout=5.0)
-                    except asyncio.TimeoutError:
-                        pass
-                raise TimeoutError(f"Skill execution timed out after {timeout_seconds}s")
+            stdout_lines, stderr_lines = await self._stream_subprocess(
+                proc=proc,
+                timeout_seconds=timeout_seconds,
+                progress_callback=progress_callback,
+                job_id=job_id,
+                current_phase=current_phase,
+            )
 
             if proc.returncode != 0:
-                raise RuntimeError(f"Skill execution failed: {stderr.decode()}")
+                error_text = "\n".join(stderr_lines)
+                raise RuntimeError(f"Skill execution failed: {error_text}")
 
             if not result_path.exists():
-                return {"raw_output": stdout.decode()}
+                return {"raw_output": "\n".join(stdout_lines)}
 
-            import json
             result_text = result_path.read_text()
             # Limit result size to 10MB
             if len(result_text) > 10 * 1024 * 1024:
@@ -91,6 +185,9 @@ class LocalSandbox:
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute R code in a subprocess with resource limits."""
         script = self._build_r_script(code, inputs)
@@ -123,27 +220,21 @@ class LocalSandbox:
                 preexec_fn=_set_limits,
             )
 
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(),
-                    timeout=timeout_seconds,
-                )
-            except asyncio.TimeoutError:
-                if proc.returncode is None:
-                    proc.kill()
-                    try:
-                        await asyncio.wait_for(proc.wait(), timeout=5.0)
-                    except asyncio.TimeoutError:
-                        pass
-                raise TimeoutError(f"R skill execution timed out after {timeout_seconds}s")
+            stdout_lines, stderr_lines = await self._stream_subprocess(
+                proc=proc,
+                timeout_seconds=timeout_seconds,
+                progress_callback=progress_callback,
+                job_id=job_id,
+                current_phase=current_phase,
+            )
 
             if proc.returncode != 0:
-                raise RuntimeError(f"R skill execution failed: {stderr.decode()}")
+                error_text = "\n".join(stderr_lines)
+                raise RuntimeError(f"R skill execution failed: {error_text}")
 
             if not result_path.exists():
-                return {"raw_output": stdout.decode()}
+                return {"raw_output": "\n".join(stdout_lines)}
 
-            import json
             result_text = result_path.read_text()
             # Limit result size to 10MB
             if len(result_text) > 10 * 1024 * 1024:
@@ -159,8 +250,99 @@ class LocalSandbox:
                 except (asyncio.TimeoutError, ProcessLookupError):
                     pass
 
+    async def run_command(
+        self,
+        command: str,
+        cwd: Optional[Path] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: float = 30.0,
+    ) -> str:
+        """Run a shell command locally."""
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(cwd or self.working_dir),
+            env=env,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(),
+            timeout=timeout_seconds,
+        )
+        output = stdout.decode(errors="replace")
+        if stderr:
+            output += "\n" + stderr.decode(errors="replace")
+        return output.strip()
+
+    async def _stream_subprocess(
+        self,
+        proc: asyncio.subprocess.Process,
+        timeout_seconds: float,
+        progress_callback: Optional[Callable[[ExecutionState], None]],
+        job_id: Optional[str],
+        current_phase: Optional[str],
+    ) -> tuple[List[str], List[str]]:
+        """Read stdout/stderr incrementally and optionally report progress."""
+        stdout_lines: List[str] = []
+        stderr_lines: List[str] = []
+
+        async def _read_stream(stream, lines: List[str]) -> None:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                lines.append(line.decode(errors="replace").rstrip("\n"))
+
+        stdout_task = asyncio.create_task(_read_stream(proc.stdout, stdout_lines))
+        stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_lines))
+
+        async def _progress_reporter() -> None:
+            if progress_callback is None:
+                return
+            while not proc.returncode == 0 and not proc.stdout.at_eof():
+                await asyncio.sleep(1.0)
+                if proc.returncode is not None:
+                    break
+                logs = (stdout_lines + stderr_lines)[-50:]
+                progress_callback(
+                    ExecutionState(
+                        job_id=job_id or "unknown",
+                        status="RUNNING",
+                        current_phase=current_phase,
+                        progress_pct=min(10.0 + len(stdout_lines) * 2.0, 90.0),
+                        logs=logs,
+                        scheduler_type="local",
+                    )
+                )
+
+        reporter_task = asyncio.create_task(_progress_reporter())
+
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            reporter_task.cancel()
+            try:
+                await reporter_task
+            except asyncio.CancelledError:
+                pass
+            if proc.returncode is None:
+                proc.kill()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    pass
+            raise TimeoutError(f"Skill execution timed out after {timeout_seconds}s")
+
+        reporter_task.cancel()
+        try:
+            await reporter_task
+        except asyncio.CancelledError:
+            pass
+
+        await asyncio.gather(stdout_task, stderr_task)
+        return stdout_lines, stderr_lines
+
     def _build_python_script(self, code: str, inputs: Dict[str, Any]) -> str:
-        import json
         inputs_json = json.dumps(inputs)
 
         return f"""import json
@@ -212,7 +394,6 @@ with open('__skill_result__.json', 'w') as f:
 """
 
     def _build_r_script(self, code: str, inputs: Dict[str, Any]) -> str:
-        import json
         inputs_json = json.dumps(inputs)
 
         return f"""# Load inputs from JSON
@@ -248,3 +429,296 @@ if (requireNamespace("jsonlite", quietly = TRUE)) {{
   writeLines(result_str, "__skill_result__.json")
 }}
 """
+
+
+class BubblewrapSandbox(Sandbox):
+    """Filesystem/network isolation via Linux user namespaces (``bwrap``).
+
+    Uses the host Python/R interpreter and installed packages, but restricts
+    the process to a read-only root filesystem and a writable working directory.
+    """
+
+    def __init__(self, working_dir: Path, container_image: Optional[str] = None):
+        super().__init__(working_dir)
+        self._bwrap = shutil.which("bwrap")
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return shutil.which("bwrap") is not None
+
+    def _base_args(self, cwd: Path) -> List[str]:
+        """Build the shared bubblewrap argument list."""
+        return [
+            str(self._bwrap),
+            "--ro-bind", "/", "/",
+            "--bind", str(self.working_dir), "/work",
+            "--dir", "/tmp",
+            "--proc", "/proc",
+            "--dev", "/dev",
+            "--unshare-user", "--unshare-ipc", "--unshare-pid",
+            "--unshare-net", "--unshare-uts",
+            "--chdir", "/work",
+        ]
+
+    async def run_python(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        inputs_json = json.dumps(inputs)
+        script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
+        script_path = self.working_dir / "__skill_script__.py"
+        script_path.write_text(script)
+
+        result_path = self.working_dir / "__skill_result__.json"
+        args = self._base_args(self.working_dir) + [
+            "python", "/work/__skill_script__.py", inputs_json,
+        ]
+        return await self._run_in_sandbox(
+            args,
+            result_path,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+    async def run_r(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        script = LocalSandbox(self.working_dir)._build_r_script(code, inputs)
+        script_path = self.working_dir / "__skill_script__.R"
+        script_path.write_text(script)
+
+        result_path = self.working_dir / "__skill_result__.json"
+        args = self._base_args(self.working_dir) + [
+            "Rscript", "/work/__skill_script__.R",
+        ]
+        return await self._run_in_sandbox(
+            args,
+            result_path,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+    async def run_command(
+        self,
+        command: str,
+        cwd: Optional[Path] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: float = 30.0,
+    ) -> str:
+        run_cwd = Path(cwd or self.working_dir)
+        args = self._base_args(run_cwd) + ["/bin/sh", "-c", command]
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        output = stdout.decode(errors="replace")
+        if stderr:
+            output += "\n" + stderr.decode(errors="replace")
+        return output.strip()
+
+    async def _run_in_sandbox(
+        self,
+        args: List[str],
+        result_path: Path,
+        timeout_seconds: float,
+        progress_callback: Optional[Callable[[ExecutionState], None]],
+        job_id: Optional[str],
+        current_phase: Optional[str],
+    ) -> Dict[str, Any]:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
+            proc=proc,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+        if proc.returncode != 0:
+            error_text = "\n".join(stderr_lines)
+            raise RuntimeError(f"Sandbox execution failed: {error_text}")
+
+        if not result_path.exists():
+            return {"raw_output": "\n".join(stdout_lines)}
+
+        result_text = result_path.read_text()
+        if len(result_text) > 10 * 1024 * 1024:
+            raise RuntimeError("Skill result exceeds 10MB limit")
+        return json.loads(result_text)
+
+
+class ContainerSandbox(Sandbox):
+    """Docker/Podman container isolation.
+
+    The container image must contain the skill's language runtime and
+    dependencies. Use ``settings.skill_container_image`` to override the
+    default ``python:3.10-slim`` image.
+    """
+
+    def __init__(self, working_dir: Path, container_image: Optional[str] = None):
+        super().__init__(working_dir)
+        self.container_image = container_image or "python:3.10-slim"
+        self._engine = self._detect_engine()
+
+    @classmethod
+    def is_available(cls) -> bool:
+        return cls._detect_engine() is not None
+
+    @staticmethod
+    def _detect_engine() -> Optional[str]:
+        for engine in ("docker", "podman"):
+            if shutil.which(engine):
+                return engine
+        return None
+
+    async def run_python(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        inputs_json = json.dumps(inputs)
+        script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
+        script_path = self.working_dir / "__skill_script__.py"
+        script_path.write_text(script)
+
+        result_path = self.working_dir / "__skill_result__.json"
+        args = [
+            self._engine,
+            "run", "--rm",
+            "--network", "none",
+            "-v", f"{self.working_dir}:/work",
+            "-w", "/work",
+            self.container_image,
+            "python", "/work/__skill_script__.py", inputs_json,
+        ]
+        return await self._run_in_container(
+            args,
+            result_path,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+    async def run_r(
+        self,
+        code: str,
+        inputs: Dict[str, Any],
+        timeout_seconds: float = 60.0,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        job_id: Optional[str] = None,
+        current_phase: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        script = LocalSandbox(self.working_dir)._build_r_script(code, inputs)
+        script_path = self.working_dir / "__skill_script__.R"
+        script_path.write_text(script)
+
+        result_path = self.working_dir / "__skill_result__.json"
+        args = [
+            self._engine,
+            "run", "--rm",
+            "--network", "none",
+            "-v", f"{self.working_dir}:/work",
+            "-w", "/work",
+            self.container_image,
+            "Rscript", "/work/__skill_script__.R",
+        ]
+        return await self._run_in_container(
+            args,
+            result_path,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+    async def run_command(
+        self,
+        command: str,
+        cwd: Optional[Path] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: float = 30.0,
+    ) -> str:
+        run_cwd = Path(cwd or self.working_dir)
+        args = [
+            self._engine,
+            "run", "--rm",
+            "--network", "none",
+            "-v", f"{run_cwd}:/work",
+            "-w", "/work",
+            self.container_image,
+            "/bin/sh", "-c", command,
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        output = stdout.decode(errors="replace")
+        if stderr:
+            output += "\n" + stderr.decode(errors="replace")
+        return output.strip()
+
+    async def _run_in_container(
+        self,
+        args: List[str],
+        result_path: Path,
+        timeout_seconds: float,
+        progress_callback: Optional[Callable[[ExecutionState], None]],
+        job_id: Optional[str],
+        current_phase: Optional[str],
+    ) -> Dict[str, Any]:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
+            proc=proc,
+            timeout_seconds=timeout_seconds,
+            progress_callback=progress_callback,
+            job_id=job_id,
+            current_phase=current_phase,
+        )
+
+        if proc.returncode != 0:
+            error_text = "\n".join(stderr_lines)
+            raise RuntimeError(f"Container execution failed: {error_text}")
+
+        if not result_path.exists():
+            return {"raw_output": "\n".join(stdout_lines)}
+
+        result_text = result_path.read_text()
+        if len(result_text) > 10 * 1024 * 1024:
+            raise RuntimeError("Skill result exceeds 10MB limit")
+        return json.loads(result_text)

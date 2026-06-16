@@ -211,18 +211,62 @@ class SkillDAG:
         """Load CONFIRMED seed edges from YAML."""
         data = yaml.safe_load(path.read_text())
         for seed in data.get("seeds", []):
-            edge = SkillDAGEdge(
-                id=f"{seed['from']}_{seed['type']}_{seed['to']}",
+            self.add_edge(
                 from_skill=seed["from"],
                 to_skill=seed["to"],
-                edge_type=EdgeType(seed["type"]),
-                confidence=1.0,
-                status=EdgeStatus.CONFIRMED,
-                source="manual_seed",
+                edge_type=seed["type"],
                 context=seed.get("context", ""),
             )
-            self.edges[edge.id] = edge
+
+    def add_edge(
+        self,
+        from_skill: str,
+        to_skill: str,
+        edge_type: str,
+        context: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> SkillDAGEdge:
+        """Add or confirm a manual/domain seed edge (idempotent).
+
+        Unlike ``propose_edge`` which creates CANDIDATE runtime proposals,
+        ``add_edge`` immediately marks the edge CONFIRMED with full confidence.
+        This is the API used by bootstrapping, domain loaders, and manual seeds.
+        """
+        edge_type_enum = EdgeType(edge_type)
+        edge_id = f"{from_skill}_{edge_type_enum.value}_{to_skill}"
+        now = datetime.now(timezone.utc).isoformat()
+
+        edge = self.edges.get(edge_id)
+        if edge is not None:
+            edge.status = EdgeStatus.CONFIRMED
+            edge.confidence = max(edge.confidence, 1.0)
+            edge.source = "manual_seed"
+            if context:
+                edge.context = context
+            if metadata:
+                edge.context = metadata.get("context", edge.context)
+            edge.updated_at = now
             self._persist_edge(edge)
+            return edge
+
+        edge = SkillDAGEdge(
+            id=edge_id,
+            from_skill=from_skill,
+            to_skill=to_skill,
+            edge_type=edge_type_enum,
+            confidence=1.0,
+            status=EdgeStatus.CONFIRMED,
+            source="manual_seed",
+            context=context,
+            created_at=now,
+            updated_at=now,
+        )
+        if metadata:
+            edge.context = metadata.get("context", edge.context)
+
+        self.edges[edge_id] = edge
+        self._persist_edge(edge)
+        return edge
 
     # ─────────────────────────────────────────
     # Query interface (for PlanEngine / Agent)

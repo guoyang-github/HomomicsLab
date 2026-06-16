@@ -5,9 +5,6 @@ Lightweight, no external vector DB required. Uses scikit-learn.
 
 from typing import Dict, List, Optional
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
 from homomics_lab.skills.models import SkillDefinition
 
 
@@ -16,14 +13,22 @@ class SkillSemanticSearch:
 
     def __init__(self):
         self._skills: Dict[str, SkillDefinition] = {}
-        self._vectorizer = TfidfVectorizer(
-            lowercase=True,
-            stop_words="english",
-            ngram_range=(1, 2),
-            max_features=5000,
-        )
+        self._vectorizer = None
         self._vectors = None
         self._dirty = True
+
+    def _get_vectorizer(self):
+        """Lazy-import scikit-learn to avoid hard import-time dependency."""
+        if self._vectorizer is None:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+
+            self._vectorizer = TfidfVectorizer(
+                lowercase=True,
+                stop_words="english",
+                ngram_range=(1, 2),
+                max_features=5000,
+            )
+        return self._vectorizer
 
     def add(self, skill: SkillDefinition) -> None:
         """Add a skill to the index."""
@@ -42,6 +47,8 @@ class SkillSemanticSearch:
             self._dirty = False
             return
 
+        from sklearn.metrics.pairwise import cosine_similarity
+
         texts = []
         self._skill_ids = []
         for skill_id, skill in self._skills.items():
@@ -57,8 +64,11 @@ class SkillSemanticSearch:
             texts.append(" ".join(filter(None, text_parts)))
             self._skill_ids.append(skill_id)
 
-        self._vectors = self._vectorizer.fit_transform(texts)
+        vectorizer = self._get_vectorizer()
+        self._vectors = vectorizer.fit_transform(texts)
         self._dirty = False
+        # Keep cosine_similarity bound for search() to avoid repeated import
+        self._cosine_similarity = cosine_similarity
 
     def search(self, query: str, top_k: int = 10) -> List[tuple[SkillDefinition, float]]:
         """Search skills by semantic similarity.
@@ -71,8 +81,9 @@ class SkillSemanticSearch:
         if not self._skills or self._vectors is None:
             return []
 
-        query_vec = self._vectorizer.transform([query])
-        similarities = cosine_similarity(query_vec, self._vectors).flatten()
+        vectorizer = self._get_vectorizer()
+        query_vec = vectorizer.transform([query])
+        similarities = self._cosine_similarity(query_vec, self._vectors).flatten()
 
         # Get top-k results
         indexed_scores = list(enumerate(similarities))

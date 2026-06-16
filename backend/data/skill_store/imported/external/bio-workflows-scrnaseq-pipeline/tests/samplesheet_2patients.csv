@@ -1,0 +1,3 @@
+sample_id,file_path,file_format,condition,batch,technology,note
+PA08,/mnt/c/Users/guoyang/Desktop/DemoShot/PA08_sc.h5ad,h5ad,High_NI,Batch1,10x_v3,PDAC patient with neural invasion
+PA12,/mnt/c/Users/guoyang/Desktop/DemoShot/PA12_sc.h5ad,h5ad,Low_NI,Batch1,10x_v3,PDAC patient without neural invasion

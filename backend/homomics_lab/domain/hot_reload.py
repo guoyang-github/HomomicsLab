@@ -5,14 +5,11 @@ automatically reloading without service restart.
 """
 
 import asyncio
-import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional
 
 from homomics_lab.domain.loader import DomainLoader
-from homomics_lab.domain.models import DomainDefinition
 from homomics_lab.domain.registry import DomainRegistry
-from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 
 
@@ -21,6 +18,21 @@ class FileWatcher:
 
     Production alternative: use watchdog library (pip install watchdog).
     """
+
+    # Directories that are expensive or irrelevant to scan for skill/domain reloads.
+    IGNORED_DIRS: frozenset[str] = frozenset({
+        ".git", "node_modules", ".venv", "venv", "__pycache__",
+        ".pytest_cache", ".mypy_cache", ".ruff_cache", ".benchmarks",
+        "data", "bak", "dist", "build", ".gitignore", ".metadata",
+    })
+    # Large/binary file extensions that should not trigger reloads.
+    IGNORED_EXTENSIONS: frozenset[str] = frozenset({
+        ".h5ad", ".h5", ".hdf5", ".bam", ".cram", ".sam",
+        ".fastq", ".fq", ".fasta", ".fa", ".gz", ".zip", ".tar",
+        ".parquet", ".zarr", ".db", ".sqlite", ".pkl", ".pickle",
+    })
+    # Skip individual files larger than this to avoid blocking on data artifacts.
+    MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
 
     def __init__(self, check_interval: float = 2.0):
         self.check_interval = check_interval
@@ -34,7 +46,9 @@ class FileWatcher:
         path = Path(path).resolve()
         if path not in self._callbacks:
             self._callbacks[path] = []
-            self._update_mtime(path)
+            # Defer mtime computation to the first async check to avoid blocking
+            # the caller during startup on directories that may contain large data files.
+            self._watched_files[path] = 0.0
         self._callbacks[path].append(callback)
 
     def unwatch(self, path: Path) -> None:
@@ -43,17 +57,53 @@ class FileWatcher:
         self._callbacks.pop(path, None)
         self._watched_files.pop(path, None)
 
-    def _update_mtime(self, path: Path) -> None:
-        """Get the latest modification time of a path (file or directory)."""
+    def _should_skip_path(self, item: Path) -> bool:
+        """Return True if a path should be ignored during scanning."""
+        # Skip hidden files/dirs and known non-source directories.
+        for part in item.parts:
+            if part.startswith(".") and part != ".":
+                return True
+            if part in self.IGNORED_DIRS:
+                return True
+        if item.suffix.lower() in self.IGNORED_EXTENSIONS:
+            return True
+        return False
+
+    def _update_mtime_sync(self, path: Path) -> float:
+        """Get the latest modification time of a path (file or directory).
+
+        This is the blocking implementation; it must be called from a worker thread.
+        """
         if path.is_file():
-            self._watched_files[path] = path.stat().st_mtime
+            try:
+                if path.stat().st_size > self.MAX_FILE_SIZE_BYTES:
+                    return 0.0
+                return path.stat().st_mtime
+            except OSError:
+                return 0.0
         elif path.is_dir():
-            # Track the newest mtime in the directory
             max_mtime = 0.0
-            for item in path.rglob("*"):
-                if item.is_file():
-                    max_mtime = max(max_mtime, item.stat().st_mtime)
-            self._watched_files[path] = max_mtime
+            try:
+                for item in path.rglob("*"):
+                    if self._should_skip_path(item):
+                        continue
+                    if item.is_file():
+                        try:
+                            if item.stat().st_size > self.MAX_FILE_SIZE_BYTES:
+                                continue
+                            max_mtime = max(max_mtime, item.stat().st_mtime)
+                        except OSError:
+                            continue
+            except OSError:
+                pass
+            return max_mtime
+        return 0.0
+
+    async def _update_mtime(self, path: Path) -> None:
+        """Async wrapper that offloads blocking filesystem calls to a thread."""
+        self._watched_files[path] = await asyncio.to_thread(
+            self._update_mtime_sync, path
+        )
 
     async def start(self) -> None:
         """Start watching in a background task."""
@@ -80,8 +130,8 @@ class FileWatcher:
         """Check all watched paths for changes."""
         for path, callbacks in list(self._callbacks.items()):
             old_mtime = self._watched_files.get(path, 0.0)
-            self._update_mtime(path)
-            new_mtime = self._watched_files[path]
+            await self._update_mtime(path)
+            new_mtime = self._watched_files.get(path, 0.0)
 
             if new_mtime > old_mtime:
                 for callback in callbacks:
@@ -124,15 +174,28 @@ class DomainHotReloader:
                     domain = self.loader.load(path)
                     self.registry.register(domain, self.loader, path)
                     print(f"[HotReload] Domain '{domain_id}' reloaded successfully")
+                    self._refresh_intent_analyzers()
                     return
 
             # New domain
             domain = self.loader.load(path)
             self.registry.register(domain, self.loader, path)
             print(f"[HotReload] New domain '{domain.domain}' loaded")
+            self._refresh_intent_analyzers()
 
         except Exception as e:
             print(f"[HotReload] Failed to reload {path}: {e}")
+
+    @staticmethod
+    def _refresh_intent_analyzers() -> None:
+        """Notify live intent analyzers that domain definitions changed."""
+        try:
+            from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
+
+            CascadeIntentAnalyzer.reload_all()
+            print("[HotReload] Intent analyzers refreshed")
+        except Exception as e:
+            print(f"[HotReload] Failed to refresh intent analyzers: {e}")
 
     async def start(self) -> None:
         await self.watcher.start()

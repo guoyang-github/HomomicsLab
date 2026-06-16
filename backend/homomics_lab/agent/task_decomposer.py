@@ -175,14 +175,19 @@ class TaskDecomposer:
         self,
         plan_engine: Optional[PlanEngine] = None,
         skill_registry: Optional[SkillRegistry] = None,
+        cbkb=None,
     ):
         self._plan_engine = plan_engine
         self._skill_registry = skill_registry or get_default_registry()
+        self._cbkb = cbkb
 
     def _get_plan_engine(self) -> PlanEngine:
         """Lazy initialize PlanEngine with the skill registry."""
         if self._plan_engine is None:
-            self._plan_engine = PlanEngine(skill_registry=self._skill_registry)
+            self._plan_engine = PlanEngine(
+                skill_registry=self._skill_registry,
+                cbkb=self._cbkb,
+            )
         return self._plan_engine
 
     async def decompose(self, intent: UserIntent, context: Dict[str, Any]) -> TaskTree:

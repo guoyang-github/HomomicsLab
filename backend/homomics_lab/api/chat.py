@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 
+from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer as IntentAnalyzer
+from homomics_lab.agent.sla import SLAEngine
 from homomics_lab.agent.turn_runner import TurnRunner
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.jobs import JobService, JobStatus
@@ -283,3 +285,43 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
     except WebSocketDisconnect:
         pass
+
+
+class SLARequest(BaseModel):
+    message: str
+
+
+class SLAResponse(BaseModel):
+    execution_mode: str
+    confidence: float
+    estimated_steps: int
+    required_skills: List[str]
+    missing_skills: List[str]
+    estimated_llm_cost_usd: Optional[float]
+    estimated_compute_cost_usd: Optional[float]
+    risks: List[str]
+    explanation: str
+    nfcore_pipeline: Optional[str] = None
+
+
+@router.post("/sla", response_model=SLAResponse)
+async def assess_sla(
+    request: SLARequest,
+    http_request: Request,
+):
+    """Assess agent confidence and execution mode for a user message.
+
+    This endpoint does not execute anything; it tells the user whether the
+    agent can auto-run, needs confirmation, or requires human help.
+    """
+    intent_analyzer = IntentAnalyzer()
+    intent = await intent_analyzer.analyze(request.message)
+
+    skill_registry = getattr(
+        http_request.app.state, "skill_executor", None
+    )
+    if skill_registry is not None:
+        skill_registry = skill_registry.registry
+    sla_engine = SLAEngine(skill_registry=skill_registry)
+    sla = sla_engine.assess(intent)
+    return SLAResponse(**sla.to_dict())

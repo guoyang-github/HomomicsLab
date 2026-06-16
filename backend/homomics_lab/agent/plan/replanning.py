@@ -159,29 +159,84 @@ class DynamicReplanningEngine:
         trigger: ReplanningTrigger,
         delta: PlanDelta,
     ) -> None:
-        """Handle anomaly_detected triggers."""
-        if trigger.severity != "critical":
-            return
-
+        """Handle anomaly_detected triggers from InterpretationEngine."""
         phase_type = trigger.context.get("phase_type")
-        if phase_type != "qc":
+        if phase_type is None:
             return
 
-        # Find the QC phase and insert a re-QC phase after it
+        if phase_type in ("qc", "spatial_qc"):
+            self._handle_qc_anomaly(plan, trigger, delta)
+        elif phase_type in ("clustering", "spatial_clustering"):
+            self._handle_clustering_anomaly(plan, trigger, delta)
+
+    def _handle_qc_anomaly(
+        self,
+        plan: PlanResult,
+        trigger: ReplanningTrigger,
+        delta: PlanDelta,
+    ) -> None:
+        """Insert or adjust a re-QC phase based on QC quality flags."""
+        flags = [f.lower() for f in trigger.context.get("flags", [])]
+        metrics = trigger.context.get("metrics", {})
+        filter_rate = metrics.get("filter_rate")
+
+        # Decide tightening direction from the flags.
+        too_lenient = any("lenient" in f for f in flags)
+        too_strict = (
+            trigger.severity in ("major", "critical")
+            and not too_lenient
+            and (filter_rate is None or filter_rate >= 0.05)
+        )
+
+        if not too_lenient and not too_strict:
+            return
+
         for i, phase in enumerate(plan.phases):
-            if phase.phase_type == "qc":
+            if phase.phase_type in ("qc", "spatial_qc"):
+                params = {"tight_mode": too_strict}
+                if too_lenient:
+                    params = {"tight_mode": True, "loosen": True}
                 re_qc = Phase(
                     phase_type="qc",
                     required=True,
-                    description="Re-QC with tighter parameters",
+                    description="Re-QC with adjusted parameters",
                     parameters={
-                        "tight_mode": True,
+                        **params,
                         **trigger.context.get("extra_params", {}),
                     },
+                    selected_skill=phase.selected_skill,
                 )
                 self._insert_phase(plan, i + 1, re_qc)
                 delta.phases_to_insert.append(re_qc)
-                delta.reason += "Inserted re-QC after QC due to critical anomaly. "
+                delta.reason += (
+                    f"Inserted re-QC after QC due to {trigger.severity} anomaly. "
+                )
+                break
+
+    def _handle_clustering_anomaly(
+        self,
+        plan: PlanResult,
+        trigger: ReplanningTrigger,
+        delta: PlanDelta,
+    ) -> None:
+        """Adjust clustering resolution when clusters look under/over-resolved."""
+        flags = [f.lower() for f in trigger.context.get("flags", [])]
+        for i, phase in enumerate(plan.phases):
+            if phase.phase_type in ("clustering", "spatial_clustering"):
+                current_res = float(phase.parameters.get("resolution", 1.0))
+                if any("under-resolve" in f for f in flags):
+                    new_res = round(current_res * 1.5, 2)
+                elif any("over-resolve" in f for f in flags):
+                    new_res = round(max(0.1, current_res * 0.7), 2)
+                else:
+                    new_res = current_res
+
+                if new_res != current_res:
+                    phase.parameters["resolution"] = new_res
+                    delta.phases_to_modify.append((i, {"resolution": new_res}))
+                    delta.reason += (
+                        f"Adjusted clustering resolution to {new_res} due to anomaly. "
+                    )
                 break
 
     def _handle_data_state_change(
@@ -211,6 +266,62 @@ class DynamicReplanningEngine:
                 self._insert_phase(plan, de_idx, integration_phase)
                 delta.phases_to_insert.append(integration_phase)
                 delta.reason += "Inserted integration before DE due to batch effect. "
+
+        elif change_type == "missing_downstream":
+            recommended_phase_type = trigger.context.get("recommended_phase_type")
+            if not recommended_phase_type:
+                return
+            if any(p.phase_type == recommended_phase_type for p in plan.phases):
+                return
+
+            source_phase_type = trigger.context.get("phase_type")
+            insert_idx = len(plan.phases)
+            for i, phase in enumerate(plan.phases):
+                if phase.phase_type == source_phase_type:
+                    insert_idx = i + 1
+
+            recommended_skill_id = trigger.context.get("recommended_skill_id")
+            selected_skill = None
+            if self.skill_dag is not None and recommended_skill_id:
+                selected_skill = self.skill_dag.registry.get(recommended_skill_id)
+
+            new_phase = Phase(
+                phase_type=recommended_phase_type,
+                required=True,
+                description=(
+                    f"Inserted {recommended_phase_type} based on interpretation"
+                ),
+                selected_skill=selected_skill,
+                parameters={
+                    "recommended_skill_id": recommended_skill_id,
+                },
+            )
+            self._insert_phase(plan, insert_idx, new_phase)
+            delta.phases_to_insert.append(new_phase)
+            delta.reason += (
+                f"Inserted {recommended_phase_type} after {source_phase_type} "
+                f"based on interpretation recommendation. "
+            )
+
+        elif change_type == "alternative_skill":
+            recommended_skill_id = trigger.context.get("recommended_skill_id")
+            phase_type = trigger.context.get("phase_type")
+            if not recommended_skill_id or not phase_type:
+                return
+            for i, phase in enumerate(plan.phases):
+                if phase.phase_type == phase_type:
+                    alt_skill = None
+                    if self.skill_dag is not None:
+                        alt_skill = self.skill_dag.registry.get(recommended_skill_id)
+                    phase.selected_skill = alt_skill
+                    delta.phases_to_modify.append(
+                        (i, {"selected_skill": recommended_skill_id})
+                    )
+                    delta.reason += (
+                        f"Swapped {phase_type} skill to {recommended_skill_id} "
+                        f"based on interpretation recommendation. "
+                    )
+                    break
 
     def _handle_skill_failure(
         self,

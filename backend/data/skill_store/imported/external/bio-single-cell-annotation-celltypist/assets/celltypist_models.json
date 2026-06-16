@@ -1,0 +1,132 @@
+{
+  "tool": "CellTypist",
+  "version": "1.0.0",
+  "description": "CellTypist pre-trained model catalog",
+  "last_updated": "2026-03-18",
+  "package": "celltypist",
+  "installation": "pip install celltypist",
+  "website": "https://www.celltypist.org",
+  "models": [
+    {
+      "name": "Immune_All_Low.pkl",
+      "description": "All immune cells, low resolution",
+      "tissue": "Immune",
+      "species": "human",
+      "cell_types": 28,
+      "cells_trained": "~300,000",
+      "use_case": "General immune annotation, broad categories",
+      "resolution": "Low",
+      "examples": ["T cells", "B cells", "Monocytes", "DCs", "NK cells"]
+    },
+    {
+      "name": "Immune_All_High.pkl",
+      "description": "All immune cells, high resolution",
+      "tissue": "Immune",
+      "species": "human",
+      "cell_types": 98,
+      "cells_trained": "~300,000",
+      "use_case": "Detailed immune subtypes, fine-grained annotation",
+      "resolution": "High",
+      "examples": ["CD4 naive", "CD4 TCM", "CD4 TEM", "Treg", "Th1", "Th2", "Th17"]
+    },
+    {
+      "name": "Cells_Intestinal_Training.pkl",
+      "description": "Intestinal cells",
+      "tissue": "Intestine",
+      "species": "human",
+      "cell_types": 56,
+      "cells_trained": "~100,000",
+      "use_case": "Colon and small intestine epithelial cells",
+      "resolution": "Medium-High",
+      "examples": ["Enterocytes", "Goblet cells", "Paneth cells", "Tuft cells"]
+    },
+    {
+      "name": "Cells_Lung_Airway_Training.pkl",
+      "description": "Lung airway cells",
+      "tissue": "Lung",
+      "species": "human",
+      "cell_types": 38,
+      "cells_trained": "~70,000",
+      "use_case": "Airway epithelial cells",
+      "resolution": "Medium",
+      "examples": ["Basal", "Ciliated", "Club", "Goblet", "Neuroendocrine"]
+    },
+    {
+      "name": "NLP_Mouse_Immune.pkl",
+      "description": "Mouse immune cells",
+      "tissue": "Immune",
+      "species": "mouse",
+      "cell_types": 22,
+      "cells_trained": "~150,000",
+      "use_case": "Mouse immune system annotation",
+      "resolution": "Medium",
+      "examples": ["CD4 T cells", "CD8 T cells", "B cells", "Monocytes"]
+    },
+    {
+      "name": "Developing_Mouse_Brain.pkl",
+      "description": "Developing mouse brain",
+      "tissue": "Brain",
+      "species": "mouse",
+      "cell_types": 45,
+      "cells_trained": "~400,000",
+      "use_case": "Mouse brain development",
+      "resolution": "High",
+      "examples": ["Neuroblasts", "Neurons", "Glia", "Progenitors"]
+    },
+    {
+      "name": "Developing_Human_Brain.pkl",
+      "description": "Developing human brain",
+      "tissue": "Brain",
+      "species": "human",
+      "cell_types": 51,
+      "cells_trained": "~600,000",
+      "use_case": "Human brain development",
+      "resolution": "High",
+      "examples": ["Radial glia", "Excitatory neurons", "Inhibitory neurons", "OPC"]
+    },
+    {
+      "name": "Adult_Mouse_OlfactoryBulb.pkl",
+      "description": "Mouse olfactory bulb",
+      "tissue": "Brain",
+      "species": "mouse",
+      "cell_types": 25,
+      "cells_trained": "~50,000",
+      "use_case": "Olfactory bulb annotation",
+      "resolution": "Medium",
+      "examples": ["Mitral cells", "Granule cells", "PG cells"]
+    },
+    {
+      "name": "COVID19_Immune_Landscape.pkl",
+      "description": "COVID-19 immune landscape",
+      "tissue": "Immune",
+      "species": "human",
+      "cell_types": 42,
+      "cells_trained": "~800,000",
+      "use_case": "COVID-19 patient immune profiling",
+      "resolution": "High",
+      "examples": ["Activated T cells", "Exhausted T cells", "Inflammatory monocytes"]
+    },
+    {
+      "name": "Tabula_Sapiens.pkl",
+      "description": "Tabula Sapiens reference",
+      "tissue": "Pan-tissue",
+      "species": "human",
+      "cell_types": 150,
+      "cells_trained": "~500,000",
+      "use_case": "Cross-tissue general annotation",
+      "resolution": "Medium",
+      "examples": ["Tissue-specific epithelial", "Endothelial", "Immune"]
+    }
+  ],
+  "usage": {
+    "list_models": "celltypist.models.models_description()",
+    "download": "celltypist.models.download_models(model='Immune_All_Low.pkl')",
+    "annotate": "predictions = celltypist.annotate(adata, model='Immune_All_Low.pkl', majority_voting=True)"
+  },
+  "notes": [
+    "Models are automatically downloaded on first use",
+    "Use majority_voting=True for cluster-level consensus",
+    "Check conf_score for prediction confidence",
+    "Low confidence predictions may need manual review"
+  ]
+}

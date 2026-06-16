@@ -30,10 +30,21 @@ class AnalysisStrategy:
     applicable_intents: List[str]  # intent patterns this strategy matches
     skeleton: List[Phase]
     state_checks: List[StateCheck] = field(default_factory=list)
+    preferred_libraries: Dict[str, List[str]] = field(default_factory=dict)
+    code_templates: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    data_sources: List[Dict[str, Any]] = field(default_factory=list)
+    fallback_rules: List[Dict[str, str]] = field(default_factory=list)
 
     def generate_skeleton(self, data_state: DataState) -> List[Phase]:
         """Generate the base skeleton, applying state-based modifications."""
-        phases = [Phase(phase_type=p.phase_type, required=p.required) for p in self.skeleton]
+        phases = [
+            Phase(
+                phase_type=p.phase_type,
+                required=p.required,
+                description=p.description,
+            )
+            for p in self.skeleton
+        ]
 
         for check in self.state_checks:
             if check.condition(data_state):
@@ -139,13 +150,13 @@ SINGLE_CELL_STANDARD = AnalysisStrategy(
     description="Standard single-cell RNA-seq analysis pipeline",
     applicable_intents=["single_cell_analysis", "scRNA", "single cell", "scanpy"],
     skeleton=[
-        Phase(phase_type="qc", required=True, description="Quality control filtering"),
-        Phase(phase_type="normalization", required=True, description="Count normalization"),
-        Phase(phase_type="dim_reduction", required=True, description="PCA dimensionality reduction"),
-        Phase(phase_type="clustering", required=True, description="Cell clustering (Louvain/Leiden)"),
-        Phase(phase_type="annotation", required=False, description="Cell type annotation"),
-        Phase(phase_type="differential_expression", required=False, description="Differential expression analysis"),
-        Phase(phase_type="visualization", required=False, description="Generate UMAP and other plots"),
+        Phase(phase_type="qc", required=True, description="Quality control filtering single-cell RNA-seq scanpy"),
+        Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy"),
+        Phase(phase_type="dim_reduction", required=True, description="PCA principal component analysis dimensionality reduction single-cell scanpy"),
+        Phase(phase_type="clustering", required=True, description="Cell clustering Louvain Leiden single-cell scanpy"),
+        Phase(phase_type="annotation", required=False, description="Cell type annotation marker genes single-cell"),
+        Phase(phase_type="differential_expression", required=False, description="Differential expression analysis single-cell DE"),
+        Phase(phase_type="visualization", required=False, description="Generate UMAP heatmap plots single-cell visualization"),
     ],
     state_checks=[
         StateCheck(

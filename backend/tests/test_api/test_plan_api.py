@@ -14,7 +14,7 @@ from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
 
-def _poll_job(client, job_id: str, timeout: float = 5.0):
+def _poll_job(client, job_id: str, timeout: float = 30.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         response = client.get(f"/api/execution/{job_id}/status")

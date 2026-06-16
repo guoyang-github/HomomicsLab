@@ -111,11 +111,11 @@ class TestDynamicReplanningEngine:
         assert new_plan.phases[re_qc_idx].parameters.get("tight_mode") is True
         assert new_plan.reproducibility_context.get("replanned") is True
 
-    def test_anomaly_non_critical_does_nothing(self, plan_engine, mock_skill_dag, base_plan):
+    def test_anomaly_minor_without_flags_does_nothing(self, plan_engine, mock_skill_dag, base_plan):
         engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
         trigger = ReplanningTrigger(
             trigger_type="anomaly_detected",
-            severity="major",
+            severity="minor",
             context={"phase_type": "qc"},
         )
 
@@ -123,6 +123,123 @@ class TestDynamicReplanningEngine:
 
         assert len(new_plan.phases) == len(base_plan.phases)
         assert new_plan.reproducibility_context["replanning_delta"]["phases_inserted"] == 0
+
+    def test_anomaly_major_qc_inserts_re_qc(self, plan_engine, mock_skill_dag, base_plan):
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        trigger = ReplanningTrigger(
+            trigger_type="anomaly_detected",
+            severity="major",
+            context={
+                "phase_type": "qc",
+                "flags": ["Elevated filtering rate: 35%"],
+                "metrics": {"filter_rate": 0.35},
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        phase_types = [p.phase_type for p in new_plan.phases]
+        assert phase_types.count("qc") == 2
+
+    def test_anomaly_lenient_qc_inserts_re_qc(self, plan_engine, mock_skill_dag, base_plan):
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        trigger = ReplanningTrigger(
+            trigger_type="anomaly_detected",
+            severity="minor",
+            context={
+                "phase_type": "qc",
+                "flags": ["Very low filtering rate: 2% — QC may be too lenient"],
+                "metrics": {"filter_rate": 0.02},
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        phase_types = [p.phase_type for p in new_plan.phases]
+        assert phase_types.count("qc") == 2
+        inserted = [p for p in new_plan.phases if p.phase_type == "qc"][1]
+        assert inserted.parameters.get("loosen") is True
+
+    def test_clustering_under_resolve_adjusts_resolution(self, plan_engine, mock_skill_dag, base_plan):
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        base_plan.phases[3].parameters["resolution"] = 0.5
+        trigger = ReplanningTrigger(
+            trigger_type="anomaly_detected",
+            severity="major",
+            context={
+                "phase_type": "clustering",
+                "flags": ["Only 2 clusters detected — may under-resolve cell types"],
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        clustering_phase = new_plan.phases[3]
+        assert clustering_phase.parameters["resolution"] == 0.75
+
+    def test_missing_downstream_inserts_phase(self, plan_engine, mock_skill_dag, base_plan):
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        trigger = ReplanningTrigger(
+            trigger_type="data_state_changed",
+            severity="minor",
+            context={
+                "change_type": "missing_downstream",
+                "phase_type": "clustering",
+                "recommended_phase_type": "annotation",
+                "recommended_skill_id": "bio-single-cell-annotation-markers",
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        phase_types = [p.phase_type for p in new_plan.phases]
+        assert "annotation" in phase_types
+        assert phase_types.index("annotation") == phase_types.index("clustering") + 1
+
+    def test_missing_downstream_already_present_does_nothing(self, plan_engine, mock_skill_dag, base_plan):
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        trigger = ReplanningTrigger(
+            trigger_type="data_state_changed",
+            severity="minor",
+            context={
+                "change_type": "missing_downstream",
+                "phase_type": "dim_reduction",
+                "recommended_phase_type": "clustering",
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        assert len(new_plan.phases) == len(base_plan.phases)
+
+    def test_alternative_skill_swap(self, plan_engine, registry, mock_skill_dag, base_plan):
+        base_plan.phases[3].selected_skill = registry.get("scanpy_cluster")
+        engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)
+        # Register an alternative in the mock DAG registry so lookup succeeds.
+        registry.register(
+            SkillDefinition(
+                id="scanpy_cluster_v2",
+                name="scanpy_cluster_v2",
+                version="1.0",
+                category="single_cell",
+                description="Clustering v2",
+                input_schema=SkillInputSchema(),
+            )
+        )
+        trigger = ReplanningTrigger(
+            trigger_type="data_state_changed",
+            severity="minor",
+            context={
+                "change_type": "alternative_skill",
+                "phase_type": "clustering",
+                "recommended_skill_id": "scanpy_cluster_v2",
+            },
+        )
+
+        new_plan = engine.replan(base_plan, [trigger], DataState())
+
+        clustering_phase = new_plan.phases[3]
+        assert clustering_phase.selected_skill.id == "scanpy_cluster_v2"
 
     def test_batch_effect_inserts_integration(self, plan_engine, mock_skill_dag, base_plan):
         engine = DynamicReplanningEngine(plan_engine, mock_skill_dag)

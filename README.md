@@ -2,7 +2,7 @@
 
 A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and self-evolving analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.4.1** — End-to-end analysis automation with **single-file domain declarations**, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, and complete reproducibility capture.
+> **v0.4.1** — End-to-end analysis automation with **single-file domain declarations**, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, complete reproducibility capture, **DataStore offloading for large results**, **skill result memoization**, and **optional dense semantic search**.
 
 ---
 
@@ -156,7 +156,31 @@ workspaces/{project_id}/
 - **Snapshots**: Point-in-time workspace state capture
 - **Checksum Integrity**: Every artifact registered with SHA-256; tampering is detectable
 
-### 9. Dynamic Agent Roles — Capability as Configuration
+### 9. Big Results & Skill Memoization
+
+Real bioinformatics data does not fit in JSON:
+
+- **DataStore** automatically offloads pandas `DataFrame` → Parquet, `AnnData` → H5AD, and large/pickle objects to files under the workspace, returning a small `ResultReference`.
+- **SkillCache** memoizes deterministic skill executions keyed by stable SHA-256 of `skill_id + inputs + fingerprint`, so identical inputs return in milliseconds.
+
+### 10. Optional Dense Semantic Search
+
+Skill retrieval uses a dual engine:
+
+- **TF-IDF** fallback (lightweight, no extra model download)
+- **sentence-transformers** dense embeddings when `HOMOMICS_SEMANTIC_SEARCH_MODEL=all-MiniLM-L6-v2` is configured
+
+### 11. Security & Trust Model
+
+Community skills require explicit trust before execution:
+
+- Imported skills are marked `trusted=false` by default.
+- `POST /api/skills/{id}/trust` toggles trust.
+- Untrusted external skills raise `UntrustedSkillError` at runtime.
+- High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`.
+- Enable `HOMOMICS_INTERACTIVE_MODE=true` to require explicit approval before any high-risk tool invocation.
+
+### 12. Dynamic Agent Roles — Capability as Configuration
 
 Instead of hardcoding `BioinfoAgent`, `VizAgent`, and `ExperimentAgent` classes, HomomicsLab uses **YAML-configurable roles** that determine what skills, tools, and permissions an agent has:
 
@@ -176,7 +200,7 @@ permissions:
 - **Blocked skills**: Explicit denylist for security-sensitive environments
 - **Tool-level access control**: Each role sees only its permitted atomic tools
 
-### 10. Long-Horizon Dynamic Replanning
+### 13. Long-Horizon Dynamic Replanning
 
 Plans are not carved in stone. The **DynamicReplanningEngine** monitors execution and replans in real time when reality diverges from expectation:
 
@@ -187,7 +211,7 @@ Plans are not carved in stone. The **DynamicReplanningEngine** monitors executio
 
 Unlike static workflow engines (Snakemake, Galaxy), HomomicsLab adapts the plan *while executing* based on data state and intermediate results.
 
-### 11. Multi-Agent Swarm — Parallel Execution + Consensus
+### 14. Multi-Agent Swarm — Parallel Execution + Consensus
 
 HomomicsLab is not limited to a single agent per task. The **AgentSwarm** orchestrates multiple specialists in parallel:
 
@@ -198,7 +222,7 @@ HomomicsLab is not limited to a single agent per task. The **AgentSwarm** orches
 
 This is not just "multi-agent" theater—it's disciplined parallelism with conflict detection.
 
-### 12. Agent Self-Evolution
+### 15. Agent Self-Evolution
 
 Agents get smarter with every analysis. The **AgentEvolutionEngine** continuously learns from CBKB history:
 
@@ -209,7 +233,7 @@ Agents get smarter with every analysis. The **AgentEvolutionEngine** continuousl
 
 Roles and plans are **living configurations**, not static YAML files.
 
-### 13. CBKB Auto-Curation — The Knowledge Base That Curates Itself
+### 16. CBKB Auto-Curation — The Knowledge Base That Curates Itself
 
 The Computational Biology Knowledge Base does not wait for manual maintenance. The **CBKBCurator** runs automatic curation passes:
 
@@ -234,9 +258,9 @@ docker-compose up --build
 ### Local Development
 
 ```bash
-# Backend
+# Backend (run from repo root so uv.lock / pyproject.toml are found)
+pip install -e ".[dev,test]"
 cd backend
-pip install -e ".[dev]"
 uvicorn homomics_lab.main:app --reload --port 8080
 
 # Frontend (new terminal)
@@ -269,7 +293,7 @@ HomomicsLab/
 │   │   ├── agent/              # Agent orchestration layer
 │   │   │   ├── core/           # AgentCore, DynamicAgent, RoleRegistry, roles/*.yaml
 │   │   │   ├── plan/           # PlanEngine — adaptive strategy generation
-│   │   │   ├── replanning.py     # DynamicReplanningEngine — execution-time plan adaptation
+│   │   │   ├── plan/replanning.py  # DynamicReplanningEngine — execution-time plan adaptation
 │   │   │   ├── interpretation.py   # InterpretationEngine
 │   │   │   ├── swarm.py            # AgentSwarm — parallel multi-agent execution + consensus
 │   │   │   ├── orchestrator.py     # Task scheduler with retry & HITL
@@ -299,7 +323,7 @@ HomomicsLab/
 │   │   ├── viz/                # Plotly-based visualization engine
 │   │   ├── reports/            # HTML/Markdown report generation
 │   │   └── api/                # FastAPI REST + WebSocket endpoints
-│   └── tests/                  # 504 tests
+│   └── tests/                  # 814 tests
 ├── frontend/
 │   └── src/
 │       ├── components/
@@ -311,7 +335,7 @@ HomomicsLab/
 ├── Dockerfile
 ├── docker-compose.yml
 └── docs/
-    ├── architecture.md         # v0.4.0 architecture principles
+    ├── architecture.md         # v0.4.1 architecture principles
     └── setup.md
 ```
 
@@ -332,15 +356,18 @@ HomomicsLab/
 | `POST /api/domains/install` | Install domain from upload |
 | `GET /api/domains/` | List installed domains |
 | `POST /api/domains/reload` | Hot-reload a domain |
+| `POST /api/skills/{id}/trust` | Trust/untrust an external skill |
+| `GET /api/skills/tools/pending` | List pending high-risk tool approvals |
+| `POST /api/skills/approve-tool/{call_id}` | Approve a high-risk tool call |
+| `POST /api/skills/reject-tool/{call_id}` | Reject a high-risk tool call |
 
 ---
 
 ## Testing
 
 ```bash
-cd backend
-pytest tests/ -q
-# 538+ tests passing
+pytest backend/tests/ -q
+# 814 tests passing
 ```
 
 Coverage spans:
@@ -363,12 +390,17 @@ Environment variables (prefix `HOMOMICS_`):
 | `HOMOMICS_PORT` | `8080` | API server port |
 | `HOMOMICS_EXTERNAL_SKILLS_DIR` | — | Path to external skill collection |
 | `HOMOMICS_SEMANTIC_SEARCH_MODEL` | — | Set to `all-MiniLM-L6-v2` for dense embeddings |
+| `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, or `auto` |
+| `HOMOMICS_SKILLS_SHELL_EXECUTION_ENABLED` | `false` | Allow `!command` injection in SKILL.md |
+| `HOMOMICS_INTERACTIVE_MODE` | `false` | Require approval for high-risk tool calls |
+| `HOMOMICS_QUEUE_BACKEND` | `memory` | `memory` or `redis` |
+| `HOMOMICS_WORKER_MODE` | `true` | Start a local worker inside the API process |
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy, scikit-learn, sentence-transformers, sqlite-vec
+- **Backend**: Python 3.10+, FastAPI, Pydantic v2, SQLAlchemy, scikit-learn, sentence-transformers, sqlite-vec, pyarrow, weasyprint
 - **Frontend**: React 18, TypeScript, Tailwind CSS, Zustand, TanStack Query, Plotly.js
 - **Workflows**: Nextflow (DSL2), SLURM (sbatch/sacct)
 - **Deployment**: Docker, Docker Compose, nginx

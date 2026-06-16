@@ -131,7 +131,7 @@ class JobService:
         await self._publish_state(job_id, JobStatus.CANCELLED, "Job cancelled")
         return job
 
-    def start_worker(self) -> None:
+    async def start_worker(self) -> None:
         if not settings.worker_mode:
             return
         if self._runner is None:
@@ -140,7 +140,26 @@ class JobService:
                 repository=self._repository,
                 pubsub=self._pubsub,
             )
+        await self._recover_queued_jobs()
         self._runner.start()
+
+    async def _recover_queued_jobs(self) -> None:
+        """Re-enqueue jobs that were QUEUED when the previous process exited.
+
+        Only safe for single-process/memory backend deployments. With Redis,
+        multiple workers may recover concurrently; the runner's distributed
+        lock ensures each job is executed by at most one worker.
+        """
+        try:
+            queued = await self._repository.list_by_status(JobStatus.QUEUED.value)
+        except Exception:
+            return
+        for job in queued:
+            try:
+                await self._queue.enqueue(job.job_id)
+                await self._publish_state(job.job_id, JobStatus.QUEUED, "Job recovered after restart")
+            except Exception:
+                pass
 
     async def stop_worker(self, timeout: float = 10.0) -> None:
         if self._runner is not None:

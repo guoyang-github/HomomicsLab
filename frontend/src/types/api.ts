@@ -121,4 +121,81 @@ export interface SkillDetail extends SkillSummary {
   dependencies: string[]
   scripts_dir: string | null
   source: string
+  namespace: string
+  enabled: boolean
+}
+
+export interface ImportSkillRequest {
+  source: string
+  namespace?: string
+  skill_id?: string
+  enable?: boolean
+}
+
+export interface PromoteSkillRequest {
+  source_dir: string
+  skill_id?: string
+  name?: string
+  description?: string
+  category?: string
+  namespace?: string
+  trusted?: boolean
+}
+
+export interface PromoteSkillResponse {
+  skill_id: string
+  name: string
+  namespace: string
+  source_dir: string
+  trusted: boolean
+}
+
+export interface ImportSkillResponse {
+  skill_id: string
+  name: string
+  version: string
+  namespace: string
+  enabled: boolean
+}
+
+export interface SkillValidationResponse {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+export interface SkillTestResponse {
+  success: boolean
+  stdout: string
+  stderr: string
+  exit_code: number | null
+  tests_run: number
+  tests_passed: number
+}
+
+export interface SkillLockResponse {
+  project_id: string
+  locked_at: string
+  skills: Record<string, string>
+}
+
+export interface DomainListing {
+  id: string
+  name: string
+  description: string
+  version: string
+  author: string
+  tags: string[]
+  source: string
+}
+
+export interface ExportDomainResponse {
+  exported_to: string
+  domain_id: string
+}
+
+export interface ImportDomainResponse {
+  imported: boolean
+  domain_id: string
+  domain_dir: string
 }

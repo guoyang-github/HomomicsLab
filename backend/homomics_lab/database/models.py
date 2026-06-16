@@ -81,3 +81,39 @@ class ScheduledJobRun(Base):
     status: Mapped[str] = mapped_column(String, index=True)
     result_json: Mapped[str] = mapped_column(Text, nullable=True)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
+
+
+class ProjectRecord(Base):
+    """Persistent project metadata."""
+
+    __tablename__ = "projects"
+
+    project_id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    owner_id: Mapped[str] = mapped_column(String, index=True, default="anonymous")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class TraceRecord(Base):
+    """Persistent execution trace for a job or plan."""
+
+    __tablename__ = "execution_traces"
+
+    trace_id: Mapped[str] = mapped_column(String, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    project_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String, index=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    ended_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str] = mapped_column(Text, nullable=True)
+    nodes_json: Mapped[str] = mapped_column(Text, default="[]")

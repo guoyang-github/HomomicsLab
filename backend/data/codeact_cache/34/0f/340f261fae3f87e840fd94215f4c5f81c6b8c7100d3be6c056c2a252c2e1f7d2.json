@@ -1,0 +1,6 @@
+{
+  "key": "340f261fae3f87e840fd94215f4c5f81c6b8c7100d3be6c056c2a252c2e1f7d2",
+  "task": "custom task",
+  "language": "python",
+  "code": "print('from llm')\nresult = {'value': 99}"
+}

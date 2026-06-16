@@ -5,13 +5,13 @@ version: "1.0.0"
 phases:
   - id: qc
     required: true
-    description: Quality control filtering
+    description: Quality control filtering for single-cell RNA-seq
     skills: [scanpy_qc]
     default_skill: scanpy_qc
 
   - id: normalization
     required: true
-    description: Count normalization
+    description: Count normalization and log transformation
     skills: [scanpy_normalize]
 
   - id: dim_reduction
@@ -21,22 +21,22 @@ phases:
 
   - id: clustering
     required: true
-    description: Cell clustering (Louvain/Leiden)
+    description: Cell clustering with Louvain or Leiden
     skills: [scanpy_cluster]
 
   - id: annotation
     required: false
-    description: Cell type annotation
+    description: Cell type annotation with marker genes
     skills: [scanpy_annotation]
 
   - id: differential_expression
     required: false
-    description: Differential expression analysis
+    description: Differential expression analysis between clusters
     skills: [scanpy_de]
 
   - id: visualization
     required: false
-    description: Generate UMAP and other plots
+    description: Generate UMAP and heatmap plots
     skills: [plot_umap, plot_heatmap]
 
 state_checks:
@@ -231,5 +231,58 @@ data_state_schema:
   large_scale:
     type: boolean
     description: Whether dataset has > 100k cells
+
+preferred_libraries:
+  python:
+    - scanpy
+    - pandas
+    - numpy
+    - scipy
+    - scikit-learn
+    - leidenalg
+    - python-igraph
+  r:
+    - Seurat
+    - SingleR
+    - harmony
+    - scran
+
+code_templates:
+  single_cell_qc:
+    language: python
+    skeleton: |
+      import scanpy as sc
+      adata = sc.read_h5ad("{input.h5ad}")
+      adata.var['mt'] = adata.var_names.str.startswith('MT-')
+      sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
+      adata = adata[adata.obs.n_genes_by_counts > 200, :]
+      adata = adata[adata.obs.pct_counts_mt < 5, :]
+      adata.write("{output.h5ad}")
+      result = {"cells": int(adata.n_obs), "genes": int(adata.n_vars)}
+
+  single_cell_clustering:
+    language: python
+    skeleton: |
+      import scanpy as sc
+      adata = sc.read_h5ad("{input.h5ad}")
+      sc.pp.highly_variable_genes(adata, n_top_genes=2000)
+      sc.tl.pca(adata)
+      sc.pp.neighbors(adata)
+      sc.tl.umap(adata)
+      sc.tl.leiden(adata)
+      adata.write("{output.h5ad}")
+      result = {"clusters": int(adata.obs['leiden'].nunique())}
+
+data_sources:
+  - id: pbmc3k
+    path: data/pbmc3k_raw.h5ad
+    format: h5ad
+    description: 10x PBMC 3k demo dataset
+
+fallback_rules:
+  - when: "no_skill_match > 0.8"
+    action: "code_from_retrieval"
+  - when: "intent == single_cell_analysis"
+    action: "generated_from_template"
 
 skills_dir: null

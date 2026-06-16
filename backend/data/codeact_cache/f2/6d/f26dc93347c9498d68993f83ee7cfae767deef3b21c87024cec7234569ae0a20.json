@@ -1,0 +1,6 @@
+{
+  "key": "f26dc93347c9498d68993f83ee7cfae767deef3b21c87024cec7234569ae0a20",
+  "task": "run QC and filter mito genes",
+  "language": "python",
+  "code": "import scanpy as sc\nadata = sc.read_h5ad(\"in.h5ad\")\nadata.var['mt'] = adata.var_names.str.startswith('MT-')\nsc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)\nadata = adata[adata.obs.n_genes_by_counts > 200, :]\nadata = adata[adata.obs.pct_counts_mt < 5, :]\nadata.write(\"output/result.h5ad\")\nresult = {\"output_path\": \"output/result.h5ad\", \"cells\": int(adata.n_obs)}\nprint(f\"QC done: {adata.n_obs} cells remain\")\n"
+}

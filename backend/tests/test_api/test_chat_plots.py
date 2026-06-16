@@ -9,9 +9,6 @@ from homomics_lab.agent.turn_runner import TurnResult, ExecutionMode
 from homomics_lab.models.common import ChatMessage, MessageType
 
 
-client = TestClient(app)
-
-
 def _make_turn_result(attachment_type: MessageType, content: dict, response_text: str = "done") -> TurnResult:
     """Build a TurnResult with a plot attachment for mocking."""
     attachment = ChatMessage(
@@ -47,15 +44,16 @@ def test_send_message_returns_plot_data_attachments():
         },
     )
 
-    with patch("homomics_lab.api.chat.TurnRunner") as mock_runner_cls:
-        instance = mock_runner_cls.return_value
-        instance.run_turn = AsyncMock(return_value=result)
+    with TestClient(app) as client:
+        with patch("homomics_lab.api.chat.TurnRunner") as mock_runner_cls:
+            instance = mock_runner_cls.return_value
+            instance.run_turn = AsyncMock(return_value=result)
 
-        response = client.post("/api/chat/send", json={
-            "project_id": "proj_1",
-            "session_id": "sess_plots",
-            "message": "帮我画一个UMAP图",
-        })
+            response = client.post("/api/chat/send", json={
+                "project_id": "proj_1",
+                "session_id": "sess_plots",
+                "message": "帮我画一个UMAP图",
+            })
 
     assert response.status_code == 200
     data = response.json()
@@ -79,15 +77,16 @@ def test_send_message_with_static_plot_attachment():
         },
     )
 
-    with patch("homomics_lab.api.chat.TurnRunner") as mock_runner_cls:
-        instance = mock_runner_cls.return_value
-        instance.run_turn = AsyncMock(return_value=result)
+    with TestClient(app) as client:
+        with patch("homomics_lab.api.chat.TurnRunner") as mock_runner_cls:
+            instance = mock_runner_cls.return_value
+            instance.run_turn = AsyncMock(return_value=result)
 
-        response = client.post("/api/chat/send", json={
-            "project_id": "proj_1",
-            "session_id": "sess_static_plots",
-            "message": "帮我画一个QC图",
-        })
+            response = client.post("/api/chat/send", json={
+                "project_id": "proj_1",
+                "session_id": "sess_static_plots",
+                "message": "帮我画一个QC图",
+            })
 
     assert response.status_code == 200
     data = response.json()

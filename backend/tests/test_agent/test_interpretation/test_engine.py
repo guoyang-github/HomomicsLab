@@ -4,6 +4,7 @@ import pytest
 
 from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.agent.plan.replanning import ReplanningTrigger
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import EdgeStatus, EdgeType, SkillDAG
@@ -105,3 +106,66 @@ class TestInterpretationEngine:
 
         # Should NOT recommend normalization since it's already done
         assert not any("normalization" in r.description.lower() for r in result.recommendations)
+
+    def test_to_triggers_high_filtering_qc(self, skill_dag_with_followed_by):
+        engine = InterpretationEngine(skill_dag=skill_dag_with_followed_by)
+        phase = Phase(phase_type="qc", selected_skill=skill_dag_with_followed_by.registry.get("scanpy_qc"))
+        result = engine.interpret_phase(
+            phase=phase,
+            skill_output={"input_cells": 1000, "output_cells": 300},
+            data_state=DataState(),
+        )
+
+        triggers = engine.to_triggers(result, phase)
+
+        assert any(t.trigger_type == "anomaly_detected" for t in triggers)
+        anomaly = next(t for t in triggers if t.trigger_type == "anomaly_detected")
+        assert anomaly.severity in ("major", "critical")
+
+    def test_to_triggers_missing_downstream(self, skill_dag_with_followed_by):
+        engine = InterpretationEngine(skill_dag=skill_dag_with_followed_by)
+        phase = Phase(phase_type="qc", selected_skill=skill_dag_with_followed_by.registry.get("scanpy_qc"))
+        result = engine.interpret_phase(
+            phase=phase,
+            skill_output={"input_cells": 2700, "output_cells": 2531},
+            data_state=DataState(),
+        )
+
+        triggers = engine.to_triggers(result, phase)
+
+        assert any(
+            t.trigger_type == "data_state_changed"
+            and t.context.get("change_type") == "missing_downstream"
+            and t.context.get("recommended_phase_type") == "dim_reduction"
+            for t in triggers
+        )
+
+    def test_to_triggers_clustering_alternative(self):
+        engine = InterpretationEngine()
+        phase = Phase(phase_type="clustering")
+        result = engine.interpret_phase(
+            phase=phase,
+            skill_output={"n_clusters": 2},
+            data_state=DataState(),
+        )
+
+        triggers = engine.to_triggers(result, phase)
+
+        assert any(
+            t.trigger_type == "anomaly_detected"
+            and t.context.get("phase_type") == "clustering"
+            for t in triggers
+        )
+
+    def test_to_triggers_normal_qc_empty(self, skill_dag_with_followed_by):
+        engine = InterpretationEngine(skill_dag=skill_dag_with_followed_by)
+        phase = Phase(phase_type="qc", selected_skill=skill_dag_with_followed_by.registry.get("scanpy_qc"))
+        result = engine.interpret_phase(
+            phase=phase,
+            skill_output={"input_cells": 2700, "output_cells": 2531},
+            data_state=DataState(has_normalization=True),
+        )
+
+        triggers = engine.to_triggers(result, phase)
+
+        assert not any(t.trigger_type == "anomaly_detected" for t in triggers)

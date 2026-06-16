@@ -104,6 +104,38 @@ class TestNextflowRunner:
         assert runner._to_nextflow_time("1d") == "1.d"
         assert runner._to_nextflow_time("45s") == "45.s"
 
+    @pytest.mark.asyncio
+    async def test_run_pipeline_dir_ingests_results(self, tmp_path, monkeypatch):
+        from homomics_lab.config import settings
+
+        monkeypatch.setattr(settings, "data_dir", tmp_path)
+        runner = NextflowRunner(working_dir=tmp_path)
+
+        pipeline_dir = tmp_path / "nf-core-test"
+        pipeline_dir.mkdir()
+        (pipeline_dir / "main.nf").write_text("workflow {}")
+
+        outdir = tmp_path / "results"
+        outdir.mkdir()
+        (outdir / "multiqc_report.html").write_text("<html>report</html>")
+
+        async def fake_run_with_streaming(**kwargs):
+            return {"status": "completed", "job_id": "nf_pipeline_test"}
+
+        monkeypatch.setattr(runner, "_run_with_streaming", fake_run_with_streaming)
+
+        result = await runner.run_pipeline_dir(
+            pipeline_dir,
+            inputs={"outdir": str(outdir)},
+            project_id="proj_nf",
+        )
+
+        assert result["status"] == "completed"
+        assert "ingested_artifacts" in result
+        assert len(result["ingested_artifacts"]) == 1
+        assert result["ingested_artifacts"][0]["artifact_type"] == "report"
+        assert (tmp_path / "workspaces" / "proj_nf" / "output" / "multiqc_report.html").exists()
+
 
 class TestGetScheduler:
     def test_get_local_scheduler(self, tmp_path):
@@ -123,3 +155,93 @@ class TestGetScheduler:
         # Nextflow is never chosen in auto mode (only explicit)
         scheduler = get_scheduler("auto", working_dir=tmp_path)
         assert isinstance(scheduler, LocalScheduler)
+
+    def test_get_auto_selects_nextflow_for_large_plan(self, tmp_path, monkeypatch):
+        from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
+        from homomics_lab.hpc import router as router_module
+
+        monkeypatch.setattr(
+            router_module.NextflowRunner,
+            "is_available",
+            classmethod(lambda cls: True),
+        )
+        monkeypatch.setattr(
+            router_module.SlurmScheduler,
+            "is_available",
+            classmethod(lambda cls: False),
+        )
+        plan = PlanResult(
+            phases=[Phase(phase_type=f"step_{i}", required=True) for i in range(6)],
+            strategy_name="test",
+            data_state=DataState(),
+        )
+        scheduler = get_scheduler(
+            "auto",
+            working_dir=tmp_path,
+            plan=plan,
+            data_state=DataState(),
+        )
+        assert isinstance(scheduler, NextflowRunner)
+
+
+class TestExecutionMonitoring:
+    @pytest.mark.asyncio
+    async def test_local_scheduler_reports_progress(self, tmp_path):
+        states = []
+
+        def callback(state):
+            states.append(state)
+
+        scheduler = LocalScheduler(working_dir=tmp_path, progress_callback=callback)
+        skill = SkillDefinition(
+            id="test",
+            name="Test",
+            version="1.0",
+            category="test",
+            runtime=SkillRuntime(type="python"),
+        )
+        result = await scheduler.execute(
+            skill,
+            "import time\ntime.sleep(0.1)\nresult = {'x': 42}",
+            {},
+            timeout_seconds=30,
+        )
+        assert result["x"] == 42
+        assert len(states) >= 2
+        assert states[0].status == "PENDING"
+        assert states[-1].status == "COMPLETED"
+
+    @pytest.mark.asyncio
+    async def test_nextflow_runner_run_plan_translates_and_runs(self, tmp_path, monkeypatch):
+        from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
+
+        runner = NextflowRunner(working_dir=tmp_path)
+        captured = {}
+
+        async def fake_run_project(nf_file, inputs, timeout_seconds, weblog_url=None):
+            captured["nf_file"] = nf_file
+            captured["inputs"] = inputs
+            return {"mock": True}
+
+        monkeypatch.setattr(runner, "run_project", fake_run_project)
+
+        skill = SkillDefinition(
+            id="scanpy_qc",
+            name="QC",
+            version="1.0",
+            category="single-cell",
+            runtime=SkillRuntime(type="python"),
+        )
+        plan = PlanResult(
+            phases=[
+                Phase(phase_type="qc", required=True, selected_skill=skill),
+                Phase(phase_type="normalize", required=True, selected_skill=skill),
+            ],
+            strategy_name="test",
+            data_state=DataState(),
+        )
+        result = await runner.run_plan(plan, inputs={"input_file": "data.h5ad"})
+        assert result["mock"] is True
+        assert "nf_file" in result
+        assert captured["nf_file"] == Path(result["nf_file"])
+        assert captured["inputs"] == {"input_file": "data.h5ad"}

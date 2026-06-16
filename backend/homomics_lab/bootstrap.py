@@ -50,6 +50,38 @@ def _discover_external_skill_dirs() -> List[Path]:
     return candidates
 
 
+async def _ensure_database_schema() -> None:
+    """Create or migrate the database schema.
+
+    In production (PostgreSQL) we rely on Alembic migrations. For SQLite local
+    development and tests we use SQLAlchemy create_all for simplicity and to
+    avoid event-loop conflicts inside test runners.
+    """
+    if settings.database_url.startswith("sqlite"):
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        return
+
+    import asyncio
+    try:
+        from alembic import command
+        from alembic.config import Config
+
+        alembic_cfg_path = Path(__file__).parent.parent / "alembic.ini"
+        if alembic_cfg_path.exists():
+            alembic_cfg = Config(str(alembic_cfg_path))
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
+            # Alembic env.py uses asyncio.run; run it in a worker thread to avoid
+            # event-loop conflicts inside the async bootstrap context.
+            await asyncio.to_thread(command.upgrade, alembic_cfg, "head")
+            return
+    except Exception as exc:
+        print(f"Alembic migration failed: {exc}. Falling back to create_all.")
+
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
 async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str, Any]:
     """Initialize the common runtime context used by workers and the API.
 
@@ -59,9 +91,9 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
     create_default_agents()
 
-    # Ensure ORM tables exist
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Ensure ORM tables exist. Prefer Alembic migrations; fall back to create_all
+    # for SQLite/dev/test environments where Alembic may not have been run yet.
+    await _ensure_database_schema()
 
     # Tools
     tool_registry = ToolRegistry()

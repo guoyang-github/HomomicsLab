@@ -19,6 +19,7 @@ class ToolDefinition:
     output_schema: Dict[str, Any] = field(default_factory=dict)
     handler: Optional[Callable] = None  # Execution function
     source: str = "builtin"  # "builtin" | "mcp" | "plugin"
+    risk_level: str = "low"  # "low" | "medium" | "high"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -26,6 +27,8 @@ class ToolDefinition:
             raise ValueError("Tool name is required")
         if not self.description:
             raise ValueError("Tool description is required")
+        if self.risk_level not in {"low", "medium", "high"}:
+            raise ValueError(f"Invalid risk_level: {self.risk_level}")
 
 
 @dataclass

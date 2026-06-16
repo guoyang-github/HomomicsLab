@@ -8,6 +8,7 @@ from homomics_lab.cli.commands.validate import validate_domain
 from homomics_lab.cli.commands.install import install_domain
 from homomics_lab.cli.commands.generate import generate_domain
 from homomics_lab.cli.commands.list import list_domains
+from homomics_lab.cli.commands.trace import register_trace_parser
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -111,6 +112,9 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show detailed info",
     )
+
+    # trace
+    register_trace_parser(subparsers)
 
     return parser
 

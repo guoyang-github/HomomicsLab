@@ -12,14 +12,20 @@ This separation ensures that:
   - The system remains interpretable and auditable
 """
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
 from homomics_lab.agent.plan.strategies import StrategyLibrary
+from homomics_lab.agent.retrieval import SkillRetriever
+from homomics_lab.agent.plan.validator import PlanValidator
+from homomics_lab.config import settings
+from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import SkillDAG
+from homomics_lab.tools.registry import ToolRegistry
 
 
 class PlanEngine:
@@ -38,12 +44,28 @@ class PlanEngine:
         self,
         skill_registry: SkillRegistry,
         skill_dag: Optional[SkillDAG] = None,
+        skill_retriever: Optional[SkillRetriever] = None,
         llm_fallback: Optional[LLMFallbackPlanner] = None,
+        cbkb: Optional[CBKB] = None,
+        tool_registry: Optional[ToolRegistry] = None,
+        data_sources: Optional[List[Dict[str, Any]]] = None,
+        literature_retriever: Optional[LiteratureRetriever] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
+        if literature_retriever is None and settings.literature_retrieval_enabled:
+            literature_retriever = LiteratureRetriever()
+        self.skill_retriever = skill_retriever or SkillRetriever(
+            skill_registry=skill_registry,
+            skill_dag=skill_dag,
+            tool_registry=tool_registry,
+            data_sources=data_sources,
+            literature_retriever=literature_retriever,
+        )
+        self.plan_validator = PlanValidator(skill_registry=skill_registry)
         self.strategy_library = StrategyLibrary()
         self.llm_fallback = llm_fallback or LLMFallbackPlanner(skill_registry)
+        self.cbkb = cbkb
 
     async def plan(
         self,
@@ -67,24 +89,40 @@ class PlanEngine:
         # 3. Generate skeleton (domain knowledge + state adaptation)
         phases = strategy.generate_skeleton(data_state)
 
-        # 4. Select skills for each phase (SkillDAG assists here)
-        for phase in phases:
-            if not phase.required:
-                continue
-            phase.selected_skill = self._select_skill_for_phase(phase, data_state)
+        # 4. Retrieve augmented context once for the whole plan
+        retrieval_query = self._build_retrieval_query(intent, phases)
+        retrieval_context = self.skill_retriever.retrieve(
+            query=retrieval_query,
+            intent_type=intent.analysis_type,
+            data_sources=strategy.data_sources,
+            include_literature=self.skill_retriever.literature_retriever is not None,
+        )
 
-        # 5. Detect gaps between phases
+        # 5. Select skills for each phase using the retrieval context
+        # Optional phases also get a default skill so the full skeleton is
+        # executable; downstream replanning can drop them if constraints apply.
+        learned_defaults: List[Dict[str, Any]] = []
+        for phase in phases:
+            phase.selected_skill = self._select_skill_for_phase(
+                phase, data_state, retrieval_context
+            )
+            injected = self._apply_learned_defaults(phase)
+            learned_defaults.extend(injected)
+
+        # 6. Detect gaps between phases
         gaps = self._detect_gaps(phases)
 
-        # 6. Build reproducibility context
+        # 7. Build reproducibility context
         reproducibility_context = {
             "plan_engine_version": "0.3.0",
             "strategy": strategy.name,
             "intent": intent.analysis_type,
             "data_state": data_state.to_context(),
+            "retrieval_context": retrieval_context.to_prompt_context(),
+            "learned_defaults": learned_defaults,
         }
 
-        return PlanResult(
+        plan_result = PlanResult(
             phases=phases,
             strategy_name=strategy.name,
             data_state=data_state,
@@ -92,17 +130,53 @@ class PlanEngine:
             reproducibility_context=reproducibility_context,
         )
 
+        validation_report = self.plan_validator.validate(plan_result)
+        reproducibility_context["validation"] = {
+            "valid": validation_report.valid,
+            "errors": [
+                {"severity": e.severity, "phase": e.phase, "skill_id": e.skill_id, "message": e.message}
+                for e in validation_report.errors
+            ],
+            "warnings": [
+                {"severity": w.severity, "phase": w.phase, "skill_id": w.skill_id, "message": w.message}
+                for w in validation_report.warnings
+            ],
+        }
+        plan_result.reproducibility_context = reproducibility_context
+
+        return plan_result
+
+    @staticmethod
+    def _build_retrieval_query(intent: UserIntent, phases: List[Phase]) -> str:
+        """Build a rich query for skill retrieval from intent and skeleton."""
+        parts = [intent.analysis_type]
+        keywords = getattr(intent, "keywords", None) or []
+        parts.extend(keywords)
+        for phase in phases:
+            parts.append(phase.phase_type)
+            if phase.description:
+                parts.append(phase.description)
+        return " ".join(parts)
+
     def _select_skill_for_phase(
         self,
         phase: Phase,
         data_state: DataState,
+        retrieval_context: Optional[Any] = None,
     ) -> Optional[Any]:
         """Select the best skill for a given phase.
 
-        SkillDAG is used here to discover relevant skills and filter conflicts.
-        If SkillDAG is not available, falls back to semantic search.
+        When a retrieval context is available we re-rank the retrieved skills
+        by how well they match the phase type/description. Otherwise we fall
+        back to direct registry semantic search.
         """
         query = f"{phase.phase_type} {phase.description}"
+
+        if retrieval_context is not None and retrieval_context.skills:
+            # Re-rank retrieved skills for this specific phase
+            ranked = self._rank_skills_for_phase(query, retrieval_context.skills)
+            if ranked:
+                return ranked[0].skill
 
         if self.skill_dag is not None:
             # Use SkillDAG for structured search
@@ -118,6 +192,73 @@ class PlanEngine:
         # Fallback: direct registry search
         skills = self.skill_registry.search(query)
         return skills[0] if skills else None
+
+    def _apply_learned_defaults(
+        self,
+        phase: Phase,
+    ) -> List[Dict[str, Any]]:
+        """Inject historically successful parameter defaults from CBKB.
+
+        Only fills parameters that are absent from the phase and present in the
+        skill's input schema.  Requires at least 3 historical samples.
+        """
+        injected: List[Dict[str, Any]] = []
+        if self.cbkb is None or phase.selected_skill is None:
+            return injected
+
+        schema_props = phase.selected_skill.input_schema.properties or {}
+        if not schema_props:
+            return injected
+
+        suggestions = self.cbkb.suggest_parameters(phase.selected_skill.id)
+        seen_params: set = set()
+        for suggestion in suggestions:
+            param_name = suggestion["param_name"]
+            if param_name in seen_params:
+                continue
+            seen_params.add(param_name)
+            if param_name not in schema_props:
+                continue
+            if param_name in phase.parameters:
+                continue
+            if suggestion.get("samples", 0) < 3:
+                continue
+            phase.parameters[param_name] = suggestion["param_value"]
+            injected.append(
+                {
+                    "phase": phase.phase_type,
+                    "skill_id": phase.selected_skill.id,
+                    "param_name": param_name,
+                    "param_value": suggestion["param_value"],
+                    "mean_outcome": suggestion["mean_outcome"],
+                    "samples": suggestion["samples"],
+                }
+            )
+        return injected
+
+    @staticmethod
+    def _rank_skills_for_phase(
+        query: str,
+        retrieved_skills: List[Any],
+    ) -> List[Any]:
+        """Re-rank retrieved skills for a specific phase query.
+
+        Simple keyword matching boost on top of the retrieval score.
+        """
+        query_lower = query.lower()
+        scored = []
+        for rs in retrieved_skills:
+            text = " ".join([
+                rs.skill.name,
+                rs.skill.description,
+                rs.skill.category,
+                *rs.skill.metadata.get("keywords", []),
+            ]).lower()
+            keyword_hits = sum(1 for token in query_lower.split() if len(token) > 2 and token in text)
+            score = rs.semantic_score + rs.graph_boost + keyword_hits * 0.05
+            scored.append((score, rs))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [rs for _, rs in scored]
 
     def _detect_gaps(self, phases: List[Phase]) -> List[PlannedGap]:
         """Detect potential gaps between consecutive phases.

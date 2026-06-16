@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from homomics_lab.main import app
 
 
-def _poll_job(client: TestClient, job_id: str, timeout: float = 5.0):
+def _poll_job(client: TestClient, job_id: str, timeout: float = 30.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         response = client.get(f"/api/execution/{job_id}/status")

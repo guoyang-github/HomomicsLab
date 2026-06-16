@@ -6,10 +6,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
+from homomics_lab.logging_config import set_correlation_id
+from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
+from homomics_lab.reproducibility.engine import ReproducibilityEngine
+from homomics_lab.workspace.manager import WorkspaceManager
 
 from .models import Job, JobMode, JobStatus
 from .repository import JobRepository
@@ -86,14 +91,33 @@ class BackgroundJobRunner:
             logger.info("Job %s is already being processed by another worker", job_id)
             return
 
+        # All logs for this job share the same correlation id.
+        set_correlation_id(job_id)
+        trace_store = TraceStore()
+        await trace_store.start_trace(
+            trace_id=job_id,
+            session_id=None,
+            project_id=None,
+            root_name=f"job:{job_id}",
+        )
+
         try:
             job = await self._repository.get(job_id)
             if job is None:
                 logger.error("Job %s not found in repository", job_id)
+                await trace_store.finish_trace(job_id, "failed", "Job not found in repository")
                 return
+
+            # Update trace with actual session/project now that the job is loaded.
+            trace = await trace_store.get_trace(job_id)
+            if trace is not None:
+                trace.session_id = job.session_id
+                trace.project_id = job.project_id
+                await trace_store._save(trace)
 
             # The job may have been cancelled while sitting in the queue.
             if job.status == JobStatus.CANCELLED:
+                await trace_store.finish_trace(job_id, "cancelled")
                 return
 
             job.status = JobStatus.RUNNING
@@ -106,9 +130,13 @@ class BackgroundJobRunner:
             progress_callback = self._make_progress_callback(job_id)
             runner = self._runner_factory(progress_callback)
 
+            # Start reproducibility tracking for this job.
+            repro_engine = self._create_repro_engine(job)
+
             try:
+                timeout = settings.default_job_timeout_seconds
                 if job.mode == JobMode.RESUME_HITL:
-                    result = await runner.resume_hitl(
+                    coro = runner.resume_hitl(
                         session_id=job.session_id,
                         task_id=job.resume_task_id,
                         choice=job.resume_choice,
@@ -117,11 +145,13 @@ class BackgroundJobRunner:
                         task_tree=job.task_tree,
                     )
                 else:
-                    result = await runner.execute_tree(
+                    coro = runner.execute_tree(
                         tree=job.task_tree,
                         working_memory=job.working_memory,
                         project_id=job.project_id,
+                        trace_id=job_id,
                     )
+                result = await asyncio.wait_for(coro, timeout=timeout)
 
                 # Persist mutated state
                 job.task_tree = result.task_tree
@@ -140,6 +170,7 @@ class BackgroundJobRunner:
                     await self._update_plan_status(job.plan_id, plan_status)
 
                 await self._repository.update(job)
+                await self._ingest_to_cbkb(job)
 
                 if job.status == JobStatus.AWAITING_HUMAN:
                     self._publish_state(
@@ -148,18 +179,45 @@ class BackgroundJobRunner:
                         "Waiting for human input",
                         hitl_checkpoint=result.hitl_checkpoint,
                     )
+                    await trace_store.finish_trace(job_id, "running")
                 else:
                     self._publish_state(job_id, job.status, "Job finished")
+                    await trace_store.finish_trace(
+                        job_id,
+                        "completed" if job.status == JobStatus.COMPLETED else "failed",
+                        job.error_message,
+                    )
 
+            except asyncio.TimeoutError:
+                logger.error("Job %s timed out after %ss", job_id, settings.default_job_timeout_seconds)
+                job.status = JobStatus.FAILED
+                job.error_message = f"Timeout after {settings.default_job_timeout_seconds}s"
+                job.updated_at = datetime.now(timezone.utc)
+                await self._repository.update(job)
+                await self._ingest_to_cbkb(job)
+                if job.plan_id:
+                    await self._update_plan_status(job.plan_id, PlanStatus.FAILED)
+                self._publish_state(job_id, JobStatus.FAILED, job.error_message)
+                await trace_store.finish_trace(job_id, "failed", job.error_message)
             except Exception as exc:
                 logger.exception("Job %s failed", job_id)
                 job.status = JobStatus.FAILED
                 job.error_message = str(exc)
                 job.updated_at = datetime.now(timezone.utc)
                 await self._repository.update(job)
+                await self._ingest_to_cbkb(job)
                 if job.plan_id:
                     await self._update_plan_status(job.plan_id, PlanStatus.FAILED)
                 self._publish_state(job_id, JobStatus.FAILED, str(exc))
+                await trace_store.finish_trace(job_id, "failed", str(exc))
+            finally:
+                # Finalize reproducibility bundle regardless of outcome.
+                try:
+                    cbkb = self._get_cbkb()
+                    repro_engine.finalize(cbkb=cbkb)
+                    logger.info("Reproducibility bundle finalized for job %s", job_id)
+                except Exception:
+                    logger.exception("Failed to finalize reproducibility bundle for job %s", job_id)
         finally:
             await self._release_lock(job_id)
 
@@ -207,8 +265,34 @@ class BackgroundJobRunner:
         # Local import to avoid a circular dependency between jobs.runner
         # and agent.turn_runner at module load time.
         from homomics_lab.agent.turn_runner import TurnRunner
+        from homomics_lab.knowledge.cbkb import CBKB
 
-        return TurnRunner(progress_callback=progress_callback)
+        cbkb = CBKB(settings.data_dir)
+        return TurnRunner(progress_callback=progress_callback, cbkb=cbkb)
+
+    @staticmethod
+    def _create_repro_engine(job: Job) -> ReproducibilityEngine:
+        """Create a ReproducibilityEngine for the job's project."""
+        project_id = job.project_id or "default"
+        workspace = WorkspaceManager(base_dir=settings.data_dir, project_id=project_id)
+        repro_engine = ReproducibilityEngine(workspace)
+        repro_engine.start_analysis(project_id=project_id)
+        if job.task_tree is not None:
+            task_tree_dict = {
+                "tasks": [t.model_dump(mode="json") for t in job.task_tree.tasks]
+            }
+            repro_engine.record_plan(
+                task_tree=task_tree_dict,
+                plan_context={"job_id": job.job_id, "mode": job.mode.value},
+            )
+        return repro_engine
+
+    @staticmethod
+    def _get_cbkb():
+        """Get the CBKB instance for reproducibility indexing."""
+        from homomics_lab.knowledge.cbkb import CBKB
+
+        return CBKB(settings.data_dir)
 
     @staticmethod
     def _mode_to_status(mode) -> JobStatus:
@@ -253,6 +337,38 @@ class BackgroundJobRunner:
 
         if isinstance(self._queue, RedisQueueBackend):
             await self._queue.release_lock(job_id, self._worker_id)
+
+    async def _ingest_to_cbkb(self, job: Job) -> None:
+        """Archive the completed job outcome into CBKB for self-evolution."""
+        if job.task_tree is None:
+            return
+        try:
+            from homomics_lab.evolution.ingestion import CBKBIngestionService
+            from homomics_lab.knowledge.cbkb import CBKB
+
+            cbkb = CBKB(settings.data_dir)
+            ingestion = CBKBIngestionService(cbkb)
+            duration = None
+            if job.updated_at and job.created_at:
+                updated = (
+                    job.updated_at.replace(tzinfo=timezone.utc)
+                    if job.updated_at.tzinfo is None
+                    else job.updated_at
+                )
+                created = (
+                    job.created_at.replace(tzinfo=timezone.utc)
+                    if job.created_at.tzinfo is None
+                    else job.created_at
+                )
+                duration = (updated - created).total_seconds()
+            ingestion.ingest_workflow(
+                project_id=job.project_id,
+                task_tree=job.task_tree,
+                success=job.status == JobStatus.COMPLETED,
+                duration_seconds=duration,
+            )
+        except Exception:
+            logger.exception("CBKB ingestion failed for job %s", job.job_id)
 
     async def _heartbeat_loop(self) -> None:
         """Periodically refresh this worker's liveness key when using Redis."""

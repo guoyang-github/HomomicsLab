@@ -1,13 +1,15 @@
 import asyncio
 import dataclasses
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.phase_gate import GateResult, PhaseGateEvaluator
-from homomics_lab.agent.plan.models import DataState, PlanResult, SuccessCriterion
+from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine, ReplanningTrigger
 from homomics_lab.agent.reviewer import ReviewerAgent
 from homomics_lab.agent.supervisor import SupervisorAgent
@@ -18,6 +20,11 @@ from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.state_machine import TaskStateMachine
 from homomics_lab.tasks.task_tree import TaskTree
 from homomics_lab.hitl.detector import HITLDetector
+from homomics_lab.knowledge.cbkb import CBKB
+from homomics_lab.observability.trace_store import TraceStore
+
+
+_UNSET = object()
 
 
 class Orchestrator:
@@ -33,6 +40,8 @@ class Orchestrator:
         supervisor: Optional[SupervisorAgent] = None,
         reviewer: Optional[ReviewerAgent] = None,
         message_bus: Optional[AgentMessageBus] = None,
+        interpretation_engine: Optional[InterpretationEngine] = _UNSET,
+        cbkb: Optional[CBKB] = None,
     ):
         self.registry = registry or get_default_registry()
         self.state_machine = TaskStateMachine()
@@ -44,8 +53,20 @@ class Orchestrator:
         self.supervisor = supervisor
         self.reviewer = reviewer
         self.message_bus = message_bus
+        if interpretation_engine is _UNSET and self.replanning_engine is not None:
+            skill_dag = getattr(self.replanning_engine, "skill_dag", None)
+            self.interpretation_engine = InterpretationEngine(skill_dag=skill_dag)
+        elif interpretation_engine is _UNSET:
+            self.interpretation_engine = None
+        else:
+            self.interpretation_engine = interpretation_engine
 
+        self.cbkb = cbkb
+        self._ingestion_service = None
+        if self.cbkb is not None:
+            from homomics_lab.evolution.ingestion import CBKBIngestionService
 
+            self._ingestion_service = CBKBIngestionService(self.cbkb)
 
     async def run_tree(self, tree: TaskTree, context: Dict[str, Any] = None) -> Dict[str, Any]:
         context = context or {}
@@ -212,6 +233,10 @@ class Orchestrator:
                         )
                         continue
 
+                # Gate passed — interpret the result and adaptively replan if
+                # the interpretation recommends it (e.g. missing downstream step).
+                await self._maybe_adaptive_replan(tree, task, result, context)
+
                 # Gate passed.
                 self.state_machine.transition(task, TaskStatus.COMPLETED)
 
@@ -235,7 +260,77 @@ class Orchestrator:
                     scheduler_type="agent",
                 )
             )
+
+        if self._ingestion_service is not None:
+            try:
+                project_id = context.get("project_id", "unknown") if context else "unknown"
+                duration_seconds = None
+                if hasattr(self, "_tree_start_time"):
+                    duration_seconds = (
+                        datetime.now(timezone.utc) - self._tree_start_time
+                    ).total_seconds()
+                self._ingestion_service.ingest_workflow(
+                    project_id=project_id,
+                    task_tree=tree,
+                    phase_results=results,
+                    success=not hitl_triggered,
+                    duration_seconds=duration_seconds,
+                )
+            except Exception:
+                # Ingestion failures must not break execution.
+                pass
+
         return results
+
+    async def _add_trace_node(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        node_type: str,
+    ) -> Optional[str]:
+        """Add a trace node for the task if a trace_id is present in context."""
+        trace_id = context.get("trace_id") if context else None
+        if not trace_id:
+            return None
+        try:
+            store = TraceStore()
+            node = await store.add_node(
+                trace_id=trace_id,
+                node_type=node_type,
+                name=task.name,
+                parent_id="root",
+                inputs={"skills": task.skills_required, "parameters": task.parameters},
+                metadata={"phase": task.phase, "task_id": task.id},
+            )
+            return node.node_id if node else None
+        except Exception:
+            # Trace recording must not break execution.
+            return None
+
+    async def _finish_trace_node(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        node_id: Optional[str],
+        results: Dict[str, Any],
+    ) -> None:
+        """Update the trace node with the task outcome."""
+        trace_id = context.get("trace_id") if context else None
+        if not trace_id or not node_id:
+            return
+        try:
+            store = TraceStore()
+            result = results.get(task.id, {})
+            success = isinstance(result, dict) and not result.get("error")
+            await store.update_node(
+                trace_id=trace_id,
+                node_id=node_id,
+                status="completed" if success else "failed",
+                outputs=result if isinstance(result, dict) else {"output": result},
+                error=result.get("error") if isinstance(result, dict) else None,
+            )
+        except Exception:
+            pass
 
     async def resume_task(
         self,
@@ -626,6 +721,105 @@ class Orchestrator:
         )
         await self._apply_replan(tree, task, trigger, context)
 
+    async def _maybe_adaptive_replan(
+        self,
+        tree: TaskTree,
+        task: TaskNode,
+        result: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> None:
+        """Interpret a successful result and replan if recommendations warrant it."""
+        if self.interpretation_engine is None or self.replanning_engine is None:
+            return
+
+        if task.adaptive_replan_count >= task.max_adaptive_replan_attempts:
+            return
+
+        interpretation = await self._interpret_task_result(task, result, context)
+        if interpretation is None:
+            return
+
+        phase = Phase(
+            phase_type=task.name,
+            parameters=dict(task.parameters),
+            selected_skill=self._resolve_skill_for_task(task),
+        )
+        triggers = self.interpretation_engine.to_triggers(interpretation, phase)
+        if not triggers:
+            return
+
+        current_plan = self._build_plan_result_from_tree(tree)
+        data_state = (
+            self.phase_gate_evaluator.data_state
+            if self.phase_gate_evaluator
+            else DataState()
+        )
+        new_plan = self.replanning_engine.replan(
+            current_plan, triggers, data_state
+        )
+
+        delta = new_plan.reproducibility_context.get("replanning_delta", {})
+        total_changes = (
+            delta.get("phases_inserted", 0)
+            + delta.get("phases_removed", 0)
+            + delta.get("phases_modified", 0)
+        )
+        if total_changes == 0:
+            return
+
+        task.adaptive_replan_count += 1
+        self._merge_replan_into_tree(tree, new_plan, task)
+
+        if self.workspace_manager is not None:
+            try:
+                self.workspace_manager.snapshot(
+                    f"adaptive_replan_{task.id}_attempt_{task.adaptive_replan_count}"
+                )
+            except Exception:
+                pass
+
+    async def _interpret_task_result(
+        self,
+        task: TaskNode,
+        result: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> Optional[Any]:
+        """Build an Interpretation for a completed task."""
+        from homomics_lab.agent.interpretation import Interpretation
+
+        output = result
+        if isinstance(result, dict) and "output" in result and isinstance(result["output"], dict):
+            output = result["output"]
+
+        phase = Phase(
+            phase_type=task.name,
+            parameters=dict(task.parameters),
+            selected_skill=self._resolve_skill_for_task(task),
+        )
+        data_state = (
+            self.phase_gate_evaluator.data_state
+            if self.phase_gate_evaluator
+            else DataState()
+        )
+        try:
+            return self.interpretation_engine.interpret_phase(
+                phase, output, data_state
+            )
+        except Exception:
+            return None
+
+    def _resolve_skill_for_task(
+        self,
+        task: TaskNode,
+    ) -> Optional[Any]:
+        """Resolve the SkillDefinition for a task from skill_dag or skills_required."""
+        skill_id = task.skills_required[0] if task.skills_required else None
+        if not skill_id:
+            return None
+        if self.replanning_engine is not None and self.replanning_engine.skill_dag is not None:
+            return self.replanning_engine.skill_dag.registry.get(skill_id)
+        return None
+
     def _build_plan_result_from_tree(self, tree: TaskTree) -> PlanResult:
         decomposer = TaskDecomposer()
         return decomposer._task_tree_to_plan_result(
@@ -701,40 +895,48 @@ class Orchestrator:
         The caller is responsible for phase-gate evaluation and marking the
         task as COMPLETED / AWAITING_HUMAN / FAILED.
         """
+        trace_node_id = await self._add_trace_node(task, context, node_type="phase")
+
         if self.supervisor is not None:
-            return await self._execute_task_with_supervisor(task, context, results)
+            try:
+                return await self._execute_task_with_supervisor(task, context, results)
+            finally:
+                await self._finish_trace_node(task, context, trace_node_id, results)
 
         max_attempts = task.retry_policy.max_attempts
         backoff = task.retry_policy.backoff_seconds
 
-        for attempt in range(1, max_attempts + 1):
-            # Only transition if not already running (e.g., on retry)
-            if task.status != TaskStatus.RUNNING:
-                self.state_machine.transition(task, TaskStatus.RUNNING)
+        try:
+            for attempt in range(1, max_attempts + 1):
+                # Only transition if not already running (e.g., on retry)
+                if task.status != TaskStatus.RUNNING:
+                    self.state_machine.transition(task, TaskStatus.RUNNING)
 
-            try:
-                agent = self._resolve_agent(task)
-                if agent is None:
-                    raise RuntimeError(f"No agent found for task {task.name}")
+                try:
+                    agent = self._resolve_agent(task)
+                    if agent is None:
+                        raise RuntimeError(f"No agent found for task {task.name}")
 
-                result = await agent.run(task, context)
-                results[task.id] = result
-                task.result = result
-                return result
+                    result = await agent.run(task, context)
+                    results[task.id] = result
+                    task.result = result
+                    return result
 
-            except Exception as e:
-                task.error_message = str(e)
-                task.attempt_count = attempt
+                except Exception as e:
+                    task.error_message = str(e)
+                    task.attempt_count = attempt
 
-                if attempt < max_attempts:
-                    # Transition to FAILED so we can retry
-                    self.state_machine.transition(task, TaskStatus.FAILED)
-                    # Retry with backoff
-                    await asyncio.sleep(backoff * (2 ** (attempt - 1)))
-                else:
-                    # Final attempt failed
-                    self.state_machine.transition(task, TaskStatus.FAILED)
-                    raise
+                    if attempt < max_attempts:
+                        # Transition to FAILED so we can retry
+                        self.state_machine.transition(task, TaskStatus.FAILED)
+                        # Retry with backoff
+                        await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+                    else:
+                        # Final attempt failed
+                        self.state_machine.transition(task, TaskStatus.FAILED)
+                        raise
+        finally:
+            await self._finish_trace_node(task, context, trace_node_id, results)
 
     async def _execute_task_with_supervisor(
         self,

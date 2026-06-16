@@ -9,6 +9,9 @@ on:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,25 +19,35 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          cd backend
-          pip install -e ".[dev]"
-      - name: Run tests
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+      - name: Run tests with coverage
+        run: pytest backend/tests/ -q --tb=short --cov=backend/homomics_lab --cov-report=term-missing --cov-fail-under=70
+
+  backend-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend Docker image
+        run: docker build -t homomics-lab-backend .
+      - name: Smoke test backend container
         run: |
-          cd backend
-          pytest tests/ -q --tb=short
+          docker run -d --name homomics-backend -p 8080:8080 homomics-lab-backend
+          sleep 10
+          curl -f http://localhost:8080/health || (docker logs homomics-backend && exit 1)
+          docker stop homomics-backend
 
   frontend-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
+        run: npm ci
       - name: Build
-        run: |
-          cd frontend
-          npm run build
+        run: npm run build

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, ExportDomainResponse, ImportDomainResponse } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 
 const API_BASE = '/api'
@@ -98,6 +98,44 @@ export const skillsApi = {
 
   getSkill: (skillId: string) =>
     api.get<SkillDetail>(`/skills/${skillId}`),
+
+  importSkill: (data: ImportSkillRequest) =>
+    api.post<ImportSkillResponse>('/skills/import', data),
+
+  promoteSkill: (data: PromoteSkillRequest) =>
+    api.post<PromoteSkillResponse>('/skills/promote', data),
+
+  updateSkill: (skillId: string, data: ImportSkillRequest) =>
+    api.post<ImportSkillResponse>(`/skills/${skillId}/update`, data),
+
+  removeSkill: (skillId: string, namespace: string = 'default') =>
+    api.delete(`/skills/${skillId}`, { params: { namespace } }),
+
+  enableSkill: (skillId: string, namespace: string = 'default') =>
+    api.post(`/skills/${skillId}/enable`, null, { params: { namespace } }),
+
+  disableSkill: (skillId: string, namespace: string = 'default') =>
+    api.post(`/skills/${skillId}/disable`, null, { params: { namespace } }),
+
+  validateSkill: (skillId: string, namespace: string = 'default') =>
+    api.post<SkillValidationResponse>(`/skills/${skillId}/validate`, null, { params: { namespace } }),
+
+  testSkill: (skillId: string, namespace: string = 'default') =>
+    api.post<SkillTestResponse>(`/skills/${skillId}/test`, null, { params: { namespace } }),
+
+  lockSkills: (projectId: string) =>
+    api.post<SkillLockResponse>('/skills/lock', null, { params: { project_id: projectId } }),
+}
+
+export const domainsApi = {
+  listDomains: () =>
+    api.get<DomainListing[]>('/domains/'),
+
+  exportDomain: (domainId: string, targetDir?: string) =>
+    api.post<ExportDomainResponse>(`/domains/${domainId}/export`, targetDir ? { target_dir: targetDir } : undefined),
+
+  importDomain: (source: string) =>
+    api.post<ImportDomainResponse>('/domains/import', { source }),
 }
 
 export default api

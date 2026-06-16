@@ -31,6 +31,22 @@ class MemoryQueueBackend:
     async def join(self) -> None:
         await self._queue.join()
 
+    async def remove(self, job_id: str) -> int:
+        """Remove all occurrences of a job_id from the queue."""
+        items: List[str] = []
+        while not self._queue.empty():
+            try:
+                items.append(self._queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        removed = 0
+        for item in items:
+            if item == job_id:
+                removed += 1
+            else:
+                await self._queue.put(item)
+        return removed
+
     async def close(self) -> None:
         pass
 

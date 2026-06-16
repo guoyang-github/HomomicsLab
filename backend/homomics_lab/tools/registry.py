@@ -38,6 +38,7 @@ class ToolRegistry:
         input_schema: Optional[Dict[str, Any]] = None,
         output_schema: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        risk_level: str = "low",
     ) -> ToolDefinition:
         """Convenience method to register a builtin tool."""
         tool = ToolDefinition(
@@ -47,6 +48,7 @@ class ToolRegistry:
             output_schema=output_schema or {},
             handler=handler,
             source="builtin",
+            risk_level=risk_level,
             metadata=metadata or {},
         )
         self.register(tool)

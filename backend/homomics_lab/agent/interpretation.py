@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.agent.plan.replanning import ReplanningTrigger
 from homomics_lab.models.common import PlotAttachment
 from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.skill_dag import SkillDAG
@@ -367,6 +368,95 @@ class InterpretationEngine:
                 )
 
         return recommendations
+
+    def to_triggers(
+        self,
+        interpretation: Interpretation,
+        phase: Phase,
+    ) -> List[ReplanningTrigger]:
+        """Convert an interpretation into replanning triggers.
+
+        This bridges InterpretationEngine and DynamicReplanningEngine.  Only
+        actionable triggers are emitted so that normal results do not cause
+        spurious replans.
+        """
+        triggers: List[ReplanningTrigger] = []
+        qa = interpretation.quality_assessment
+
+        if qa is not None and qa.has_anomaly():
+            severity = "major"
+            if qa.overall == "poor" or any(
+                "high" in f.lower() or "critical" in f.lower() for f in qa.flags
+            ):
+                severity = "critical"
+            elif all("lenient" in f.lower() or "low" in f.lower() for f in qa.flags):
+                severity = "minor"
+
+            triggers.append(
+                ReplanningTrigger(
+                    trigger_type="anomaly_detected",
+                    context={
+                        "phase_type": phase.phase_type,
+                        "flags": list(qa.flags),
+                        "metrics": dict(qa.metrics),
+                    },
+                    severity=severity,
+                )
+            )
+
+        for rec in interpretation.recommendations:
+            if rec.type == "alternative" and rec.skill_id:
+                triggers.append(
+                    ReplanningTrigger(
+                        trigger_type="data_state_changed",
+                        context={
+                            "change_type": "alternative_skill",
+                            "phase_type": phase.phase_type,
+                            "recommended_skill_id": rec.skill_id,
+                            "reason": rec.reason,
+                        },
+                        severity="minor",
+                    )
+                )
+            elif rec.type == "next_step" and rec.skill_id:
+                next_phase = self._infer_phase_type(rec.skill_id, rec.description)
+                if next_phase and next_phase != phase.phase_type:
+                    triggers.append(
+                        ReplanningTrigger(
+                            trigger_type="data_state_changed",
+                            context={
+                                "change_type": "missing_downstream",
+                                "phase_type": phase.phase_type,
+                                "recommended_phase_type": next_phase,
+                                "recommended_skill_id": rec.skill_id,
+                                "reason": rec.reason,
+                            },
+                            severity="minor",
+                        )
+                    )
+
+        return triggers
+
+    @staticmethod
+    def _infer_phase_type(
+        skill_id: Optional[str], description: str = ""
+    ) -> Optional[str]:
+        """Map a skill id or description to a canonical phase type."""
+        text = f"{skill_id or ''} {description}".lower()
+        mapping = {
+            "qc": ["qc", "quality control", "filter"],
+            "normalization": ["normaliz", "normalize"],
+            "dim_reduction": ["pca", "dim_reduction", "dimensionality"],
+            "clustering": ["cluster", "leiden", "louvain"],
+            "annotation": ["annotat", "marker", "cell type"],
+            "differential_expression": ["de", "deg", "differential"],
+            "integration": ["integrat", "batch", "harmony", "combat"],
+            "visualization": ["plot", "visual", "umap", "tsne"],
+        }
+        for phase, keywords in mapping.items():
+            if any(k in text for k in keywords):
+                return phase
+        return None
 
     def _extract_plots(
         self,

@@ -140,6 +140,24 @@ class DomainDefinition(BaseModel):
         description="Relative path to skills directory",
     )
 
+    # Code generation guidance
+    preferred_libraries: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Preferred libraries per language (python, r, bash)",
+    )
+    code_templates: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Named code templates for common tasks",
+    )
+    data_sources: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Domain-specific data sources available to generated code",
+    )
+    fallback_rules: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Rules for selecting execution mode when no curated skill matches",
+    )
+
     def get_intent_keywords(self) -> Dict[str, List[str]]:
         """Build a map of analysis_type -> keywords for IntentAnalyzer."""
         return {
