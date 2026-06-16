@@ -11,7 +11,15 @@ v0.4.1 已完成以下关键重构：
 - `ExecutionPubSub` + SSE 执行状态推送
 - `ReproducibilityEngine` 可复现审计
 
-当前测试基线（全量测试，含本地缓存的语义搜索）：**651 passed, 7 warnings**。
+v0.4.2 新增：
+
+- **跨进程工具调用沙盒** (`tools/invoke_tool.py`)：支持 `local`/`bubblewrap`/`container` 后端
+- **CodeAct 代码缓存** (`execution/code_cache.py`)：基于任务描述 embedding 相似度复用生成代码
+- **自动回归基线**：CodeAct 成功执行后自动记录基线
+- **前端“保存为 Skill”按钮**：将成功 CodeAct 运行提升为可复用技能包
+- **领域模板市场** (`domain/marketplace.py` + `api/domains.py` + 前端 Domains 标签页)
+
+当前测试基线：**901 passed, 8 warnings**。
 
 v0.5 的目标是把系统从“对话式同步执行”升级为“可后台运行、可阶段校验、可多人机协作、可审计复现”的生产级生物信息学 Agent 平台。
 
@@ -247,5 +255,9 @@ pytest --ignore=tests/test_context/test_semantic_memory.py --ignore=tests/test_s
 
 ## 下一步建议
 
-建议按 **P0-1 → P0-2 → P0-3 → P1-1** 的顺序实施。  
-P0-1、P0-2、P0-3、P1-1 已完成，下一步建议进入 **P1-2（Plan 版本化 UI + HITL 升级界面）**。
+P0-1、P0-2、P0-3、P1-1、P1-2、P2 及 v0.4.2 增强项均已完成。当前建议进入：
+
+1. **P3 收尾**：Redis Job Queue + 分布式 Worker（已完成框架，待生产验证）。
+2. **个人用户上车体验**：本地模型默认、示例数据集、引导式首屏。
+3. **技能生态填充**：引入/编写覆盖单细胞、空间、基因组、宏基因组的高质量 skill。
+4. **自进化闭环验证**：在积累足够执行历史后启用 `HOMOMICS_CURATION_ENABLED` 和 `HOMOMICS_EVOLUTION_ENABLED`，观察 CBKB 与 AgentEvolution 的实际效果。

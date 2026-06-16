@@ -456,7 +456,79 @@ curl -X POST http://localhost:8000/hitl/respond \
 
 ---
 
-## Skill Development
+## Domain Marketplace
+
+HomomicsLab includes a domain template marketplace for sharing and importing bioinformatics domain declarations.
+
+## List available domains
+
+```bash
+curl http://localhost:8000/api/domains/
+```
+
+## Import a domain
+
+```bash
+# From a local directory
+curl -X POST http://localhost:8000/api/domains/import \
+  -H "Content-Type: application/json" \
+  -d '{"source": "./domains/metagenomics"}'
+
+# From a git repository
+curl -X POST http://localhost:8000/api/domains/import \
+  -H "Content-Type: application/json" \
+  -d '{"source": "https://github.com/example/homomics-metagenomics.git"}'
+```
+
+## Export a domain
+
+```bash
+curl -X POST http://localhost:8000/api/domains/metagenomics/export
+```
+
+## Import code templates
+
+```bash
+curl -X POST http://localhost:8000/api/domains/import-templates \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain_id": "metagenomics",
+    "templates": {"qc_template": "...code..."}
+  }'
+```
+
+The marketplace UI is available in the frontend under the **Domains** workspace tab.
+
+---
+
+# CodeAct Cache & Tool Sandbox
+
+## CodeAct Cache
+
+CodeAct-generated code is cached by task-description embedding similarity. To disable:
+
+```env
+HOMOMICS_CODEACT_CACHE_ENABLED=false
+```
+
+Cache directory defaults to `./data/codeact_cache`.
+
+## Tool Invocation Sandbox
+
+High-risk tools can be forced to run in an isolated sandbox:
+
+```env
+HOMOMICS_FORCE_SANDBOX=true
+HOMOMICS_SKILL_SANDBOX_BACKEND=auto   # auto | local | bubblewrap | container
+```
+
+- `local`: subprocess inside the worker process (fastest, least isolation)
+- `bubblewrap`: Linux user-namespace sandbox (recommended for local dev)
+- `container`: Docker/container runtime (recommended for production)
+
+---
+
+# Skill Development
 
 ### Directory Structure
 

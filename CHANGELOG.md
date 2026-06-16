@@ -2,6 +2,41 @@
 
 All notable changes to HomomicsLab are documented in this file.
 
+## [0.4.2] — Agent Execution Hardening & Domain Marketplace
+
+### Added
+
+- **Cross-process tool invocation sandbox** (`backend/homomics_lab/tools/invoke_tool.py`)
+  - Uniform protocol for invoking atomic tools across process boundaries.
+  - Supports `local`, `bubblewrap`, and `container` backends.
+  - High-risk tools (`shell_exec`, `file_write`, `file_edit`) can be forced to run inside an isolated sandbox via `HOMOMICS_FORCE_SANDBOX=true`.
+
+- **CodeAct code cache** (`backend/homomics_lab/execution/code_cache.py`)
+  - Caches CodeAct-generated code keyed by task-description embeddings.
+  - Similar tasks hit the cache instead of calling the LLM again.
+  - Configurable via `HOMOMICS_CODEACT_CACHE_ENABLED` and `HOMOMICS_CODEACT_CACHE_DIR`.
+
+- **Auto-recorded regression baselines** (`backend/homomics_lab/stability/regression_tester.py`)
+  - Successful CodeAct executions automatically record a regression baseline.
+  - Future runs can be compared against the baseline to detect silent drift.
+
+- **"Save as Skill" frontend button**
+  - `frontend/src/components/skills/SkillManager.tsx` now includes a **Save as Skill** button.
+  - Calls `POST /api/skills/promote` to turn a successful CodeAct run into a curated `SKILL.md + scripts/` package.
+
+- **Domain template marketplace**
+  - `backend/homomics_lab/domain/marketplace.py` + `backend/homomics_lab/api/domains.py`
+  - Endpoints: `GET /api/domains/`, `POST /api/domains/import`, `POST /api/domains/import-zip`, `POST /api/domains/{id}/export`, `POST /api/domains/import-templates`.
+  - Frontend: `frontend/src/components/domains/DomainMarketplace.tsx` with a new **Domains** tab in the workspace.
+
+- **Tests**
+  - Added regression and integration tests covering tool sandbox invocation, CodeAct cache hit/miss, and domain marketplace import/export.
+  - Full backend suite: **901 passed**.
+
+### Changed
+
+- Updated `README.md` and `README.zh.md` to reflect the latest architecture, current maturity, and new v0.4.2 capabilities.
+
 ## [0.4.1] — P3 Big Data, Caching & Security Hardening
 
 ### Added

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from homomics_lab.llm_client import FakeLLMClient
-from homomics_lab.skills.code_act import (
+from homomics_lab.execution.code_act import (
     _build_python_wrapper,
     execute_code,
     generate_code,

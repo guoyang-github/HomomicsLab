@@ -1,6 +1,6 @@
 """Tests for CodeAct cache."""
 
-from homomics_lab.skills.code_cache import CodeActCache
+from homomics_lab.execution.code_cache import CodeActCache
 
 
 def test_cache_round_trip(tmp_path):

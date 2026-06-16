@@ -1,8 +1,8 @@
 # HomomicsLab
 
-A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and self-evolving analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
+A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and extensible analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.4.1** — End-to-end analysis automation with **single-file domain declarations**, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, agent self-evolution, CBKB auto-curation, multi-layer stability guards, complete reproducibility capture, **DataStore offloading for large results**, **skill result memoization**, and **optional dense semantic search**.
+> **v0.4.1** — End-to-end analysis automation with single-file domain declarations, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, CBKB auto-curation, multi-layer stability guards, complete reproducibility capture, DataStore offloading for large results, skill result memoization, **CodeAct code caching**, **cross-process tool invocation sandbox**, and a **domain template marketplace**.
 
 ---
 
@@ -21,168 +21,124 @@ Computational biology sits at a painful intersection:
 
 ---
 
-## What Makes HomomicsLab Different
+## Current Status & Maturity
 
-HomomicsLab is not built in a vacuum. It synthesizes the best ideas from **general-purpose AI agents**, **bioinformatics workflow systems**, **interactive notebooks**, **MLOps tooling**, and **code-generation assistants**—then adds the missing pieces that none of them provide alone.
+HomomicsLab is best understood as a **production-ready agent framework** with a growing library of built-in capabilities. The core architecture, execution engine, stability guards, and extensibility mechanisms are implemented and tested. However, like any general-purpose agent platform, its practical power grows with the number and quality of skills/domains installed.
 
-### Intellectual Lineage
-
-HomomicsLab is part of a rapidly emerging class of **domain-specific agent systems** for science. We directly acknowledge the shoulders we stand on:
-
-| System | What We Adopted | What Was Missing (That HomomicsLab Adds) |
+| Capability | Status | Notes |
 |---|---|---|
-| **Biomni** (Stanford/Genentech) | CodeAct-style code generation; unified biomedical tool space; retrieval-augmented planning | Single-agent architecture with no stability guards; no version locking; no data lineage; reproducibility is an afterthought |
-| **DeerFlow 2** (ByteDance) | Sub-agent orchestration; sandboxed execution; progressive skill loading; persistent memory | Generalist research harness with no bioinformatics domain strategy; no schema validation; no regression testing; loop detection kills legitimate bioinformatics workflows |
-| **Hermes** (NousResearch) | `SKILL.md` skill specification format; modular skill libraries | No execution-time schema validation; no skill relationship evolution; no workspace provenance |
-| **OmicVerse** | Single-cell/bulk RNA-seq analysis methods; visualization best practices | A Python library, not an agent—requires manual orchestration; no natural language interface; no reproducibility capture |
-| **CowAgent** (zhayujie) | Sub-agent orchestration; sandboxed execution; progressive skill loading; persistent memory; Markdown wiki PKB | Generalist IM assistant with no bioinformatics domain strategy; no schema validation; no regression testing; PKB is a black-box wiki with no experiment provenance or parameter lore |
-| **AutoGPT / BabyAGI** | Autonomous planning loops; task decomposition; memory layers | No domain knowledge of biology; no stability guards; no reproducibility framework |
-| **LangChain / LlamaIndex** | Tool registry abstraction; context compression; retrieval patterns | No strict schema validation for tool I/O; no version locking; no regression testing |
-| **Galaxy / nf-core** | Community-validated workflows; reproducible environments | Rigid parameter schemas; users must speak "workflow-ese"; no adaptive planning based on data state |
-| **Snakemake / Nextflow** | Declarative execution; HPC scalability | Require expert orchestration; no semantic understanding of data state |
-| **Aider / Cursor / Devin** | Code generation as first-class artifact; agent-driven editing | No domain strategy templates; no explanation of *why* code was generated; no cross-run learning |
-| **W&B / MLflow** | Experiment tracking; environment logging | Track model training, not end-to-end bioinformatics analysis; miss HITL decisions and agent reasoning |
-| **DVC** | Data versioning; pipeline lineage concepts | Require manual DAG definition; no automated provenance from agent execution |
+| Agent orchestration (intent → plan → execute) | ✅ Implemented | `TurnRunner`, `PlanEngine`, `Orchestrator`, `AgentCore` |
+| Dynamic agent roles | ✅ Implemented | YAML-configurable `RoleDefinition` + `DynamicAgent` |
+| Multi-agent swarm & consensus | ✅ Implemented | `AgentSwarm` with semaphore-controlled parallelism |
+| Skill runtime & sandboxing | ✅ Implemented | Local / bubblewrap / container backends |
+| Schema validation (L1) | ✅ Implemented | JSON Schema input/output validation per skill |
+| Version locking (L2) | ✅ Implemented | Project-level skill/env/version locks |
+| Regression baselines (L2) | ✅ Implemented | Auto-recorded after successful CodeAct runs |
+| Reproducibility bundles | ✅ Implemented | Code, plan, HITL, env lock captured per job |
+| DataStore offloading | ✅ Implemented | Parquet/H5AD/pickle offload for large results |
+| Skill result cache | ✅ Implemented | SHA-256 keyed memoization |
+| CodeAct code cache | ✅ Implemented | Embedding-based similarity cache for generated code |
+| Cross-process tool invocation | ✅ Implemented | Sandbox-isolated `shell_exec`/`file_*` tools |
+| Domain marketplace | ✅ Implemented | Import/export domain templates via UI/API |
+| CBKB & auto-curation | 🟡 Framework ready | Interfaces implemented; self-evolution loop requires sufficient execution history |
+| SkillDAG self-evolution | 🟡 Framework ready | Graph exists and records executions; edge promotion requires repeated successful runs |
+| Dense semantic search | 🟡 Optional | Requires `HOMOMICS_SEMANTIC_SEARCH_MODEL` |
+| Agent self-evolution | 🟡 Framework ready | Scheduled jobs disabled by default for individual users |
 
-**What none of the above provide together**: a **bioinformatics-native agent platform** with dynamic roles, self-evolving skill relationships, three-layer stability guards, complete reproducibility bundles, and automated data lineage—running inside a sandboxed workspace with human-in-the-loop checkpoints.
+> **For individual users**: HomomicsLab is designed to be self-hosted, privacy-first, and locally runnable. No data leaves your machine unless you explicitly configure external LLM APIs or cloud storage.
 
-### 0. Single-File Domain Declaration — Extend to Any Omics in 20 Minutes
+---
 
-HomomicsLab is not limited to single-cell or spatial transcriptomics. Any bioinformatics domain—genomics, proteomics, metabolomics, epigenomics, metagenomics—can be added via a **single `domain.yaml` file**.
+## What's New in v0.4.1
 
-```bash
-# Initialize a new domain scaffold
-homomics domain init metagenomics --phases "qc,denoising,taxonomy,diversity"
+### Cross-Process Tool Invocation Sandbox
+- `backend/homomics_lab/tools/invoke_tool.py` provides a uniform protocol for invoking atomic tools across process boundaries.
+- Supports `local`, `bubblewrap`, and `container` backends so high-risk tool calls run in isolated sandboxes.
 
-# Or let LLM generate it from natural language
-homomics domain generate "16S amplicon analysis with DADA2 and QIIME2"
+### CodeAct Code Cache
+- `backend/homomics_lab/execution/code_cache.py` caches CodeAct-generated code keyed by task-description embeddings.
+- Similar tasks hit the cache instead of calling the LLM again, reducing cost and latency.
 
-# Validate and install
-homomics validate domain.yaml && homomics install .
-```
+### Auto-Recorded Regression Baselines
+- After a successful CodeAct execution, the system automatically records a regression baseline.
+- Future runs of the same skill/code can be compared against the baseline to detect silent drift.
 
-No Python code changes. No service restart. The `DomainLoader` automatically registers skills, strategies, intents, DAG seeds, roles, and SOPs. See [`docs/domain-extension-guide.md`](docs/domain-extension-guide.md) for the full guide.
+### "Save as Skill" in the Frontend
+- The Skill Manager UI now includes a **Save as Skill** button that promotes a successful CodeAct run into a curated `SKILL.md + scripts/` package.
+
+### Domain Template Marketplace
+- New `frontend/src/components/domains/DomainMarketplace.tsx` UI tab for browsing, importing, and exporting domain templates.
+- Backend endpoints: `GET /api/domains/`, `POST /api/domains/import`, `POST /api/domains/{id}/export`, `POST /api/domains/import-zip`.
+
+---
+
+## What Makes HomomicsLab Different
 
 ### 1. End-to-End Analysis Closure
 
 From a sentence like *"Analyze my PBMC dataset and find marker genes for each cluster"* to a **self-contained HTML report with UMAPs, DE tables, and method sections**—in one conversation.
 
 HomomicsLab handles the entire lifecycle:
-- **Intent Analysis** — Parses natural language research goals into structured `UserIntent` objects. Dynamically loaded from `domain.yaml` intent declarations—not hardcoded keyword lists. Supports any bioinformatics workflow.
-- **Adaptive Planning** — Selects from extensible domain strategy templates declared in `domain.yaml` and generates plans that adapt to real-time data state. Batch detected → inject integration; low quality → tighten QC; skill fails → auto-swap alternative via SkillDAG.
-- **Execution** — Sandboxed skill runtime with schema validation and resource monitoring. Skills are **source-agnostic**—builtin, external, community, or user-uploaded are treated identically.
-- **Interpretation** — Phase-level result analysis: "QC filtered 12% of cells—within normal range. Next: normalization."
-- **Reporting** — Auto-generated publication-ready HTML/Markdown reports with figures and provenance
-- **Reproducibility** — Every analysis exports a `ReproducibilityBundle`: exact code, plan, HITL decisions, environment lock
+- **Intent Analysis** — Parses natural language research goals into structured `UserIntent` objects loaded from `domain.yaml`.
+- **Adaptive Planning** — Selects from extensible domain strategy templates and generates plans that adapt to real-time data state.
+- **Execution** — Sandboxed skill runtime with schema validation and resource monitoring. Skills are source-agnostic.
+- **Interpretation** — Phase-level result analysis and anomaly detection.
+- **Reporting** — Auto-generated HTML/Markdown reports with figures and provenance.
+- **Reproducibility** — Every analysis exports a `ReproducibilityBundle`: exact code, plan, HITL decisions, environment lock.
 
 ### 2. Domain-Native Intelligence
 
-HomomicsLab is not a thin wrapper around GPT-4. It embeds **bioinformatics workflow knowledge** at the architecture level:
-
-- **Strategy Templates**: The PlanEngine carries built-in domain strategies (`single_cell_standard`, `spatial_transcriptomics`, `qc_only`) that encode the *correct order of operations*—not as hardcoded scripts, but as adaptable templates that respond to data characteristics.
-- **Data-State Adaptation**: The plan changes based on what the data tells us. Batch effect detected? The plan automatically inserts integration. Low cell quality? QC thresholds tighten. Already have clusters? Skip redundancy.
-- **SkillDAG**: A self-evolving knowledge graph that tracks how skills relate in practice—`scanpy_qc` → `scanpy_pca` → `scanpy_cluster`—learned from execution history, not hand-coded.
+- **Strategy Templates**: The PlanEngine carries built-in domain strategies (`single_cell_standard`, `spatial_transcriptomics`, `qc_only`) that encode the *correct order of operations* as adaptable templates.
+- **Data-State Adaptation**: The plan changes based on data characteristics—batch effect detected → inject integration; low quality → tighten QC.
+- **SkillDAG**: A self-evolving knowledge graph that tracks how skills relate in practice, learned from execution history and `domain.yaml` seeds.
 
 ### 3. Self-Evolving Skill Ecosystem
 
-Skills in HomomicsLab are not plugins you manually install and forget. They are **first-class citizens in a living system**:
-
-- **Self-Evolving Relationships**: The SkillDAG automatically discovers `followed_by`, `conflicts_with`, and `alternative_to` relationships from execution history and `domain.yaml` seed declarations. Edges graduate from `CANDIDATE` → `CONFIRMED` after repeated success.
-- **Semantic Discovery**: Dual-engine skill search—TF-IDF for exact matching + sentence-transformers for conceptual similarity. A query for "reduce dimensions" finds PCA, UMAP, and t-SNE even if none mention "reduce" in their titles.
-- **Auto-Generation**: Generate new skills from natural language requirements via templated scaffolding.
-- **Unified Format**: Built-in and external skills use the identical `SKILL.md + scripts/` format. No "second-class citizen" external skills.
+- **Self-Evolving Relationships**: SkillDAG discovers `followed_by`, `conflicts_with`, and `alternative_to` relationships. Edges graduate from `CANDIDATE` → `CONFIRMED` after repeated success.
+- **Semantic Discovery**: Dual-engine skill search—TF-IDF fallback + optional sentence-transformers dense embeddings.
+- **Auto-Generation**: Generate new skills from natural language requirements.
+- **Unified Format**: Built-in and external skills use the identical `SKILL.md + scripts/` format.
+- **Promotion from CodeAct**: Successful CodeAct runs can be promoted to reusable skills via UI or API.
 
 ### 4. Multi-Layer Stability Guard
-
-Bioinformatics analysis is too critical to fail silently. HomomicsLab deploys **defense in depth**:
 
 | Layer | Defense | Prevents |
 |---|---|---|
 | **L1 — Schema Validation** | Every skill input/output validated against declared JSON Schema | Type mismatches, missing required fields, silent data corruption |
 | **L2 — Version Locking** | Project-level lock: skill versions, script SHA-256, pip freeze, Python version | "It worked yesterday" drift, dependency hell |
 | **L2 — Regression Testing** | Record baselines from known-good executions; detect output signature drift | Skill updates that silently change results |
-| *(planned) L3* | Cross-phase semantic consistency checks | Logical contradictions between analysis steps |
+| **L2 — Code Safety** | Static audit of LLM-generated CodeAct code before execution | Dangerous imports, path traversal, shell injection |
 
-### 5. Complete Reproducibility, Not Just Version Control
+### 5. Complete Reproducibility
 
-A Git commit is not enough for computational biology. HomomicsLab's `ReproducibilityEngine` captures:
-
-- **Exact code** — The agent-generated Python that called the skills, not just skill names
-- **The plan** — Full execution strategy with data-state adaptations
-- **Every HITL decision** — When the human chose resolution=0.8 over the default
-- **Environment lock** — `pip freeze`, `conda env export`, Python version
-- **Skill version lock** — Exact versions and script checksums of every skill used
-
-The result is a **JSON-serializable Bundle** that can be reloaded, inspected, and replayed.
+The `ReproducibilityEngine` captures:
+- Exact agent-generated code
+- The full execution plan with data-state adaptations
+- Every HITL decision
+- Environment lock (`pip freeze`, Python version)
+- Skill version lock (exact versions and script checksums)
 
 ### 6. Interpretable, Not a Black Box
 
-After every major phase (QC, clustering, annotation, DE, visualization), the **InterpretationEngine** produces:
+After every major phase, the **InterpretationEngine** produces:
+- A human-readable summary
+- Anomaly flags when thresholds are exceeded
+- Actionable recommendations ranked by confidence
 
-- A **human-readable summary**: *"QC filtered 12% of cells (2,531 remaining), within normal range."*
-- **Anomaly flags**: *"High cell filtering rate: 80% — check data quality"* when filter rate exceeds 50%
-- **Actionable recommendations**: *"Next: dimensionality reduction with PCA"* — ranked by confidence, informed by workflow rules + SkillDAG + current data state
-
-Users always know what happened, why it happened, and what should come next.
-
-### 7. Computational Biology Knowledge Base (CBKB)
-
-Unlike generic personal knowledge bases (e.g., CowAgent's Markdown wiki), HomomicsLab's CBKB is **structured around the ontology of bioinformatics analysis**:
-
-| Layer | Stores | Value |
-|---|---|---|
-| **Experiment Graph** | Every `ReproducibilityBundle` as a node; typed edges (`shares_skill`, `shares_parameter`, `derived_from`) | "Which past analyses used the same QC strategy?" |
-| **Parameter Lore** | "Skill parameter → outcome quality" mappings extracted from execution history | "For PBMC datasets, `resolution=0.6` historically yields the best cluster separation" |
-| **Anomaly Archive** | Every phase-level anomaly detected by InterpretationEngine | "Last time batch effect exceeded 30%, Harmony outperformed scVI" |
-| **Lab SOP** | Best-practice templates auto-distilled from repeated successful analyses | Versioned, lockable standard operating procedures per lab |
-| **Skill Evolution Log** | History of SkillDAG edge state transitions (`CANDIDATE` → `CONFIRMED`) | "Our lab's data has independently confirmed the QC→PCA→Cluster workflow 47 times" |
-
-CBKB is **not a black-box vector database**. Every entry is traceable to a `ReproducibilityBundle`, a `Workspace` artifact, or a `SkillDAG` edge. It is a **collective memory for the lab**, not just the assistant.
-
-### 8. Data Provenance as a First-Class Feature
-
-Every artifact in HomomicsLab carries its history:
+### 7. Data Provenance as a First-Class Feature
 
 ```
 workspaces/{project_id}/
-├── data/               # Original data — read-only protected (chmod 444)
+├── data/               # Original data — read-only protected
 ├── intermediate/       # Step artifacts with SHA-256 checksums
 ├── outputs/            # Final deliverables
 ├── logs/               # Execution logs
 └── .metadata/          # Artifact registry, lineage graph, snapshots, version.lock
 ```
 
-- **Lineage Graph**: Directed provenance from raw data → QC → clustering → DE → figures
-- **Snapshots**: Point-in-time workspace state capture
-- **Checksum Integrity**: Every artifact registered with SHA-256; tampering is detectable
+### 8. Dynamic Agent Roles
 
-### 9. Big Results & Skill Memoization
-
-Real bioinformatics data does not fit in JSON:
-
-- **DataStore** automatically offloads pandas `DataFrame` → Parquet, `AnnData` → H5AD, and large/pickle objects to files under the workspace, returning a small `ResultReference`.
-- **SkillCache** memoizes deterministic skill executions keyed by stable SHA-256 of `skill_id + inputs + fingerprint`, so identical inputs return in milliseconds.
-
-### 10. Optional Dense Semantic Search
-
-Skill retrieval uses a dual engine:
-
-- **TF-IDF** fallback (lightweight, no extra model download)
-- **sentence-transformers** dense embeddings when `HOMOMICS_SEMANTIC_SEARCH_MODEL=all-MiniLM-L6-v2` is configured
-
-### 11. Security & Trust Model
-
-Community skills require explicit trust before execution:
-
-- Imported skills are marked `trusted=false` by default.
-- `POST /api/skills/{id}/trust` toggles trust.
-- Untrusted external skills raise `UntrustedSkillError` at runtime.
-- High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`.
-- Enable `HOMOMICS_INTERACTIVE_MODE=true` to require explicit approval before any high-risk tool invocation.
-
-### 12. Dynamic Agent Roles — Capability as Configuration
-
-Instead of hardcoding `BioinfoAgent`, `VizAgent`, and `ExperimentAgent` classes, HomomicsLab uses **YAML-configurable roles** that determine what skills, tools, and permissions an agent has:
+Instead of hardcoded agent classes, HomomicsLab uses YAML-configurable roles:
 
 ```yaml
 role_id: visualization
@@ -195,53 +151,19 @@ permissions:
   max_concurrent_tasks: 2
 ```
 
-- One permanent **Analyst** coordinates; **Specialists** spawn on demand
-- **Wildcard matching**: `scanpy_*` routes all Scanpy skills automatically
-- **Blocked skills**: Explicit denylist for security-sensitive environments
-- **Tool-level access control**: Each role sees only its permitted atomic tools
+### 9. Big Results & Skill Memoization
 
-### 13. Long-Horizon Dynamic Replanning
+- **DataStore** automatically offloads pandas `DataFrame` → Parquet, `AnnData` → H5AD, and large objects to files, returning a small `ResultReference`.
+- **SkillCache** memoizes deterministic skill executions keyed by stable SHA-256 of `skill_id + inputs + fingerprint`.
+- **CodeActCache** caches generated code by task-description embedding similarity.
 
-Plans are not carved in stone. The **DynamicReplanningEngine** monitors execution and replans in real time when reality diverges from expectation:
+### 10. Security & Trust Model
 
-- **Critical anomaly detected in QC** → automatically insert a re-QC phase with tightened thresholds
-- **Batch effect discovered post-clustering** → dynamically insert integration before differential expression
-- **Skill failure** → swap to an alternative skill via SkillDAG and resume
-- **User intervention changes parameters** → propagate the change downstream through all dependent phases
-
-Unlike static workflow engines (Snakemake, Galaxy), HomomicsLab adapts the plan *while executing* based on data state and intermediate results.
-
-### 14. Multi-Agent Swarm — Parallel Execution + Consensus
-
-HomomicsLab is not limited to a single agent per task. The **AgentSwarm** orchestrates multiple specialists in parallel:
-
-- **Parallel task groups**: Independent tasks fan out to sub-agents with semaphore-controlled concurrency
-- **Consensus voting**: The same task can be assigned to multiple agents; disagreeing opinions are surfaced with confidence scores
-- **Broadcast messaging**: The lead analyst can broadcast context to all matching specialists
-- **SwarmOrchestrator**: Automatically identifies independent task groups in a task tree and executes them in parallel
-
-This is not just "multi-agent" theater—it's disciplined parallelism with conflict detection.
-
-### 15. Agent Self-Evolution
-
-Agents get smarter with every analysis. The **AgentEvolutionEngine** continuously learns from CBKB history:
-
-- **Role evolution**: If `resolution=0.6` consistently yields better clusters across 10+ projects, the system proposes updating the role's default prompt or metadata
-- **Plan pattern mining**: Recurring successful phase sequences are extracted as reusable plan patterns with success-rate statistics
-- **Parameter preference learning**: Per-project and per-lab parameter preferences are automatically distilled from ParameterLore
-- **SOP auto-evolution**: When a successful analysis pattern repeats >3 times, the system proposes a new Lab SOP or a version bump to an existing one
-
-Roles and plans are **living configurations**, not static YAML files.
-
-### 16. CBKB Auto-Curation — The Knowledge Base That Curates Itself
-
-The Computational Biology Knowledge Base does not wait for manual maintenance. The **CBKBCurator** runs automatic curation passes:
-
-- **Nightly distillation**: New experiment bundles are scanned for skill sequences, parameter combinations, and project similarities
-- **Topic clustering**: Experiments are grouped by Jaccard similarity on skills + parameters; each cluster gets a topic name and centroid summary
-- **Narrative reports**: "This month your lab analyzed 12 single-cell datasets. The most common anomaly was batch effect (6 occurrences). The most reliable parameter was `resolution=0.6`."
-- **Auto-linking**: Similar experiments automatically get typed edges (`shares_skill`, `shares_parameter`) in the Experiment Graph
-- **SOP divergence detection**: When existing SOPs no longer match the lab's actual best practices, the system flags them for review
+- Imported skills are marked `trusted=false` by default.
+- `POST /api/skills/{id}/trust` toggles trust.
+- High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`.
+- `HOMOMICS_INTERACTIVE_MODE=true` requires explicit approval before high-risk tool invocation.
+- `HOMOMICS_FORCE_SANDBOX=true` routes shell/code execution through bubblewrap/container sandboxes.
 
 ---
 
@@ -270,6 +192,18 @@ npm run dev
 # open http://localhost:5173
 ```
 
+### Running Without an External LLM Key
+
+For local/embedded model use, configure a compatible local inference endpoint and set:
+
+```env
+HOMOMICS_LLM_PROVIDER=openai-compatible
+HOMOMICS_LLM_BASE_URL=http://localhost:11434/v1
+HOMOMICS_LLM_MODEL=qwen2.5:14b
+```
+
+> Note: Local models work best for intent analysis and simple skill selection. Complex CodeAct generation still benefits from frontier models.
+
 ---
 
 ## Project Structure
@@ -278,88 +212,155 @@ npm run dev
 HomomicsLab/
 ├── backend/
 │   ├── homomics_lab/
+│   │   ├── agent/              # Agent orchestration layer
+│   │   │   ├── core/           # AgentCore, DynamicAgent, RoleRegistry, roles/*.yaml
+│   │   │   ├── plan/           # PlanEngine — adaptive strategy generation
+│   │   │   ├── replanning.py   # DynamicReplanningEngine
+│   │   │   ├── interpretation.py
+│   │   │   ├── swarm.py        # AgentSwarm — parallel multi-agent execution + consensus
+│   │   │   ├── orchestrator.py # Task scheduler with retry & HITL
+│   │   │   ├── evolution.py    # AgentEvolutionEngine
+│   │   │   └── turn_runner.py  # Unified conversational turn loop
 │   │   ├── domain/             # Domain declaration system (v0.4.1)
-│   │   │   ├── models.py       # DomainDefinition, Phase, StateCheck Pydantic models
-│   │   │   ├── loader.py       # DomainLoader — reads domain.yaml, auto-registers all
-│   │   │   ├── registry.py     # DomainRegistry — manages loaded domains
-│   │   │   ├── hot_reload.py   # Runtime hot-reload for domains & skills
+│   │   │   ├── models.py
+│   │   │   ├── loader.py       # DomainLoader — reads domain.yaml
+│   │   │   ├── registry.py     # DomainRegistry
+│   │   │   ├── hot_reload.py   # Runtime hot-reload
+│   │   │   ├── marketplace.py  # Domain template marketplace
 │   │   │   └── domains/        # Built-in domain declarations
 │   │   │       ├── single_cell/domain.yaml
 │   │   │       ├── spatial/domain.yaml
 │   │   │       └── metagenomics/domain.yaml
-│   │   ├── cli/                # Command-line tools (v0.4.1)
-│   │   │   ├── main.py         # homomics CLI entry point
-│   │   │   └── commands/       # init, validate, install, generate, list
-│   │   ├── agent/              # Agent orchestration layer
-│   │   │   ├── core/           # AgentCore, DynamicAgent, RoleRegistry, roles/*.yaml
-│   │   │   ├── plan/           # PlanEngine — adaptive strategy generation
-│   │   │   ├── plan/replanning.py  # DynamicReplanningEngine — execution-time plan adaptation
-│   │   │   ├── interpretation.py   # InterpretationEngine
-│   │   │   ├── swarm.py            # AgentSwarm — parallel multi-agent execution + consensus
-│   │   │   ├── orchestrator.py     # Task scheduler with retry & HITL
-│   │   │   ├── evolution.py        # AgentEvolutionEngine — role/plan/SOP self-evolution
-│   │   │   └── turn_runner.py    # Unified conversational turn loop
+│   │   ├── cli/                # Command-line tools
+│   │   │   └── commands/       # init, validate, install, generate, list, trace
+│   │   ├── execution/          # CodeAct execution base layer
+│   │   │   ├── code_act.py     # CodeAct execution engine
+│   │   │   ├── code_cache.py   # CodeAct similarity cache
+│   │   │   └── code_safety.py  # Static safety audit for generated code
 │   │   ├── skills/             # Skill ecosystem
 │   │   │   ├── skill_dag.py    # Self-evolving typed knowledge graph
-│   │   │   ├── loader.py       # Unified SKILL.md + scripts/ loader (builtin/external/user)
+│   │   │   ├── loader.py       # Unified SKILL.md + scripts/ loader
 │   │   │   ├── runtime.py      # Sandbox execution with schema validation
 │   │   │   ├── registry.py     # Skill discovery & registration
+│   │   │   ├── promotion.py    # Promote CodeAct runs to skills
 │   │   │   └── models.py       # Pydantic skill definitions
 │   │   ├── stability/          # Quality assurance
-│   │   │   ├── schema_validator.py   # L1: JSON Schema validation
-│   │   │   ├── version_locker.py     # L2: version locking
-│   │   │   └── regression_tester.py  # L2: regression baselines
+│   │   │   ├── schema_validator.py
+│   │   │   ├── version_locker.py
+│   │   │   └── regression_tester.py
+│   │   ├── tools/              # Atomic tool registry + cross-process invocation
+│   │   │   ├── registry.py
+│   │   │   ├── approval.py
+│   │   │   └── invoke_tool.py
 │   │   ├── workspace/          # Data provenance & persistence
-│   │   │   ├── manager.py      # Persistent workspace + artifact registry
-│   │   │   └── lineage.py      # Data provenance graph
 │   │   ├── reproducibility/    # Audit trail
-│   │   │   └── engine.py       # Bundle capture (code, plan, HITL, env)
-│   │   ├── tools/              # Atomic tool registry with role filtering
 │   │   ├── context/            # Working memory, semantic memory, compression
 │   │   ├── knowledge/          # CBKB: 5-layer domain-specific knowledge base
-│   │   │   ├── cbkb.py             # ExperimentGraph, ParameterLore, AnomalyArchive, LabSOP, SkillEvolutionLog
-│   │   │   └── curator.py        # CBKBCurator — auto-distillation, clustering, narrative reports
-│   │   ├── hpc/                # SLURM, Nextflow, local schedulers
-│   │   ├── viz/                # Plotly-based visualization engine
-│   │   ├── reports/            # HTML/Markdown report generation
+│   │   ├── jobs/               # Background job queue + worker
 │   │   └── api/                # FastAPI REST + WebSocket endpoints
-│   └── tests/                  # 814 tests
+│   └── tests/                  # 901 tests
 ├── frontend/
 │   └── src/
 │       ├── components/
 │       │   ├── chat/           # Chat panel, HITL forms, plot rendering
 │       │   ├── workspace/      # Workflow canvas, tabs
 │       │   ├── reports/        # Report list + viewer
-│       │   └── skills/         # Skill search + generator
+│       │   ├── skills/         # Skill search + manager + generator
+│       │   └── domains/        # Domain marketplace
 │       └── stores/             # Zustand state management
 ├── Dockerfile
 ├── docker-compose.yml
 └── docs/
-    ├── architecture.md         # v0.4.1 architecture principles
-    └── setup.md
+    ├── architecture.md
+    ├── design.md
+    ├── operations.md
+    ├── domain-extension-guide.md
+    ├── roadmap-v0.5.md
+    └── homomics-lab-improvement-plan-v1.0.md
 ```
 
 ---
 
 ## API Endpoints
 
+### Chat & Execution
 | Endpoint | Description |
 |---|---|
 | `POST /api/chat/send` | Send message to agent |
 | `POST /api/chat/hitl/respond` | Respond to HITL checkpoint |
+| `POST /api/chat/debate/respond` | Respond to a debate choice |
+| `WS /api/chat/ws/{session_id}` | Real-time chat WebSocket |
+| `POST /api/chat/sla` | Assess confidence/execution mode before running |
+
+### Skills
+| Endpoint | Description |
+|---|---|
 | `GET /api/skills/` | List all skills |
-| `GET /api/skills/search?q=` | Semantic + graph-boosted skill search |
-| `POST /api/viz/plot` | Generate plot |
-| `POST /api/reports/create` | Create analysis report |
-| `GET /api/reports/{id}/html` | Export self-contained HTML report |
-| `POST /api/skill-generator/generate` | Auto-generate skill from requirements |
-| `POST /api/domains/install` | Install domain from upload |
-| `GET /api/domains/` | List installed domains |
-| `POST /api/domains/reload` | Hot-reload a domain |
-| `POST /api/skills/{id}/trust` | Trust/untrust an external skill |
+| `GET /api/skills/search?q=` | Keyword search skills |
+| `GET /api/skills/{id}` | Get skill details |
+| `POST /api/skills/import` | Import skill from path/git/zip |
+| `POST /api/skills/{id}/update` | Re-import/update a skill |
+| `DELETE /api/skills/{id}` | Remove a skill |
+| `POST /api/skills/{id}/enable` | Enable a skill |
+| `POST /api/skills/{id}/disable` | Disable a skill |
+| `POST /api/skills/{id}/validate` | Validate skill directory structure |
+| `POST /api/skills/{id}/test` | Run skill's built-in tests |
+| `POST /api/skills/{id}/trust` | Mark skill trusted/untrusted |
+| `POST /api/skills/promote` | Promote CodeAct run to curated skill |
+| `POST /api/skills/lock` | Create project version lock |
 | `GET /api/skills/tools/pending` | List pending high-risk tool approvals |
 | `POST /api/skills/approve-tool/{call_id}` | Approve a high-risk tool call |
 | `POST /api/skills/reject-tool/{call_id}` | Reject a high-risk tool call |
+
+### Plans & Jobs
+| Endpoint | Description |
+|---|---|
+| `GET /api/plan/{plan_id}` | Get plan details |
+| `POST /api/plan/{plan_id}/approve` | Approve a plan |
+| `POST /api/plan/{plan_id}/reject` | Reject a plan |
+| `POST /api/plan/{plan_id}/modify` | Modify and approve/reject a plan |
+| `GET /api/execution/{job_id}/status` | Get job execution status |
+
+### Domains & Marketplace
+| Endpoint | Description |
+|---|---|
+| `GET /api/domains/` | List available domain templates |
+| `POST /api/domains/import` | Import domain from path/git/zip |
+| `POST /api/domains/import-zip` | Upload and import domain zip |
+| `POST /api/domains/{id}/export` | Export domain template as zip |
+| `POST /api/domains/import-templates` | Import code templates into a domain |
+
+### Projects, Reports & Viz
+| Endpoint | Description |
+|---|---|
+| `GET /api/projects` | List projects |
+| `POST /api/projects` | Create project |
+| `GET /api/projects/{id}` | Get project details |
+| `POST /api/projects/{id}/lock-versions` | Lock environment versions |
+| `POST /api/viz/plot` | Generate plot |
+| `POST /api/reports/create` | Create analysis report |
+| `GET /api/reports/{id}/html` | Export self-contained HTML report |
+
+---
+
+## CLI
+
+```bash
+# Initialize a new domain
+homomics init metagenomics --phases "qc,denoising,taxonomy,diversity"
+
+# Validate a domain.yaml
+homomics validate domain.yaml
+
+# Install a domain
+homomics install ./metagenomics --domains-dir ./backend/homomics_lab/domains
+
+# Generate a domain from a description (requires OPENAI_API_KEY)
+homics generate "16S amplicon analysis with DADA2 and QIIME2"
+
+# List installed domains
+homomics list --domains-dir ./backend/homomics_lab/domains
+```
 
 ---
 
@@ -367,17 +368,18 @@ HomomicsLab/
 
 ```bash
 pytest backend/tests/ -q
-# 814 tests passing
+# 901 passed
 ```
 
 Coverage spans:
 - **Agent layer**: Dynamic roles, adaptive planning, interpretation, orchestration, task state machine
-- **Skill layer**: DAG evolution, unified loader, sandbox execution, semantic search
+- **Skill layer**: DAG evolution, unified loader, sandbox execution, semantic search, CodeAct cache
 - **Stability layer**: Schema validation, version locking, regression testing
 - **Workspace layer**: Path resolution, artifact registry, lineage graph, snapshots
 - **Reproducibility layer**: Bundle capture, JSON roundtrip, environment lock
 - **Integration layer**: AgentCore + Orchestrator, PlanEngine + AgentCore, Workspace + VersionLocker
 - **Domain layer**: Domain declaration models, loader, registry, validation, hot-reload
+- **Tool layer**: Cross-process invocation, approval flow, risk levels
 
 ---
 
@@ -388,13 +390,17 @@ Environment variables (prefix `HOMOMICS_`):
 | Variable | Default | Description |
 |---|---|---|
 | `HOMOMICS_PORT` | `8080` | API server port |
+| `HOMOMICS_DATABASE_URL` | `sqlite+aiosqlite:///./homomics_lab.db` | Database URL |
 | `HOMOMICS_EXTERNAL_SKILLS_DIR` | — | Path to external skill collection |
 | `HOMOMICS_SEMANTIC_SEARCH_MODEL` | — | Set to `all-MiniLM-L6-v2` for dense embeddings |
 | `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, or `auto` |
-| `HOMOMICS_SKILLS_SHELL_EXECUTION_ENABLED` | `false` | Allow `!command` injection in SKILL.md |
+| `HOMOMICS_FORCE_SANDBOX` | `true` | Route shell/code execution through sandbox |
 | `HOMOMICS_INTERACTIVE_MODE` | `false` | Require approval for high-risk tool calls |
-| `HOMOMICS_QUEUE_BACKEND` | `memory` | `memory` or `redis` |
+| `HOMOMICS_CODEACT_CACHE_ENABLED` | `true` | Enable CodeAct code cache |
+| `HOMOMICS_SKILL_CACHE_ENABLED` | `true` | Enable skill result memoization |
 | `HOMOMICS_WORKER_MODE` | `true` | Start a local worker inside the API process |
+| `HOMOMICS_CURATION_ENABLED` | `false` | Enable nightly CBKB curation |
+| `HOMOMICS_EVOLUTION_ENABLED` | `false` | Enable nightly agent evolution |
 
 ---
 
@@ -404,6 +410,18 @@ Environment variables (prefix `HOMOMICS_`):
 - **Frontend**: React 18, TypeScript, Tailwind CSS, Zustand, TanStack Query, Plotly.js
 - **Workflows**: Nextflow (DSL2), SLURM (sbatch/sacct)
 - **Deployment**: Docker, Docker Compose, nginx
+
+---
+
+## Roadmap
+
+See [`docs/roadmap-v0.5.md`](docs/roadmap-v0.5.md) and [`docs/homomics-lab-improvement-plan-v1.0.md`](docs/homomics-lab-improvement-plan-v1.0.md) for detailed plans.
+
+High-level next steps:
+- Expand built-in and community skill coverage across single-cell, spatial, genomics, and metagenomics.
+- Strengthen the self-evolution loop as execution history accumulates.
+- Improve out-of-the-box experience for individual users (local model defaults, example datasets, guided onboarding).
+- Harden long-running job reliability and resource monitoring for personal devices.
 
 ---
 

@@ -14,7 +14,7 @@ from homomics_lab.config import settings
 from homomics_lab.data import DataStore, ResultReference
 from homomics_lab.skills.agent_executor import AgentSkillExecutor
 from homomics_lab.skills.cache import SkillCache
-from homomics_lab.skills.code_act import run_code_act
+from homomics_lab.execution.code_act import run_code_act
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 from homomics_lab.skills.tracker import SkillPerformanceTracker

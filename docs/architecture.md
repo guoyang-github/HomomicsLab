@@ -46,7 +46,13 @@ HomomicsLab uses a layered hybrid architecture:
 - `skills/runtime.py` — **SkillRuntimeExecutor**: sandboxed execution with schema validation, caching, and data offloading
 - `skills/skill_dag.py` — **SkillDAG**: self-evolving typed graph for skill discovery and relationship tracking (used for selection assistance, NOT plan generation)
 - `skills/cache.py` — **SkillCache**: disk-based memoization of deterministic skill results
+- `skills/promotion.py` — **TransientSkillPromoter**: promotes a successful CodeAct run into a curated `SKILL.md + scripts/` skill package
 - `skills/models.py` — Pydantic models for skill definitions (input/output schema, runtime, metadata)
+
+### Execution Layer (`execution/`)
+- `execution/code_act.py` — **CodeAct executor**: generates and runs Python/R/Bash code that composes skills, tools, and libraries
+- `execution/code_cache.py` — **CodeActCache**: embedding-based similarity cache for CodeAct-generated code so similar tasks reuse prior generated code instead of calling the LLM
+- `execution/code_safety.py` — static safety audit for LLM-generated CodeAct code
 - `skills/semantic_search_v2.py` — optional dense semantic skill retrieval (sentence-transformers) with TF-IDF fallback
 
 ### Data Layer (`data/`)
@@ -55,7 +61,7 @@ HomomicsLab uses a layered hybrid architecture:
 ### Stability Layer (`stability/`)
 - `stability/schema_validator.py` — **SchemaValidator** (L1): strict JSON Schema validation for skill inputs/outputs
 - `stability/version_locker.py` — **VersionLocker** (L2): project-level version locking (skills, environment, Python version)
-- `stability/regression_tester.py` — **RegressionTester** (L2): lightweight regression baselines for skill output drift detection
+- `stability/regression_tester.py` — **RegressionTester** (L2): lightweight regression baselines for skill output drift detection; baselines are auto-recorded after successful CodeAct runs
 
 ### Workspace Layer (`workspace/`)
 - `workspace/manager.py` — **WorkspaceManager**: persistent project directories with artifact registry, SHA-256 checksums, data lineage graph, snapshots, and version locking integration
@@ -67,6 +73,13 @@ HomomicsLab uses a layered hybrid architecture:
 ### Tools Layer (`tools/`)
 - `tools/registry.py` — **ToolRegistry**: atomic tool capability registry (file_read/write/list, shell_exec, web_search, memory_search) with role-based access control and `risk_level` metadata
 - `tools/approval.py` — **ToolApprovalStore**: interactive approval flow for high-risk tool calls when `HOMOMICS_INTERACTIVE_MODE=true`
+- `tools/invoke_tool.py` — **cross-process tool invocation protocol**: executes atomic tools in isolated subprocesses/sandboxes (`local`, `bubblewrap`, `container`) so high-risk operations never run inside the API process
+
+### Domain Layer (`domain/`)
+- `domain/loader.py` — **DomainLoader**: reads a single `domain.yaml` and registers skills, strategies, intents, DAG seeds, roles, and SOPs
+- `domain/registry.py` — **DomainRegistry**: central store for loaded domains with hot-reload support
+- `domain/marketplace.py` — **DomainMarketplace**: import/export domain templates from local paths, zip archives, or git URLs
+- `domain/hot_reload.py` — **DomainHotReloader / SkillHotReloader**: runtime reload of domain declarations and external skills
 
 ### Observability Layer (`observability/`)
 - `observability/trace_store.py` — **TraceStore**: persistent execution traces with correlation IDs, structured per job / task / phase
@@ -94,8 +107,10 @@ HomomicsLab uses a layered hybrid architecture:
 
 7. **Result offloading by default**: Large objects never travel as inline JSON; `DataStore` serializes them to the workspace and returns a `ResultReference`.
 
-8. **Deterministic caching**: Identical skill inputs + fingerprint skip execution entirely via `SkillCache`.
+8. **Deterministic caching**: Identical skill inputs + fingerprint skip execution entirely via `SkillCache`; similar CodeAct tasks reuse cached generated code via `CodeActCache`.
 
-9. **Defense in depth for tools**: High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`; interactive mode requires explicit approval before invocation.
+9. **Defense in depth for tools**: High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`; interactive mode requires explicit approval before invocation; cross-process sandbox execution isolates tool side effects from the API process.
 
 10. **Reproducibility per job**: Every background job produces a finalized `ReproducibilityBundle`, and outcomes are ingested into CBKB for self-evolution.
+
+11. **Auto-regression baselines**: Successful CodeAct executions automatically record baselines so future runs can be checked for drift.

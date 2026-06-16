@@ -43,10 +43,21 @@ HomomicsLab is a **domain-native agent platform** for computational biology. It 
 │  │ (discovery)   │  │ (SKILL.md)    │  │ (typed graph) │  │ (sandbox)     │   │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
 │                                                                              │
+│                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                    ToolRegistry (atomic capabilities)                   │ │
 │  │  file_read/write/list · shell_exec · web_search · memory_search       │ │
+│  │  invoke_tool (local · bubblewrap · container)                         │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EXECUTION BASE LAYER                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │
+│  │ CodeAct       │  │ CodeActCache  │  │ CodeSafety    │                      │
+│  │ (executor)    │  │ (similarity)  │  │ (audit)       │                      │
+│  └──────────────┘  └──────────────┘  └──────────────┘                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -279,6 +290,18 @@ The `DomainLoader` reads `domain.yaml` and automatically:
 - Registers DAG seeds via `SkillDAG`
 - Registers SOPs via `CBKB`
 - Exposes intent config to `IntentAnalyzer` via `DomainRegistry`
+
+### Domain Template Marketplace
+
+Domains can be shared as self-contained templates via the `DomainMarketplace`:
+
+- **List**: `GET /api/domains/` returns built-in and imported domain templates.
+- **Import**: `POST /api/domains/import` accepts a local path, zip archive, or git URL.
+- **Upload**: `POST /api/domains/import-zip` accepts a zip upload.
+- **Export**: `POST /api/domains/{id}/export` creates a portable zip of the domain.
+- **Code templates**: `POST /api/domains/import-templates` injects reusable code templates into an existing domain.
+
+The marketplace is exposed in the frontend through the **Domains** workspace tab.
 
 ### Adding a New Skill (Legacy)
 

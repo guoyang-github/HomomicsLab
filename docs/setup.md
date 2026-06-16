@@ -41,4 +41,26 @@ homomics --version
 # Start server
 homomics start
 homomics start --port 9000 --reload
+
+# Domain management
+homomics init metagenomics --phases "qc,denoising,taxonomy"
+homomics validate domain.yaml
+homomics install ./metagenomics --domains-dir ./backend/homomics_lab/domains
+homomics list --domains-dir ./backend/homomics_lab/domains
+```
+
+## Useful Configuration
+
+```bash
+# Run with a local/embedded model instead of OpenAI
+export HOMOMICS_LLM_PROVIDER=openai-compatible
+export HOMOMICS_LLM_BASE_URL=http://localhost:11434/v1
+export HOMOMICS_LLM_MODEL=qwen2.5:14b
+
+# Enable bubblewrap/container sandbox for high-risk tools
+export HOMOMICS_FORCE_SANDBOX=true
+export HOMOMICS_SKILL_SANDBOX_BACKEND=bubblewrap
+
+# Disable CodeAct cache for debugging
+export HOMOMICS_CODEACT_CACHE_ENABLED=false
 ```

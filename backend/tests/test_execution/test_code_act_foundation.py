@@ -4,7 +4,7 @@
 import pytest
 
 from homomics_lab.agent.retrieval import RetrievedTool, RetrievalContext
-from homomics_lab.skills.code_act import (
+from homomics_lab.execution.code_act import (
     _build_tool_module,
     _format_retrieval_context,
     execute_code,

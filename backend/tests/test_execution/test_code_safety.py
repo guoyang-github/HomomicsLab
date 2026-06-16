@@ -1,7 +1,7 @@
 """Tests for CodeAct safety scanner."""
 
 
-from homomics_lab.skills.code_safety import CodeSafetyScanner, requires_hitl
+from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
 
 
 def test_safe_code_passes():

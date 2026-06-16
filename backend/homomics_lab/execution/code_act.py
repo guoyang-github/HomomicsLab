@@ -64,7 +64,7 @@ async def generate_code_async(
 ) -> str:
     """Async version of ``generate_code`` for use inside async callers."""
     from homomics_lab.config import settings
-    from homomics_lab.skills.code_cache import CodeActCache
+    from homomics_lab.execution.code_cache import CodeActCache
 
     cache = CodeActCache(settings.codeact_cache_dir) if settings.codeact_cache_enabled else None
     if cache is not None:
@@ -400,7 +400,7 @@ async def execute_code(
     execution is refused.
     """
     from homomics_lab.config import settings
-    from homomics_lab.skills.code_safety import CodeSafetyScanner, requires_hitl
+    from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
     from homomics_lab.skills.sandbox import BubblewrapSandbox, ContainerSandbox, LocalSandbox, Sandbox
 
     # Static safety scan and optional HITL gate.
