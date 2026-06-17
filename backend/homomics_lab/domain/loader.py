@@ -11,6 +11,7 @@ from homomics_lab.domain.models import (
 )
 from homomics_lab.agent.plan.models import DataState, Phase
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StateCheck, StrategyLibrary
+from homomics_lab.knowledge.cbkb import CBKB, LabSOP
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -115,10 +116,12 @@ class DomainLoader:
         skill_registry: SkillRegistry,
         strategy_lib: StrategyLibrary,
         skill_dag: Optional[Any] = None,
+        cbkb: Optional[CBKB] = None,
     ):
         self.skill_registry = skill_registry
         self.strategy_lib = strategy_lib
         self.skill_dag = skill_dag
+        self.cbkb = cbkb
         self.validator = DomainValidator(skill_registry, strategy_lib)
 
     def load(self, domain_yaml_path: Path) -> DomainDefinition:
@@ -307,24 +310,34 @@ class DomainLoader:
 
     def _register_sops(self, domain: DomainDefinition) -> None:
         """Register SOPs into CBKB."""
-        # Lazy import to avoid circular dependency
-        try:
-            from homomics_lab.knowledge.cbkb import CBKB, LabSOP
+        if self.cbkb is None or not domain.sops:
+            return
 
-            cbkb = CBKB(base_dir=".")
-            for sop_def in domain.sops:
-                sop = LabSOP(
-                    id=sop_def.id,
-                    title=sop_def.title,
-                    version=sop_def.version,
-                    category=domain.domain,
-                    locked=sop_def.locked,
-                    content=sop_def.content,
+        import sqlite3
+
+        for sop_def in domain.sops:
+            sop = LabSOP(
+                id=sop_def.id,
+                name=sop_def.title,
+                category=domain.domain,
+                template={
+                    "steps": sop_def.steps,
+                    "content": sop_def.content,
+                },
+                derived_from_bundle_ids=[],
+                version=sop_def.version,
+                locked=sop_def.locked,
+            )
+            try:
+                self.cbkb.create_sop(sop)
+            except sqlite3.IntegrityError:
+                # SOP already exists; leave the existing record untouched.
+                pass
+            except Exception as exc:
+                print(
+                    f"Warning: Failed to register SOP '{sop_def.id}' for domain "
+                    f"'{domain.domain}': {exc}"
                 )
-                cbkb.create_sop(sop)
-        except (ImportError, TypeError, Exception):
-            # CBKB not available or not properly initialized, skip SOP registration
-            pass
 
     def generate_intent_config(self, domain: DomainDefinition) -> Dict[str, Any]:
         """Generate intent analyzer configuration from domain definition."""

@@ -581,19 +581,23 @@ runner = TurnRunner(
 
 ---
 
-## 5. 当前已知限制
+## 5. 已修复的已知限制
 
 1. **Domain SOP 模型不匹配**
-   - `domain.yaml` 中 SOP 使用 `steps` 列表。
-   - `DomainSOP` 模型期望 `content` 字符串。
-   - `LabSOP` 数据类期望 `template` 字典。
-   - 因此领域 SOP 目前未成功写入 CBKB。
+   - `DomainSOP` 同时接受 `steps` 列表与 `content` 字符串，保持向后兼容。
+   - `DomainLoader` 在初始化时接收 `CBKB` 实例，`_register_sops()` 按 `LabSOP` 数据类构造 `template` 字典并写入 CBKB。
+   - 启动流程中 CBKB 提前实例化，确保领域加载阶段即可使用。
 
 2. **MemoryManager CBKB 增强未完整实现**
-   - `enrich_context()` 仅初始化了空列表，尚未真正查询 CBKB。
+   - `MemoryManager.enrich_context()` 现在会查询 CBKB：
+     - 当前项目最近的实验节点（`list_experiment_nodes_by_project`）。
+     - 最近使用 skill 的参数经验（`query_parameter_lore`，支持按项目过滤）。
+     - 最近归档的 SOP 列表（`list_sops`）。
+     - 当前项目的异常记录（`query_anomalies`）。
 
 3. **外部 skill 默认不信任**
-   - 社区 skill 需要显式 trust 后才能执行脚本，这是安全设计，但需要用户注意。
+   - 自动发现的同级社区 skill 仓库（如 `NanoResearch-Skills`、`Genomics-Skills` 等）中的 skill 会被自动标记为 `trusted`，降低本地开发摩擦。
+   - 通过 `HOMOMICS_EXTERNAL_SKILLS_DIRS` 显式配置的外部目录仍需手动 trust，保留安全边界。
 
 ---
 

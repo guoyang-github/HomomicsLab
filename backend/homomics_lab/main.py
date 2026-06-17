@@ -16,7 +16,6 @@ from homomics_lab.logging_config import (
     new_correlation_id,
     set_correlation_id,
 )
-from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.plan import PlanStore
 from homomics_lab.scheduler import HomomicsScheduler
 from homomics_lab.api.router import api_router
@@ -44,9 +43,8 @@ async def lifespan(app: FastAPI):
     app.state.memory_manager = ctx["memory_manager"]
 
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
-    cbkb = CBKB(base_dir=settings.data_dir)
+    cbkb = ctx["cbkb"]
     app.state.cbkb = cbkb
-    ctx["memory_manager"].cbkb = cbkb
 
     print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
     for external_skills in settings.external_skills_dirs:

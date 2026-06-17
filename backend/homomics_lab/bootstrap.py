@@ -19,6 +19,7 @@ from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
 from homomics_lab.domain.hot_reload import DomainHotReloader, SkillHotReloader
 from homomics_lab.agent.plan.strategies import StrategyLibrary
+from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.builtin import register_builtin_skills
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.llm_client import LLMClient
@@ -121,6 +122,9 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # for SQLite/dev/test environments where Alembic may not have been run yet.
     await _ensure_database_schema()
 
+    # CBKB is created early so domain loading and memory management can use it.
+    cbkb = CBKB(base_dir=settings.data_dir)
+
     # Tools
     tool_registry = ToolRegistry()
     register_all_builtin_tools(tool_registry)
@@ -159,7 +163,8 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # Each skill subdirectory is copied to data/skill_store/imported/<namespace>/
     # so the runtime no longer depends on the original external location.
     discovery_loader = SkillLoader(registry=skill_executor.registry)
-    external_dirs = settings.external_skills_dirs or _discover_external_skill_dirs()
+    auto_trusted_dirs = _discover_external_skill_dirs()
+    external_dirs = settings.external_skills_dirs or auto_trusted_dirs
 
     # Normalize collection folder names to clean namespaces and remove stale
     # imported directories (e.g. old "external" or renamed collections).
@@ -177,6 +182,10 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         if not external_skills_dir.exists():
             continue
         namespace = _namespace_for_external_dir(external_skills_dir)
+        # Auto-trust skills discovered from the canonical sibling repos to reduce
+        # friction in local development. Explicitly configured directories still
+        # require manual trust unless they are also discovered siblings.
+        auto_trust = external_skills_dir in auto_trusted_dirs
         for skill_path in external_skills_dir.iterdir():
             if not skill_path.is_dir():
                 continue
@@ -194,8 +203,12 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                     namespace=namespace,
                     enable=True,
                 )
+                if auto_trust:
+                    skill = skill_store.trust_skill(
+                        skill.id, namespace=namespace, trusted=True
+                    )
                 skill.metadata["namespace"] = namespace
-                skill.metadata["trusted"] = False
+                skill.metadata.setdefault("trusted", False)
                 skill_executor.register_skill(skill)
             except Exception as exc:
                 print(f"Warning: Failed to import skill from {skill_path}: {exc}")
@@ -217,6 +230,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         skill_registry=skill_executor.registry,
         strategy_lib=strategy_library,
         skill_dag=skill_dag,
+        cbkb=cbkb,
     )
     domains_dir = Path(__file__).parent / "domains"
     loaded_domains = []
@@ -270,7 +284,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     memory_manager = MemoryManager(
         session_store=session_store,
         semantic_memory=semantic_memory,
-        cbkb=None,  # wired later if available
+        cbkb=cbkb,
     )
 
     return {
@@ -286,4 +300,5 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "mcp_client": mcp_client,
         "llm_client": llm_client,
         "memory_manager": memory_manager,
+        "cbkb": cbkb,
     }

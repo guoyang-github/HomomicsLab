@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.context.semantic_memory import SemanticMemory
 from homomics_lab.context.session_store import SessionState, SessionStore
@@ -49,21 +49,70 @@ class MemoryManager:
         working_memory: WorkingMemory,
     ) -> Dict[str, Any]:
         """Retrieve relevant historical context for the current turn."""
-        context: Dict[str, Any] = {"memory_snippets": [], "parameter_preferences": []}
+        context: Dict[str, Any] = {
+            "memory_snippets": [],
+            "recent_experiments": [],
+            "recent_sops": [],
+            "recent_anomalies": [],
+            "parameter_preferences": [],
+        }
 
-        if self.semantic_memory is None:
-            return context
-
-        try:
-            query = f"{user_message} project:{project_id}"
-            results = await self.semantic_memory.search(query, top_k=5)
-            context["memory_snippets"] = [r["text"] for r in results]
-        except Exception:
-            logger.warning("Semantic memory search failed; continuing without it", exc_info=True)
+        if self.semantic_memory is not None:
+            try:
+                query = f"{user_message} project:{project_id}"
+                results = await self.semantic_memory.search(query, top_k=5)
+                context["memory_snippets"] = [r["text"] for r in results]
+            except Exception:
+                logger.warning("Semantic memory search failed; continuing without it", exc_info=True)
 
         if self.cbkb is not None:
             try:
-                context["parameter_preferences"] = []
+                experiments = self.cbkb.list_experiment_nodes_by_project(project_id, limit=5)
+                context["recent_experiments"] = [
+                    {
+                        "bundle_id": n.bundle_id,
+                        "summary": n.summary,
+                        "skills_used": n.skills_used,
+                        "phases": n.phases,
+                    }
+                    for n in experiments
+                ]
+
+                skills_used = {s for n in experiments for s in n.skills_used}
+                parameter_preferences: List[Dict[str, Any]] = []
+                for skill_id in skills_used:
+                    entries = self.cbkb.query_parameter_lore(
+                        skill_id=skill_id, project_id=project_id, limit=3
+                    )
+                    parameter_preferences.extend(
+                        {
+                            "skill_id": e.skill_id,
+                            "param_name": e.param_name,
+                            "param_value": e.param_value,
+                            "outcome_metric": e.outcome_metric,
+                            "outcome_value": e.outcome_value,
+                            "context": e.context,
+                        }
+                        for e in entries
+                    )
+                context["parameter_preferences"] = parameter_preferences
+
+                sops = self.cbkb.list_sops()[:5]
+                context["recent_sops"] = [
+                    {"id": s.id, "name": s.name, "category": s.category}
+                    for s in sops
+                ]
+
+                anomalies = self.cbkb.query_anomalies(project_id=project_id, limit=5)
+                context["recent_anomalies"] = [
+                    {
+                        "phase_type": a.phase_type,
+                        "summary": a.summary,
+                        "severity": a.severity,
+                        "recommendations": a.recommendations,
+                    }
+                    for a in anomalies
+                ]
             except Exception:
                 logger.warning("CBKB enrichment failed; continuing without it", exc_info=True)
 

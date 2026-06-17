@@ -278,6 +278,33 @@ class CBKB:
             metadata=json.loads(row[6]),
         )
 
+    def list_experiment_nodes_by_project(
+        self, project_id: str, limit: int = 10
+    ) -> List[ExperimentNode]:
+        """Return recent experiment nodes for a given project."""
+        with sqlite3.connect(str(self.db_path)) as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM experiment_nodes
+                WHERE project_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (project_id, limit),
+            ).fetchall()
+        return [
+            ExperimentNode(
+                bundle_id=r[0],
+                project_id=r[1],
+                created_at=r[2],
+                skills_used=json.loads(r[3]),
+                phases=json.loads(r[4]),
+                summary=r[5],
+                metadata=json.loads(r[6]),
+            )
+            for r in rows
+        ]
+
     # ── Layer 2: Parameter Lore ─────────────────────
 
     def add_parameter_lore(self, entry: ParameterLoreEntry) -> None:
@@ -307,6 +334,7 @@ class CBKB:
         skill_id: Optional[str] = None,
         param_name: Optional[str] = None,
         min_outcome: Optional[float] = None,
+        project_id: Optional[str] = None,
         limit: int = 50,
     ) -> List[ParameterLoreEntry]:
         conditions = []
@@ -320,6 +348,9 @@ class CBKB:
         if min_outcome is not None:
             conditions.append("outcome_value >= ?")
             params.append(min_outcome)
+        if project_id:
+            conditions.append("project_id = ?")
+            params.append(project_id)
 
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
         sql = f"SELECT * FROM parameter_lore {where} ORDER BY created_at DESC LIMIT ?"

@@ -118,6 +118,7 @@ class DomainSOP(BaseModel):
     version: str = "1.0.0"
     locked: bool = False
     content: str = ""
+    steps: List[str] = Field(default_factory=list)
 
 
 class DomainDefinition(BaseModel):
