@@ -9,7 +9,7 @@ from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.database import Base, async_engine
 from homomics_lab.models.common import ChatMessage, MessageType
-from homomics_lab.plan import Plan, PlanStatus, PlanStore
+from homomics_lab.plan import Plan, PlanModification, PlanStatus, PlanStore
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
@@ -141,3 +141,71 @@ async def test_plan_round_trip_with_fallback(store):
     assert fetched.is_fallback is True
     assert fetched.plan_result.is_fallback is True
     assert len(fetched.plan_result.phases) == 2
+
+
+@pytest.mark.asyncio
+async def test_modify_plan_add_phase(store):
+    plan = _make_plan()
+    await store.create(plan)
+
+    new_plan = await store.modify(
+        plan.plan_id,
+        modifications=[
+            PlanModification(
+                phase_type="normalization",
+                action="add",
+                after="qc",
+                description="Normalize counts",
+                required=True,
+                skill_id="scanpy_normalize",
+            )
+        ],
+    )
+
+    assert new_plan.parent_plan_id == plan.plan_id
+    assert new_plan.version == plan.version + 1
+    phase_types = [p.phase_type for p in new_plan.plan_result.phases]
+    assert phase_types == ["qc", "normalization", "clustering"]
+    assert any(
+        t.get("from") == "qc" and t.get("to") == "normalization"
+        for t in new_plan.plan_result.phase_transitions
+    )
+
+
+@pytest.mark.asyncio
+async def test_modify_plan_remove_phase(store):
+    plan = _make_plan()
+    await store.create(plan)
+
+    new_plan = await store.modify(
+        plan.plan_id,
+        modifications=[PlanModification(phase_type="clustering", action="remove")],
+    )
+
+    phase_types = [p.phase_type for p in new_plan.plan_result.phases]
+    assert phase_types == ["qc"]
+    assert all(
+        t.get("from") != "clustering" and t.get("to") != "clustering"
+        for t in new_plan.plan_result.phase_transitions
+    )
+
+
+@pytest.mark.asyncio
+async def test_modify_plan_update_dependency(store):
+    plan = _make_plan()
+    await store.create(plan)
+
+    new_plan = await store.modify(
+        plan.plan_id,
+        modifications=[
+            PlanModification(
+                phase_type="clustering",
+                action="update_dependency",
+                dependencies=["qc"],
+            )
+        ],
+    )
+
+    clustering_task = next(t for t in new_plan.task_tree.tasks if t.name == "clustering")
+    qc_task = next(t for t in new_plan.task_tree.tasks if t.name == "qc")
+    assert qc_task.id in clustering_task.dependencies

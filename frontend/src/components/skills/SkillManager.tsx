@@ -11,6 +11,8 @@ import {
   PowerOff,
   Save,
   Download,
+  Search,
+  Quote,
 } from 'lucide-react'
 import { skillsApi } from '@/services/api'
 import type { SkillDetail, SkillTestResponse, SkillValidationResponse } from '@/types/api'
@@ -25,7 +27,9 @@ import {
   EmptyState,
   Select,
 } from '@/components/ui'
+import { useChatStore } from '@/stores/chatStore'
 import { toastError, toastSuccess } from '@/stores/toastStore'
+import { useTranslation } from '@/i18n'
 
 const categoryColors: Record<string, string> = {
   'single-cell': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
@@ -33,6 +37,10 @@ const categoryColors: Record<string, string> = {
   'workflows': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   'genomics': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   'agent_core': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  'utility': 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300',
+  'data_io': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'general': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
+  'mcp': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
 }
 
 const runtimeColors: Record<string, string> = {
@@ -45,9 +53,12 @@ const runtimeColors: Record<string, string> = {
 }
 
 export function SkillManager() {
+  const { t } = useTranslation()
+  const setDraftInput = useChatStore((state) => state.setDraftInput)
   const [skills, setSkills] = useState<SkillDetail[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null)
   const [importSource, setImportSource] = useState('')
   const [importNamespace, setImportNamespace] = useState('default')
@@ -66,11 +77,11 @@ export function SkillManager() {
       setSkills(response.data as SkillDetail[])
       setError('')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载 Skills 失败')
+      setError(err?.response?.data?.detail || t('skills.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadSkills()
@@ -87,11 +98,11 @@ export function SkillManager() {
         enable: true,
       })
       setImportSource('')
-      toastSuccess('Skill 导入成功')
+      toastSuccess(t('skills.importSuccess'))
       await loadSkills()
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '导入失败')
-      toastError(err?.response?.data?.detail || '导入失败')
+      setError(err?.response?.data?.detail || t('skills.importFailed'))
+      toastError(err?.response?.data?.detail || t('skills.importFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -105,25 +116,28 @@ export function SkillManager() {
       } else {
         await skillsApi.enableSkill(skill.id, skill.namespace)
       }
-      toastSuccess(`${skill.name} 已${skill.enabled ? '禁用' : '启用'}`)
+      toastSuccess(t('skills.toggleSuccess', {
+        name: skill.name,
+        action: t(skill.enabled ? 'skills.disabled' : 'skills.enabled'),
+      }))
       await loadSkills()
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || '切换失败')
+      toastError(err?.response?.data?.detail || t('skills.toggleFailed'))
     } finally {
       setActionLoading(null)
     }
   }
 
   const handleRemove = async (skill: SkillDetail) => {
-    if (!confirm(`确定要移除 Skill "${skill.name}" 吗？`)) return
+    if (!confirm(t('skills.removeConfirm', { name: skill.name }))) return
     setActionLoading(skill.id)
     try {
       await skillsApi.removeSkill(skill.id, skill.namespace)
       setSelectedSkill(null)
-      toastSuccess('Skill 已移除')
+      toastSuccess(t('skills.removeSuccess'))
       await loadSkills()
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || '移除失败')
+      toastError(err?.response?.data?.detail || t('skills.removeFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -134,9 +148,9 @@ export function SkillManager() {
     try {
       const response = await skillsApi.validateSkill(skill.id, skill.namespace)
       setValidationResult(response.data)
-      toastSuccess(response.data.valid ? '验证通过' : '验证未通过')
+      toastSuccess(response.data.valid ? t('skills.validationPassed') : t('skills.validationNotPassed'))
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || '验证失败')
+      toastError(err?.response?.data?.detail || t('skills.validationFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -148,9 +162,9 @@ export function SkillManager() {
     try {
       const response = await skillsApi.testSkill(skill.id, skill.namespace)
       setTestResult(response.data)
-      toastSuccess(response.data.success ? '测试通过' : '测试失败')
+      toastSuccess(response.data.success ? t('skills.testPassed') : t('skills.testFailed'))
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || '测试失败')
+      toastError(err?.response?.data?.detail || t('skills.testFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -162,9 +176,9 @@ export function SkillManager() {
       const projectId = prompt('Project ID for lock file:', 'default-project') || 'default-project'
       const response = await skillsApi.lockSkills(projectId)
       setLockResult(JSON.stringify(response.data, null, 2))
-      toastSuccess('版本已锁定')
+      toastSuccess(t('skills.lockSuccess'))
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || '锁定失败')
+      toastError(err?.response?.data?.detail || t('skills.lockFailed'))
     } finally {
       setActionLoading(null)
     }
@@ -182,60 +196,93 @@ export function SkillManager() {
       })
       setPromoteSourceDir('')
       setPromoteName('')
-      toastSuccess('CodeAct 运行已升级为 Skill')
+      toastSuccess(t('skills.promoteSuccess'))
       await loadSkills()
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '升级失败')
-      toastError(err?.response?.data?.detail || '升级失败')
+      setError(err?.response?.data?.detail || t('skills.promoteFailed'))
+      toastError(err?.response?.data?.detail || t('skills.promoteFailed'))
     } finally {
       setActionLoading(null)
     }
   }
 
+  const allowedSources = new Set(['external', 'imported'])
+  const isHiddenSkill = (s: SkillDetail) =>
+    !allowedSources.has(s.source) || s.category === 'agent_core' || s.id.startsWith('core_')
+  const query = search.trim().toLowerCase()
+  const displaySkills = skills.filter((s) => {
+    if (isHiddenSkill(s)) return false
+    if (!query) return true
+    return (
+      s.name.toLowerCase().includes(query) ||
+      s.id.toLowerCase().includes(query) ||
+      s.description.toLowerCase().includes(query) ||
+      s.category.toLowerCase().includes(query)
+    )
+  })
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border bg-card px-4 py-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Skill 管理</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('skills.title')}</h2>
           <Button onClick={handleLock} loading={actionLoading === 'lock'} variant="secondary">
             <Lock className="mr-1.5 h-4 w-4" />
-            锁定版本
+            {t('skills.lock')}
           </Button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('skills.searchPlaceholder')}
+            className="pl-9"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-end gap-2">
           <Input
             value={importSource}
             onChange={(e) => setImportSource(e.target.value)}
-            placeholder="路径、Git URL 或 zip 压缩包..."
+            placeholder={t('skills.importPlaceholder')}
             className="flex-1"
           />
           <Input
             value={importNamespace}
             onChange={(e) => setImportNamespace(e.target.value)}
-            placeholder="命名空间"
+            placeholder={t('skills.namespace')}
             className="w-32"
           />
           <Button onClick={handleImport} loading={actionLoading === 'import'} disabled={!importSource.trim()}>
-            导入
+            {t('skills.import')}
           </Button>
         </div>
 
         <Card className="mt-3">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">将 CodeAct 运行升级为 Skill</CardTitle>
+            <CardTitle className="text-sm">{t('skills.promoteTitle')}</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 sm:flex-row">
+          <CardContent className="flex flex-col items-start gap-2 sm:flex-row sm:items-end">
             <Input
               value={promoteSourceDir}
               onChange={(e) => setPromoteSourceDir(e.target.value)}
-              placeholder="CodeAct 工作目录路径..."
+              placeholder={t('skills.promoteSource')}
               className="flex-1"
             />
             <Input
               value={promoteName}
               onChange={(e) => setPromoteName(e.target.value)}
-              placeholder="Skill 名称（可选）"
+              placeholder={t('skills.promoteName')}
               className="w-48"
             />
             <Select
@@ -257,7 +304,7 @@ export function SkillManager() {
               className="bg-success hover:bg-success-700"
             >
               <Save className="mr-1.5 h-4 w-4" />
-              保存为 Skill
+              {t('skills.promote')}
             </Button>
           </CardContent>
         </Card>
@@ -276,17 +323,17 @@ export function SkillManager() {
             </div>
           )}
 
-          {!loading && skills.length === 0 && (
+          {!loading && displaySkills.length === 0 && (
             <EmptyState
               icon={Download}
-              title="暂无 Skills"
-              description="导入或启用 Skills 以开始使用"
-              action={{ label: '刷新', onClick: loadSkills }}
+              title={t('skills.empty')}
+              description={t('skills.emptyDesc')}
+              action={{ label: t('common.refresh'), onClick: loadSkills }}
             />
           )}
 
           <div className="divide-y divide-border">
-            {skills.map((skill) => (
+            {displaySkills.map((skill) => (
               <button
                 key={`${skill.namespace}:${skill.id}`}
                 onClick={() => {
@@ -308,7 +355,7 @@ export function SkillManager() {
                       <Badge className={categoryColors[skill.category] || 'bg-slate-100 text-slate-600'} size="sm">
                         {skill.category}
                       </Badge>
-                      {!skill.enabled && <Badge variant="secondary" size="sm">已禁用</Badge>}
+                      {!skill.enabled && <Badge variant="secondary" size="sm">{t('skills.disabledBadge')}</Badge>}
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{skill.description}</p>
                   </div>
@@ -345,7 +392,7 @@ export function SkillManager() {
                 loading={actionLoading === selectedSkill.id}
               >
                 {selectedSkill.enabled ? <PowerOff className="mr-1.5 h-3.5 w-3.5" /> : <Power className="mr-1.5 h-3.5 w-3.5" />}
-                {selectedSkill.enabled ? '禁用' : '启用'}
+                {selectedSkill.enabled ? t('skills.disable') : t('skills.enable')}
               </Button>
               <Button
                 size="sm"
@@ -354,7 +401,7 @@ export function SkillManager() {
                 loading={actionLoading === `${selectedSkill.id}:validate`}
               >
                 <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
-                验证
+                {t('skills.validate')}
               </Button>
               <Button
                 size="sm"
@@ -363,7 +410,18 @@ export function SkillManager() {
                 loading={actionLoading === `${selectedSkill.id}:test`}
               >
                 <Play className="mr-1.5 h-3.5 w-3.5" />
-                测试
+                {t('skills.test')}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setDraftInput(`@skill:${selectedSkill.id}`)
+                  toastSuccess(t('chat.referenceSkill'))
+                }}
+              >
+                <Quote className="mr-1.5 h-3.5 w-3.5" />
+                {t('skills.detail.reference')}
               </Button>
               <Button
                 size="sm"
@@ -372,7 +430,7 @@ export function SkillManager() {
                 loading={actionLoading === selectedSkill.id}
               >
                 <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                移除
+                {t('skills.remove')}
               </Button>
             </div>
 
@@ -380,7 +438,7 @@ export function SkillManager() {
               <Card className={clsx('mb-4', validationResult.valid ? 'border-success/30' : 'border-error/30')}>
                 <CardContent className="py-3">
                   <div className={clsx('text-sm font-medium', validationResult.valid ? 'text-success' : 'text-error')}>
-                    {validationResult.valid ? '验证通过' : '验证失败'}
+                    {validationResult.valid ? t('skills.validationPassed') : t('skills.validationFailed')}
                   </div>
                   {validationResult.errors.length > 0 && (
                     <ul className="mt-2 list-inside list-disc text-xs text-error">
@@ -400,7 +458,7 @@ export function SkillManager() {
               <Card className={clsx('mb-4', testResult.success ? 'border-success/30' : 'border-error/30')}>
                 <CardContent className="py-3">
                   <div className={clsx('text-sm font-medium', testResult.success ? 'text-success' : 'text-error')}>
-                    {testResult.success ? '测试通过' : '测试失败'}
+                    {testResult.success ? t('skills.testPassed') : t('skills.testFailed')}
                     {testResult.tests_run > 0 && (
                       <span className="ml-2 text-xs text-muted-foreground">
                         {testResult.tests_passed}/{testResult.tests_run}
@@ -418,16 +476,16 @@ export function SkillManager() {
             )}
 
             <div className="space-y-3 rounded-lg border border-border bg-card p-4 text-sm">
-              <InfoRow label="版本" value={selectedSkill.version} />
-              <InfoRow label="来源" value={selectedSkill.source} />
-              <InfoRow label="运行时" value={selectedSkill.runtime_type} />
-              <InfoRow label="主要工具" value={selectedSkill.primary_tool || 'N/A'} />
+              <InfoRow label={t('skills.detail.version')} value={selectedSkill.version} />
+              <InfoRow label={t('skills.detail.source')} value={selectedSkill.source} />
+              <InfoRow label={t('skills.detail.runtime')} value={selectedSkill.runtime_type} />
+              <InfoRow label={t('skills.detail.primaryTool')} value={selectedSkill.primary_tool || 'N/A'} />
               {selectedSkill.dependencies.length > 0 && (
-                <InfoRow label="依赖" value={selectedSkill.dependencies.join(', ')} />
+                <InfoRow label={t('skills.detail.dependencies')} value={selectedSkill.dependencies.join(', ')} />
               )}
               {selectedSkill.keywords.length > 0 && (
                 <div>
-                  <span className="text-xs font-medium text-muted-foreground">关键词</span>
+                  <span className="text-xs font-medium text-muted-foreground">{t('skills.detail.keywords')}</span>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {selectedSkill.keywords.map((k, idx) => (
                       <Badge key={`${k}-${idx}`} variant="secondary" size="sm">{k}</Badge>

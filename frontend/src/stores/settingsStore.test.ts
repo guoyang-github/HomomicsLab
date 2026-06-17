@@ -13,7 +13,7 @@ describe('settingsStore', () => {
     expect(state.execution.sandboxBackend).toBe('subprocess')
     expect(state.search.topK).toBe(5)
     expect(state.budget.monthlyBudget).toBe(50)
-    expect(state.dataRetentionDays).toBe(30)
+    expect(state.dataRetentionDays).toBe(0)
     expect(state.enableNotifications).toBe(true)
   })
 
@@ -62,6 +62,6 @@ describe('settingsStore', () => {
     useSettingsStore.getState().reset()
     const state = useSettingsStore.getState()
     expect(state.model.model).toBe('gpt-4o')
-    expect(state.dataRetentionDays).toBe(30)
+    expect(state.dataRetentionDays).toBe(0)
   })
 })

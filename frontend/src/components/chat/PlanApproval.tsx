@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Check, X, Pencil, AlertCircle } from 'lucide-react'
+import { Check, X, Pencil, AlertCircle, Layers } from 'lucide-react'
 import { planApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { usePlanStore } from '@/stores/planStore'
+import { useTranslation } from '@/i18n'
 import { Button, Badge, Card, CardHeader, CardDescription, CardContent } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import type { PlanRequestContent, PlanPhase } from '@/types/chat'
@@ -18,8 +20,10 @@ interface EditableParams {
 }
 
 export function PlanApproval({ content }: Props) {
+  const { t } = useTranslation()
   const { plan_id, response_text, plan } = content
   const { addMessage } = useChatStore()
+  const { loadPlan, discardDraft } = usePlanStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editing, setEditing] = useState(false)
   const [params, setParams] = useState<EditableParams>(() => {
@@ -34,20 +38,8 @@ export function PlanApproval({ content }: Props) {
 
   const modifiedPhases = plan.phases.filter((phase) => phase.phase_type in params)
 
-  const buildModifications = (): Array<{
-    phase_type: string
-    parameter: string
-    old_value: unknown
-    new_value: unknown
-    action: string
-  }> => {
-    const modifications: Array<{
-      phase_type: string
-      parameter: string
-      old_value: unknown
-      new_value: unknown
-      action: string
-    }> = []
+  const buildModifications = (): import('@/stores/planStore').PlanModification[] => {
+    const modifications: import('@/stores/planStore').PlanModification[] = []
     plan.phases.forEach((phase) => {
       const edited = params[phase.phase_type]
       if (!edited) return
@@ -56,10 +48,10 @@ export function PlanApproval({ content }: Props) {
         if (original[key] !== value) {
           modifications.push({
             phase_type: phase.phase_type,
+            action: 'update',
             parameter: key,
             old_value: original[key],
             new_value: value,
-            action: 'update',
           })
         }
       })
@@ -77,24 +69,37 @@ export function PlanApproval({ content }: Props) {
         } else {
           await planApi.approve(plan_id)
         }
-        toastSuccess('计划已批准，开始执行')
+        toastSuccess(t('plan.approved'))
+        discardDraft()
       } else {
         await planApi.reject(plan_id)
-        toastSuccess('计划已拒绝')
+        toastSuccess(t('plan.rejected'))
+        discardDraft()
       }
 
       addMessage({
         id: `msg_${Date.now()}`,
         type: 'system',
-        content: approved ? '已批准计划，开始执行。' : '已拒绝计划。',
+        content: approved ? t('plan.approvedMessage') : t('plan.rejectedMessage'),
         sender: 'system',
         timestamp: new Date().toISOString(),
       })
     } catch (error: any) {
-      toastError(error?.response?.data?.detail || '提交失败')
+      toastError(error?.response?.data?.detail || t('common.submitFailed'))
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const openInEditor = () => {
+    loadPlan(content)
+    addMessage({
+      id: `msg_${Date.now()}`,
+      type: 'system',
+      content: t('plan.openedInEditor'),
+      sender: 'system',
+      timestamp: new Date().toISOString(),
+    })
   }
 
   const updateParam = (phaseType: string, key: string, value: unknown) => {
@@ -111,7 +116,7 @@ export function PlanApproval({ content }: Props) {
     <Card className="border-primary/20 bg-primary/5">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Badge variant="info" size="md">计划待审批</Badge>
+          <Badge variant="info" size="md">{t('plan.pendingApproval')}</Badge>
           {plan.is_fallback && <Badge variant="warning" size="sm">fallback</Badge>}
         </div>
         <CardDescription className="mt-2 text-foreground/80">{response_text}</CardDescription>
@@ -134,7 +139,7 @@ export function PlanApproval({ content }: Props) {
           <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-sm text-warning-foreground">
             <div className="mb-1 flex items-center gap-2 font-medium">
               <AlertCircle className="h-4 w-4" />
-              已知缺口
+              {t('plan.knownGaps')}
             </div>
             <ul className="list-disc space-y-1 pl-4 text-xs">
               {plan.gaps.map((gap, idx) => (
@@ -149,11 +154,11 @@ export function PlanApproval({ content }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => handleApprove(true)} loading={isSubmitting}>
             <Check className="mr-1.5 h-4 w-4" />
-            批准
+            {t('plan.approve')}
           </Button>
           <Button variant="outline" onClick={() => handleApprove(false)} disabled={isSubmitting}>
             <X className="mr-1.5 h-4 w-4" />
-            拒绝
+            {t('plan.reject')}
           </Button>
           <Button
             variant="secondary"
@@ -161,7 +166,11 @@ export function PlanApproval({ content }: Props) {
             disabled={isSubmitting || modifiedPhases.length === 0}
           >
             <Pencil className="mr-1.5 h-4 w-4" />
-            {editing ? '完成编辑' : '编辑参数'}
+            {editing ? t('plan.finishEdit') : t('plan.editParams')}
+          </Button>
+          <Button variant="outline" onClick={openInEditor} disabled={isSubmitting}>
+            <Layers className="mr-1.5 h-4 w-4" />
+            {t('plan.canvasEdit')}
           </Button>
         </div>
       </CardContent>
@@ -178,6 +187,7 @@ interface PhaseRowProps {
 }
 
 function PlanPhaseRow({ index, phase, editing, values, onChange }: PhaseRowProps) {
+  const { t } = useTranslation()
   const hasParams = phase.parameters && Object.keys(phase.parameters).length > 0
 
   return (
@@ -189,7 +199,7 @@ function PlanPhaseRow({ index, phase, editing, values, onChange }: PhaseRowProps
           </span>
           <span className="text-sm font-semibold text-foreground">{phase.phase_type}</span>
           {phase.required === false && (
-            <Badge variant="secondary" size="sm">可选</Badge>
+            <Badge variant="secondary" size="sm">{t('common.optional')}</Badge>
           )}
         </div>
         {phase.skill_id && <Badge variant="outline" size="sm">{phase.skill_id}</Badge>}

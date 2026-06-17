@@ -24,57 +24,59 @@ import {
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { Badge, Button } from '@/components/ui'
+import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
 
 const statusConfig: Record<
   TaskStatus,
-  { color: string; bg: string; border: string; icon: React.ElementType; label: string }
+  { color: string; bg: string; border: string; icon: React.ElementType; labelKey: string }
 > = {
   pending: {
     color: 'text-slate-500',
     bg: 'bg-slate-100 dark:bg-slate-800',
     border: 'border-slate-300 dark:border-slate-700',
     icon: Clock,
-    label: '待执行',
+    labelKey: 'taskStatus.pending',
   },
   running: {
     color: 'text-primary',
     bg: 'bg-primary/10',
     border: 'border-primary',
     icon: Loader2,
-    label: '执行中',
+    labelKey: 'taskStatus.running',
   },
   completed: {
     color: 'text-success',
     bg: 'bg-success/10',
     border: 'border-success',
     icon: CheckCircle2,
-    label: '已完成',
+    labelKey: 'taskStatus.completed',
   },
   failed: {
     color: 'text-error',
     bg: 'bg-error/10',
     border: 'border-error',
     icon: AlertCircle,
-    label: '失败',
+    labelKey: 'taskStatus.failed',
   },
   awaiting_human: {
     color: 'text-warning',
     bg: 'bg-warning/10',
     border: 'border-warning',
     icon: AlertCircle,
-    label: '待确认',
+    labelKey: 'taskStatus.awaitingHuman',
   },
   aborted: {
     color: 'text-slate-500',
     bg: 'bg-slate-100 dark:bg-slate-800',
     border: 'border-slate-300 dark:border-slate-700',
     icon: Square,
-    label: '已中止',
+    labelKey: 'taskStatus.aborted',
   },
 }
 
 function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
+  const { t } = useTranslation()
   const selectTask = useTaskStore((state) => state.selectTask)
   const config = statusConfig[data.status]
   const Icon = config.icon
@@ -103,7 +105,7 @@ function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
 
       <div className="mt-3 flex items-center justify-between">
         <Badge variant={data.status === 'running' ? 'info' : data.status === 'completed' ? 'success' : data.status === 'failed' ? 'error' : 'secondary'} size="sm">
-          {config.label}
+          {t(config.labelKey)}
         </Badge>
         <span className="text-[10px] text-muted-foreground">{data.estimated_duration_minutes} min</span>
       </div>
@@ -124,6 +126,7 @@ const nodeTypes = {
 }
 
 export function FlowCanvas() {
+  const { t } = useTranslation()
   const tasks = useTaskStore((state) => state.tasks)
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
   const jobId = useExecutionStore((state) => state.jobId)
@@ -200,21 +203,21 @@ export function FlowCanvas() {
   return (
     <div className="h-full w-full">
       <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-border bg-card/90 p-1.5 shadow-card backdrop-blur">
-        <Button variant="ghost" size="sm" title="运行">
+        <Button variant="ghost" size="sm" title={t('workflow.run')}>
           <Play className="mr-1 h-3.5 w-3.5" />
-          运行
+          {t('workflow.run')}
         </Button>
-        <Button variant="ghost" size="sm" title="重试">
+        <Button variant="ghost" size="sm" title={t('workflow.retry')}>
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
-          重试
+          {t('workflow.retry')}
         </Button>
-        <Button variant="ghost" size="sm" title="跳过">
+        <Button variant="ghost" size="sm" title={t('workflow.skip')}>
           <SkipForward className="mr-1 h-3.5 w-3.5" />
-          跳过
+          {t('workflow.skip')}
         </Button>
-        <Button variant="ghost" size="sm" title="中止">
+        <Button variant="ghost" size="sm" title={t('workflow.abort')}>
           <Square className="mr-1 h-3.5 w-3.5" />
-          中止
+          {t('workflow.abort')}
         </Button>
         {jobId && (
           <Badge variant="outline" size="sm" className="ml-2">
@@ -232,6 +235,7 @@ export function FlowCanvas() {
         fitView
         minZoom={0.2}
         maxZoom={2}
+        proOptions={{ hideAttribution: true }}
       >
         <Background color="hsl(var(--muted-foreground))" gap={20} size={1} />
         <Controls className="!bg-card !text-foreground !border-border" />

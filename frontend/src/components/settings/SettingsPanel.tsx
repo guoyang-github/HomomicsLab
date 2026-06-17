@@ -8,6 +8,7 @@ import {
   Save,
   RotateCcw,
   AlertCircle,
+  Globe,
 } from 'lucide-react'
 import {
   Card,
@@ -27,11 +28,15 @@ import {
 } from '@/components/ui'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { toastSuccess } from '@/stores/toastStore'
+import { useTranslation } from '@/i18n'
 
 const providerOptions = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'azure', label: 'Azure OpenAI' },
+  { value: 'moonshot', label: 'Kimi (Moonshot)' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'qwen', label: 'Qwen' },
   { value: 'local', label: 'Local / Ollama' },
   { value: 'custom', label: 'Custom Endpoint' },
 ]
@@ -40,6 +45,9 @@ const modelOptions: Record<string, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-3-5-sonnet-latest', 'claude-3-opus-latest', 'claude-3-haiku-latest'],
   azure: ['gpt-4o', 'gpt-4o-mini'],
+  moonshot: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
+  deepseek: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
+  qwen: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-coder-plus'],
   local: ['llama3.1', 'qwen2.5', 'mistral', 'deepseek-coder'],
   custom: ['custom-model'],
 }
@@ -57,7 +65,34 @@ const embeddingOptions = [
   { value: 'local/BAAI/bge-large-zh-v1.5', label: 'Local BGE Large' },
 ]
 
+const languageOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'zh', label: '中文' },
+]
+
+function defaultBaseUrlPlaceholder(provider: string): string {
+  switch (provider) {
+    case 'local':
+      return 'http://localhost:11434'
+    case 'moonshot':
+      return 'https://api.moonshot.cn/v1'
+    case 'deepseek':
+      return 'https://api.deepseek.com'
+    case 'qwen':
+      return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    case 'azure':
+      return 'https://<resource>.openai.azure.com'
+    default:
+      return 'https://api.openai.com/v1'
+  }
+}
+
+function apiKeyPlaceholder(provider: string): string {
+  return provider === 'local' ? 'Local models usually do not require a key' : 'sk-...'
+}
+
 export function SettingsPanel() {
+  const { t } = useTranslation()
   const settings = useSettingsStore()
   const [activeTab, setActiveTab] = useState('model')
   const [hasChanges, setHasChanges] = useState(false)
@@ -65,14 +100,14 @@ export function SettingsPanel() {
   const handleChange = () => setHasChanges(true)
 
   const handleSave = () => {
-    toastSuccess('设置已保存')
+    toastSuccess(t('settings.saveSuccess'))
     setHasChanges(false)
   }
 
   const handleReset = () => {
-    if (confirm('确定要重置所有设置为默认值吗？')) {
+    if (confirm(t('settings.resetConfirm'))) {
       settings.reset()
-      toastSuccess('设置已重置')
+      toastSuccess(t('settings.resetSuccess'))
       setHasChanges(false)
     }
   }
@@ -82,25 +117,23 @@ export function SettingsPanel() {
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">设置</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              配置模型、执行环境、检索与预算参数
-            </p>
+            <h1 className="text-2xl font-bold text-foreground">{t('settings.title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('settings.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             {hasChanges && (
               <Badge variant="warning" size="md">
                 <AlertCircle className="mr-1 h-3 w-3" />
-                未保存
+                {t('settings.unsaved')}
               </Badge>
             )}
             <Button variant="outline" onClick={handleReset}>
               <RotateCcw className="mr-1.5 h-4 w-4" />
-              重置
+              {t('common.reset')}
             </Button>
             <Button onClick={handleSave}>
               <Save className="mr-1.5 h-4 w-4" />
-              保存
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -109,35 +142,35 @@ export function SettingsPanel() {
           <TabsList className="grid w-full grid-cols-5 sm:w-auto">
             <TabsTrigger value="model">
               <Bot className="mr-1.5 h-4 w-4" />
-              AI 模型
+              {t('settings.tabs.model')}
             </TabsTrigger>
             <TabsTrigger value="execution">
               <Terminal className="mr-1.5 h-4 w-4" />
-              执行环境
+              {t('settings.tabs.execution')}
             </TabsTrigger>
             <TabsTrigger value="search">
               <Search className="mr-1.5 h-4 w-4" />
-              语义检索
+              {t('settings.tabs.search')}
             </TabsTrigger>
             <TabsTrigger value="budget">
               <Wallet className="mr-1.5 h-4 w-4" />
-              预算控制
+              {t('settings.tabs.budget')}
             </TabsTrigger>
             <TabsTrigger value="general">
               <Settings2 className="mr-1.5 h-4 w-4" />
-              通用
+              {t('settings.tabs.general')}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="model" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>大语言模型</CardTitle>
-                <CardDescription>配置对话与 CodeAct 生成使用的 LLM</CardDescription>
+                <CardTitle>{t('settings.model.title')}</CardTitle>
+                <CardDescription>{t('settings.model.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Provider</label>
+                  <label className="text-sm font-medium">{t('settings.model.provider')}</label>
                   <Select
                     value={settings.model.provider}
                     options={providerOptions}
@@ -149,7 +182,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">模型</label>
+                  <label className="text-sm font-medium">{t('settings.model.model')}</label>
                   <Select
                     value={settings.model.model}
                     options={modelOptions[settings.model.provider].map((m) => ({ value: m, label: m }))}
@@ -160,11 +193,11 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-medium">API Key</label>
+                  <label className="text-sm font-medium">{t('settings.model.apiKey')}</label>
                   <Input
                     type="password"
                     value={settings.model.apiKey}
-                    placeholder={settings.model.provider === 'local' ? 'Local 模型通常无需 Key' : 'sk-...'}
+                    placeholder={apiKeyPlaceholder(settings.model.provider)}
                     onChange={(e) => {
                       settings.updateModel({ apiKey: e.target.value })
                       handleChange()
@@ -172,10 +205,10 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-medium">Base URL / Endpoint</label>
+                  <label className="text-sm font-medium">{t('settings.model.baseUrl')}</label>
                   <Input
                     value={settings.model.baseUrl}
-                    placeholder={settings.model.provider === 'local' ? 'http://localhost:11434' : 'https://api.openai.com/v1'}
+                    placeholder={defaultBaseUrlPlaceholder(settings.model.provider)}
                     onChange={(e) => {
                       settings.updateModel({ baseUrl: e.target.value })
                       handleChange()
@@ -183,7 +216,9 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Temperature: {settings.model.temperature}</label>
+                  <label className="text-sm font-medium">
+                    {t('settings.model.temperature')}: {settings.model.temperature}
+                  </label>
                   <input
                     type="range"
                     min="0"
@@ -198,7 +233,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Max Tokens</label>
+                  <label className="text-sm font-medium">{t('settings.model.maxTokens')}</label>
                   <Input
                     type="number"
                     value={settings.model.maxTokens}
@@ -215,12 +250,12 @@ export function SettingsPanel() {
           <TabsContent value="execution" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>代码执行环境</CardTitle>
-                <CardDescription>配置 CodeAct 代码运行环境与资源限制</CardDescription>
+                <CardTitle>{t('settings.execution.title')}</CardTitle>
+                <CardDescription>{t('settings.execution.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">沙箱后端</label>
+                  <label className="text-sm font-medium">{t('settings.execution.sandbox')}</label>
                   <Select
                     value={settings.execution.sandboxBackend}
                     options={sandboxOptions}
@@ -231,7 +266,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">超时时间（秒）</label>
+                  <label className="text-sm font-medium">{t('settings.execution.timeout')}</label>
                   <Input
                     type="number"
                     value={settings.execution.timeoutSeconds}
@@ -242,7 +277,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">工作目录</label>
+                  <label className="text-sm font-medium">{t('settings.execution.workDir')}</label>
                   <Input
                     value={settings.execution.workDir}
                     onChange={(e) => {
@@ -252,7 +287,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">数据目录</label>
+                  <label className="text-sm font-medium">{t('settings.execution.dataDir')}</label>
                   <Input
                     value={settings.execution.dataDir}
                     onChange={(e) => {
@@ -262,7 +297,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-medium">内存限制（MB）</label>
+                  <label className="text-sm font-medium">{t('settings.execution.memory')}</label>
                   <Input
                     type="number"
                     value={settings.execution.memoryLimitMb}
@@ -279,12 +314,12 @@ export function SettingsPanel() {
           <TabsContent value="search" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>语义检索</CardTitle>
-                <CardDescription>配置 Skill 召回使用的 Embedding 模型</CardDescription>
+                <CardTitle>{t('settings.search.title')}</CardTitle>
+                <CardDescription>{t('settings.search.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-medium">Embedding 模型</label>
+                  <label className="text-sm font-medium">{t('settings.search.embedding')}</label>
                   <Select
                     value={settings.search.embeddingModel}
                     options={embeddingOptions}
@@ -295,7 +330,9 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Top-K: {settings.search.topK}</label>
+                  <label className="text-sm font-medium">
+                    {t('settings.search.topK')}: {settings.search.topK}
+                  </label>
                   <input
                     type="range"
                     min="1"
@@ -310,7 +347,9 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">相似度阈值: {settings.search.similarityThreshold}</label>
+                  <label className="text-sm font-medium">
+                    {t('settings.search.threshold')}: {settings.search.similarityThreshold}
+                  </label>
                   <input
                     type="range"
                     min="0"
@@ -331,12 +370,12 @@ export function SettingsPanel() {
           <TabsContent value="budget" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>预算与审批</CardTitle>
-                <CardDescription>控制单次与月度成本，设置人工审批阈值</CardDescription>
+                <CardTitle>{t('settings.budget.title')}</CardTitle>
+                <CardDescription>{t('settings.budget.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">单次请求预算（USD）</label>
+                  <label className="text-sm font-medium">{t('settings.budget.perRequest')}</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -348,7 +387,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">月度预算（USD）</label>
+                  <label className="text-sm font-medium">{t('settings.budget.monthly')}</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -360,7 +399,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Token 审批阈值</label>
+                  <label className="text-sm font-medium">{t('settings.budget.tokenThreshold')}</label>
                   <Input
                     type="number"
                     value={settings.budget.approvalThresholdTokens}
@@ -371,7 +410,7 @@ export function SettingsPanel() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">成本审批阈值（USD）</label>
+                  <label className="text-sm font-medium">{t('settings.budget.costThreshold')}</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -389,14 +428,31 @@ export function SettingsPanel() {
           <TabsContent value="general" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>通用设置</CardTitle>
-                <CardDescription>数据保留、计划审批与通知偏好</CardDescription>
+                <CardTitle>{t('settings.general.title')}</CardTitle>
+                <CardDescription>{t('settings.general.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{t('settings.general.language')}</p>
+                      <p className="text-sm text-muted-foreground">{t('settings.general.languageDesc')}</p>
+                    </div>
+                  </div>
+                  <Select
+                    value={settings.locale}
+                    options={languageOptions}
+                    onChange={(e) => {
+                      settings.setLocale(e.target.value as 'en' | 'zh')
+                      handleChange()
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="font-medium">自动批准计划</p>
-                    <p className="text-sm text-muted-foreground">跳过计划审批步骤直接执行</p>
+                    <p className="font-medium">{t('settings.general.autoApprove')}</p>
+                    <p className="text-sm text-muted-foreground">{t('settings.general.autoApproveDesc')}</p>
                   </div>
                   <Switch
                     checked={settings.autoApprovePlans}
@@ -408,8 +464,8 @@ export function SettingsPanel() {
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
-                    <p className="font-medium">启用通知</p>
-                    <p className="text-sm text-muted-foreground">任务完成或需要人工介入时显示提示</p>
+                    <p className="font-medium">{t('settings.general.notifications')}</p>
+                    <p className="text-sm text-muted-foreground">{t('settings.general.notificationsDesc')}</p>
                   </div>
                   <Switch
                     checked={settings.enableNotifications}
@@ -421,15 +477,23 @@ export function SettingsPanel() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">数据保留天数</label>
+                    <label className="text-sm font-medium">
+                      {t('settings.general.retention')}{' '}
+                      {settings.dataRetentionDays === 0 && (
+                        <span className="text-muted-foreground">({t('settings.general.retentionForever')})</span>
+                      )}
+                    </label>
                     <Input
                       type="number"
+                      min={0}
                       value={settings.dataRetentionDays}
+                      placeholder={t('settings.general.retentionHint')}
                       onChange={(e) => {
                         settings.setDataRetentionDays(parseInt(e.target.value, 10) || 0)
                         handleChange()
                       }}
                     />
+                    <p className="text-xs text-muted-foreground">{t('settings.general.retentionHint')}</p>
                   </div>
                 </div>
               </CardContent>

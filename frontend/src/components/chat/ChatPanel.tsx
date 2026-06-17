@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
+import { useTranslation } from '@/i18n'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { SessionList } from './SessionList'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 
 export function ChatPanel() {
+  const { t } = useTranslation()
   const [showSessions, setShowSessions] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
   const isTyping = useChatStore((state) => state.isTyping)
@@ -29,16 +31,16 @@ export function ChatPanel() {
                 'rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
                 showSessions && 'text-primary'
               )}
-              title={showSessions ? '收起会话列表' : '展开会话列表'}
+              title={showSessions ? t('chat.toggleSidebarHide') : t('chat.toggleSidebarShow')}
             >
               <MessageSquare className="h-5 w-5" />
             </button>
-            <h2 className="text-sm font-semibold text-foreground">对话</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('nav.chat')}</h2>
           </div>
           {isTyping && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Agent 思考中...
+              {t('chat.agentThinking')}
             </div>
           )}
         </div>

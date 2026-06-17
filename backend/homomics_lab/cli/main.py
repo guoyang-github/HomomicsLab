@@ -9,6 +9,11 @@ from homomics_lab.cli.commands.install import install_domain
 from homomics_lab.cli.commands.generate import generate_domain
 from homomics_lab.cli.commands.list import list_domains
 from homomics_lab.cli.commands.trace import register_trace_parser
+from homomics_lab.cli.commands.benchmark import register_benchmark_parser, run_benchmark
+from homomics_lab.cli.commands.run import register_run_parser, run_run
+from homomics_lab.cli.commands.plans import register_plans_parser, run_plans
+from homomics_lab.cli.commands.jobs import register_jobs_parser, run_jobs
+from homomics_lab.cli.commands.init_project import register_init_project_parser, init_project
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -116,6 +121,19 @@ def create_parser() -> argparse.ArgumentParser:
     # trace
     register_trace_parser(subparsers)
 
+    # benchmark
+    register_benchmark_parser(subparsers)
+
+    # run skill
+    register_run_parser(subparsers)
+
+    # plans / jobs
+    register_plans_parser(subparsers)
+    register_jobs_parser(subparsers)
+
+    # init-project
+    register_init_project_parser(subparsers)
+
     return parser
 
 
@@ -125,7 +143,7 @@ def main(argv=None):
 
     if args.command is None:
         parser.print_help()
-        sys.exit(1)
+        raise SystemExit(1)
 
     try:
         if args.command == "init":
@@ -138,10 +156,21 @@ def main(argv=None):
             generate_domain(args)
         elif args.command == "list":
             list_domains(args)
+        elif args.command == "benchmark":
+            return run_benchmark(args)
+        elif args.command == "run":
+            return run_run(args)
+        elif args.command == "plans":
+            return run_plans(args)
+        elif args.command == "jobs":
+            return run_jobs(args)
+        elif args.command == "init-project":
+            return init_project(args)
+        return 0
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

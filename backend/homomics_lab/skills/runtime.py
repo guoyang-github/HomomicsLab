@@ -5,10 +5,14 @@ The executor no longer distinguishes between builtin (code strings) and
 external (file-based) skills.
 """
 
+import importlib.metadata
+import re
+import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from homomics_lab.config import settings
 from homomics_lab.data import DataStore, ResultReference
@@ -555,6 +559,145 @@ class SkillRuntimeExecutor:
 
         return None
 
+    @staticmethod
+    def _installed_distribution_names() -> Set[str]:
+        """Return canonicalized names of installed distributions."""
+        try:
+            return {
+                dist.metadata["Name"].lower().replace("-", "_").replace(".", "_")
+                for dist in importlib.metadata.distributions()
+            }
+        except Exception:
+            return set()
+
+    def _ensure_requirements(self, scripts_dir: Path) -> None:
+        """Detect requirements.txt and ensure dependencies are importable.
+
+        If any declared dependency is missing, prompt the user to install it
+        when running interactively; otherwise raise a descriptive error.
+        """
+        req_file = scripts_dir / "requirements.txt"
+        if not req_file.exists():
+            return
+
+        try:
+            from packaging.requirements import Requirement
+        except Exception:  # pragma: no cover - packaging is a required dep
+            Requirement = None
+
+        raw_lines = req_file.read_text(encoding="utf-8").splitlines()
+        missing: List[str] = []
+        installed = self._installed_distribution_names()
+
+        for line in raw_lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            spec = stripped.split("#", 1)[0].strip()
+            if not spec:
+                continue
+            if Requirement is not None:
+                try:
+                    name = Requirement(spec).name
+                except Exception:
+                    name = spec.split("==", 1)[0].split(">=", 1)[0].split("<=", 1)[0].strip()
+            else:
+                name = spec.split("==", 1)[0].split(">=", 1)[0].split("<=", 1)[0].strip()
+            canonical = name.lower().replace("-", "_").replace(".", "_")
+            if canonical not in installed:
+                missing.append(spec)
+
+        if not missing:
+            return
+
+        message = (
+            f"Skill requires packages not installed: {', '.join(missing)}.\n"
+            f"Install from {req_file}?"
+        )
+        if sys.stdin.isatty():
+            answer = input(f"{message} [y/N]: ").strip().lower()
+            if answer.startswith("y"):
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "-r", str(req_file)]
+                )
+                return
+        raise RuntimeError(
+            f"Missing required packages for skill: {', '.join(missing)}. "
+            f"Install with: pip install -r {req_file}"
+        )
+
+    def _ensure_r_requirements(self, scripts_dir: Path) -> None:
+        """Detect dependencies.R and ensure required R packages are installed.
+
+        The file may contain plain package names (one per line) or R-style
+        library/require calls. Missing packages are reported with an install
+        command; automatic installation is not performed to avoid mutating the
+        user's R environment unexpectedly.
+        """
+        dep_file = scripts_dir / "dependencies.R"
+        if not dep_file.exists():
+            return
+
+        raw_lines = dep_file.read_text(encoding="utf-8").splitlines()
+        packages: List[str] = []
+        for line in raw_lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            # Match library(pkg) or require(pkg) with optional quotes.
+            match = re.search(r"(?:library|require)\s*\(\s*['\"]?([^'\")\s]+)['\"]?", stripped)
+            if match:
+                packages.append(match.group(1))
+            else:
+                # Treat as plain package name if no R call syntax.
+                packages.append(stripped.split()[0])
+
+        if not packages:
+            return
+
+        # Check installed status using Rscript.
+        quoted = ", ".join(f'"{pkg}"' for pkg in packages)
+        check_script = f"cat(all(sapply(c({quoted}), requireNamespace, quietly=TRUE)))"
+        try:
+            result = subprocess.run(
+                ["Rscript", "-e", check_script],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            installed_all = result.returncode == 0 and result.stdout.strip() == "TRUE"
+        except FileNotFoundError as exc:
+            raise RuntimeError("Rscript not found; cannot execute R skills.") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Timeout while checking R package dependencies.") from exc
+
+        if installed_all:
+            return
+
+        missing = []
+        for pkg in packages:
+            try:
+                res = subprocess.run(
+                    ["Rscript", "-e", f'cat(requireNamespace("{pkg}", quietly=TRUE))'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                if res.returncode != 0 or res.stdout.strip() != "TRUE":
+                    missing.append(pkg)
+            except Exception:
+                missing.append(pkg)
+
+        if missing:
+            quoted = ", ".join(f'"{pkg}"' for pkg in missing)
+            install_cmd = f"install.packages(c({quoted}))"
+            raise RuntimeError(
+                f"Missing required R packages for skill: {', '.join(missing)}. "
+                f"Install in R with: {install_cmd}"
+            )
+
     async def _execute_from_dir(
         self,
         skill: SkillDefinition,
@@ -563,7 +706,12 @@ class SkillRuntimeExecutor:
         inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Execute a skill by reading scripts from its directory."""
+        self._ensure_requirements(scripts_dir)
+
         timeout = self._parse_timeout(skill.runtime.resources.time)
+
+        if exec_type == "r":
+            self._ensure_r_requirements(scripts_dir)
 
         # Collect all script files
         if exec_type == "r":

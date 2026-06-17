@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { clsx } from 'clsx'
-import { Search, X, Loader2, Code2, Tags, Box } from 'lucide-react'
+import { Search, X, Loader2, Code2, Tags, Box, Quote } from 'lucide-react'
 import { skillsApi } from '@/services/api'
+import { useTranslation } from '@/i18n'
+import { useChatStore } from '@/stores/chatStore'
+import { toastSuccess } from '@/stores/toastStore'
 import type { SkillSummary, SkillDetail } from '@/types/api'
 import { Input, Badge, Button, EmptyState, Skeleton } from '@/components/ui'
 
@@ -20,6 +23,8 @@ const runtimeColors: Record<string, string> = {
 }
 
 export function SkillSearch() {
+  const { t } = useTranslation()
+  const setDraftInput = useChatStore((state) => state.setDraftInput)
   const [query, setQuery] = useState('')
   const [skills, setSkills] = useState<SkillSummary[]>([])
   const [loading, setLoading] = useState(false)
@@ -35,11 +40,11 @@ export function SkillSearch() {
       setSkills(response.data)
       setError('')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载 Skills 失败')
+      setError(err?.response?.data?.detail || t('skills.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadAllSkills()
@@ -61,7 +66,7 @@ export function SkillSearch() {
         setSkills(response.data)
         setError('')
       } catch (err: any) {
-        setError(err?.response?.data?.detail || '搜索失败')
+        setError(err?.response?.data?.detail || t('skills.searchFailed'))
       } finally {
         setLoading(false)
       }
@@ -74,11 +79,16 @@ export function SkillSearch() {
       const response = await skillsApi.getSkill(skillId)
       setSelectedSkill(response.data)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载详情失败')
+      setError(err?.response?.data?.detail || t('skills.loadDetailFailed'))
     } finally {
       setDetailLoading(false)
     }
   }
+
+  const allowedSources = new Set(['external', 'imported'])
+  const visibleSkills = skills.filter(
+    (s) => allowedSources.has(s.source) && s.category !== 'agent_core' && !s.id.startsWith('core_')
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -88,7 +98,7 @@ export function SkillSearch() {
           <Input
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="搜索 Skills（如 UMAP、Seurat、QC）..."
+            placeholder={t('skills.searchPlaceholder')}
             className="pl-9 pr-9"
           />
           {query && (
@@ -101,8 +111,8 @@ export function SkillSearch() {
           )}
         </div>
         <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>{skills.length} 个 Skills</span>
-          {query && <span className="text-primary">搜索："{query}"</span>}
+          <span>{t('skills.countLabel', { count: visibleSkills.length })}</span>
+          {query && <span className="text-primary">{t('skills.searchActive', { query })}</span>}
         </div>
       </div>
 
@@ -122,21 +132,21 @@ export function SkillSearch() {
           {error && !loading && (
             <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
               <p className="text-sm text-error">{error}</p>
-              <Button onClick={loadAllSkills} size="sm">重试</Button>
+              <Button onClick={loadAllSkills} size="sm">{t('common.retry')}</Button>
             </div>
           )}
 
-          {!loading && skills.length === 0 && !error && (
+          {!loading && visibleSkills.length === 0 && !error && (
             <EmptyState
               icon={Search}
-              title="未找到 Skills"
-              description="尝试其他关键词，或在管理页面导入 Skills"
-              action={{ label: '刷新', onClick: loadAllSkills }}
+              title={t('skills.searchEmpty')}
+              description={t('skills.searchEmptyDesc')}
+              action={{ label: t('common.refresh'), onClick: loadAllSkills }}
             />
           )}
 
           <div className="divide-y divide-border">
-            {skills.map((skill) => (
+            {visibleSkills.map((skill) => (
               <button
                 key={skill.id}
                 onClick={() => handleSelectSkill(skill.id)}
@@ -189,15 +199,29 @@ export function SkillSearch() {
 
                 <p className="mb-4 text-sm text-muted-foreground">{selectedSkill.description}</p>
 
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setDraftInput(`@skill:${selectedSkill.id}`)
+                      toastSuccess(t('chat.referenceSkill'))
+                    }}
+                  >
+                    <Quote className="mr-1.5 h-3.5 w-3.5" />
+                    {t('skills.detail.reference')}
+                  </Button>
+                </div>
+
                 <div className="space-y-3">
-                  <DetailCard icon={Tags} title="分类" value={selectedSkill.category} />
-                  <DetailCard icon={Box} title="运行时" value={selectedSkill.runtime_type.toUpperCase()} />
+                  <DetailCard icon={Tags} title={t('skills.detail.category')} value={selectedSkill.category} />
+                  <DetailCard icon={Box} title={t('skills.detail.runtime')} value={selectedSkill.runtime_type.toUpperCase()} />
                   {selectedSkill.primary_tool && (
-                    <DetailCard icon={Code2} title="主要工具" value={selectedSkill.primary_tool} />
+                    <DetailCard icon={Code2} title={t('skills.detail.primaryTool')} value={selectedSkill.primary_tool} />
                   )}
                   {selectedSkill.keywords.length > 0 && (
                     <div className="rounded-lg border border-border bg-card p-3">
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">关键词</div>
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">{t('skills.detail.keywords')}</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {selectedSkill.keywords.map((kw, idx) => (
                           <Badge key={`${kw}-${idx}`} variant="secondary" size="sm">{kw}</Badge>
@@ -207,7 +231,7 @@ export function SkillSearch() {
                   )}
                   {selectedSkill.supported_tools.length > 0 && (
                     <div className="rounded-lg border border-border bg-card p-3">
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">支持工具</div>
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">{t('skills.detail.supportedTools')}</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {selectedSkill.supported_tools.map((tool, idx) => (
                           <Badge key={`${tool}-${idx}`} variant="outline" size="sm">{tool}</Badge>
@@ -216,7 +240,7 @@ export function SkillSearch() {
                     </div>
                   )}
                   {selectedSkill.dependencies.length > 0 && (
-                    <DetailCard icon={Code2} title="依赖" value={selectedSkill.dependencies.join(', ')} />
+                    <DetailCard icon={Code2} title={t('skills.detail.dependencies')} value={selectedSkill.dependencies.join(', ')} />
                   )}
                 </div>
               </div>

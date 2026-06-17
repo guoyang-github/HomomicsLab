@@ -1,8 +1,9 @@
 """API endpoints for the domain template marketplace."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
+import yaml
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
@@ -101,6 +102,40 @@ async def import_templates(request: Request, body: ImportTemplatesRequest):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"domain_id": body.domain_id, "path": str(domain_dir)}
+
+
+@router.get("/{domain_id}/preview")
+async def preview_domain(domain_id: str, request: Request):
+    """Return detailed preview data for a domain template."""
+    marketplace = _get_marketplace(request)
+    source_dir = marketplace._find_domain_dir(domain_id)
+    if source_dir is None:
+        raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
+
+    domain_yaml = source_dir / "domain.yaml"
+    if not domain_yaml.exists():
+        raise HTTPException(status_code=404, detail="domain.yaml not found")
+
+    try:
+        data: Dict[str, Any] = yaml.safe_load(domain_yaml.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to read domain: {exc}") from exc
+
+    return {
+        "domain_id": domain_id,
+        "name": data.get("display_name") or data.get("domain", domain_id),
+        "description": data.get("description", ""),
+        "version": data.get("version", "1.0.0"),
+        "author": data.get("author", ""),
+        "orchestrator_skills": data.get("orchestrator_skills", []),
+        "phases": data.get("phases", []),
+        "phase_transitions": data.get("phase_transitions", []),
+        "intents": data.get("intents", []),
+        "skills": data.get("skills", []),
+        "roles": data.get("roles", []),
+        "sops": data.get("sops", []),
+        "code_templates": data.get("code_templates", {}),
+    }
 
 
 @router.post("/{domain_id}/export")

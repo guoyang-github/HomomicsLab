@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { MessagesSquare, Check, Star } from 'lucide-react'
 import { chatApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { useTranslation } from '@/i18n'
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Textarea } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import type { DebateRequestContent, DebateOption } from '@/types/chat'
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function DebateRequest({ content }: Props) {
+  const { t } = useTranslation()
   const { topic, options, recommendation, round_summaries } = content
   const [selectedOption, setSelectedOption] = useState(recommendation?.id || options[0]?.id || '')
   const [parameters, setParameters] = useState('{}')
@@ -28,7 +30,7 @@ export function DebateRequest({ content }: Props) {
         try {
           parsedParams = JSON.parse(parameters)
         } catch {
-          toastError('参数 JSON 格式无效')
+          toastError(t('common.invalidJson'))
           setIsSubmitting(false)
           return
         }
@@ -42,16 +44,17 @@ export function DebateRequest({ content }: Props) {
       })
 
       const chosen = options.find((o) => o.id === selectedOption)
-      toastSuccess(`已选择：${chosen?.label || selectedOption}`)
+      const label = chosen?.label || selectedOption
+      toastSuccess(t('debate.selected', { label }))
       addMessage({
         id: `msg_${Date.now()}`,
         type: 'system',
-        content: `已选择：${chosen?.label || selectedOption}`,
+        content: t('debate.selected', { label }),
         sender: 'system',
         timestamp: new Date().toISOString(),
       })
     } catch (error: any) {
-      toastError(error?.response?.data?.detail || '提交失败')
+      toastError(error?.response?.data?.detail || t('common.submitFailed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -83,7 +86,7 @@ export function DebateRequest({ content }: Props) {
             {isRecommended && (
               <Badge variant="success" size="sm">
                 <Star className="mr-1 h-3 w-3" />
-                推荐
+                {t('common.recommended')}
               </Badge>
             )}
           </div>
@@ -91,7 +94,7 @@ export function DebateRequest({ content }: Props) {
             <div className="mt-0.5 text-xs text-muted-foreground">{option.description}</div>
           )}
           {option.score !== undefined && (
-            <div className="mt-1 text-xs text-muted-foreground">得分：{option.score.toFixed(2)}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{t('debate.scoreLabel', { score: option.score.toFixed(2) })}</div>
           )}
         </div>
       </label>
@@ -120,7 +123,7 @@ export function DebateRequest({ content }: Props) {
         <div className="space-y-2">{options.map(renderOption)}</div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">参数（JSON）</label>
+          <label className="text-sm font-medium">{t('debate.parametersJson')}</label>
           <Textarea
             value={parameters}
             onChange={(e) => setParameters(e.target.value)}
@@ -131,7 +134,7 @@ export function DebateRequest({ content }: Props) {
 
         <Button onClick={handleSubmit} loading={isSubmitting} disabled={!selectedOption}>
           <Check className="mr-1.5 h-4 w-4" />
-          确认选择
+          {t('debate.confirmChoice')}
         </Button>
       </CardContent>
     </Card>

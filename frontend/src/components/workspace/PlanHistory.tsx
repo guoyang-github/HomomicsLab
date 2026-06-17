@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { Clock, GitCompare } from 'lucide-react'
 import { planApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { useTranslation } from '@/i18n'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
 
 interface PlanSummary {
@@ -22,6 +23,7 @@ interface DiffItem {
 }
 
 export function PlanHistory() {
+  const { t } = useTranslation()
   const { currentSessionId } = useChatStore()
   const [plans, setPlans] = useState<PlanSummary[]>([])
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
@@ -44,7 +46,7 @@ export function PlanHistory() {
   }
 
   if (!currentSessionId) {
-    return <p className="text-sm text-muted-foreground">请先开始一个会话</p>
+    return <p className="text-sm text-muted-foreground">{t('planHistory.startSession')}</p>
   }
 
   return (
@@ -52,11 +54,11 @@ export function PlanHistory() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Clock className="h-4 w-4 text-primary" />
-          计划版本历史
+          {t('planHistory.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {loading && <p className="text-xs text-muted-foreground">加载中...</p>}
+        {loading && <p className="text-xs text-muted-foreground">{t('common.loading')}</p>}
         <ul className="space-y-1.5">
           {plans.map((plan) => (
             <li
@@ -74,7 +76,7 @@ export function PlanHistory() {
                 <Badge variant="outline" size="sm">{plan.status}</Badge>
               </div>
               <div className="mt-1 text-muted-foreground">
-                版本 {plan.version} · {new Date(plan.created_at).toLocaleString()}
+                {t('plan.versionLabel', { version: plan.version })} · {new Date(plan.created_at).toLocaleString()}
               </div>
             </li>
           ))}
@@ -84,7 +86,7 @@ export function PlanHistory() {
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
               <GitCompare className="h-3.5 w-3.5" />
-              与上一版本差异
+              {t('planHistory.diffTitle')}
             </div>
             <ul className="space-y-1">
               {diff.differences.map((d, idx) => (

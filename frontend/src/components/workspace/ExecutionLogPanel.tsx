@@ -3,8 +3,10 @@ import { clsx } from 'clsx'
 import { Terminal, ChevronUp, ChevronDown, Trash2, Download, Activity } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { Button, Badge } from '@/components/ui'
+import { useTranslation } from '@/i18n'
 
 export function ExecutionLogPanel() {
+  const { t } = useTranslation()
   const logs = useExecutionStore((state) => state.logs)
   const status = useExecutionStore((state) => state.status)
   const isConnected = useExecutionStore((state) => state.isConnected)
@@ -31,12 +33,26 @@ export function ExecutionLogPanel() {
     URL.revokeObjectURL(url)
   }
 
-  const statusBadge = {
-    idle: <Badge variant="secondary">空闲</Badge>,
-    running: <Badge variant="info"><Activity className="mr-1 h-3 w-3 animate-pulse" />运行中</Badge>,
-    completed: <Badge variant="success">已完成</Badge>,
-    failed: <Badge variant="error">失败</Badge>,
-    aborted: <Badge variant="warning">已中止</Badge>,
+  const renderStatusBadge = () => {
+    switch (status) {
+      case 'idle':
+        return <Badge variant="secondary">{t('executionLog.idle')}</Badge>
+      case 'running':
+        return (
+          <Badge variant="info">
+            <Activity className="mr-1 h-3 w-3 animate-pulse" />
+            {t('executionLog.running')}
+          </Badge>
+        )
+      case 'completed':
+        return <Badge variant="success">{t('executionLog.completed')}</Badge>
+      case 'failed':
+        return <Badge variant="error">{t('executionLog.failed')}</Badge>
+      case 'aborted':
+        return <Badge variant="warning">{t('executionLog.aborted')}</Badge>
+      default:
+        return null
+    }
   }
 
   return (
@@ -49,8 +65,8 @@ export function ExecutionLogPanel() {
       <div className="flex h-10 items-center justify-between border-b border-border px-4">
         <div className="flex items-center gap-3">
           <Terminal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">执行日志</span>
-          {statusBadge[status]}
+          <span className="text-xs font-medium text-foreground">{t('executionLog.title')}</span>
+          {renderStatusBadge()}
           {isConnected && (
             <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
           )}
@@ -58,15 +74,15 @@ export function ExecutionLogPanel() {
         <div className="flex items-center gap-1">
           {expanded && (
             <>
-              <Button variant="ghost" size="icon" onClick={downloadLogs} title="下载日志">
+              <Button variant="ghost" size="icon" onClick={downloadLogs} title={t('executionLog.download')}>
                 <Download className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={clearLogs} title="清空">
+              <Button variant="ghost" size="icon" onClick={clearLogs} title={t('executionLog.clear')}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setExpanded((e) => !e)} title={expanded ? '收起' : '展开'}>
+          <Button variant="ghost" size="icon" onClick={() => setExpanded((e) => !e)} title={expanded ? t('executionLog.collapse') : t('executionLog.expand')}>
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </Button>
         </div>
@@ -76,7 +92,7 @@ export function ExecutionLogPanel() {
         <div ref={scrollRef} className="h-[216px] overflow-y-auto p-3 font-mono text-xs">
           {logs.length === 0 ? (
             <div className="flex h-full items-center justify-center text-muted-foreground">
-              暂无日志
+              {t('executionLog.empty')}
             </div>
           ) : (
             <div className="space-y-1">

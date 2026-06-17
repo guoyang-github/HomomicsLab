@@ -1,0 +1,5 @@
+sample_id,fastq_dir,transcriptome,expect_cells,condition
+PA08,fastqs/PA08,/ref/refdata-gex-GRCh38-2024-A,5000,High_NI
+PA11,fastqs/PA11,/ref/refdata-gex-GRCh38-2024-A,5000,High_NI
+PA02,fastqs/PA02,/ref/refdata-gex-GRCh38-2024-A,5000,High_NI
+PA12,fastqs/PA12,/ref/refdata-gex-GRCh38-2024-A,5000,Low_NI

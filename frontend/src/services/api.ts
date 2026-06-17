@@ -1,6 +1,7 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, ExportDomainResponse, ImportDomainResponse } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
+import type { PlanModification } from '@/stores/planStore'
 
 const API_BASE = '/api'
 
@@ -32,13 +33,7 @@ export const planApi = {
   reject: (plan_id: string) =>
     api.post(`/plan/${plan_id}/reject`),
 
-  modify: (plan_id: string, approved: boolean, modifications: Array<{
-    phase_type: string
-    parameter?: string
-    old_value?: unknown
-    new_value?: unknown
-    action?: string
-  }>) =>
+  modify: (plan_id: string, approved: boolean, modifications: PlanModification[]) =>
     api.post(`/plan/${plan_id}/modify`, { approved, modifications }),
 
   getPlan: (plan_id: string) =>
@@ -62,7 +57,36 @@ export const projectApi = {
     api.get<Project[]>('/projects'),
 }
 
+export interface FileEntry {
+  name: string
+  type: 'file' | 'directory'
+  path: string
+  size: number | null
+  modified_at: number
+}
+
+export interface FileListResponse {
+  project_id: string
+  path: string
+  entries: FileEntry[]
+}
+
+export interface FileReadResponse {
+  project_id: string
+  path: string
+  mime_type: string
+  size: number
+  encoding: 'utf-8' | 'base64'
+  content: string
+}
+
 export const fileApi = {
+  listFiles: (projectId: string, path: string = '') =>
+    api.get<FileListResponse>(`/files/list?project_id=${projectId}&path=${encodeURIComponent(path)}`),
+
+  readFile: (projectId: string, path: string) =>
+    api.get<FileReadResponse>(`/files/read?project_id=${projectId}&path=${encodeURIComponent(path)}`),
+
   uploadFile: (file: File, projectId: string) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -130,6 +154,9 @@ export const skillsApi = {
 export const domainsApi = {
   listDomains: () =>
     api.get<DomainListing[]>('/domains/'),
+
+  previewDomain: (domainId: string) =>
+    api.get<DomainPreview>(`/domains/${domainId}/preview`),
 
   exportDomain: (domainId: string, targetDir?: string) =>
     api.post<ExportDomainResponse>(`/domains/${domainId}/export`, targetDir ? { target_dir: targetDir } : undefined),

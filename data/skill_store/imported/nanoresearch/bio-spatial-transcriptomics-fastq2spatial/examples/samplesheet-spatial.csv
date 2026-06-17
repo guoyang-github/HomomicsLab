@@ -1,0 +1,5 @@
+sample_id,fastq_dir,image_path,transcriptome,slide,area,condition
+PA08,fastqs/PA08,images/PA08_tissue.tif,/ref/refdata-gex-GRCh38-2020-A,V19L01-041,A1,High_NI
+PA11,fastqs/PA11,images/PA11_tissue.tif,/ref/refdata-gex-GRCh38-2020-A,V19L01-041,B1,High_NI
+PA02,fastqs/PA02,images/PA02_tissue.tif,/ref/refdata-gex-GRCh38-2020-A,V19L01-042,A1,Low_NI
+PA12,fastqs/PA12,images/PA12_tissue.tif,/ref/refdata-gex-GRCh38-2020-A,V19L01-042,B1,Low_NI

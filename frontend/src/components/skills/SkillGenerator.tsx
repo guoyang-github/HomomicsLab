@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Wand2, Sparkles, FileCode2, Check } from 'lucide-react'
+import { useTranslation } from '@/i18n'
 import {
   Button,
   Input,
@@ -18,6 +19,7 @@ interface GeneratedFile {
 }
 
 export function SkillGenerator() {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('custom')
@@ -52,7 +54,7 @@ export function SkillGenerator() {
 
   const handleGenerate = async () => {
     if (!name.trim() || !description.trim()) {
-      setError('名称和描述为必填项')
+      setError(t('skills.generator.requiredFields'))
       return
     }
 
@@ -85,10 +87,10 @@ export function SkillGenerator() {
         content: content as string,
       }))
       setGeneratedFiles(files)
-      toastSuccess('Skill 生成成功')
+      toastSuccess(t('skills.generator.success'))
     } catch (err) {
-      setError('生成 Skill 失败')
-      toastError('生成 Skill 失败')
+      setError(t('skills.generator.failed'))
+      toastError(t('skills.generator.failed'))
     } finally {
       setLoading(false)
     }
@@ -99,38 +101,38 @@ export function SkillGenerator() {
       <div className="border-b border-border bg-card px-4 py-4">
         <div className="flex items-center gap-2">
           <Wand2 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Skill 生成器</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('skills.generator.title')}</h2>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">根据需求描述生成新的 Skill</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('skills.generator.subtitle')}</p>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 overflow-y-auto border-r border-border p-4">
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">名称 *</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：Seurat 聚类" />
+              <label className="text-sm font-medium">{t('skills.generator.name')}</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('skills.generator.namePlaceholder')} />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">描述 *</label>
+                <label className="text-sm font-medium">{t('skills.generator.description')}</label>
                 <Button type="button" variant="ghost" size="sm" onClick={handleSuggest}>
                   <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                  自动建议
+                  {t('skills.generator.suggest')}
                 </Button>
               </div>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="这个 Skill 做什么？"
+                placeholder={t('skills.generator.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">分类</label>
+                <label className="text-sm font-medium">{t('skills.generator.category')}</label>
                 <Select
                   value={category}
                   options={[
@@ -145,7 +147,7 @@ export function SkillGenerator() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">工具类型</label>
+                <label className="text-sm font-medium">{t('skills.generator.toolType')}</label>
                 <Select
                   value={toolType}
                   options={[
@@ -159,26 +161,26 @@ export function SkillGenerator() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">主要工具</label>
-              <Input value={primaryTool} onChange={(e) => setPrimaryTool(e.target.value)} placeholder="例如：scanpy, Seurat" />
+              <label className="text-sm font-medium">{t('skills.generator.primaryTool')}</label>
+              <Input value={primaryTool} onChange={(e) => setPrimaryTool(e.target.value)} placeholder={t('skills.generator.primaryToolPlaceholder')} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">支持工具（逗号分隔）</label>
+              <label className="text-sm font-medium">{t('skills.generator.supportedTools')}</label>
               <Input value={supportedTools} onChange={(e) => setSupportedTools(e.target.value)} placeholder="scanpy, anndata, numpy" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">关键词（逗号分隔）</label>
+              <label className="text-sm font-medium">{t('skills.generator.keywords')}</label>
               <Input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="qc, filtering, single-cell" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">依赖（逗号分隔）</label>
+              <label className="text-sm font-medium">{t('skills.generator.dependencies')}</label>
               <Input value={dependencies} onChange={(e) => setDependencies(e.target.value)} placeholder="scanpy, anndata, matplotlib" />
             </div>
 
             {error && <p className="text-sm text-error">{error}</p>}
 
             <Button onClick={handleGenerate} loading={loading} className="w-full">
-              {loading ? '生成中...' : '生成 Skill'}
+              {loading ? t('skills.generator.generating') : t('skills.generator.generate')}
             </Button>
           </div>
         </div>
@@ -188,7 +190,7 @@ export function SkillGenerator() {
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <FileCode2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">填写表单并点击生成</p>
+                <p className="text-sm text-muted-foreground">{t('skills.generator.empty')}</p>
               </div>
             </div>
           ) : (
@@ -196,7 +198,7 @@ export function SkillGenerator() {
               <div className="border-b border-border bg-card px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Check className="h-4 w-4 text-success" />
-                  已生成：{skillId}
+                  {t('skills.generator.generated', { skillId })}
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">

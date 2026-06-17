@@ -9,6 +9,7 @@ from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.jobs import JobService, JobStatus
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.plan import PlanPresenter, PlanStore
+from homomics_lab.api.chat_references import resolve_chat_references
 
 router = APIRouter()
 
@@ -76,14 +77,20 @@ async def send_message(
         http_request.app.state, "plan_store", None
     ) or PlanStore()
 
+    skill_executor = getattr(http_request.app.state, "skill_executor", None)
+    user_message = await resolve_chat_references(
+        request.message, request.project_id, skill_executor
+    )
+
     # Use TurnRunner for consistent handling of all intents, including LLM fallback.
     runner = TurnRunner(
         tool_registry=getattr(http_request.app.state, "tool_registry", None),
         memory_manager=memory_manager,
+        cbkb=getattr(http_request.app.state, "cbkb", None),
     )
     result = await runner.run_turn(
         session_id=request.session_id,
-        user_message=request.message,
+        user_message=user_message,
         working_memory=working_memory,
         project_id=request.project_id,
         job_service=job_service,
@@ -204,7 +211,10 @@ async def respond_to_debate(
     if project_id is None:
         project_id = "default"
 
-    runner = TurnRunner(memory_manager=memory_manager)
+    runner = TurnRunner(
+        memory_manager=memory_manager,
+        cbkb=getattr(http_request.app.state, "cbkb", None),
+    )
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -258,7 +268,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         while True:
             data = await websocket.receive_json()
             project_id = data.get("project_id", "default")
-            user_message = data.get("message", "")
+            raw_message = data.get("message", "")
+
+            skill_executor = getattr(websocket.app.state, "skill_executor", None)
+            user_message = await resolve_chat_references(
+                raw_message, project_id, skill_executor
+            )
 
             working_memory, _ = await memory_manager.load_session(session_id, project_id)
 

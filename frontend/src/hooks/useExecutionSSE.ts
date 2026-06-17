@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { useTranslation } from '@/i18n'
 
 export function useExecutionSSE(jobId: string | null) {
+  const { t } = useTranslation()
   const eventSourceRef = useRef<EventSource | null>(null)
   const addLog = useExecutionStore((state) => state.addLog)
   const setConnected = useExecutionStore((state) => state.setConnected)
@@ -71,7 +73,7 @@ export function useExecutionSSE(jobId: string | null) {
           addLog({
             timestamp: new Date().toISOString(),
             level: 'error',
-            message: data.message || '执行失败',
+            message: data.message || t('execution.failed'),
           })
           es.close()
           setConnected(false)
@@ -94,5 +96,5 @@ export function useExecutionSSE(jobId: string | null) {
       es.close()
       setConnected(false)
     }
-  }, [jobId, addLog, setConnected, setStatus, updateTaskStatus])
+  }, [jobId, addLog, setConnected, setStatus, updateTaskStatus, t])
 }

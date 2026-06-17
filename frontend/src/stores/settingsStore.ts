@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type LlmProvider = 'openai' | 'anthropic' | 'azure' | 'local' | 'custom'
+export type LlmProvider = 'openai' | 'anthropic' | 'azure' | 'moonshot' | 'deepseek' | 'qwen' | 'local' | 'custom'
 export type SandboxBackend = 'subprocess' | 'docker' | 'local'
 
 export interface ModelConfig {
@@ -34,11 +34,14 @@ export interface BudgetConfig {
   approvalThresholdCost: number
 }
 
+export type Locale = 'en' | 'zh'
+
 export interface SettingsState {
   model: ModelConfig
   execution: ExecutionConfig
   search: SearchConfig
   budget: BudgetConfig
+  locale: Locale
   dataRetentionDays: number
   autoApprovePlans: boolean
   enableNotifications: boolean
@@ -46,6 +49,7 @@ export interface SettingsState {
   updateExecution: (config: Partial<ExecutionConfig>) => void
   updateSearch: (config: Partial<SearchConfig>) => void
   updateBudget: (config: Partial<BudgetConfig>) => void
+  setLocale: (locale: Locale) => void
   setDataRetentionDays: (days: number) => void
   setAutoApprovePlans: (value: boolean) => void
   setEnableNotifications: (value: boolean) => void
@@ -89,13 +93,15 @@ export const useSettingsStore = create<SettingsState>()(
       execution: defaultExecution,
       search: defaultSearch,
       budget: defaultBudget,
-      dataRetentionDays: 30,
+      locale: 'en',
+      dataRetentionDays: 0,
       autoApprovePlans: false,
       enableNotifications: true,
       updateModel: (config) => set((state) => ({ model: { ...state.model, ...config } })),
       updateExecution: (config) => set((state) => ({ execution: { ...state.execution, ...config } })),
       updateSearch: (config) => set((state) => ({ search: { ...state.search, ...config } })),
       updateBudget: (config) => set((state) => ({ budget: { ...state.budget, ...config } })),
+      setLocale: (locale) => set({ locale }),
       setDataRetentionDays: (days) => set({ dataRetentionDays: days }),
       setAutoApprovePlans: (value) => set({ autoApprovePlans: value }),
       setEnableNotifications: (value) => set({ enableNotifications: value }),
@@ -105,13 +111,22 @@ export const useSettingsStore = create<SettingsState>()(
           execution: defaultExecution,
           search: defaultSearch,
           budget: defaultBudget,
-          dataRetentionDays: 30,
+          locale: 'en',
+          dataRetentionDays: 0,
           autoApprovePlans: false,
           enableNotifications: true,
         }),
     }),
     {
       name: 'homomics-settings',
+      version: 2,
+      migrate: (persistedState: any) => {
+        // Reset language to English for existing stored settings once.
+        if (persistedState && persistedState.locale !== 'en') {
+          return { ...persistedState, locale: 'en' }
+        }
+        return persistedState
+      },
     }
   )
 )

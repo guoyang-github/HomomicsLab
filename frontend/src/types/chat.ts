@@ -49,6 +49,12 @@ export interface PlanPhase {
   parameters?: Record<string, unknown>
 }
 
+export interface PlanTransition {
+  from: string
+  to: string
+  type: string
+}
+
 export interface PlanRequestContent {
   plan_id: string
   response_text: string
@@ -58,6 +64,7 @@ export interface PlanRequestContent {
     is_fallback: boolean
     intent_analysis_type: string
     phases: PlanPhase[]
+    transitions?: PlanTransition[]
     gaps?: Array<Record<string, unknown>>
     suggestion_text?: string
     version: number

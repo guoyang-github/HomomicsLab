@@ -13,6 +13,7 @@ import 'highlight.js/lib/languages/latex'
 import { clsx } from 'clsx'
 import { Copy, Check } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from '@/i18n'
 
 interface MarkdownRendererProps {
   content: string
@@ -20,6 +21,7 @@ interface MarkdownRendererProps {
 }
 
 function CodeBlock({ language, value }: { language?: string; value: string }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -37,7 +39,7 @@ function CodeBlock({ language, value }: { language?: string; value: string }) {
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? '已复制' : '复制'}
+          {copied ? t('common.copied') : t('common.copy')}
         </button>
       </div>
       <pre className="overflow-x-auto p-4 text-xs leading-relaxed">

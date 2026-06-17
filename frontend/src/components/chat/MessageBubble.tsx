@@ -7,6 +7,7 @@ import { HITLRequest } from './HITLRequest'
 import { PlanApproval } from './PlanApproval'
 import { DebateRequest } from './DebateRequest'
 import { PlotChart } from '../shared/PlotChart'
+import { useTranslation } from '@/i18n'
 import type {
   ChatMessage,
   TodoListContent,
@@ -78,6 +79,7 @@ interface Props {
 }
 
 export function MessageBubble({ message, onRegenerate }: Props) {
+  const { t } = useTranslation()
   const isUser = message.sender === 'user'
   const [copied, setCopied] = useState(false)
 
@@ -210,19 +212,19 @@ export function MessageBubble({ message, onRegenerate }: Props) {
               <button
                 onClick={handleCopy}
                 className="rounded p-1 hover:bg-muted"
-                title="复制"
+                title={t('message.copy')}
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               {onRegenerate && (
-                <button onClick={onRegenerate} className="rounded p-1 hover:bg-muted" title="重新生成">
+                <button onClick={onRegenerate} className="rounded p-1 hover:bg-muted" title={t('message.regenerate')}>
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               )}
-              <button className="rounded p-1 hover:bg-muted" title="有用">
+              <button className="rounded p-1 hover:bg-muted" title={t('message.useful')}>
                 <ThumbsUp className="h-3.5 w-3.5" />
               </button>
-              <button className="rounded p-1 hover:bg-muted" title="无用">
+              <button className="rounded p-1 hover:bg-muted" title={t('message.notUseful')}>
                 <ThumbsDown className="h-3.5 w-3.5" />
               </button>
             </div>

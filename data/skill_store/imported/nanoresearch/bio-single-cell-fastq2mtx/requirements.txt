@@ -1,0 +1,15 @@
+# bio-single-cell-fastq2mtx
+# This skill wraps command-line tools; no Python/R packages required.
+# Install the following tools independently:
+#
+# Option 1: Cell Ranger
+#   Download from: https://www.10xgenomics.com/support/software/cell-ranger
+#   Requires: Linux x86_64, 64GB+ RAM recommended
+#
+# Option 2: STARsolo
+#   Install via conda: conda install -c bioconda star
+#   Or build from source: https://github.com/alexdobin/STAR
+#   Requires: Linux/macOS, 64GB+ RAM recommended
+#
+# Optional (for batch processing):
+#   GNU parallel: apt-get install parallel  or  conda install -c conda-forge parallel

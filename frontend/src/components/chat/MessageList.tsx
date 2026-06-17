@@ -3,8 +3,10 @@ import { useChatStore } from '@/stores/chatStore'
 import { MessageBubble } from './MessageBubble'
 import { EmptyState } from '@/components/ui'
 import { Sparkles } from 'lucide-react'
+import { useTranslation } from '@/i18n'
 
 export function MessageList() {
+  const { t } = useTranslation()
   const messages = useChatStore((state) => state.messages)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -17,8 +19,8 @@ export function MessageList() {
       <div className="flex flex-1 items-center justify-center overflow-y-auto p-4">
         <EmptyState
           icon={Sparkles}
-          title="开始新的分析对话"
-          description="描述您的生物信息分析需求，例如：'帮我完成 PBMC 单细胞数据的标准化与聚类分析'"
+          title={t('chat.emptyTitle')}
+          description={t('chat.emptyDesc')}
         />
       </div>
     )

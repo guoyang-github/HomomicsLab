@@ -1,0 +1,67 @@
+# 通用中文学位论文样式
+# Usage: plt.style.use('chinese_thesis.mplstyle')
+#
+# Specifications:
+# - A4 page size
+# - Larger fonts for readability
+# - Chinese font support (SimHei/SimSun)
+# - Suitable for both color and B&W printing
+
+# Figure properties
+figure.dpi: 100
+figure.facecolor: white
+figure.constrained_layout.use: True
+figure.figsize: 5.5, 4.125  # Larger figures for A4 page
+
+# Font properties (larger for thesis readability)
+font.size: 10
+font.family: serif
+font.serif: SimSun, Source Han Serif CN, Noto Serif CJK SC, WenQuanYi Micro Hei, Times New Roman, DejaVu Serif
+font.sans-serif: SimHei, Source Han Sans CN, Noto Sans CJK SC, WenQuanYi Micro Hei, Arial, Helvetica
+
+# Axes properties
+axes.linewidth: 0.8
+axes.labelsize: 11
+axes.titlesize: 11
+axes.labelweight: normal
+axes.spines.top: True
+axes.spines.right: True
+axes.edgecolor: black
+axes.axisbelow: True
+axes.grid: False
+axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b', 'e377c2', '7f7f7f', 'bcbd22', '17becf'])
+
+# Tick properties
+xtick.major.size: 4
+xtick.minor.size: 2
+xtick.major.width: 0.8
+xtick.minor.width: 0.5
+xtick.labelsize: 10
+xtick.direction: out
+ytick.major.size: 4
+ytick.minor.size: 2
+ytick.major.width: 0.8
+ytick.minor.width: 0.5
+ytick.labelsize: 10
+ytick.direction: out
+
+# Line properties
+lines.linewidth: 1.8
+lines.markersize: 6
+lines.markeredgewidth: 0.6
+
+# Legend properties
+legend.fontsize: 9
+legend.frameon: True
+legend.edgecolor: black
+legend.fancybox: False
+
+# Save properties
+savefig.dpi: 300
+savefig.format: png
+savefig.bbox: tight
+savefig.pad_inches: 0.1
+savefig.facecolor: white
+
+# Image properties
+image.cmap: viridis

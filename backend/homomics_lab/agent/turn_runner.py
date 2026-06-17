@@ -135,7 +135,7 @@ class TurnRunner:
         memory_manager: Optional[MemoryManager] = None,
     ):
         self._cbkb = cbkb
-        self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=debate)
+        self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=debate, cbkb=self._cbkb)
         self.task_decomposer = task_decomposer or TaskDecomposer(cbkb=self._cbkb)
         self._orchestrator = orchestrator
         self._registry = registry
@@ -290,118 +290,17 @@ class TurnRunner:
                     extra_context=extra_context,
                 )
 
-            # 3.5 Clarification handling
-            if intent.analysis_type == "clarification":
-                turn_result = self._handle_clarification(intent, working_memory)
-            else:
-                # 3.6 MCP tool fast path
-                mcp_tool_name = intent.metadata.get("tool_name")
-                if mcp_tool_name and self._tool_registry is not None:
-                    turn_result = await self._handle_mcp_tool(
-                        mcp_tool_name,
-                        intent.metadata.get("tool_inputs", {}),
-                        working_memory,
-                    )
-                else:
-                    # 4. Route based on intent complexity
-                    if intent.complexity == "direct_response":
-                        turn_result = await self._handle_direct_response(
-                            intent, user_message, working_memory
-                        )
-                    else:
-                        # Decompose into a canonical plan and executable task tree.
-                        plan_result, tree = await self.task_decomposer.decompose_with_plan(
-                            intent, context={"project_id": project_id}
-                        )
-
-                        # Persist the plan if a store is available.
-                        plan: Optional[Plan] = None
-                        if plan_store is not None:
-                            plan = Plan(
-                                plan_id=_new_plan_id(),
-                                session_id=session_id,
-                                project_id=project_id,
-                                status=PlanStatus.PENDING_APPROVAL,
-                                is_fallback=plan_result.is_fallback,
-                                intent_analysis_type=intent.analysis_type,
-                                intent_complexity=intent.complexity,
-                                plan_result=plan_result,
-                                task_tree=tree,
-                                working_memory=working_memory,
-                            )
-                            await plan_store.create(plan)
-
-                        # Optionally submit skill execution to the background queue.
-                        if enqueue_skills and job_service is not None:
-                            # Fallback / LLM-generated plans require explicit approval first.
-                            if plan is not None and plan.is_fallback:
-                                response_text = (
-                                    "我为您生成了一个分析计划，请确认后再执行。"
-                                )
-                                plan_payload = PlanPresenter.to_user_payload(plan)
-                                agent_msg = ChatMessage(
-                                    id=f"msg_{len(working_memory.messages)}",
-                                    type=MessageType.PLAN_REQUEST,
-                                    content={
-                                        "plan_id": plan.plan_id,
-                                        "plan": plan_payload,
-                                        "response_text": response_text,
-                                    },
-                                    sender="agent",
-                                )
-                                working_memory.add_message(agent_msg)
-                                turn_result = TurnResult(
-                                    mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
-                                    response_text=response_text,
-                                    task_tree=tree,
-                                    agent_message=agent_msg,
-                                    plan_id=plan.plan_id,
-                                )
-                            else:
-                                mode = (
-                                    JobMode.SINGLE_STEP
-                                    if intent.complexity == "single_step"
-                                    else JobMode.WORKFLOW
-                                )
-                                job = await job_service.create_job(
-                                    session_id=session_id,
-                                    project_id=project_id,
-                                    working_memory=working_memory,
-                                    task_tree=tree,
-                                    mode=mode,
-                                    plan_id=plan.plan_id if plan is not None else None,
-                                )
-                                # Record the plan on the job for reproducibility.
-                                if plan is not None:
-                                    plan.status = PlanStatus.APPROVED
-                                    plan.approved_by = "system"
-                                    await plan_store.update(plan)
-
-                                response_text = "已提交后台执行，完成后会通知您。"
-                                agent_msg = ChatMessage(
-                                    id=f"msg_{len(working_memory.messages)}",
-                                    type=MessageType.TEXT,
-                                    content=response_text,
-                                    sender="agent",
-                                )
-                                working_memory.add_message(agent_msg)
-                                turn_result = TurnResult(
-                                    mode=ExecutionMode.QUEUED,
-                                    response_text=response_text,
-                                    task_tree=tree,
-                                    agent_message=agent_msg,
-                                    job_id=job.job_id,
-                                    plan_id=plan.plan_id if plan is not None else None,
-                                )
-                        elif intent.complexity == "single_step":
-                            turn_result = await self._handle_single_step(
-                                tree, working_memory, project_id
-                            )
-                        else:
-                            # Complex workflow
-                            turn_result = await self._handle_workflow(
-                                tree, working_memory, project_id
-                            )
+            # 3.5 Route based on structured intent (backward compatible).
+            turn_result = await self._route_by_intent(
+                intent=intent,
+                user_message=user_message,
+                working_memory=working_memory,
+                project_id=project_id,
+                session_id=session_id,
+                plan_store=plan_store,
+                job_service=job_service,
+                enqueue_skills=enqueue_skills,
+            )
         except Exception as e:
             turn_result = self._build_error_result(str(e), working_memory)
 
@@ -457,7 +356,6 @@ class TurnRunner:
         working_memory: WorkingMemory,
     ) -> TurnResult:
         """Directly invoke an MCP tool and return its result."""
-        import json
 
         result = await self._tool_registry.invoke_async(tool_name, tool_inputs)
 
@@ -560,6 +458,156 @@ class TurnRunner:
                 reason="user selected debate option",
             ),
             user_message,
+        )
+
+    async def _route_by_intent(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        session_id: str,
+        plan_store: Optional[PlanStore],
+        job_service: Optional[Any],
+        enqueue_skills: bool,
+    ) -> TurnResult:
+        """Route a user intent to the right execution path.
+
+        Uses the structured ``interaction_mode`` and ``scope`` fields when
+        available, with backward-compatible fallbacks to ``analysis_type`` and
+        ``complexity``.
+        """
+        interaction_mode = intent.interaction_mode
+        scope = intent.scope
+
+        # Backward compatibility for legacy intents that don't set the new fields.
+        if intent.analysis_type == "clarification":
+            interaction_mode = "clarify"
+        elif intent.complexity == "direct_response" and not intent.metadata.get("tool_name"):
+            interaction_mode = "answer"
+
+        if interaction_mode == "clarify":
+            return self._handle_clarification(intent, working_memory)
+
+        if interaction_mode == "answer":
+            return await self._handle_direct_response(
+                intent, user_message, working_memory
+            )
+
+        # MCP tool fast path.
+        mcp_tool_name = intent.metadata.get("tool_name")
+        if mcp_tool_name and self._tool_registry is not None:
+            return await self._handle_mcp_tool(
+                mcp_tool_name,
+                intent.metadata.get("tool_inputs", {}),
+                working_memory,
+            )
+
+        # Everything else is some form of execution.
+        plan_result, tree = await self.task_decomposer.decompose_with_plan(
+            intent, context={"project_id": project_id}
+        )
+
+        plan: Optional[Plan] = None
+        if plan_store is not None:
+            plan = Plan(
+                plan_id=_new_plan_id(),
+                session_id=session_id,
+                project_id=project_id,
+                status=PlanStatus.PENDING_APPROVAL,
+                is_fallback=plan_result.is_fallback,
+                intent_analysis_type=intent.analysis_type,
+                intent_complexity=intent.complexity,
+                plan_result=plan_result,
+                task_tree=tree,
+                working_memory=working_memory,
+            )
+            await plan_store.create(plan)
+
+        if enqueue_skills and job_service is not None:
+            return await self._enqueue_execution(
+                intent=intent,
+                tree=tree,
+                plan=plan,
+                working_memory=working_memory,
+                session_id=session_id,
+                project_id=project_id,
+                job_service=job_service,
+                plan_store=plan_store,
+            )
+
+        if scope == "single_step" or intent.complexity == "single_step":
+            return await self._handle_single_step(tree, working_memory, project_id)
+
+        return await self._handle_workflow(tree, working_memory, project_id)
+
+    async def _enqueue_execution(
+        self,
+        intent: UserIntent,
+        tree: TaskTree,
+        plan: Optional[Plan],
+        working_memory: WorkingMemory,
+        session_id: str,
+        project_id: str,
+        job_service: Any,
+        plan_store: Optional[PlanStore],
+    ) -> TurnResult:
+        """Submit a task tree to the background job queue."""
+        if plan is not None and plan.is_fallback:
+            response_text = "我为您生成了一个分析计划，请确认后再执行。"
+            plan_payload = PlanPresenter.to_user_payload(plan)
+            agent_msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.PLAN_REQUEST,
+                content={
+                    "plan_id": plan.plan_id,
+                    "plan": plan_payload,
+                    "response_text": response_text,
+                },
+                sender="agent",
+            )
+            working_memory.add_message(agent_msg)
+            return TurnResult(
+                mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
+                response_text=response_text,
+                task_tree=tree,
+                agent_message=agent_msg,
+                plan_id=plan.plan_id,
+            )
+
+        mode = (
+            JobMode.SINGLE_STEP
+            if intent.scope == "single_step" or intent.complexity == "single_step"
+            else JobMode.WORKFLOW
+        )
+        job = await job_service.create_job(
+            session_id=session_id,
+            project_id=project_id,
+            working_memory=working_memory,
+            task_tree=tree,
+            mode=mode,
+            plan_id=plan.plan_id if plan is not None else None,
+        )
+        if plan is not None and plan_store is not None:
+            plan.status = PlanStatus.APPROVED
+            plan.approved_by = "system"
+            await plan_store.update(plan)
+
+        response_text = "已提交后台执行，完成后会通知您。"
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TEXT,
+            content=response_text,
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+        return TurnResult(
+            mode=ExecutionMode.QUEUED,
+            response_text=response_text,
+            task_tree=tree,
+            agent_message=agent_msg,
+            job_id=job.job_id,
+            plan_id=plan.plan_id if plan is not None else None,
         )
 
     async def _handle_single_step(

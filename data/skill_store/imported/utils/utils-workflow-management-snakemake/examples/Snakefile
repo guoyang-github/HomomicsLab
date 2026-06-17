@@ -1,0 +1,13 @@
+# Snakemake RNA-seq Quantification Workflow
+# Compatible with Snakemake 7.x and 8.x
+
+configfile: "config.yaml"
+
+SAMPLES = list(config["samples"].keys())
+
+rule all:
+    input:
+        "results/multiqc_report.html"
+
+include: "rules/qc.smk"
+include: "rules/quantify.smk"

@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { AlertTriangle, AlertCircle, ShieldAlert, CircleDollarSign, Search, Check } from 'lucide-react'
 import { chatApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { useTranslation } from '@/i18n'
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Textarea } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 
@@ -24,15 +25,16 @@ interface Props {
   taskId: string
 }
 
-const triggerConfig: Record<string, { icon: React.ElementType; label: string; variant: any; color: string }> = {
-  reviewer_reject: { icon: Search, label: '审核拒绝', variant: 'warning', color: 'text-warning' },
-  worker_failure: { icon: AlertTriangle, label: '执行失败', variant: 'error', color: 'text-error' },
-  phase_gate_fail: { icon: AlertCircle, label: '阶段检查未通过', variant: 'warning', color: 'text-warning' },
-  high_cost: { icon: CircleDollarSign, label: '高成本', variant: 'warning', color: 'text-warning' },
-  high_risk: { icon: ShieldAlert, label: '高风险', variant: 'error', color: 'text-error' },
-}
-
 export function HITLRequest({ checkpoint, taskId }: Props) {
+  const { t } = useTranslation()
+  const triggerConfig: Record<string, { icon: React.ElementType; label: string; variant: any; color: string }> = {
+    reviewer_reject: { icon: Search, label: t('hitl.reviewReject'), variant: 'warning', color: 'text-warning' },
+    worker_failure: { icon: AlertTriangle, label: t('hitl.workerFailure'), variant: 'error', color: 'text-error' },
+    phase_gate_fail: { icon: AlertCircle, label: t('hitl.phaseGateFail'), variant: 'warning', color: 'text-warning' },
+    high_cost: { icon: CircleDollarSign, label: t('hitl.highCost'), variant: 'warning', color: 'text-warning' },
+    high_risk: { icon: ShieldAlert, label: t('hitl.highRisk'), variant: 'error', color: 'text-error' },
+  }
+
   const recommendedAction = (checkpoint.metadata?.recommended_action as string) || checkpoint.default_option?.id
   const riskLevel = (checkpoint.metadata?.risk_level as string) || 'medium'
 
@@ -43,7 +45,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
 
   const config = triggerConfig[checkpoint.trigger_reason] || {
     icon: AlertCircle,
-    label: '需要确认',
+    label: t('hitl.confirmationNeeded'),
     variant: 'warning',
     color: 'text-warning',
   }
@@ -59,7 +61,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
         try {
           parsedParams = JSON.parse(parameters)
         } catch {
-          toastError('参数 JSON 格式无效')
+          toastError(t('common.invalidJson'))
           setIsSubmitting(false)
           return
         }
@@ -72,16 +74,17 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
         parameters: parsedParams,
       })
 
-      toastSuccess('已确认操作')
+      const confirmedLabel = checkpoint.options.find((o) => o.id === selectedOption)?.label || selectedOption
+      toastSuccess(t('hitl.confirmed'))
       addMessage({
         id: `msg_${Date.now()}`,
         type: 'system',
-        content: `已确认：${checkpoint.options.find((o) => o.id === selectedOption)?.label}`,
+        content: t('hitl.confirmedAction', { label: confirmedLabel }),
         sender: 'system',
         timestamp: new Date().toISOString(),
       })
     } catch (error: any) {
-      toastError(error?.response?.data?.detail || '提交失败')
+      toastError(error?.response?.data?.detail || t('common.submitFailed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -93,13 +96,13 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
         <div className="flex items-center gap-2">
           <Icon className={clsx('h-5 w-5', config.color)} />
           <CardTitle className="text-base">{config.label}</CardTitle>
-          <Badge variant={config.variant} size="sm">风险：{riskLevel}</Badge>
+          <Badge variant={config.variant} size="sm">{t('hitl.riskLabel', { level: riskLevel })}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1 text-sm">
           <p>
-            <span className="text-muted-foreground">原因：</span>
+            <span className="text-muted-foreground">{t('hitl.reasonLabel')}</span>
             {checkpoint.trigger_reason}
           </p>
           <p className="text-muted-foreground">{checkpoint.context_summary}</p>
@@ -107,7 +110,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
 
         {recommendedAction && (
           <p className="text-xs font-medium text-foreground">
-            推荐操作：{checkpoint.options.find((o) => o.id === recommendedAction)?.label}
+            {t('hitl.recommendedAction')} {checkpoint.options.find((o) => o.id === recommendedAction)?.label}
           </p>
         )}
 
@@ -141,7 +144,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">参数（JSON）</label>
+          <label className="text-sm font-medium">{t('debate.parametersJson')}</label>
           <Textarea
             value={parameters}
             onChange={(e) => setParameters(e.target.value)}
@@ -152,7 +155,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
 
         <Button onClick={handleSubmit} loading={isSubmitting} disabled={!selectedOption}>
           <Check className="mr-1.5 h-4 w-4" />
-          确认
+          {t('common.confirm')}
         </Button>
       </CardContent>
     </Card>

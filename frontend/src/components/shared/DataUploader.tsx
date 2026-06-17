@@ -4,9 +4,11 @@ import { useDropzone } from 'react-dropzone'
 import { UploadCloud, FileText } from 'lucide-react'
 import { fileApi } from '@/services/api'
 import { useChatStore } from '@/stores/chatStore'
+import { useTranslation } from '@/i18n'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 
 export function DataUploader() {
+  const { t } = useTranslation()
   const { currentProjectId } = useChatStore()
 
   const onDrop = useCallback(
@@ -14,14 +16,14 @@ export function DataUploader() {
       for (const file of acceptedFiles) {
         try {
           const response = await fileApi.uploadFile(file, currentProjectId)
-          toastSuccess(`${response.data.filename} 上传成功`)
+          toastSuccess(t('dataUploader.uploadSuccess', { filename: response.data.filename }))
         } catch (error: any) {
           const detail = error?.response?.data?.detail
-          toastError(detail || `${file.name} 上传失败`)
+          toastError(detail || t('dataUploader.uploadFailed', { filename: file.name }))
         }
       }
     },
-    [currentProjectId]
+    [currentProjectId, t]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -48,10 +50,10 @@ export function DataUploader() {
         {isDragActive ? <FileText className="h-5 w-5" /> : <UploadCloud className="h-5 w-5" />}
       </div>
       <p className="text-sm font-medium text-foreground">
-        {isDragActive ? '释放文件以上传' : '拖拽或点击上传数据'}
+        {isDragActive ? t('dataUploader.dropToUpload') : t('dataUploader.dragOrClick')}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        支持 .h5ad, .mtx, .csv, .tsv, .fastq.gz
+        {t('dataUploader.supportedFormats')}
       </p>
     </div>
   )

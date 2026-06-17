@@ -1,0 +1,63 @@
+# 科学通报 (Chinese Science Bulletin) journal style
+# Usage: plt.style.use('sci_bulletin.mplstyle')
+#
+# Similar to Science China series:
+# - Single column: 82 mm
+# - Double column: 170 mm
+# - Chinese font support
+
+# Figure properties
+figure.dpi: 100
+figure.facecolor: white
+figure.constrained_layout.use: True
+figure.figsize: 3.23, 2.425  # 82 mm single column
+
+# Font properties
+font.size: 8
+font.family: sans-serif
+font.sans-serif: SimHei, Source Han Sans CN, Noto Sans CJK SC, WenQuanYi Micro Hei, Arial, Helvetica, DejaVu Sans
+
+# Axes properties
+axes.linewidth: 0.6
+axes.labelsize: 9
+axes.titlesize: 9
+axes.labelweight: normal
+axes.spines.top: False
+axes.spines.right: False
+axes.edgecolor: black
+axes.axisbelow: True
+axes.grid: False
+axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b', 'e377c2', '7f7f7f', 'bcbd22', '17becf'])
+
+# Tick properties
+xtick.major.size: 3
+xtick.minor.size: 1.5
+xtick.major.width: 0.6
+xtick.minor.width: 0.4
+xtick.labelsize: 8
+xtick.direction: out
+ytick.major.size: 3
+ytick.minor.size: 1.5
+ytick.major.width: 0.6
+ytick.minor.width: 0.4
+ytick.labelsize: 8
+ytick.direction: out
+
+# Line properties
+lines.linewidth: 1.4
+lines.markersize: 4
+lines.markeredgewidth: 0.5
+
+# Legend properties
+legend.fontsize: 7
+legend.frameon: False
+
+# Save properties
+savefig.dpi: 600
+savefig.format: pdf
+savefig.bbox: tight
+savefig.pad_inches: 0.05
+savefig.facecolor: white
+
+# Image properties
+image.cmap: viridis

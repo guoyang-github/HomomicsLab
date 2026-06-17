@@ -22,9 +22,13 @@ class SkillSummary(BaseModel):
     id: str
     name: str
     description: str
+    version: str
     category: str
     runtime_type: str
     primary_tool: str
+    source: str = "builtin"
+    namespace: str = "default"
+    enabled: bool = True
 
 
 class SkillDetail(SkillSummary):
@@ -101,9 +105,13 @@ async def list_skills(request: Request):
             id=s.id,
             name=s.name,
             description=s.description,
+            version=s.version,
             category=s.category,
             runtime_type=s.runtime.type,
             primary_tool=s.metadata.get("primary_tool", ""),
+            source=s.metadata.get("source", "builtin"),
+            namespace=s.metadata.get("namespace", "default"),
+            enabled=s.metadata.get("enabled", True),
         )
         for s in skills
     ]
@@ -120,9 +128,13 @@ async def search_skills(request: Request, q: str):
             id=s.id,
             name=s.name,
             description=s.description,
+            version=s.version,
             category=s.category,
             runtime_type=s.runtime.type,
             primary_tool=s.metadata.get("primary_tool", ""),
+            source=s.metadata.get("source", "builtin"),
+            namespace=s.metadata.get("namespace", "default"),
+            enabled=s.metadata.get("enabled", True),
         )
         for s in skills
     ]

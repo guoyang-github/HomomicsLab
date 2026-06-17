@@ -1,0 +1,11 @@
+{
+    "rnaseq_pipeline.samples": [
+        {
+            "sample_id": "SAMPLE1",
+            "fastq_1": "/data/SAMPLE1_R1.fq.gz",
+            "fastq_2": "/data/SAMPLE1_R2.fq.gz",
+            "strandedness": "auto"
+        }
+    ],
+    "rnaseq_pipeline.salmon_index": "/ref/salmon_index"
+}

@@ -48,25 +48,25 @@ export function Modal({ open, onClose, title, description, children, footer, siz
     >
       <div
         className={clsx(
-          'relative w-full rounded-xl border border-border bg-card text-card-foreground shadow-floating animate-slide-in',
+          'relative flex max-h-[85vh] w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-floating animate-slide-in',
           sizeClasses[size]
         )}
         role="dialog"
         aria-modal="true"
       >
         {(title || description) && (
-          <div className="flex items-start justify-between border-b border-border p-5">
-            <div>
-              {title && <h2 className="text-lg font-semibold">{title}</h2>}
-              {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          <div className="flex shrink-0 items-start justify-between border-b border-border p-5">
+            <div className="min-w-0 pr-4">
+              {title && <h2 className="truncate text-lg font-semibold">{title}</h2>}
+              {description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description}</p>}
             </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
               <X className="h-4 w-4" />
             </Button>
           </div>
         )}
-        <div className="p-5">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 border-t border-border p-5">{footer}</div>}
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        {footer && <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border p-5">{footer}</div>}
       </div>
     </div>
   )

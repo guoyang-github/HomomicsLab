@@ -21,6 +21,13 @@ from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.context.working_memory import WorkingMemory
 
 
+# Optional CBKB import; avoid hard dependency at module load.
+try:
+    from homomics_lab.knowledge.cbkb import CBKB
+except Exception:  # pragma: no cover
+    CBKB = None  # type: ignore
+
+
 # Track live analyzer instances so domain hot-reload can refresh intent definitions.
 _analyzer_instances: weakref.WeakSet = weakref.WeakSet()
 
@@ -44,6 +51,7 @@ class CascadeIntentAnalyzer:
         clarification_threshold: float = 0.35,
         high_confidence_threshold: float = 0.75,
         debate: Optional[LightweightDebate] = None,
+        cbkb: Optional[Any] = None,
     ):
         self._definitions = list(definitions or [])
         self.use_domain_registry = use_domain_registry
@@ -54,6 +62,7 @@ class CascadeIntentAnalyzer:
         self.embedding_classifier = embedding_classifier or EmbeddingIntentClassifier(weight=0.35)
         self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.40)
         self.debate = debate
+        self.cbkb = cbkb
 
         # Always load built-in intents (qa, general_help, file_conversion) so
         # domain-agnostic requests work even without domain registry.
@@ -224,6 +233,7 @@ class CascadeIntentAnalyzer:
         message: str,
         working_memory: Optional[WorkingMemory] = None,
         extra_context: Optional[Dict[str, Any]] = None,
+        cbkb: Optional[Any] = None,
     ) -> UserIntent:
         """Analyze user message and return structured intent."""
         context = self._build_context(working_memory, extra_context)
@@ -237,7 +247,11 @@ class CascadeIntentAnalyzer:
             top_keyword = self._apply_mcp_override(
                 top_keyword, message, keyword_matches[1:]
             )
-            return self._to_user_intent(top_keyword, message)
+            intent = self._to_user_intent(
+                top_keyword, message, alternatives=keyword_matches[1:]
+            )
+            self._enrich_with_cbkb(intent, cbkb)
+            return intent
 
         # Layer 2: embedding semantic match
         embedding_matches = await self.embedding_classifier.classify(
@@ -256,10 +270,16 @@ class CascadeIntentAnalyzer:
 
         # Layer 4: clarification only when the ensemble signals genuine ambiguity.
         if fused.needs_clarification:
-            return await self._build_clarification_intent(fused, message)
+            intent = await self._build_clarification_intent(fused, message)
+            self._enrich_with_cbkb(intent, cbkb)
+            return intent
 
         primary = self._apply_mcp_override(fused.primary, message, fused.alternatives)
-        return self._to_user_intent(primary, message, sub_intents=fused.sub_intents)
+        intent = self._to_user_intent(
+            primary, message, sub_intents=fused.sub_intents, alternatives=fused.alternatives
+        )
+        self._enrich_with_cbkb(intent, cbkb)
+        return intent
 
     def _build_context(
         self,
@@ -547,6 +567,7 @@ class CascadeIntentAnalyzer:
         match: IntentMatch,
         message: str,
         sub_intents: Optional[List[IntentMatch]] = None,
+        alternatives: Optional[List[IntentMatch]] = None,
     ) -> UserIntent:
         """Convert an IntentMatch to the public UserIntent object."""
         definition = self._find_definition(match.analysis_type)
@@ -561,6 +582,11 @@ class CascadeIntentAnalyzer:
                 sub_user_intents.append(self._to_user_intent(sub, message))
 
         metadata: Dict[str, Any] = {"reason": match.reason, "source": match.source}
+        if alternatives:
+            metadata["alternatives"] = [
+                {"analysis_type": m.analysis_type, "confidence": m.confidence, "source": m.source}
+                for m in alternatives
+            ]
         if match.analysis_type in (
             "pubmed_search",
             "pubmed_fetch",
@@ -569,6 +595,12 @@ class CascadeIntentAnalyzer:
         ):
             metadata["tool_name"] = match.analysis_type
             metadata["tool_inputs"] = self._extract_mcp_inputs(match.analysis_type, message)
+
+        # Structured intent decomposition (best-practice v2).
+        interaction_mode = self._determine_interaction_mode(match, complexity, metadata)
+        scope = self._determine_scope(complexity, has_sub_intents)
+        domain = self._determine_domain(match, definition)
+        target = self._determine_target(match, definition)
 
         return UserIntent(
             analysis_type=match.analysis_type,
@@ -579,7 +611,150 @@ class CascadeIntentAnalyzer:
             domain_knowledge=domain_knowledge,
             sub_intents=sub_user_intents,
             metadata=metadata,
+            interaction_mode=interaction_mode,
+            domain=domain,
+            target=target,
+            scope=scope,
         )
+
+    def _enrich_with_cbkb(
+        self,
+        intent: UserIntent,
+        cbkb: Optional[Any],
+    ) -> None:
+        """Attach CBKB-derived SOPs, anomalies, and parameter lore to the intent.
+
+        The CBKB instance passed to analyze() overrides the one configured at
+        construction time. If neither is available, enrichment is a no-op.
+        """
+        cbkb = cbkb or self.cbkb
+        if cbkb is None:
+            return
+
+        try:
+            canonical_domain = UserIntent(
+                analysis_type=intent.analysis_type, complexity="single_step"
+            ).domain
+            categories = {intent.domain, canonical_domain, intent.analysis_type} - {None, ""}
+            sops = []
+            seen_sop_ids = set()
+            for category in categories:
+                for sop in cbkb.list_sops(category=category):
+                    if sop.id not in seen_sop_ids:
+                        seen_sop_ids.add(sop.id)
+                        sops.append(sop)
+            anomalies = cbkb.query_anomalies(phase_type=intent.analysis_type, limit=3)
+
+            # Parameter lore: use any known skill ids referenced by the intent or
+            # its sub-intents. Domain-level intents do not yet resolve to skills,
+            # so this list may be empty until execution-time retrieval.
+            skill_ids = []
+            if intent.target and intent.target != intent.analysis_type:
+                skill_ids.append(intent.target)
+            for sub in intent.sub_intents:
+                if sub.target and sub.target != sub.analysis_type:
+                    skill_ids.append(sub.target)
+            lore: List[Dict[str, Any]] = []
+            for skill_id in skill_ids[:5]:
+                for entry in cbkb.query_parameter_lore(skill_id=skill_id, limit=2):
+                    lore.append({
+                        "skill_id": entry.skill_id,
+                        "param_name": entry.param_name,
+                        "param_value": entry.param_value,
+                        "outcome_value": entry.outcome_value,
+                        "context": entry.context,
+                    })
+
+            intent.metadata["cbkb"] = {
+                "sops": [
+                    {
+                        "id": sop.id,
+                        "name": sop.name,
+                        "category": sop.category,
+                        "version": sop.version,
+                        "locked": sop.locked,
+                    }
+                    for sop in sops[:3]
+                ],
+                "anomalies": [
+                    {
+                        "id": rec.id,
+                        "phase_type": rec.phase_type,
+                        "summary": rec.summary,
+                        "flags": rec.flags,
+                        "severity": rec.severity,
+                    }
+                    for rec in anomalies
+                ],
+                "parameter_lore": lore,
+            }
+        except Exception:
+            # CBKB enrichment is best-effort; never break intent analysis.
+            pass
+
+    @staticmethod
+    def _determine_interaction_mode(
+        match: IntentMatch,
+        complexity: str,
+        metadata: Dict[str, Any],
+    ) -> str:
+        if match.analysis_type == "clarification":
+            return "clarify"
+        if metadata.get("tool_name"):
+            return "execute"
+        if complexity == "direct_response":
+            return "answer"
+        return "execute"
+
+    @staticmethod
+    def _determine_scope(complexity: str, has_sub_intents: bool) -> str:
+        if complexity in ("single_step", "direct_response"):
+            return "single_step"
+        if has_sub_intents:
+            return "partial"
+        if complexity == "complex":
+            return "full"
+        return "full"
+
+    def _determine_domain(
+        self,
+        match: IntentMatch,
+        definition: Optional[Any],
+    ) -> Optional[str]:
+        if definition and definition.domain:
+            return definition.domain
+        domain_from_analysis = UserIntent(analysis_type=match.analysis_type, complexity="single_step").domain
+        return domain_from_analysis
+
+    def _determine_target(
+        self,
+        match: IntentMatch,
+        definition: Optional[Any],
+    ) -> Optional[str]:
+        # Explicit single-step helpers.
+        if match.analysis_type == "file_conversion":
+            return "convert_file"
+        if match.analysis_type == "qa":
+            return "answer_question"
+        if match.analysis_type == "general_help":
+            return "generate_code"
+        # If the analysis_type itself is a known phase id, treat it as the target.
+        if self._is_known_phase(match.analysis_type):
+            return match.analysis_type
+        return None
+
+    def _is_known_phase(self, analysis_type: str) -> bool:
+        """Check whether an analysis_type corresponds to a domain phase id."""
+        from homomics_lab.domain.registry import get_domain_registry
+
+        try:
+            registry = get_domain_registry()
+        except Exception:
+            return False
+        for domain in registry.list_all():
+            if analysis_type in domain.get_phase_types():
+                return True
+        return False
 
     async def _build_clarification_intent(
         self,

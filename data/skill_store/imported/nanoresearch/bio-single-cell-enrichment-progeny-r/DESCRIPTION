@@ -1,0 +1,21 @@
+Package: bio.single.cell.enrichment.progeny.r
+Type: Skill
+Title: Single-cell Analysis Skill
+Version: 1.0.0
+Authors@R: person("Yang", "Guo", email = "guo@example.com", role = c("aut", "cre"))
+Description: Bioinformatics skill for single-cell analysis.
+License: MIT
+Depends:
+    R (>= 4.2.0)
+Imports:
+    progeny,
+    Seurat,
+    SummarizedExperiment,
+    SingleCellExperiment,
+    ggplot2,
+    pheatmap,
+    patchwork,
+    ggridges,
+    dplyr
+Encoding: UTF-8
+LazyData: true

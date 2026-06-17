@@ -1,4 +1,5 @@
 import { useTaskStore } from '@/stores/taskStore'
+import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskProgress } from '@/types/tasks'
 
 interface Props {
@@ -19,6 +20,7 @@ const statusIcons: Record<TaskNode['status'], string> = {
 }
 
 export function TodoList({ content }: Props) {
+  const { t } = useTranslation()
   const selectTask = useTaskStore((state) => state.selectTask)
 
   return (
@@ -28,7 +30,7 @@ export function TodoList({ content }: Props) {
       {content.progress && (
         <div className="mb-3">
           <div className="mb-1 flex justify-between text-xs text-slate-600">
-            <span>进度</span>
+            <span>{t('plan.progress')}</span>
             <span>{content.progress.completed}/{content.progress.total}</span>
           </div>
           <div className="h-2 w-full rounded-full bg-slate-200">

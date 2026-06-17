@@ -494,8 +494,14 @@ class SkillStore:
 
         requirements = skill_dir / "requirements.txt"
         environment = skill_dir / "environment.yml"
-        if scripts_dir.exists() and not requirements.exists() and not environment.exists():
-            warnings.append("scripts/ present but no requirements.txt or environment.yml found")
+        r_dependencies = skill_dir / "dependencies.R"
+        if (
+            scripts_dir.exists()
+            and not requirements.exists()
+            and not environment.exists()
+            and not r_dependencies.exists()
+        ):
+            warnings.append("scripts/ present but no requirements.txt, environment.yml or dependencies.R found")
 
         valid = len(errors) == 0
         return ValidationReport(valid=valid, errors=errors, warnings=warnings)

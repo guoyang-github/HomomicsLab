@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from homomics_lab.api.audit import audit_middleware
-from homomics_lab.api.auth import get_current_user, require_auth
+from homomics_lab.api.auth import require_auth
 from homomics_lab.api.rate_limit import rate_limit_dependency, update_limiter_config
 from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context
@@ -16,6 +16,7 @@ from homomics_lab.logging_config import (
     new_correlation_id,
     set_correlation_id,
 )
+from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.plan import PlanStore
 from homomics_lab.scheduler import HomomicsScheduler
 from homomics_lab.api.router import api_router
@@ -41,6 +42,11 @@ async def lifespan(app: FastAPI):
     app.state.skill_reloader = ctx["skill_reloader"]
     app.state.mcp_client = ctx["mcp_client"]
     app.state.memory_manager = ctx["memory_manager"]
+
+    # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
+    cbkb = CBKB(base_dir=settings.data_dir)
+    app.state.cbkb = cbkb
+    ctx["memory_manager"].cbkb = cbkb
 
     print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
     for external_skills in settings.external_skills_dirs:

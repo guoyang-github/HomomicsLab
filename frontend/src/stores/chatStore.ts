@@ -16,15 +16,17 @@ interface ChatState {
   isTyping: boolean
   currentSessionId: string
   currentProjectId: string
+  draftInput: string
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
   setIsTyping: (typing: boolean) => void
   setSessionId: (id: string) => void
   setProjectId: (id: string) => void
+  setDraftInput: (value: string) => void
   clearMessages: () => void
 
-  createSession: (name?: string) => string
+  createSession: (name?: string, projectId?: string) => string
   renameSession: (id: string, name: string) => void
   deleteSession: (id: string) => void
   getCurrentSession: () => ChatSession | undefined
@@ -36,7 +38,7 @@ export const useChatStore = create<ChatState>()(
       sessions: [
         {
           id: `sess_${Date.now()}`,
-          name: '默认会话',
+          name: 'Default Session',
           projectId: 'default',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -46,6 +48,7 @@ export const useChatStore = create<ChatState>()(
       isTyping: false,
       currentSessionId: '',
       currentProjectId: 'default',
+      draftInput: '',
 
       addMessage: (message) =>
         set((state) => {
@@ -65,21 +68,23 @@ export const useChatStore = create<ChatState>()(
       setIsTyping: (isTyping) => set({ isTyping }),
       setSessionId: (currentSessionId) => set({ currentSessionId }),
       setProjectId: (currentProjectId) => set({ currentProjectId }),
+      setDraftInput: (draftInput) => set({ draftInput }),
       clearMessages: () => set({ messages: [] }),
 
-      createSession: (name) => {
+      createSession: (name?: string, projectId?: string) => {
         const id = `sess_${Date.now()}`
+        const resolvedProjectId = projectId || get().currentProjectId || 'default'
         const newSession: ChatSession = {
           id,
-          name: name || `会话 ${new Date().toLocaleString()}`,
-          projectId: 'default',
+          name: name || `Session ${new Date().toLocaleString()}`,
+          projectId: resolvedProjectId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
         set((state) => ({
           sessions: [newSession, ...state.sessions],
           currentSessionId: id,
-          currentProjectId: newSession.projectId,
+          currentProjectId: resolvedProjectId,
           messages: [],
         }))
         return id

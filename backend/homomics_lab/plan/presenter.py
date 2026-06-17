@@ -31,6 +31,7 @@ class PlanPresenter:
                     "required": phase.required,
                     "skill_id": skill_id,
                     "readonly": phase.readonly,
+                    "parameters": phase.parameters,
                 }
             )
 
@@ -45,12 +46,22 @@ class PlanPresenter:
             for gap in plan.plan_result.gaps
         ]
 
+        transitions = [
+            {
+                "from": t.get("from"),
+                "to": t.get("to"),
+                "type": t.get("type"),
+            }
+            for t in plan.plan_result.phase_transitions
+        ]
+
         return {
             "plan_id": plan.plan_id,
             "status": plan.status,
             "is_fallback": plan.is_fallback,
             "intent_analysis_type": plan.intent_analysis_type,
             "phases": phases,
+            "transitions": transitions,
             "gaps": gaps,
             "suggestion_text": plan.plan_result.suggestion_text,
             "created_at": plan.created_at.isoformat() if plan.created_at else None,

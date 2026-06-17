@@ -1,14 +1,21 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { clsx } from 'clsx'
 import { Send, Paperclip, Loader2, X, FileText, Command } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { usePlanStore } from '@/stores/planStore'
+import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
 import { Button } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
-import type { ChatMessage } from '@/types/chat'
+import type { ChatMessage, PlanRequestContent } from '@/types/chat'
 import type { TaskProgress } from '@/types/tasks'
+
+function generateSessionName(message: string): string {
+  const cleaned = message.replace(/@file:[^\s]+/g, '').replace(/@skill:[^\s]+/g, '').trim()
+  return cleaned.slice(0, 40) || 'New Session'
+}
 
 interface PendingFile {
   file: File
@@ -19,13 +26,35 @@ interface PendingFile {
 }
 
 export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () => void }) {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const consumedDraftRef = useRef<string | null>(null)
 
-  const { addMessage, currentSessionId, currentProjectId, setIsTyping, createSession } = useChatStore()
+  const {
+    addMessage,
+    currentSessionId,
+    currentProjectId,
+    setIsTyping,
+    createSession,
+    draftInput,
+    setDraftInput,
+  } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
+  const { loadPlan, discardDraft } = usePlanStore()
+
+  useEffect(() => {
+    if (!draftInput || consumedDraftRef.current === draftInput) return
+    consumedDraftRef.current = draftInput
+    setInput((prev) => {
+      const separator = prev && !prev.endsWith(' ') ? ' ' : ''
+      return prev + separator + draftInput
+    })
+    setDraftInput('')
+    textareaRef.current?.focus()
+  }, [draftInput, setDraftInput])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -33,6 +62,17 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     if (!currentSessionId) {
       createSession()
     }
+
+    const currentSession = useChatStore.getState().getCurrentSession()
+    if (currentSession) {
+      const isGenericName =
+        currentSession.name === 'Default Session' || currentSession.name.startsWith('Session ')
+      if (isGenericName) {
+        useChatStore.getState().renameSession(currentSession.id, generateSessionName(input))
+      }
+    }
+
+    discardDraft()
 
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
@@ -43,6 +83,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     }
     addMessage(userMessage)
     setInput('')
+    consumedDraftRef.current = null
     setIsLoading(true)
     setIsTyping(true)
 
@@ -68,15 +109,32 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         }
       }
 
-      const agentMessage: ChatMessage = {
-        id: `msg_${Date.now()}_agent`,
-        type: 'todo_list',
-        content: {
-          text: response.data.response,
-          tasks: tasks,
-        },
-        sender: 'agent',
-        timestamp: new Date().toISOString(),
+      let agentMessage: ChatMessage
+      if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
+        const planContent: PlanRequestContent = {
+          plan_id: response.data.plan_id || response.data.plan.plan_id,
+          response_text: response.data.response,
+          plan: response.data.plan,
+        }
+        loadPlan(planContent)
+        agentMessage = {
+          id: `msg_${Date.now()}_agent`,
+          type: 'plan_request',
+          content: planContent as unknown as Record<string, unknown>,
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+        }
+      } else {
+        agentMessage = {
+          id: `msg_${Date.now()}_agent`,
+          type: 'todo_list',
+          content: {
+            text: response.data.response,
+            tasks: tasks,
+          },
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+        }
       }
       addMessage(agentMessage)
     } catch (error: any) {
@@ -84,12 +142,12 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
       const errorMessage: ChatMessage = {
         id: `msg_${Date.now()}_error`,
         type: 'error',
-        content: detail || '发送消息失败，请重试。',
+        content: detail || t('chat.sendFailed'),
         sender: 'system',
         timestamp: new Date().toISOString(),
       }
       addMessage(errorMessage)
-      toastError(detail || '发送消息失败')
+      toastError(detail || t('chat.sendFailedShort'))
     } finally {
       setIsLoading(false)
       setIsTyping(false)
@@ -112,15 +170,15 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
       setPendingFiles((prev) =>
         prev.map((f) => (f.id === id ? { ...f, uploading: false, uploaded: true } : f))
       )
-      toastSuccess(`已上传 ${file.name}`)
+      toastSuccess(t('chat.uploaded', { filename: file.name }))
     } catch (error: any) {
       const detail = error?.response?.data?.detail
       setPendingFiles((prev) =>
         prev.map((f) =>
-          f.id === id ? { ...f, uploading: false, uploaded: false, error: detail || '上传失败' } : f
+          f.id === id ? { ...f, uploading: false, uploaded: false, error: detail || t('chat.uploadFailed') } : f
         )
       )
-      toastError(detail || `上传 ${file.name} 失败`)
+      toastError(detail || t('chat.uploadFileFailed', { filename: file.name }))
     }
   }
 
@@ -162,7 +220,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
 
       {isDragActive && (
         <div className="mb-3 rounded-lg border-2 border-dashed border-primary bg-primary/5 p-4 text-center text-sm text-primary">
-          释放文件以上传
+          {t('chat.dropToUpload')}
         </div>
       )}
 
@@ -200,7 +258,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="描述您的分析需求... 支持拖拽上传生物信息文件"
+            placeholder={t('chat.placeholder')}
             rows={1}
             className={clsx(
               'min-h-[48px] w-full resize-none rounded-xl border border-border bg-muted px-4 py-3 pr-20 text-sm',
@@ -215,11 +273,11 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
             }}
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={open} title="上传文件">
+            <Button variant="ghost" size="icon" onClick={open} title={t('chat.uploadFile')}>
               <Paperclip className="h-4 w-4" />
             </Button>
             {onOpenCommandPalette && (
-              <Button variant="ghost" size="icon" onClick={onOpenCommandPalette} title="命令面板">
+              <Button variant="ghost" size="icon" onClick={onOpenCommandPalette} title={t('chat.commandPalette')}>
                 <Command className="h-4 w-4" />
               </Button>
             )}
@@ -236,8 +294,8 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Enter 发送，Shift+Enter 换行</span>
-        <span>支持 Markdown、LaTeX、代码高亮</span>
+        <span>{t('chat.sendHint')}</span>
+        <span>{t('chat.formatHint')}</span>
       </div>
     </div>
   )

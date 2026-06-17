@@ -1,19 +1,66 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
-import { Plus, Trash2, Edit2, Check, X, MessageSquare } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X, MessageSquare, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
-import { Button } from '@/components/ui'
+import { useProjectStore } from '@/stores/projectStore'
+import { Button, Select, Modal, Input } from '@/components/ui'
+import { useTranslation } from '@/i18n'
 
 export function SessionList() {
+  const { t } = useTranslation()
   const sessions = useChatStore((state) => state.sessions)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
   const setSessionId = useChatStore((state) => state.setSessionId)
   const createSession = useChatStore((state) => state.createSession)
   const renameSession = useChatStore((state) => state.renameSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
+  const clearMessages = useChatStore((state) => state.clearMessages)
+  const setProjectId = useChatStore((state) => state.setProjectId)
+
+  const projects = useProjectStore((state) => state.projects)
+  const currentProjectId = useProjectStore((state) => state.currentProjectId)
+  const loadingProjects = useProjectStore((state) => state.loading)
+  const projectError = useProjectStore((state) => state.error)
+  const fetchProjects = useProjectStore((state) => state.fetchProjects)
+  const createProject = useProjectStore((state) => state.createProject)
+  const setCurrentProject = useProjectStore((state) => state.setCurrentProject)
+  const clearProjectError = useProjectStore((state) => state.clearError)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  useEffect(() => {
+    fetchProjects()
+  }, [fetchProjects])
+
+  // One-time migration: rename old hardcoded Chinese session names to English.
+  useEffect(() => {
+    sessions.forEach((s) => {
+      if (s.name === '默认会话') {
+        renameSession(s.id, t('sessionList.defaultSession'))
+      } else if (s.name.startsWith('会话 ')) {
+        renameSession(s.id, s.name.replace(/^会话 /, 'Session '))
+      }
+    })
+  }, [sessions, renameSession, t])
+
+  useEffect(() => {
+    const projectSessions = sessions.filter((s) => s.projectId === currentProjectId)
+    if (projectSessions.length === 0) {
+      createSession(t('sessionList.defaultSession'), currentProjectId)
+      return
+    }
+    if (!projectSessions.some((s) => s.id === currentSessionId)) {
+      setSessionId(projectSessions[0].id)
+      clearMessages()
+    }
+  }, [currentProjectId, sessions, currentSessionId, createSession, setSessionId, clearMessages, t])
+
+  const projectSessions = sessions.filter((s) => s.projectId === currentProjectId)
 
   const startEdit = (id: string, name: string) => {
     setEditingId(id)
@@ -28,29 +75,79 @@ export function SessionList() {
   }
 
   const handleDelete = (id: string) => {
-    if (confirm('确定要删除此会话吗？')) {
+    if (confirm(t('sessionList.deleteConfirm'))) {
       deleteSession(id)
     }
   }
 
+  const handleProjectChange = (value: string) => {
+    setCurrentProject(value)
+    setProjectId(value)
+    clearMessages()
+  }
+
+  const handleCreateProject = async () => {
+    const name = newProjectName.trim()
+    if (!name) return
+    setIsCreating(true)
+    const project = await createProject(name, newProjectDescription.trim())
+    setIsCreating(false)
+    if (project) {
+      setNewProjectName('')
+      setNewProjectDescription('')
+      setIsCreateModalOpen(false)
+      setProjectId(project.id)
+      clearMessages()
+    }
+  }
+
+  const projectOptions = [
+    { value: 'default', label: t('sessionList.defaultProject') },
+    ...projects.map((p) => ({ value: p.id, label: p.name })),
+  ]
+
   return (
     <div className="flex h-full flex-col border-r border-border bg-card">
+      <div className="border-b border-border p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">{t('sessionList.title')}</h2>
+          <Button size="sm" variant="outline" onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            {t('sessionList.new')}
+          </Button>
+        </div>
+        <Select
+          value={currentProjectId}
+          onChange={(e) => handleProjectChange(e.target.value)}
+          options={projectOptions}
+          disabled={loadingProjects}
+        />
+        {projectError && (
+          <div className="mt-2 flex items-center gap-2 rounded-md bg-error/10 px-2 py-1.5">
+            <p className="flex-1 text-xs leading-tight text-error">{projectError}</p>
+            <Button size="sm" variant="ghost" className="h-auto px-2 py-1 text-xs" onClick={fetchProjects}>
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between border-b border-border p-3">
-        <h2 className="text-sm font-semibold text-foreground">会话</h2>
-        <Button size="sm" onClick={() => createSession()}>
+        <h2 className="text-sm font-semibold text-foreground">{t('sessionList.sessions')}</h2>
+        <Button size="sm" onClick={() => createSession(undefined, currentProjectId)}>
           <Plus className="mr-1 h-3.5 w-3.5" />
-          新建
+          {t('sessionList.new')}
         </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {sessions.length === 0 ? (
+        {projectSessions.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
-            暂无会话
+            {t('sessionList.noSessions')}
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {sessions.map((session) => {
+            {projectSessions.map((session) => {
               const isActive = session.id === currentSessionId
               const isEditing = editingId === session.id
 
@@ -103,7 +200,7 @@ export function SessionList() {
                         variant="ghost"
                         size="icon"
                         onClick={() => startEdit(session.id, session.name)}
-                        title="重命名"
+                        title={t('sessionList.rename')}
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </Button>
@@ -111,7 +208,7 @@ export function SessionList() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(session.id)}
-                        title="删除"
+                        title={t('sessionList.delete')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -123,6 +220,47 @@ export function SessionList() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false)
+          clearProjectError()
+        }}
+        title={t('sessionList.createProject')}
+        description={t('sessionList.createProjectDesc')}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsCreateModalOpen(false)
+                clearProjectError()
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateProject} disabled={isCreating || !newProjectName.trim()}>
+              {isCreating && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              {t('sessionList.create')}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            placeholder={t('sessionList.projectName')}
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+          />
+          <Input
+            placeholder={t('sessionList.description')}
+            value={newProjectDescription}
+            onChange={(e) => setNewProjectDescription(e.target.value)}
+          />
+          {projectError && <p className="text-xs text-error">{projectError}</p>}
+        </div>
+      </Modal>
     </div>
   )
 }

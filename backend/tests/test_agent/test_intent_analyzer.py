@@ -101,3 +101,29 @@ async def test_general_help_overrides_unknown_domain(analyzer):
     intent = await analyzer.analyze("show me an example of parsing a tsv file")
     assert intent.analysis_type == "general_help"
     assert intent.complexity == "direct_response"
+
+
+@pytest.mark.asyncio
+async def test_structured_intent_fields_for_qa(analyzer):
+    intent = await analyzer.analyze("什么是 UMAP？")
+    assert intent.interaction_mode == "answer"
+    assert intent.scope == "single_step"
+    assert intent.target == "answer_question"
+
+
+@pytest.mark.asyncio
+async def test_structured_intent_fields_for_execution(analyzer_with_single_cell_domain):
+    intent = await analyzer_with_single_cell_domain.analyze("帮我分析这组单细胞数据")
+    assert intent.analysis_type == "single_cell_analysis"
+    assert intent.interaction_mode == "execute"
+    assert intent.domain == "single_cell_standard"
+    assert intent.scope == "full"
+
+
+@pytest.mark.asyncio
+async def test_structured_intent_fields_for_single_step(analyzer_with_single_cell_domain):
+    intent = await analyzer_with_single_cell_domain.analyze("把文件转换成 h5ad 格式")
+    assert intent.analysis_type == "file_conversion"
+    assert intent.interaction_mode == "execute"
+    assert intent.scope == "single_step"
+    assert intent.target == "convert_file"

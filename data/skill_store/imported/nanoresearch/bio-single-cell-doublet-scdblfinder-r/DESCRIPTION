@@ -1,0 +1,19 @@
+Package: bio.single.cell.doublet.scdblfinder.r
+Type: Skill
+Title: Single-cell Analysis Skill
+Version: 1.0.0
+Authors@R: person("Yang", "Guo", email = "guo@example.com", role = c("aut", "cre"))
+Description: Bioinformatics skill for single-cell analysis.
+License: MIT
+Depends:
+    R (>= 4.0.0)
+Imports:
+    scDblFinder,
+    SingleCellExperiment,
+    SummarizedExperiment,
+    Seurat,
+    ggplot2,
+    BiocParallel,
+    rlang
+Encoding: UTF-8
+LazyData: true

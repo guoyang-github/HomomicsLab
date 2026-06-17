@@ -1,4 +1,4 @@
-import type { ChatMessage } from './chat'
+import type { ChatMessage, PlanRequestContent } from './chat'
 import type { TaskNode } from './tasks'
 
 export interface Project {
@@ -19,6 +19,9 @@ export interface SendMessageResponse {
   response: string
   task_tree: { tasks: TaskNode[] }
   messages: ChatMessage[]
+  status: string
+  plan_id: string | null
+  plan: PlanRequestContent['plan'] | null
 }
 
 export interface FileUploadResponse {
@@ -109,9 +112,13 @@ export interface SkillSummary {
   id: string
   name: string
   description: string
+  version: string
   category: string
   runtime_type: string
   primary_tool: string
+  source: string
+  namespace: string
+  enabled: boolean
 }
 
 export interface SkillDetail extends SkillSummary {
@@ -180,13 +187,56 @@ export interface SkillLockResponse {
 }
 
 export interface DomainListing {
-  id: string
+  domain_id: string
+  name: string
+  description: string
+  version: string
+  author?: string
+  tags?: string[]
+  source: string
+}
+
+export interface DomainPreview {
+  domain_id: string
   name: string
   description: string
   version: string
   author: string
-  tags: string[]
-  source: string
+  orchestrator_skills: string[]
+  phases: Array<{
+    id: string
+    required?: boolean
+    description?: string
+    skills?: string[]
+    default_skill?: string
+    [key: string]: any
+  }>
+  phase_transitions: Array<{
+    from: string
+    to: string
+    type?: string
+    [key: string]: any
+  }>
+  intents: Array<{
+    type: string
+    description?: string
+    keywords?: string[]
+    [key: string]: any
+  }>
+  skills: string[]
+  roles: Array<{
+    role_id: string
+    name?: string
+    allowed_skills?: string[]
+    [key: string]: any
+  }>
+  sops: Array<{
+    id: string
+    title?: string
+    steps?: string[]
+    [key: string]: any
+  }>
+  code_templates: Record<string, { language?: string; skeleton?: string }>
 }
 
 export interface ExportDomainResponse {

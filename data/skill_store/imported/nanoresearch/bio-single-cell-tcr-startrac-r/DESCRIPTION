@@ -1,0 +1,37 @@
+Type: Skill
+Name: bio-single-cell-tcr-startrac-r
+Description: STARTRAC (Single T-cell Analysis by Rna-seq and Tcr TRACking) for T cell dynamics analysis. Quantifies T cell clonotype expansion, migration between tissues, and state transitions.
+Version: 1.0.0
+Author: NanoResearch Skills
+License: MIT
+Language: R
+
+Dependencies:
+  - Startrac (>= 0.1.0)
+  - Seurat (>= 4.0)
+  - data.table
+  - plyr
+  - doParallel
+  - ggplot2
+  - ComplexHeatmap
+  - RColorBrewer
+  - circlize
+  - ggpubr
+  - dplyr
+  - tidyr
+  - cowplot
+
+Key Functions:
+  - prepare_startrac_input(): Convert Seurat to STARTRAC format
+  - run_startrac(): Main analysis pipeline
+  - run_startrac_by_patient(): Per-patient analysis
+  - plot_startrac_results(): Comprehensive visualization
+  - export_startrac_results(): Export to CSV/RDS/Excel
+
+Input Format:
+  Required columns: Cell_Name, clone.id, patient, majorCluster, loc
+
+Output Indices:
+  - expa: Clonal expansion index
+  - migr: Tissue migration index
+  - tran: Phenotypic transition index

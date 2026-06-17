@@ -48,10 +48,18 @@ class PlanModification(BaseModel):
     """A single user modification to a plan phase."""
 
     phase_type: str
+    action: str = "update"  # "update" | "remove" | "add" | "update_dependency"
     parameter: Optional[str] = None
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
-    action: str = "update"  # "update" | "remove" | "add"
+
+    # Structural modification fields.
+    after: Optional[str] = None      # insert new phase after this phase
+    before: Optional[str] = None     # insert new phase before this phase
+    description: Optional[str] = None
+    required: Optional[bool] = None
+    skill_id: Optional[str] = None
+    dependencies: Optional[List[str]] = None  # for add / update_dependency
 
 
 class PlanApprovalRequest(BaseModel):

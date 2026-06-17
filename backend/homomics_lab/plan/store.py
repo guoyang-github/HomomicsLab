@@ -14,6 +14,7 @@ from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
 from .models import Plan, PlanModification, PlanStatus
+from .modifier import PlanModifier
 
 
 def _new_plan_id() -> str:
@@ -124,7 +125,7 @@ class PlanStore:
             else:
                 raise ValueError(f"Invalid modification type: {type(mod)}")
 
-        new_plan = original.model_copy(deep=True)
+        new_plan = PlanModifier.apply(original, normalized)
         new_plan.plan_id = _new_plan_id()
         new_plan.parent_plan_id = original.plan_id
         new_plan.version = original.version + 1
@@ -133,28 +134,6 @@ class PlanStore:
         new_plan.approved_at = datetime.now(timezone.utc) if approved else None
         new_plan.created_at = datetime.now(timezone.utc)
         new_plan.updated_at = datetime.now(timezone.utc)
-
-        # Apply modifications to phase parameters and task tree parameters.
-        phase_lookup = {p.phase_type: p for p in new_plan.plan_result.phases}
-        task_lookup = {t.name: t for t in new_plan.task_tree.tasks}
-
-        for mod in normalized:
-            phase = phase_lookup.get(mod.phase_type)
-            task = task_lookup.get(mod.phase_type)
-
-            if mod.action == "update" and mod.parameter is not None:
-                if phase is not None:
-                    phase.parameters[mod.parameter] = mod.new_value
-                if task is not None:
-                    task.parameters[mod.parameter] = mod.new_value
-            elif mod.action == "remove" and mod.parameter is not None:
-                if phase is not None:
-                    phase.parameters.pop(mod.parameter, None)
-                if task is not None:
-                    task.parameters.pop(mod.parameter, None)
-            elif mod.action == "add":
-                # Adding a phase is not supported through simple parameter mods.
-                pass
 
         await self.create(new_plan)
         return new_plan
@@ -217,6 +196,22 @@ class PlanStore:
             stmt = select(PlanRecord).where(PlanRecord.session_id == session_id)
             if parent_plan_id is not None:
                 stmt = stmt.where(PlanRecord.parent_plan_id == parent_plan_id)
+            stmt = stmt.order_by(desc(PlanRecord.created_at))
+            result = await session.execute(stmt)
+            return [self._to_model(r) for r in result.scalars().all()]
+
+    async def list_all(
+        self,
+        project_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Plan]:
+        """List plans, optionally filtered by project and status."""
+        async with self._session_factory() as session:
+            stmt = select(PlanRecord)
+            if project_id:
+                stmt = stmt.where(PlanRecord.project_id == project_id)
+            if status:
+                stmt = stmt.where(PlanRecord.status == status)
             stmt = stmt.order_by(desc(PlanRecord.created_at))
             result = await session.execute(stmt)
             return [self._to_model(r) for r in result.scalars().all()]

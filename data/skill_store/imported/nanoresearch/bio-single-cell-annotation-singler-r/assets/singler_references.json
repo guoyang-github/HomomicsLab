@@ -1,0 +1,126 @@
+{
+  "tool": "SingleR",
+  "package": "celldex",
+  "version": "1.0.0",
+  "description": "SingleR reference datasets via celldex Bioconductor package",
+  "last_updated": "2026-03-18",
+  "installation": "BiocManager::install('celldex')",
+  "documentation": "https://bioconductor.org/packages/celldex",
+  "references": [
+    {
+      "name": "HumanPrimaryCellAtlasData",
+      "function": "celldex::HumanPrimaryCellAtlasData()",
+      "description": "Microarray + RNA-seq from Human Primary Cell Atlas",
+      "species": "human",
+      "cell_types": 157,
+      "assay": "microarray/RNA-seq",
+      "use_cases": ["General purpose", "Mixed tissues", "Broad cell types"],
+      "strengths": ["Comprehensive coverage", "Multiple tissues", "Well-curated"],
+      "limitations": ["Some cell types from microarray", "Batch effects possible"],
+      "tissues": ["Blood", "Brain", "Liver", "Lung", "Skin", "Muscle", "Various"]
+    },
+    {
+      "name": "BlueprintEncodeData",
+      "function": "celldex::BlueprintEncodeData()",
+      "description": "Blueprint Epigenome + ENCODE RNA-seq data",
+      "species": "human",
+      "cell_types": 43,
+      "assay": "RNA-seq",
+      "use_cases": ["Immune cells", "Stromal cells", "Epithelial cells"],
+      "strengths": ["High quality RNA-seq", "Good for immune", "Stromal coverage"],
+      "limitations": ["Fewer cell types", "Blood-biased"],
+      "tissues": ["Blood", "Bone marrow"]
+    },
+    {
+      "name": "MonacoImmuneData",
+      "function": "celldex::MonacoImmuneData()",
+      "description": "Sorted immune cell populations from peripheral blood",
+      "species": "human",
+      "cell_types": 29,
+      "assay": "RNA-seq",
+      "use_cases": ["Immune cells", "Blood samples", "Detailed immune subtypes"],
+      "strengths": ["Pure sorted populations", "High resolution immune", "Reliable"],
+      "limitations": ["Blood only", "No tissue immune cells"],
+      "tissues": ["Blood"]
+    },
+    {
+      "name": "DatabaseImmuneCellExpressionData",
+      "function": "celldex::DatabaseImmuneCellExpressionData()",
+      "description": "DICE database - sorted immune cells",
+      "species": "human",
+      "cell_types": 15,
+      "assay": "RNA-seq",
+      "use_cases": ["Immune cells", "Activated vs resting"],
+      "strengths": ["Activation states", "Resting/activated pairs"],
+      "limitations": ["Fewer cell types", "Activation state dependent"],
+      "tissues": ["Blood", "Spleen", "Lung", "Thymus"]
+    },
+    {
+      "name": "NovershternHematopoieticData",
+      "function": "celldex::NovershternHematopoieticData()",
+      "description": "Hematopoietic cell differentiation atlas",
+      "species": "human",
+      "cell_types": 38,
+      "assay": "microarray",
+      "use_cases": ["Hematopoiesis", "Blood development", "Stem cells"],
+      "strengths": ["Differentiation stages", "Stem/progenitor coverage"],
+      "limitations": ["Microarray data", "Less granularity in mature cells"],
+      "tissues": ["Bone marrow", "Blood", "Cord blood"]
+    },
+    {
+      "name": "ImmGenData",
+      "function": "celldex::ImmGenData()",
+      "description": "Immunological Genome Project - mouse immune cells",
+      "species": "mouse",
+      "cell_types": 253,
+      "assay": "microarray",
+      "use_cases": ["Mouse immune", "Mouse tissues", "Immune subtypes"],
+      "strengths": ["Most comprehensive mouse immune", "Tissue-resident immune", "Activation states"],
+      "limitations": ["Mouse only", "Microarray"],
+      "tissues": ["Spleen", "Thymus", "Lymph nodes", "Lung", "Liver", "Intestine", "Various"]
+    },
+    {
+      "name": "MouseRNAseqData",
+      "function": "celldex::MouseRNAseqData()",
+      "description": "RNA-seq data from sorted mouse cell populations",
+      "species": "mouse",
+      "cell_types": 28,
+      "assay": "RNA-seq",
+      "use_cases": ["Mouse tissues", "General mouse"],
+      "strengths": ["RNA-seq", "Good coverage"],
+      "limitations": ["Fewer cell types than ImmGen", "Blood biased"],
+      "tissues": ["Blood", "Spleen", "Bone marrow"]
+    },
+    {
+      "name": "AllenBrainData",
+      "function": "celldex::AllenBrainData()",
+      "description": "Mouse brain atlas from Allen Institute",
+      "species": "mouse",
+      "cell_types": 93,
+      "assay": "RNA-seq",
+      "use_cases": ["Mouse brain", "Neuroscience"],
+      "strengths": ["Brain-specific", "High resolution"],
+      "limitations": ["Mouse only", "Brain only"],
+      "tissues": ["Brain - cortex"]
+    }
+  ],
+  "usage": {
+    "basic": "pred <- SingleR(test = sce, ref = ref, labels = ref$label.main)",
+    "fine_labels": "pred <- SingleR(test = sce, ref = ref, labels = ref$label.fine)",
+    "multiple_refs": "pred <- SingleR(test = sce, ref = list(BP = ref1, Monaco = ref2), labels = list(ref1$label.main, ref2$label.main))",
+    "pruning": "Use pred$pruned.labels to filter low confidence"
+  },
+  "selection_guidance": {
+    "human_immune": ["MonacoImmuneData", "BlueprintEncodeData"],
+    "human_general": ["HumanPrimaryCellAtlasData"],
+    "human_hematopoiesis": ["NovershternHematopoieticData"],
+    "mouse_immune": ["ImmGenData", "MouseRNAseqData"],
+    "mouse_brain": ["AllenBrainData"]
+  },
+  "notes": [
+    "Use label.main for broad categories, label.fine for subtypes",
+    "Always check pred$pruned.labels for low-quality predictions",
+    "Plot score heatmaps to assess annotation quality",
+    "Consider combining multiple references for better coverage"
+  ]
+}

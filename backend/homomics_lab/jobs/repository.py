@@ -75,6 +75,15 @@ class JobRepository:
             result = await session.execute(stmt)
             return [self._to_model(r) for r in result.scalars().all()]
 
+    async def list_all(self, project_id: Optional[str] = None) -> List[Job]:
+        async with self._session_factory() as session:
+            stmt = select(JobRecord)
+            if project_id:
+                stmt = stmt.where(JobRecord.project_id == project_id)
+            stmt = stmt.order_by(desc(JobRecord.created_at))
+            result = await session.execute(stmt)
+            return [self._to_model(r) for r in result.scalars().all()]
+
     # ------------------------------------------------------------------
     # Serialization helpers
     # ------------------------------------------------------------------

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { clsx } from 'clsx'
 import { Search, X, Command, MessageSquare, Workflow, FlaskConical, Settings, FileText, FolderOpen } from 'lucide-react'
 import { Modal } from './Modal'
+import { useTranslation } from '@/i18n'
 
 export interface CommandItem {
   id: string
@@ -20,6 +21,7 @@ export interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, onClose, items = [], onNavigate }: CommandPaletteProps) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
 
   useEffect(() => {
@@ -32,14 +34,14 @@ export function CommandPalette({ open, onClose, items = [], onNavigate }: Comman
       onClose()
     }
     return [
-      { id: 'new-chat', title: '新建会话', icon: MessageSquare, shortcut: '⌘N', onSelect: () => nav('chat') },
-      { id: 'workflow', title: '打开工作流', icon: Workflow, shortcut: '⌘1', onSelect: () => nav('workflow') },
-      { id: 'skills', title: '浏览 Skills', icon: FlaskConical, shortcut: '⌘2', onSelect: () => nav('skills') },
-      { id: 'reports', title: '查看报告', icon: FileText, shortcut: '⌘3', onSelect: () => nav('reports') },
-      { id: 'domains', title: 'Domain 市场', icon: FolderOpen, shortcut: '⌘4', onSelect: () => nav('domains') },
-      { id: 'settings', title: '打开设置', icon: Settings, shortcut: '⌘,', onSelect: () => nav('settings') },
+      { id: 'new-chat', title: t('commandPalette.newChat'), icon: MessageSquare, shortcut: '⌘N', onSelect: () => nav('chat') },
+      { id: 'workflow', title: t('commandPalette.openWorkflow'), icon: Workflow, shortcut: '⌘1', onSelect: () => nav('workflow') },
+      { id: 'skills', title: t('commandPalette.browseSkills'), icon: FlaskConical, shortcut: '⌘2', onSelect: () => nav('skills') },
+      { id: 'reports', title: t('commandPalette.viewReports'), icon: FileText, shortcut: '⌘3', onSelect: () => nav('reports') },
+      { id: 'domains', title: t('commandPalette.domainMarketplace'), icon: FolderOpen, shortcut: '⌘4', onSelect: () => nav('domains') },
+      { id: 'settings', title: t('commandPalette.openSettings'), icon: Settings, shortcut: '⌘,', onSelect: () => nav('settings') },
     ]
-  }, [onNavigate, onClose])
+  }, [onNavigate, onClose, t])
 
   const allItems = useMemo(() => [...defaultItems, ...items], [defaultItems, items])
 
@@ -75,7 +77,7 @@ export function CommandPalette({ open, onClose, items = [], onNavigate }: Comman
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索命令或跳转..."
+          placeholder={t('commandPalette.placeholder')}
           className="h-12 w-full rounded-lg border border-border bg-card pl-10 pr-10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
           autoFocus
         />
@@ -87,7 +89,7 @@ export function CommandPalette({ open, onClose, items = [], onNavigate }: Comman
       <div className="mt-2 max-h-[60vh] overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            未找到匹配命令
+            {t('commandPalette.noResults')}
           </div>
         ) : (
           Object.entries(sections).map(([section, sectionItems]) => (

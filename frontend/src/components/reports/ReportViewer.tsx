@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { clsx } from 'clsx'
 import { ArrowLeft, Download, FileCode, List, FileText } from 'lucide-react'
 import { reportApi } from '@/services/api'
+import { useTranslation } from '@/i18n'
 import type { ReportDetail } from '@/types/api'
 import { Button, Badge, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'
 
@@ -13,6 +14,7 @@ interface ReportViewerProps {
 type ViewMode = 'html' | 'json' | 'steps'
 
 export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
+  const { t } = useTranslation()
   const [report, setReport] = useState<ReportDetail | null>(null)
   const [htmlContent, setHtmlContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -35,7 +37,7 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
       setHtmlContent(htmlRes.data.html)
       setError('')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载报告失败')
+      setError(err?.response?.data?.detail || t('reports.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -89,11 +91,11 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
   if (error || !report) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
-        <div className="text-sm text-error">{error || '报告不存在'}</div>
+        <div className="text-sm text-error">{error || t('reports.notFound')}</div>
         {onBack && (
           <Button onClick={onBack} size="sm">
             <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            返回列表
+            {t('reports.backToList')}
           </Button>
         )}
       </div>
@@ -105,7 +107,7 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
           {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} title="返回列表">
+            <Button variant="ghost" size="icon" onClick={onBack} title={t('reports.backToList')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
@@ -113,16 +115,16 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
             <h3 className="text-sm font-semibold text-foreground">{report.title}</h3>
             <div className="text-xs text-muted-foreground">
               {report.metadata.project_name && `${report.metadata.project_name} · `}
-              {report.metadata.analysis_type || '分析'}
+              {report.metadata.analysis_type || t('reports.analysis')}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-1 rounded-lg border border-border p-0.5 sm:flex">
             {[
-              { mode: 'html' as ViewMode, label: '报告', icon: FileText },
+              { mode: 'html' as ViewMode, label: t('reports.tabReport'), icon: FileText },
               { mode: 'json' as ViewMode, label: 'JSON', icon: FileCode },
-              { mode: 'steps' as ViewMode, label: '步骤', icon: List },
+              { mode: 'steps' as ViewMode, label: t('reports.tabSteps'), icon: List },
             ].map(({ mode, label, icon: Icon }) => (
               <button
                 key={mode}
@@ -172,7 +174,7 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
           <div className="h-full overflow-auto bg-muted/30 p-4">
             <div className="mx-auto max-w-3xl space-y-3">
               {report.analysis_steps.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground">未记录分析步骤</div>
+                <div className="text-center text-sm text-muted-foreground">{t('reports.noSteps')}</div>
               )}
               {report.analysis_steps.map((step) => (
                 <Card key={step.step_number}>
@@ -200,10 +202,10 @@ export function ReportViewer({ reportId, onBack }: ReportViewerProps) {
                         </span>
                       )}
                       {step.duration_seconds !== null && (
-                        <span>耗时：{step.duration_seconds.toFixed(1)}s</span>
+                        <span>{t('reports.durationLabel', { seconds: step.duration_seconds.toFixed(1) })}</span>
                       )}
                       {step.started_at && (
-                        <span>开始：{new Date(step.started_at).toLocaleString()}</span>
+                        <span>{t('reports.startedAtLabel', { datetime: new Date(step.started_at).toLocaleString() })}</span>
                       )}
                     </div>
                   </CardContent>

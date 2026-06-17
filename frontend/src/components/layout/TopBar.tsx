@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { clsx } from 'clsx'
 import {
   Search,
@@ -7,9 +7,12 @@ import {
   Sun,
   Monitor,
   PanelLeft,
+  FolderKanban,
 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useTheme } from '@/hooks/useTheme'
+import { useProjectStore } from '@/stores/projectStore'
+import { useTranslation } from '@/i18n'
 
 export interface TopBarProps {
   onOpenCommandPalette: () => void
@@ -18,13 +21,21 @@ export interface TopBarProps {
 }
 
 export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: TopBarProps) {
+  const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
   const [notifications] = useState(0)
+  const projects = useProjectStore((state) => state.projects)
+  const currentProjectId = useProjectStore((state) => state.currentProjectId)
+  const currentProjectName = useMemo(() => {
+    if (currentProjectId === 'default') return t('topbar.defaultProject')
+    const project = projects.find((p) => p.id === currentProjectId)
+    return project?.name || currentProjectId
+  }, [projects, currentProjectId, t])
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onToggleSidebar} title={collapsed ? '展开侧边栏' : '收起侧边栏'}>
+        <Button variant="ghost" size="icon" onClick={onToggleSidebar} title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}>
           <PanelLeft className="h-5 w-5" />
         </Button>
         <button
@@ -35,13 +46,18 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
           )}
         >
           <Search className="h-4 w-4" />
-          <span className="flex-1 text-left">搜索命令...</span>
+          <span className="flex-1 text-left">{t('topbar.searchCommands')}</span>
           <kbd className="rounded bg-card px-1.5 py-0.5 text-[10px]">⌘K</kbd>
         </button>
       </div>
 
+      <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+        <FolderKanban className="h-4 w-4" />
+        <span className="font-medium text-foreground">{currentProjectName}</span>
+      </div>
+
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="relative" title="通知">
+        <Button variant="ghost" size="icon" className="relative" title={t('topbar.notifications')}>
           <Bell className="h-5 w-5" />
           {notifications > 0 && (
             <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[10px] text-white">
@@ -55,7 +71,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
             variant={theme === 'light' ? 'secondary' : 'ghost'}
             size="icon"
             onClick={() => setTheme('light')}
-            title="浅色"
+            title={t('topbar.light')}
           >
             <Sun className="h-4 w-4" />
           </Button>
@@ -63,7 +79,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
             variant={theme === 'system' ? 'secondary' : 'ghost'}
             size="icon"
             onClick={() => setTheme('system')}
-            title="跟随系统"
+            title={t('topbar.system')}
           >
             <Monitor className="h-4 w-4" />
           </Button>
@@ -71,7 +87,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
             variant={theme === 'dark' ? 'secondary' : 'ghost'}
             size="icon"
             onClick={() => setTheme('dark')}
-            title="深色"
+            title={t('topbar.dark')}
           >
             <Moon className="h-4 w-4" />
           </Button>

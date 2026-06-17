@@ -1,0 +1,20 @@
+Package: bio.spatial.transcriptomics.communication.cellchat.r
+Type: Skill
+Title: Spatial Transcriptomics Cell-Cell Communication Analysis Skill
+Version: 2.0.0
+Authors@R: person("Yang", "Guo", email = "guo@example.com", role = c("aut", "cre"))
+Description: Bioinformatics skill for spatial transcriptomics cell-cell communication analysis using SpatialCellChat (CellChat v3). Supports Visium, Visium HD, Xenium, Slide-seq, CosMx, and Stereo-seq technologies with single-cell resolution inference, spatial distance constraints, contact-dependent signaling, hot spot detection, and deconvolution integration.
+License: MIT
+Depends:
+    R (>= 4.2.0)
+Suggests:
+    SpatialCellChat (>= 1.0),
+    Seurat (>= 4.0.0),
+    SeuratObject,
+    jsonlite,
+    dplyr,
+    patchwork,
+    igraph,
+    testthat
+Encoding: UTF-8
+LazyData: true

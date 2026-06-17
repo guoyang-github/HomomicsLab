@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { clsx } from 'clsx'
 import { FileText, RefreshCw } from 'lucide-react'
 import { reportApi } from '@/services/api'
+import { useTranslation } from '@/i18n'
 import type { ReportSummary } from '@/types/api'
 import { Button, Badge, EmptyState } from '@/components/ui'
 
@@ -11,6 +12,7 @@ interface ReportListProps {
 }
 
 export function ReportList({ onSelectReport, selectedReportId }: ReportListProps) {
+  const { t } = useTranslation()
   const [reports, setReports] = useState<ReportSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -26,7 +28,7 @@ export function ReportList({ onSelectReport, selectedReportId }: ReportListProps
       setReports(response.data)
       setError('')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '加载报告失败')
+      setError(err?.response?.data?.detail || t('reports.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -51,7 +53,7 @@ export function ReportList({ onSelectReport, selectedReportId }: ReportListProps
         <p className="text-sm text-error">{error}</p>
         <Button onClick={loadReports} size="sm">
           <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-          重试
+          {t('common.retry')}
         </Button>
       </div>
     )
@@ -61,9 +63,9 @@ export function ReportList({ onSelectReport, selectedReportId }: ReportListProps
     return (
       <EmptyState
         icon={FileText}
-        title="暂无报告"
-        description="运行分析流程以生成报告"
-        action={{ label: '刷新', onClick: loadReports }}
+        title={t('reports.empty')}
+        description={t('reports.emptyDesc')}
+        action={{ label: t('common.refresh'), onClick: loadReports }}
       />
     )
   }
@@ -71,7 +73,7 @@ export function ReportList({ onSelectReport, selectedReportId }: ReportListProps
   return (
     <div className="h-full overflow-y-auto">
       <div className="border-b border-border bg-muted/50 px-4 py-3">
-        <div className="text-sm font-semibold text-foreground">报告 ({reports.length})</div>
+        <div className="text-sm font-semibold text-foreground">{t('reports.titleWithCount', { count: reports.length })}</div>
       </div>
       <div className="divide-y divide-border">
         {reports.map((report) => (
@@ -91,17 +93,17 @@ export function ReportList({ onSelectReport, selectedReportId }: ReportListProps
                 )}
               </div>
               <Badge className={getStatusColor(report.step_count)} size="sm">
-                {report.step_count} 步骤
+                {t('reports.steps', { count: report.step_count })}
               </Badge>
             </div>
             <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{report.analysis_type || '分析'}</span>
+              <span>{report.analysis_type || t('reports.analysis')}</span>
               <span>·</span>
               <span>{new Date(report.created_at).toLocaleDateString()}</span>
               {report.section_count > 0 && (
                 <>
                   <span>·</span>
-                  <span>{report.section_count} 章节</span>
+                  <span>{t('reports.sections', { count: report.section_count })}</span>
                 </>
               )}
             </div>

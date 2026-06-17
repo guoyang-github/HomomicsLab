@@ -1,0 +1,26 @@
+{
+    "rnaseq_pipeline.samples": [
+        {
+            "sample_id": "SAMPLE1",
+            "fastq_1": "/data/SAMPLE1_R1.fq.gz",
+            "fastq_2": "/data/SAMPLE1_R2.fq.gz",
+            "strandedness": "auto"
+        },
+        {
+            "sample_id": "SAMPLE2",
+            "fastq_1": "/data/SAMPLE2_R1.fq.gz",
+            "fastq_2": "/data/SAMPLE2_R2.fq.gz",
+            "strandedness": "auto"
+        },
+        {
+            "sample_id": "SAMPLE3",
+            "fastq_1": "/data/SAMPLE3_R1.fq.gz",
+            "fastq_2": null,
+            "strandedness": "reverse"
+        }
+    ],
+    "rnaseq_pipeline.salmon_index": "/ref/salmon_index",
+    "rnaseq_pipeline.threads": 8,
+    "rnaseq_pipeline.fastp_args": "",
+    "rnaseq_pipeline.salmon_args": "--validateMappings"
+}
