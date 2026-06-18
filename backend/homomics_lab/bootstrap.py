@@ -11,7 +11,9 @@ from typing import Any, Dict, List
 
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.config import settings
+from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.memory_manager import MemoryManager
+from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import SemanticMemory
 from homomics_lab.context.session_store import SQLiteSessionStore
 from homomics_lab.database import Base, async_engine
@@ -287,6 +289,15 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         cbkb=cbkb,
     )
 
+    context_engine = ContextEngine(
+        cbkb=cbkb,
+        semantic_memory=semantic_memory,
+        default_model=settings.context_engine_model or settings.llm_model or "default",
+        embedding_model_name=settings.semantic_search_model,
+        enable_llm_summary=settings.context_enable_episodic_summary,
+    )
+    project_state_manager = ProjectStateManager(cbkb=cbkb)
+
     return {
         "tool_registry": tool_registry,
         "schema_validator": schema_validator,
@@ -301,4 +312,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "llm_client": llm_client,
         "memory_manager": memory_manager,
         "cbkb": cbkb,
+        "context_engine": context_engine,
+        "project_state_manager": project_state_manager,
     }

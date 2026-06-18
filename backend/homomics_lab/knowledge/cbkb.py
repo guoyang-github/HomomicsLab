@@ -179,6 +179,12 @@ class CBKB:
                 );
                 CREATE INDEX IF NOT EXISTS idx_sop_category ON lab_sop(category);
 
+                CREATE TABLE IF NOT EXISTS project_state (
+                    project_id TEXT PRIMARY KEY,
+                    state_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS skill_evolution_log (
                     id TEXT PRIMARY KEY,
                     from_skill TEXT NOT NULL,
@@ -581,6 +587,37 @@ class CBKB:
             "anomalies_recorded": anomaly_count,
             "parameter_lore_entries": param_count,
         }
+
+    # ── Project State ───────────────────────────────
+
+    def save_project_state(self, project_id: str, state: Dict[str, Any]) -> None:
+        """Persist structured project state."""
+        now = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(str(self.db_path)) as conn:
+            conn.execute(
+                """
+                INSERT INTO project_state (project_id, state_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                    state_json=excluded.state_json,
+                    updated_at=excluded.updated_at
+                """,
+                (project_id, json.dumps(state, ensure_ascii=False), now),
+            )
+
+    def get_project_state(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Load structured project state."""
+        with sqlite3.connect(str(self.db_path)) as conn:
+            row = conn.execute(
+                "SELECT state_json FROM project_state WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return json.loads(row[0])
+        except json.JSONDecodeError:
+            return None
 
     def suggest_parameters(self, skill_id: str) -> List[Dict[str, Any]]:
         """Suggest parameters for a skill based on historical best outcomes."""

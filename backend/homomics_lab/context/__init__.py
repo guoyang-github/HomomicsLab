@@ -6,6 +6,36 @@ from .summarizer import ContextSummary as ContextSummary
 from .compressor import ContextCompressor as ContextCompressor
 from .session_store import SessionStore, SQLiteSessionStore
 from .memory_manager import MemoryManager
+from .context_engine import (
+    ContextEngine,
+    ContextBundle,
+    ContextPart,
+    ContextSource,
+    CompressionLevel,
+)
+from .project_state import ProjectState, ProjectStateManager
+from .cbkb_retriever import CBKBRetriever
+from .episodic_summary import EpisodicSummarizer
+from .token_budget import TokenBudgetManager
 
-__all__ = ["WorkingMemory", "RelevanceFilter", "ContextItem", "ContextSummarizer",
-           "ContextSummary", "ContextCompressor", "SessionStore", "SQLiteSessionStore", "MemoryManager"]
+__all__ = [
+    "WorkingMemory",
+    "RelevanceFilter",
+    "ContextItem",
+    "ContextSummarizer",
+    "ContextSummary",
+    "ContextCompressor",
+    "SessionStore",
+    "SQLiteSessionStore",
+    "MemoryManager",
+    "ContextEngine",
+    "ContextBundle",
+    "ContextPart",
+    "ContextSource",
+    "CompressionLevel",
+    "ProjectState",
+    "ProjectStateManager",
+    "CBKBRetriever",
+    "EpisodicSummarizer",
+    "TokenBudgetManager",
+]

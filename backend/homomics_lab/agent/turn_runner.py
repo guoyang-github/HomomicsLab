@@ -11,6 +11,8 @@ The TurnRunner handles every user message through a single, consistent pipeline:
 This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 """
 
+import json
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
@@ -23,7 +25,13 @@ from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.context.compressor import ContextCompressor
+from homomics_lab.context.context_engine.engine import ContextEngine
+from homomics_lab.context.context_engine.models import ContextBundle
 from homomics_lab.context.memory_manager import MemoryManager
+from homomics_lab.context.project_state import ProjectStateManager
+from homomics_lab.context.prompter import Prompter
+from homomics_lab.context.relevance_filter import ContextItem
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.constants import JobMode
@@ -133,6 +141,10 @@ class TurnRunner:
         tool_registry: Optional[ToolRegistry] = None,
         cbkb=None,
         memory_manager: Optional[MemoryManager] = None,
+        prompter: Optional[Prompter] = None,
+        compressor: Optional[ContextCompressor] = None,
+        context_engine: Optional[ContextEngine] = None,
+        project_state_manager: Optional[ProjectStateManager] = None,
     ):
         self._cbkb = cbkb
         self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=debate, cbkb=self._cbkb)
@@ -149,6 +161,12 @@ class TurnRunner:
         self._debate = debate
         self._tool_registry = tool_registry
         self.memory_manager = memory_manager
+        self.prompter = prompter or Prompter()
+        self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
+        self.context_engine = context_engine
+        self.project_state_manager = project_state_manager
+        self._extra_context: Dict[str, Any] = {}
+        self._context_bundle: Optional[ContextBundle] = None
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -265,7 +283,7 @@ class TurnRunner:
         working_memory.add_message(user_msg)
 
         try:
-            # 2. Enrich context from long-term memory
+            # 2. Build a token-safe context bundle from the ContextEngine.
             extra_context = None
             if self.memory_manager is not None:
                 try:
@@ -277,6 +295,24 @@ class TurnRunner:
                     logging.getLogger(__name__).warning(
                         "Memory enrichment failed; continuing without it", exc_info=True
                     )
+            self._extra_context = extra_context or {}
+
+            context_bundle = None
+            if self.context_engine is not None:
+                try:
+                    context_bundle = await self.context_engine.build(
+                        user_message=user_message,
+                        working_memory=working_memory,
+                        project_id=project_id,
+                        intent=None,
+                        reserved_output_tokens=2000,
+                    )
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "ContextEngine build failed; falling back to raw working memory", exc_info=True
+                    )
+            self._context_bundle = context_bundle
 
             # 3. Analyze intent with conversation context
             if debate_response is not None:
@@ -288,6 +324,7 @@ class TurnRunner:
                     user_message,
                     working_memory=working_memory,
                     extra_context=extra_context,
+                    context_bundle=context_bundle,
                 )
 
             # 3.5 Route based on structured intent (backward compatible).
@@ -321,6 +358,22 @@ class TurnRunner:
                     "Failed to persist turn to memory", exc_info=True
                 )
 
+        # 6. Update structured project state (best-effort)
+        if self.project_state_manager is not None:
+            try:
+                project_state = self.project_state_manager.load(project_id)
+                project_state = self.project_state_manager.update_from_turn(
+                    project_state,
+                    task_tree=getattr(turn_result, "task_tree", None),
+                    turn_result=turn_result,
+                )
+                self.project_state_manager.save(project_state)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Failed to update project state", exc_info=True
+                )
+
         return turn_result
 
     async def _handle_direct_response(
@@ -331,7 +384,9 @@ class TurnRunner:
     ) -> TurnResult:
         """Handle questions and general help requests that need no skill execution."""
         if intent.analysis_type == "general_help":
-            response_text = await self._generate_general_help_response(user_message)
+            response_text = await self._generate_general_help_response(
+                user_message, working_memory
+            )
         else:
             response_text = self._generate_qa_response(intent, user_message)
 
@@ -885,11 +940,92 @@ class TurnRunner:
             agent_message=agent_msg,
         )
 
-    async def _generate_general_help_response(self, user_message: str) -> str:
+    def _compress_working_memory(
+        self, working_memory: WorkingMemory, current_goal: str
+    ) -> str:
+        """Compress recent conversation history into a concise context string.
+
+        Uses ContextCompressor to keep only the most relevant messages for the
+        current user request. Falls back to the latest 6 raw messages if
+        compression fails.
+        """
+        messages = working_memory.get_recent_messages()
+        if not messages:
+            return ""
+
+        now = datetime.now(timezone.utc)
+        items: List[ContextItem] = []
+        for msg in messages:
+            raw_content = msg.content
+            if not isinstance(raw_content, str):
+                try:
+                    text = json.dumps(raw_content, ensure_ascii=False)
+                except Exception:
+                    text = str(raw_content)
+            else:
+                text = raw_content
+            if not text.strip():
+                continue
+            hours = 0.0
+            if msg.timestamp:
+                try:
+                    hours = (now - msg.timestamp).total_seconds() / 3600.0
+                except Exception:
+                    hours = 0.0
+            items.append(
+                ContextItem(
+                    content=f"{msg.sender}: {text}",
+                    type=msg.type.value,
+                    is_pinned=msg.id in working_memory.pinned_items,
+                    is_upstream_result=bool(msg.task_id),
+                    agent_importance=0.7 if msg.sender == "agent" else 0.5,
+                    hours_since_created=hours,
+                )
+            )
+
+        try:
+            compressed = self.compressor.compress(items, current_goal=current_goal)
+        except Exception:
+            compressed = items[-6:]
+
+        return "\n".join(item.content for item in compressed)
+
+    def _format_extra_context(self) -> str:
+        """Render CBKB/semantic-memory enrichment into a short project context string."""
+        if not self._extra_context:
+            return ""
+        parts: List[str] = []
+        snippets = self._extra_context.get("memory_snippets") or []
+        if snippets:
+            parts.append("Relevant memory snippets:\n" + "\n".join(f"- {s}" for s in snippets[:3]))
+        experiments = self._extra_context.get("recent_experiments") or []
+        if experiments:
+            parts.append(
+                "Recent experiments:\n"
+                + "\n".join(f"- {e.get('bundle_id', '')}: {e.get('summary', '')}" for e in experiments[:3])
+            )
+        sops = self._extra_context.get("recent_sops") or []
+        if sops:
+            parts.append(
+                "Relevant SOPs:\n"
+                + "\n".join(f"- {s.get('name', '')} ({s.get('category', '')})" for s in sops[:3])
+            )
+        anomalies = self._extra_context.get("recent_anomalies") or []
+        if anomalies:
+            parts.append(
+                "Recent anomalies:\n"
+                + "\n".join(f"- {a.get('phase_type', '')}: {a.get('summary', '')}" for a in anomalies[:3])
+            )
+        return "\n\n".join(parts)
+
+    async def _generate_general_help_response(
+        self, user_message: str, working_memory: WorkingMemory
+    ) -> str:
         """Generate a code/explanation response for general help requests.
 
-        Delegates to an LLM when configured; otherwise returns a safe template
-        response asking the user to provide an LLM key or rephrase.
+        Uses Prompter with compressed conversation history and CBKB-enriched
+        project context. Falls back to a safe template response if LLM is not
+        configured or fails.
         """
         llm = LLMClient()
         if not llm.is_configured():
@@ -898,22 +1034,27 @@ class TurnRunner:
                 "请设置 OPENAI_API_KEY，或告诉我您想处理什么数据，我会尽量给出建议。"
             )
 
-        system_prompt = (
-            "You are a helpful coding and data-processing assistant. "
-            "The user is asking for help with a general programming or data task. "
-            "Respond in the user's language when possible. "
-            "Provide a short code snippet followed by a brief explanation. "
-            "Do not execute any code; only return text. "
-            "If the request is unsafe or could modify files, include a warning."
-        )
-        user_prompt = f"User request: {user_message}\n\nProvide code and explanation."
+        if self._context_bundle is not None:
+            # Use the already assembled, token-safe context from ContextEngine.
+            messages = self._context_bundle.to_prompt(user_message)
+            # Keep only system/assistant messages; the user message will be appended below.
+            prompt_messages = [m for m in messages if m.get("role") != "user"]
+            prompt_messages.append({"role": "user", "content": user_message})
+        else:
+            compressed_history = self._compress_working_memory(working_memory, user_message)
+            extra_context = self._format_extra_context()
+            project_context = "\n\n".join(filter(None, [compressed_history, extra_context]))
+
+            prompt = self.prompter.build_prompt(
+                user_message=user_message,
+                working_memory=WorkingMemory(max_messages=0),
+                project_context=project_context,
+            )
+            prompt_messages = [{"role": "user", "content": prompt}]
 
         try:
             return await llm.chat_completion(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                messages=prompt_messages,
                 temperature=0.2,
                 max_tokens=1500,
             )

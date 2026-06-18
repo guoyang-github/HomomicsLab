@@ -157,5 +157,12 @@ class Settings(BaseSettings):
     session_ttl_days: int = 90
     enable_semantic_memory: bool = True
 
+    # ContextEngine settings
+    context_engine_model: Optional[str] = None  # default model for context budget
+    context_token_budget_mode: str = "normal"  # concise | normal | verbatim
+    context_enable_project_state: bool = True
+    context_enable_episodic_summary: bool = True
+    context_output_reserve_tokens: int = 2000
+
 
 settings = Settings()

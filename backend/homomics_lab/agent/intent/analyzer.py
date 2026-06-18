@@ -1,10 +1,15 @@
 """Cascade intent analyzer — combines keyword, embedding, and LLM classifiers."""
 
+import json
 import re
 import weakref
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from homomics_lab.context.compressor import ContextCompressor
+from homomics_lab.context.context_engine.models import ContextBundle
+from homomics_lab.context.relevance_filter import ContextItem
 from homomics_lab.agent.intent.classifiers import (
     EmbeddingIntentClassifier,
     IntentClassifier,
@@ -234,9 +239,15 @@ class CascadeIntentAnalyzer:
         working_memory: Optional[WorkingMemory] = None,
         extra_context: Optional[Dict[str, Any]] = None,
         cbkb: Optional[Any] = None,
+        context_bundle: Optional[ContextBundle] = None,
     ) -> UserIntent:
         """Analyze user message and return structured intent."""
-        context = self._build_context(working_memory, extra_context)
+        context = self._build_context(
+            working_memory,
+            extra_context,
+            message,
+            context_bundle=context_bundle,
+        )
 
         # Layer 1: keyword fast path
         keyword_matches = await self.keyword_classifier.classify(
@@ -285,16 +296,43 @@ class CascadeIntentAnalyzer:
         self,
         working_memory: Optional[WorkingMemory],
         extra_context: Optional[Dict[str, Any]] = None,
+        message: str = "",
+        context_bundle: Optional[ContextBundle] = None,
     ) -> Dict[str, Any]:
-        """Build context dict from working memory."""
-        if working_memory is None:
+        """Build context dict from working memory or a pre-built ContextBundle.
+
+        Recent conversation history is compressed with ContextCompressor so the
+        downstream LLM prompt stays within budget while keeping the messages
+        most relevant to the current user message.
+        """
+        if context_bundle is not None:
+            # Use the already assembled, token-safe context from ContextEngine.
+            recent_messages = []
+            for msg in context_bundle.messages:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                if role in ("system", "developer"):
+                    # Surface system/project/CBKB context as a single system message.
+                    recent_messages.append({"role": "system", "content": content})
+                else:
+                    recent_messages.append({"role": role, "content": content})
+            context = {
+                "recent_messages": recent_messages,
+                "current_task_id": working_memory.current_task_id if working_memory else None,
+                "pinned_items": working_memory.pinned_items if working_memory else [],
+            }
+        elif working_memory is None:
             context = {}
         else:
-            recent = working_memory.get_recent_messages(5)
+            recent = working_memory.get_recent_messages(10)
+            context_items = self._messages_to_context_items(
+                recent, working_memory.pinned_items
+            )
+            compressed = self._compress_context_items(context_items, current_goal=message)
             context = {
                 "recent_messages": [
-                    {"role": msg.sender, "content": msg.content}
-                    for msg in recent
+                    {"role": msg.get("role", "unknown"), "content": msg.get("content", "")}
+                    for msg in compressed
                 ],
                 "current_task_id": working_memory.current_task_id,
                 "pinned_items": working_memory.pinned_items,
@@ -302,6 +340,77 @@ class CascadeIntentAnalyzer:
         if extra_context is not None:
             context["extra_context"] = extra_context
         return context
+
+    @staticmethod
+    def _messages_to_context_items(
+        messages: List[Any], pinned_items: List[str]
+    ) -> List[ContextItem]:
+        """Convert ChatMessage objects to ContextItems for compression."""
+        items: List[ContextItem] = []
+        now = datetime.now(timezone.utc)
+        for msg in messages:
+            raw_content = msg.content
+            if not isinstance(raw_content, str):
+                try:
+                    text = json.dumps(raw_content, ensure_ascii=False)
+                except Exception:
+                    text = str(raw_content)
+            else:
+                text = raw_content
+            if not text.strip():
+                continue
+            # Preserve the original speaker so downstream prompts still know who said what.
+            content = f"{msg.sender}: {text}"
+            hours = 0.0
+            if msg.timestamp:
+                try:
+                    hours = (now - msg.timestamp).total_seconds() / 3600.0
+                except Exception:
+                    hours = 0.0
+            importance = 0.5
+            if msg.sender == "agent" and msg.type.value in {
+                "result_preview", "todo_list", "plot", "hitl_request"
+            }:
+                importance = 0.7
+            items.append(
+                ContextItem(
+                    content=content,
+                    type=msg.type.value,
+                    is_pinned=msg.id in pinned_items,
+                    is_upstream_result=bool(msg.task_id),
+                    agent_importance=importance,
+                    hours_since_created=hours,
+                )
+            )
+        return items
+
+    @staticmethod
+    def _compress_context_items(
+        items: List[ContextItem], current_goal: str
+    ) -> List[Dict[str, str]]:
+        """Run ContextCompressor and return role/content dicts."""
+        if not items:
+            return []
+        try:
+            compressor = ContextCompressor(max_items=6, max_chars_per_item=1000)
+            compressed = compressor.compress(items, current_goal=current_goal)
+        except Exception:
+            # Compression is best-effort; fall back to the latest items.
+            compressed = items[-6:]
+
+        result: List[Dict[str, str]] = []
+        for item in compressed:
+            # Content already prefixed with the sender in _messages_to_context_items.
+            # Extract a role for backwards compatibility with the prompt formatter.
+            parts = item.content.split(": ", 1)
+            if len(parts) == 2 and parts[0] in {"user", "agent", "system"}:
+                role, content = parts[0], parts[1]
+            else:
+                role, content = "agent" if item.type in {
+                    "result_preview", "todo_list", "plot", "hitl_request"
+                } else "user", item.content
+            result.append({"role": role, "content": content})
+        return result
 
     def _fuse_matches(
         self,

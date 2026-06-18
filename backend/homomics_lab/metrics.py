@@ -80,6 +80,29 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_active_jobs",
         "Number of jobs currently running or queued",
     )
+
+    # Context engine metrics
+    CONTEXT_ENGINE_BUILDS_TOTAL = Counter(
+        "homomicslab_context_engine_builds_total",
+        "Total ContextEngine builds",
+        ["model"],
+    )
+    CONTEXT_USAGE_TOKENS = Histogram(
+        "homomicslab_context_usage_tokens",
+        "Input tokens used in assembled context",
+        ["model"],
+        buckets=[500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000],
+    )
+    CONTEXT_COMPRESSION_RATE = Histogram(
+        "homomicslab_context_compression_rate",
+        "Ratio of kept parts to total candidate parts",
+        buckets=[0.0, 0.25, 0.5, 0.75, 1.0],
+    )
+    CONTEXT_DROPPED_PARTS_TOTAL = Counter(
+        "homomicslab_context_dropped_parts_total",
+        "Total context parts dropped by the ContextEngine",
+        ["source"],
+    )
 else:
     APP_INFO = None
     HTTP_REQUESTS_TOTAL = None
@@ -90,6 +113,10 @@ else:
     LLM_COST_USD = None
     SKILL_EXECUTIONS_TOTAL = None
     ACTIVE_JOBS = None
+    CONTEXT_ENGINE_BUILDS_TOTAL = None
+    CONTEXT_USAGE_TOKENS = None
+    CONTEXT_COMPRESSION_RATE = None
+    CONTEXT_DROPPED_PARTS_TOTAL = None
 
 
 def metrics_endpoint() -> Response:
@@ -161,3 +188,24 @@ def set_active_jobs(count: int) -> None:
     if not _PROMETHEUS_AVAILABLE:
         return
     ACTIVE_JOBS.set(count)
+
+
+def record_context_build(
+    model: str,
+    used_tokens: int,
+    kept_parts: int,
+    total_parts: int,
+    dropped_by_source: Optional[dict] = None,
+) -> None:
+    """Record ContextEngine build metrics."""
+    if not _PROMETHEUS_AVAILABLE:
+        return
+    if CONTEXT_ENGINE_BUILDS_TOTAL is not None:
+        CONTEXT_ENGINE_BUILDS_TOTAL.labels(model=model).inc()
+    if CONTEXT_USAGE_TOKENS is not None:
+        CONTEXT_USAGE_TOKENS.labels(model=model).observe(used_tokens)
+    if total_parts > 0 and CONTEXT_COMPRESSION_RATE is not None:
+        CONTEXT_COMPRESSION_RATE.observe(kept_parts / total_parts)
+    if dropped_by_source and CONTEXT_DROPPED_PARTS_TOTAL is not None:
+        for source, count in dropped_by_source.items():
+            CONTEXT_DROPPED_PARTS_TOTAL.labels(source=source).inc(count)

@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
     app.state.skill_reloader = ctx["skill_reloader"]
     app.state.mcp_client = ctx["mcp_client"]
     app.state.memory_manager = ctx["memory_manager"]
+    app.state.context_engine = ctx["context_engine"]
+    app.state.project_state_manager = ctx["project_state_manager"]
 
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
     cbkb = ctx["cbkb"]

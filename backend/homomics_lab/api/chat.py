@@ -87,6 +87,8 @@ async def send_message(
         tool_registry=getattr(http_request.app.state, "tool_registry", None),
         memory_manager=memory_manager,
         cbkb=getattr(http_request.app.state, "cbkb", None),
+        context_engine=getattr(http_request.app.state, "context_engine", None),
+        project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
     )
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -214,6 +216,8 @@ async def respond_to_debate(
     runner = TurnRunner(
         memory_manager=memory_manager,
         cbkb=getattr(http_request.app.state, "cbkb", None),
+        context_engine=getattr(http_request.app.state, "context_engine", None),
+        project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
     )
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(
@@ -262,7 +266,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
     """
     await websocket.accept()
     memory_manager: MemoryManager = websocket.app.state.memory_manager
-    runner = TurnRunner(memory_manager=memory_manager)
+    runner = TurnRunner(
+        memory_manager=memory_manager,
+        cbkb=getattr(websocket.app.state, "cbkb", None),
+        context_engine=getattr(websocket.app.state, "context_engine", None),
+        project_state_manager=getattr(websocket.app.state, "project_state_manager", None),
+    )
 
     try:
         while True:
