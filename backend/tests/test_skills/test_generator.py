@@ -1,6 +1,5 @@
 """Tests for skill generator."""
 
-import pytest
 
 from homomics_lab.skills.generator.generator import SkillGenerator
 from homomics_lab.skills.generator.templates import SkillTemplateBuilder

@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from homomics_lab.context.reranker import BiEncoderReranker
 from homomics_lab.knowledge.cbkb import CBKB
 
 logger = logging.getLogger(__name__)
@@ -26,21 +27,12 @@ class CBKBRetriever:
         self,
         cbkb: CBKB,
         embedding_model_name: Optional[str] = None,
+        reranker: Optional[Any] = None,
     ):
         self.cbkb = cbkb
         self.embedding_model_name = embedding_model_name
         self._embedding_model = None
-
-    def _get_embedding_model(self):
-        """Lazy-load sentence-transformers for reranking."""
-        if self._embedding_model is None and self.embedding_model_name:
-            try:
-                from sentence_transformers import SentenceTransformer
-
-                self._embedding_model = SentenceTransformer(self.embedding_model_name)
-            except Exception as exc:
-                logger.warning("Could not load embedding model for CBKB reranking: %s", exc)
-        return self._embedding_model
+        self._reranker = reranker or BiEncoderReranker(model_name=embedding_model_name)
 
     async def retrieve(
         self,
@@ -173,24 +165,13 @@ class CBKBRetriever:
         if not items:
             return []
 
-        model = self._get_embedding_model()
-        if model is None:
-            # No embedding model: keep highest-priority items.
-            items.sort(key=lambda x: -x.priority)
-            return items[:top_k]
-
         try:
-            import numpy as np
-
-            texts = [query] + [item.content for item in items]
-            embeddings = model.encode(texts, convert_to_tensor=False)
-            embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-            query_vec = embeddings[0]
-            scores = np.dot(embeddings[1:], query_vec)
-
-            scored = list(zip(items, scores))
-            scored.sort(key=lambda x: (-x[1], -x[0].priority))
-            return [item for item, _ in scored[:top_k]]
+            return self._reranker.rerank(
+                query=query,
+                candidates=items,
+                text_fn=lambda item: item.content,
+                top_k=top_k,
+            )
         except Exception as exc:
             logger.warning("CBKB reranking failed: %s", exc)
             items.sort(key=lambda x: -x.priority)

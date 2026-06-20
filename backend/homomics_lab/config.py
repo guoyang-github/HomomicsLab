@@ -63,8 +63,11 @@ class Settings(BaseSettings):
     scheduler_run_at_startup: bool = False
 
     # Skill sandbox / security settings
+    auto_load_domain_strategies: bool = True
     skill_sandbox_backend: str = "auto"  # "auto" | "local" | "bubblewrap" | "container"
     skill_container_image: str = "python:3.10-slim"
+    r_container_image: str = "r-base:4.3.0"
+    auto_install_dependencies: bool = False  # create venvs and install skill deps automatically
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
     interactive_mode: bool = False  # require approval for high-risk tool calls
     force_sandbox: bool = True  # if True, shell_exec and CodeAct must run through a sandbox
@@ -95,6 +98,13 @@ class Settings(BaseSettings):
     llm_provider: Optional[str] = None  # e.g. openai, deepseek, qwen, zhipu, moonshot, ollama
     llm_model: Optional[str] = None
     llm_fallback_models: Optional[str] = None  # comma-separated list
+
+    # LLM infrastructure (P5)
+    llm_response_cache_enabled: bool = True
+    llm_response_cache_dir: Path = Field(default_factory=lambda: Path("./data/llm_cache"))
+    llm_response_cache_ttl_seconds: float = 3600.0
+    llm_response_cache_max_entries: int = 1000
+    llm_complexity_routing_enabled: bool = False
 
     # OpenTelemetry tracing
     otel_enabled: bool = False

@@ -2,9 +2,10 @@
 
 import logging
 import math
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from homomics_lab.context.context_engine.models import ContextPart, ContextSource
+from homomics_lab.context.reranker import BiEncoderReranker
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +24,14 @@ SOURCE_PRIORITY: Dict[ContextSource, int] = {
 class ContextRanker:
     """Score context parts by relevance and remove near-duplicates."""
 
-    def __init__(self, embedding_model_name: Optional[str] = None):
+    def __init__(
+        self,
+        embedding_model_name: Optional[str] = None,
+        reranker: Optional[Any] = None,
+    ):
         self.embedding_model_name = embedding_model_name
         self._embedding_model = None
+        self._reranker = reranker or BiEncoderReranker(model_name=embedding_model_name)
 
     def _get_embedding_model(self):
         if self._embedding_model is None and self.embedding_model_name:
@@ -102,7 +108,33 @@ class ContextRanker:
         """Rank parts by score, preserving original order for ties."""
         scored = [(part, self.score(part, query)) for part in parts]
         scored.sort(key=lambda x: x[1], reverse=True)
-        return [part for part, _ in scored]
+        ranked = [part for part, _ in scored]
+        return self.rerank(ranked, query)
+
+    def rerank(
+        self,
+        parts: List[ContextPart],
+        query: str,
+        top_k: Optional[int] = None,
+    ) -> List[ContextPart]:
+        """Apply a cross-encoder or bi-encoder reranker to the ranked list.
+
+        The first pass source/temporal score provides a stable ordering;
+        the reranker refines relevance for the top candidates.
+        """
+        if not parts or not query.strip():
+            return parts
+
+        try:
+            return self._reranker.rerank(
+                query=query,
+                candidates=parts,
+                text_fn=lambda part: part.content,
+                top_k=top_k,
+            )
+        except Exception as exc:
+            logger.warning("ContextRanker reranking failed: %s", exc)
+            return parts
 
     def deduplicate(
         self,

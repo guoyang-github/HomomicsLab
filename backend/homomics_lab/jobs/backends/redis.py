@@ -5,14 +5,14 @@ import json
 import logging
 from typing import Any, Callable, Optional
 
+from homomics_lab.hpc.state import ExecutionState
+
 
 async def _async_close(client: Any) -> None:
     close = getattr(client, "aclose", None)
     if close is None:
         close = getattr(client, "close")
     await close()
-
-from homomics_lab.hpc.state import ExecutionState
 
 logger = logging.getLogger(__name__)
 

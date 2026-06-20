@@ -52,6 +52,7 @@ class SkillRuntimeExecutor:
         schema_validator: SchemaValidator = None,
         tool_registry: Optional[ToolRegistry] = None,
         llm_client: Optional[LLMClient] = None,
+        provenance_recorder = None,
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
@@ -61,6 +62,7 @@ class SkillRuntimeExecutor:
         self.schema_validator = schema_validator
         self.tool_registry = tool_registry or get_default_tool_registry()
         self.llm_client = llm_client
+        self.provenance_recorder = provenance_recorder
         self._agent_executor: Optional[AgentSkillExecutor] = None
         self.data_store = DataStore(
             working_dir or Path.cwd(),
@@ -87,6 +89,7 @@ class SkillRuntimeExecutor:
             self._scheduler = get_scheduler(
                 self._executor_type,
                 working_dir=self.working_dir,
+                provenance_recorder=self.provenance_recorder,
             )
         return self._scheduler
 
@@ -343,6 +346,16 @@ class SkillRuntimeExecutor:
         error_msg = ""
         try:
             result = await self._dispatch_execute(skill, validated)
+
+            # Output schema validation (best-effort; does not apply to wrapped references)
+            if self.schema_validator is not None and isinstance(result, dict) and not result.get("_reference"):
+                output_validation = self.schema_validator.validate_output(skill, result)
+                if not output_validation.passed:
+                    raise ValueError(
+                        f"Output validation failed for skill '{skill_id}': "
+                        f"{'; '.join(output_validation.errors)}"
+                    )
+
             success = True
             stored = self.data_store.store(
                 task_id=f"{skill_id}_{uuid.uuid4().hex[:8]}",
@@ -706,12 +719,10 @@ class SkillRuntimeExecutor:
         inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Execute a skill by reading scripts from its directory."""
-        self._ensure_requirements(scripts_dir)
-
+        # Dependency preparation is now handled by the scheduler's EnvironmentManager,
+        # which creates isolated venvs/project libraries and installs dependencies when
+        # settings.auto_install_dependencies is enabled.
         timeout = self._parse_timeout(skill.runtime.resources.time)
-
-        if exec_type == "r":
-            self._ensure_r_requirements(scripts_dir)
 
         # Collect all script files
         if exec_type == "r":

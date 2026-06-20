@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.config import settings
 
 
 @dataclass
@@ -85,6 +86,45 @@ class AnalysisStrategy:
             if phase.phase_type == check.target:
                 phase.parameters[check.target] = check.value
 
+    def score(self, intent_analysis_type: str, data_state: DataState) -> float:
+        """Score how well this strategy matches an intent and data state.
+
+        Scoring rules:
+          - Base score 1.0 if the intent is explicitly applicable.
+          - +0.2 for each keyword overlap between the intent and the
+            strategy's name, description, or skeleton phase types.
+          - +0.1 for each skeleton phase type that already has a matching
+            key in the data state.
+        """
+        score = 0.0
+        if intent_analysis_type in self.applicable_intents:
+            score = 1.0
+
+        intent_tokens = set(intent_analysis_type.lower().replace("_", " ").split())
+
+        # Build a text corpus from strategy metadata and skeleton.
+        text_parts = [self.name, self.description]
+        for phase in self.skeleton:
+            text_parts.append(phase.phase_type)
+            if phase.description:
+                text_parts.append(phase.description)
+        corpus = " ".join(text_parts).lower()
+        corpus_tokens = set(corpus.split())
+
+        keyword_hits = sum(1 for token in intent_tokens if token in corpus_tokens and len(token) > 1)
+        score += 0.2 * keyword_hits
+
+        # Boost if data state already contains keys matching skeleton phases.
+        state_keys = set(data_state.to_dict().keys())
+        for ns_values in data_state.domain_state.values():
+            if isinstance(ns_values, dict):
+                state_keys.update(ns_values.keys())
+        phase_types = {phase.phase_type for phase in self.skeleton}
+        data_hits = len(phase_types & state_keys)
+        score += 0.1 * data_hits
+
+        return score
+
 
 class StrategyLibrary:
     """Library of built-in analysis strategies."""
@@ -97,11 +137,14 @@ class StrategyLibrary:
     def _register_defaults(self) -> None:
         """Register default strategies.
 
-        Domain declarations take precedence over hard-coded defaults. Defaults
-        are only registered for intents not already covered by a loaded domain.
+        Domain declarations take precedence over hard-coded defaults when
+        ``settings.auto_load_domain_strategies`` is enabled. Defaults are
+        registered as fallback for any intents not already covered by a loaded
+        domain.
         """
-        # 1. Load domain strategies first so they take priority.
-        self._load_domain_strategies()
+        # 1. Load domain strategies first so they take priority (when enabled).
+        if settings.auto_load_domain_strategies:
+            self._load_domain_strategies()
 
         # 2. Register hard-coded defaults as fallback for uncovered intents.
         covered_intents = {
@@ -141,14 +184,48 @@ class StrategyLibrary:
     def register(self, strategy: AnalysisStrategy) -> None:
         self._strategies[strategy.name] = strategy
 
-    def select(self, intent_analysis_type: str) -> AnalysisStrategy:
-        """Select the best strategy for a given intent type."""
-        for strategy in self._strategies.values():
-            if intent_analysis_type in strategy.applicable_intents:
-                return strategy
+    def select(
+        self,
+        intent_analysis_type: str,
+        data_state: Optional[DataState] = None,
+        top_k: int = 1,
+    ) -> Union[AnalysisStrategy, List[Tuple[AnalysisStrategy, float]]]:
+        """Select the best strategy for a given intent type.
 
-        # Fallback to generic strategy
-        return GENERIC_ANALYSIS
+        Backward compatibility: when called with the legacy single-argument
+        signature (or ``top_k=1``), returns the top strategy directly.
+        When ``top_k > 1`` returns a list of ``(strategy, score)`` tuples
+        sorted by descending score.
+        """
+        if data_state is None:
+            data_state = DataState()
+        ranked = self.select_top_k(intent_analysis_type, data_state, top_k=top_k)
+        if top_k == 1:
+            return ranked[0][0] if ranked else GENERIC_ANALYSIS
+        return ranked
+
+    def select_top_k(
+        self,
+        intent_analysis_type: str,
+        data_state: DataState,
+        top_k: int = 3,
+    ) -> List[Tuple[AnalysisStrategy, float]]:
+        """Return the top-k strategies with scores for a given intent."""
+        scored = [
+            (strategy, strategy.score(intent_analysis_type, data_state))
+            for strategy in self._strategies.values()
+        ]
+        scored.sort(key=lambda item: item[1], reverse=True)
+
+        # Preserve original fallback behavior: if no strategy explicitly claims
+        # this intent (score >= 1.0), promote the generic strategy.
+        if scored and scored[0][1] < 1.0:
+            generic = self.get("generic") or GENERIC_ANALYSIS
+            scored = [(generic, 0.5)] + [
+                (s, score) for s, score in scored if s.name != generic.name
+            ]
+
+        return scored[:top_k]
 
     def get(self, name: str) -> Optional[AnalysisStrategy]:
         return self._strategies.get(name)

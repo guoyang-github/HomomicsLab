@@ -17,6 +17,7 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 # timeouts.
 settings.external_skills_dirs = []
 settings.mcp_enabled = False
+settings.auto_load_domain_strategies = False
 
 # Force app bootstrap to disable hot-reload watchers in tests; they can block
 # TestClient lifespan shutdown and are not needed for unit tests.

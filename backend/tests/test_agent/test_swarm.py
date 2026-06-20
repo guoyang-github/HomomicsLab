@@ -1,6 +1,5 @@
 import asyncio
 import pytest
-from unittest.mock import MagicMock
 
 from homomics_lab.agent.swarm import (
     AgentSwarm,

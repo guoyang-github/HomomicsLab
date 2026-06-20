@@ -6,7 +6,7 @@ Intelligently compresses conversation context by:
 3. Removing redundant or outdated information
 """
 
-from typing import List, Optional
+from typing import List
 
 from .relevance_filter import ContextItem, RelevanceFilter
 from .summarizer import ContextSummarizer

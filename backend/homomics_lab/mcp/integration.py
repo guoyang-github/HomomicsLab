@@ -1,7 +1,7 @@
 """Bootstrap-time integration of MCP tools into HomomicsLab registries."""
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from homomics_lab.config import settings
 from homomics_lab.mcp.client import BioMCPClient

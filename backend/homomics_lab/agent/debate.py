@@ -1,6 +1,5 @@
 """LightweightDebate — short multi-agent debate for ambiguous decisions."""
 
-import dataclasses
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

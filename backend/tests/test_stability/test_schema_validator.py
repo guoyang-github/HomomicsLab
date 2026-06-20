@@ -1,9 +1,8 @@
 """Tests for SchemaValidator."""
 
-import pytest
 
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillOutputSchema
-from homomics_lab.stability.schema_validator import SchemaValidator, ValidationResult
+from homomics_lab.stability.schema_validator import SchemaValidator
 
 
 class TestSchemaValidator:

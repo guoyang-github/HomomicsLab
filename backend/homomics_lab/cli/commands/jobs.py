@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 import json
-import sys
 from typing import Any, Dict
 
 from homomics_lab.jobs.repository import JobRepository

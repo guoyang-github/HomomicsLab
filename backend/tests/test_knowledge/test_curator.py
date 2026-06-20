@@ -13,9 +13,7 @@ from datetime import datetime, timezone
 
 from homomics_lab.knowledge.curator import (
     CBKBCurator,
-    DistilledInsight,
     NarrativeReport,
-    SOPProposal,
     TopicCluster,
 )
 

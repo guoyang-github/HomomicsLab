@@ -12,13 +12,14 @@ This separation ensures that:
   - The system remains interpretable and auditable
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from homomics_lab.agent.information_gathering import InformationGatheringEngine
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
-from homomics_lab.agent.plan.strategies import StrategyLibrary
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.retrieval import SkillRetriever
 from homomics_lab.agent.plan.validator import PlanValidator
 from homomics_lab.config import settings
@@ -50,9 +51,11 @@ class PlanEngine:
         tool_registry: Optional[ToolRegistry] = None,
         data_sources: Optional[List[Dict[str, Any]]] = None,
         literature_retriever: Optional[LiteratureRetriever] = None,
+        enable_information_gathering: bool = False,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
+        self.enable_information_gathering = enable_information_gathering
         if literature_retriever is None and settings.literature_retrieval_enabled:
             literature_retriever = LiteratureRetriever()
         self.skill_retriever = skill_retriever or SkillRetriever(
@@ -64,6 +67,10 @@ class PlanEngine:
         )
         self.plan_validator = PlanValidator(skill_registry=skill_registry)
         self.strategy_library = StrategyLibrary(skill_registry=skill_registry)
+        self.information_gathering = InformationGatheringEngine(
+            skill_registry=skill_registry,
+            skill_dag=skill_dag,
+        )
         self.llm_fallback = llm_fallback or LLMFallbackPlanner(skill_registry)
         self.cbkb = cbkb
 
@@ -71,67 +78,70 @@ class PlanEngine:
         self,
         intent: UserIntent,
         data_state: Optional[DataState] = None,
+        top_k: int = 1,
     ) -> PlanResult:
         """Generate an analysis plan from user intent and data state.
+
+        Args:
+            intent: The user's analysis intent.
+            data_state: Current known data state.
+            top_k: Number of strategy candidates to consider.  When ``top_k > 1``
+                a lightweight beam search ranks candidate plans by gaps and
+                skill coverage.  Defaults to 1 for backward compatibility.
 
         Returns:
             PlanResult containing the phase sequence, selected skills, and gaps.
         """
         data_state = data_state or DataState()
 
-        # 1. Select strategy based on intent
-        strategy = self.strategy_library.select(intent.analysis_type)
-
-        # 2. If no domain strategy matches, use LLM fallback to build an executable plan
-        if strategy.name == "generic":
-            return await self.llm_fallback.generate_plan(intent, data_state)
-
-        # 3. Generate skeleton (domain knowledge + state adaptation)
-        phases = strategy.generate_skeleton(data_state)
-
-        # 4. Retrieve augmented context once for the whole plan
-        retrieval_query = self._build_retrieval_query(intent, phases)
-        retrieval_context = self.skill_retriever.retrieve(
-            query=retrieval_query,
-            intent_type=intent.analysis_type,
-            data_sources=strategy.data_sources,
-            include_literature=self.skill_retriever.literature_retriever is not None,
-        )
-
-        # 5. Select skills for each phase using the retrieval context
-        # Optional phases also get a default skill so the full skeleton is
-        # executable; downstream replanning can drop them if constraints apply.
-        learned_defaults: List[Dict[str, Any]] = []
-        for phase in phases:
-            phase.selected_skill = self._select_skill_for_phase(
-                phase, data_state, retrieval_context
+        # 1. Active information gathering: if enabled and critical keys are
+        # missing, return an information-request plan instead of a premature
+        # analysis plan.  Disabled by default to preserve backward compatibility
+        # with callers that supply an empty DataState.
+        if self.enable_information_gathering:
+            probes = self.information_gathering.decide_probes(intent, data_state)
+        else:
+            probes = []
+        if probes and intent.analysis_type != "information_gathering":
+            probe_list = "\n".join(
+                f"- {p.skill_id}: {p.reason} (cost: {p.estimated_cost})"
+                for p in probes
             )
-            injected = self._apply_learned_defaults(phase)
-            learned_defaults.extend(injected)
+            return PlanResult(
+                phases=[],
+                strategy_name="information_gathering",
+                data_state=data_state,
+                is_information_request=True,
+                suggestion_text=(
+                    "Missing critical metadata. Please run the following probe skills "
+                    f"so I can build an accurate plan:\n{probe_list}"
+                ),
+                reproducibility_context={"probes": [self._probe_to_dict(p) for p in probes]},
+            )
 
-        # 6. Detect gaps between phases
-        gaps = self._detect_gaps(phases)
+        # 2. Select strategy based on intent (probabilistic when top_k > 1).
+        if top_k > 1:
+            ranked = self.strategy_library.select_top_k(
+                intent.analysis_type, data_state, top_k=top_k
+            )
+            candidates = [strategy for strategy, _score in ranked]
+        else:
+            strategy = self.strategy_library.select(intent.analysis_type)
+            candidates = [strategy]
 
-        # 7. Build reproducibility context
-        reproducibility_context = {
-            "plan_engine_version": "0.3.0",
-            "strategy": strategy.name,
-            "intent": intent.analysis_type,
-            "data_state": data_state.to_context(),
-            "retrieval_context": retrieval_context.to_prompt_context(),
-            "learned_defaults": learned_defaults,
-        }
+        # 3. Build candidate plans and pick the best one.
+        candidate_plans: List[PlanResult] = []
+        for strategy in candidates:
+            plan_result = await self._build_plan_for_strategy(
+                intent, data_state, strategy
+            )
+            candidate_plans.append(plan_result)
 
-        plan_result = PlanResult(
-            phases=phases,
-            strategy_name=strategy.name,
-            data_state=data_state,
-            gaps=gaps,
-            reproducibility_context=reproducibility_context,
-            phase_transitions=strategy.phase_transitions,
-        )
+        plan_result = self._pick_best_plan(candidate_plans)
 
+        # 4. Validate and enrich with SkillDAG risk exposure.
         validation_report = self.plan_validator.validate(plan_result)
+        reproducibility_context = dict(plan_result.reproducibility_context)
         reproducibility_context["validation"] = {
             "valid": validation_report.valid,
             "errors": [
@@ -145,7 +155,128 @@ class PlanEngine:
         }
         plan_result.reproducibility_context = reproducibility_context
 
+        if self.skill_dag is not None:
+            plan_result.risks.extend(
+                self._evaluate_skill_dag_risks(plan_result)
+            )
+
         return plan_result
+
+    async def _build_plan_for_strategy(
+        self,
+        intent: UserIntent,
+        data_state: DataState,
+        strategy: AnalysisStrategy,
+    ) -> PlanResult:
+        """Build a PlanResult for a single selected strategy."""
+        if strategy.name == "generic":
+            return await self.llm_fallback.generate_plan(intent, data_state)
+
+        phases = strategy.generate_skeleton(data_state)
+
+        retrieval_query = self._build_retrieval_query(intent, phases)
+        retrieval_context = self.skill_retriever.retrieve(
+            query=retrieval_query,
+            intent_type=intent.analysis_type,
+            data_sources=strategy.data_sources,
+            include_literature=self.skill_retriever.literature_retriever is not None,
+        )
+
+        learned_defaults: List[Dict[str, Any]] = []
+        for phase in phases:
+            phase.selected_skill = self._select_skill_for_phase(
+                phase, data_state, retrieval_context
+            )
+            injected = self._apply_learned_defaults(phase)
+            learned_defaults.extend(injected)
+
+        gaps = self._detect_gaps(phases)
+
+        reproducibility_context = {
+            "plan_engine_version": "0.3.0",
+            "strategy": strategy.name,
+            "intent": intent.analysis_type,
+            "data_state": data_state.to_context(),
+            "retrieval_context": retrieval_context.to_prompt_context(),
+            "learned_defaults": learned_defaults,
+        }
+
+        return PlanResult(
+            phases=phases,
+            strategy_name=strategy.name,
+            data_state=data_state,
+            gaps=gaps,
+            reproducibility_context=reproducibility_context,
+            phase_transitions=strategy.phase_transitions,
+        )
+
+    @staticmethod
+    def _pick_best_plan(candidate_plans: List[PlanResult]) -> PlanResult:
+        """Pick the candidate plan with the fewest gaps and highest skill coverage."""
+        if len(candidate_plans) == 1:
+            return candidate_plans[0]
+
+        def _plan_score(plan: PlanResult) -> Tuple[int, int]:
+            gap_count = len([g for g in plan.gaps if g.gap_type != "none"])
+            skill_count = len(plan.skill_sequence)
+            return (-skill_count, gap_count)
+
+        candidate_plans.sort(key=_plan_score)
+        return candidate_plans[0]
+
+    @staticmethod
+    def _probe_to_dict(probe: Any) -> Dict[str, Any]:
+        return {
+            "skill_id": probe.skill_id,
+            "reason": probe.reason,
+            "missing_key": probe.missing_key,
+            "estimated_cost": probe.estimated_cost,
+        }
+
+    def _evaluate_skill_dag_risks(self, plan_result: PlanResult) -> List[Dict[str, Any]]:
+        """Evaluate SkillDAG risks for a plan result."""
+        risks: List[Dict[str, Any]] = []
+        if self.skill_dag is None:
+            return risks
+
+        skill_sequence = plan_result.skill_sequence
+        validation = self.skill_dag.validate_sequence(skill_sequence)
+
+        for error in validation.errors:
+            risk_type = "conflict"
+            if "depends" in error.lower():
+                risk_type = "dependency"
+            risks.append({
+                "type": risk_type,
+                "severity": "error",
+                "message": error,
+                "skill_ids": skill_sequence,
+            })
+
+        for warning in validation.warnings:
+            risks.append({
+                "type": "dependency",
+                "severity": "warning",
+                "message": warning,
+                "skill_ids": skill_sequence,
+            })
+
+        # Informational risks: high-confidence alternatives exist.
+        for skill_id in skill_sequence:
+            alternatives = self.skill_dag.get_alternatives(skill_id)
+            for alt_id, confidence in alternatives:
+                if confidence >= 0.7:
+                    risks.append({
+                        "type": "alternative",
+                        "severity": "warning",
+                        "message": (
+                            f"High-confidence alternative to '{skill_id}' available: "
+                            f"'{alt_id}' (confidence={confidence:.2f})"
+                        ),
+                        "skill_ids": [skill_id, alt_id],
+                    })
+
+        return risks
 
     @staticmethod
     def _build_retrieval_query(intent: UserIntent, phases: List[Phase]) -> str:

@@ -1,6 +1,5 @@
 """Skill generator from natural language requirements."""
 
-import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional

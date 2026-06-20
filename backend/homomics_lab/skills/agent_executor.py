@@ -18,6 +18,7 @@ from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.tools.approval import ToolApprovalRequired, get_default_approval_store
+from homomics_lab.tools.models import ToolResult
 from homomics_lab.tools.registry import ToolRegistry
 
 
@@ -44,10 +45,12 @@ class AgentSkillExecutor:
         tool_registry: Optional[ToolRegistry] = None,
         llm_client: Optional[LLMClient] = None,
         max_iterations: int = 10,
+        max_tool_retries: int = 2,
     ):
         self.tool_registry = tool_registry
         self.llm_client = llm_client
         self.max_iterations = max(max_iterations, 1)
+        self.max_tool_retries = max(max_tool_retries, 0)
 
     async def execute(
         self,
@@ -102,14 +105,16 @@ class AgentSkillExecutor:
         ]
 
         tool_outputs: List[Dict[str, Any]] = []
+        consecutive_tool_errors = 0
 
-        for _ in range(self.max_iterations):
+        for iteration in range(self.max_iterations):
             try:
                 response_text = await self.llm_client.chat_completion(
                     messages,
                     temperature=0.2,
                     max_tokens=4000,
                     response_format={"type": "json_object"},
+                    intent_type="code_generation",
                 )
             except Exception as exc:
                 return {
@@ -119,27 +124,32 @@ class AgentSkillExecutor:
                     "tool_outputs": tool_outputs,
                 }
 
-            try:
-                action = json.loads(response_text)
-            except json.JSONDecodeError:
-                # Sometimes the model returns markdown-wrapped JSON; try to
-                # extract the first JSON object.
-                action = self._extract_json(response_text)
-                if action is None:
-                    return {
-                        "success": False,
-                        "skill_id": skill.id,
-                        "error": f"LLM returned non-JSON response: {response_text[:500]}",
-                        "tool_outputs": tool_outputs,
-                    }
+            action = self._parse_action(response_text)
+            if action is None:
+                return {
+                    "success": False,
+                    "skill_id": skill.id,
+                    "error": f"LLM returned non-JSON response: {response_text[:500]}",
+                    "tool_outputs": tool_outputs,
+                }
 
             action_type = action.get("action")
             if action_type == "final":
+                final_output = action.get("final_output", {})
+                validation_errors = self._validate_output(skill, final_output)
+                if validation_errors:
+                    return {
+                        "success": False,
+                        "skill_id": skill.id,
+                        "error": f"Output validation failed: {'; '.join(validation_errors)}",
+                        "final_output": final_output,
+                        "tool_outputs": tool_outputs,
+                    }
                 return {
                     "success": True,
                     "mode": "agent",
                     "skill_id": skill.id,
-                    "final_output": action.get("final_output", {}),
+                    "final_output": final_output,
                     "thought": action.get("thought", ""),
                     "tool_outputs": tool_outputs,
                 }
@@ -185,24 +195,26 @@ class AgentSkillExecutor:
                     risk_level=tool_def.risk_level,
                 )
 
-            try:
-                result = await self.tool_registry.invoke_async(canonical_tool_name, arguments)
-                tool_output = {
-                    "tool": tool_name,
-                    "arguments": arguments,
-                    "success": result.success,
-                    "output": result.output,
-                    "error_message": result.error_message,
-                }
-            except Exception as exc:
-                tool_output = {
-                    "tool": tool_name,
-                    "arguments": arguments,
-                    "success": False,
-                    "error_message": str(exc),
-                }
-
+            tool_output = await self._invoke_tool_with_logging(
+                canonical_tool_name, tool_name, arguments
+            )
             tool_outputs.append(tool_output)
+
+            if tool_output.get("success") is False:
+                consecutive_tool_errors += 1
+                if consecutive_tool_errors > self.max_tool_retries:
+                    return {
+                        "success": False,
+                        "skill_id": skill.id,
+                        "error": (
+                            f"Tool '{tool_name}' failed {consecutive_tool_errors} times in a row. "
+                            "Stopping execution."
+                        ),
+                        "tool_outputs": tool_outputs,
+                    }
+            else:
+                consecutive_tool_errors = 0
+
             messages.append(
                 {
                     "role": "assistant",
@@ -322,6 +334,28 @@ Rules:
 """
 
     @staticmethod
+    def _parse_action(response_text: str) -> Optional[Dict[str, Any]]:
+        """Parse an agent action from LLM output, tolerating markdown fences.
+
+        Tries a direct JSON parse first, then strips markdown fences, then
+        extracts the first JSON object.
+        """
+        text = response_text.strip()
+        # Strip markdown code fences if present.
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return AgentSkillExecutor._extract_json(text)
+
+    @staticmethod
     def _extract_json(text: str) -> Optional[Dict[str, Any]]:
         """Try to extract the first JSON object from a string."""
         start = text.find("{")
@@ -339,3 +373,90 @@ Rules:
                     except json.JSONDecodeError:
                         return None
         return None
+
+    async def _invoke_tool_with_logging(
+        self,
+        canonical_name: str,
+        display_name: str,
+        arguments: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Invoke a tool and return a structured output record."""
+        import time
+
+        start = time.time()
+        try:
+            result = await self.tool_registry.invoke_async(canonical_name, arguments)
+            # If the tool itself returns a ToolResult (e.g. a nested handler), use it directly.
+            if isinstance(result.output, ToolResult):
+                inner = result.output
+                output = {
+                    "tool": display_name,
+                    "arguments": arguments,
+                    "success": inner.success,
+                    "output": inner.output,
+                    "error_message": inner.error_message,
+                    "latency_ms": (time.time() - start) * 1000,
+                }
+            else:
+                output = {
+                    "tool": display_name,
+                    "arguments": arguments,
+                    "success": result.success,
+                    "output": result.output,
+                    "error_message": result.error_message,
+                    "latency_ms": (time.time() - start) * 1000,
+                }
+        except Exception as exc:
+            output = {
+                "tool": display_name,
+                "arguments": arguments,
+                "success": False,
+                "error_message": str(exc),
+                "latency_ms": (time.time() - start) * 1000,
+            }
+
+        # Best-effort audit log
+        try:
+            from homomics_lab.tools.audit import log_tool_call
+
+            log_tool_call(
+                tool_name=display_name,
+                arguments=arguments,
+                success=output["success"],
+                error_message=output.get("error_message"),
+                latency_ms=output.get("latency_ms", 0.0),
+            )
+        except Exception:
+            pass
+        return output
+
+    @staticmethod
+    def _validate_output(skill: SkillDefinition, output: Dict[str, Any]) -> List[str]:
+        """Validate agent final output against skill output_schema."""
+        schema = skill.output_schema
+        if not schema.properties and not schema.required:
+            return []
+
+        errors = []
+        for field_name in schema.required:
+            if field_name not in output:
+                errors.append(f"Missing required output field: '{field_name}'")
+
+        type_checks = {
+            "string": lambda v: isinstance(v, str),
+            "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+            "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+            "boolean": lambda v: isinstance(v, bool),
+            "array": lambda v: isinstance(v, list),
+            "object": lambda v: isinstance(v, dict),
+        }
+
+        for field_name, value in output.items():
+            if field_name in schema.properties:
+                prop = schema.properties[field_name]
+                expected = prop.get("type")
+                if expected and not type_checks.get(expected, lambda _: True)(value):
+                    errors.append(
+                        f"Type mismatch for field '{field_name}': expected {expected}, got {type(value).__name__}"
+                    )
+        return errors

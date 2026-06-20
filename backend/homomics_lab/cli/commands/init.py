@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import yaml
 
 
 DOMAIN_TEMPLATE_BLANK = """domain: {domain_name}

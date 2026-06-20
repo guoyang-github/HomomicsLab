@@ -2,7 +2,7 @@
 
 import pytest
 
-from homomics_lab.agent.phase_gate import GateResult, PhaseGateEvaluator
+from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.models import DataState, SuccessCriterion
 from homomics_lab.tasks.models import TaskNode
 

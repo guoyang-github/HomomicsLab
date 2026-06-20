@@ -2,13 +2,11 @@
 
 import argparse
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from homomics_lab.cli.commands.run import _parse_run_args, run_run
-from homomics_lab.skills.runtime import UntrustedSkillError
 
 
 def test_parse_run_args():

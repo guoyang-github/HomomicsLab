@@ -1,6 +1,5 @@
 """Tests for report data models."""
 
-import pytest
 from datetime import datetime
 
 from homomics_lab.reports.models import (

@@ -71,6 +71,17 @@ def get_current_span():
         return None
 
 
+def get_tracer(name: str = "homomicslab") -> Optional[object]:
+    """Return a tracer if OpenTelemetry is enabled and available, else None."""
+    if not getattr(settings, "otel_enabled", False):
+        return None
+    try:
+        from opentelemetry import trace
+        return trace.get_tracer(name)
+    except Exception:
+        return None
+
+
 def set_attribute(key: str, value) -> None:
     """Set an attribute on the current span if tracing is active."""
     span = get_current_span()

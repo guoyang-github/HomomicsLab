@@ -2,6 +2,49 @@
 
 All notable changes to HomomicsLab are documented in this file.
 
+## [0.5.0] — Full Roadmap Implementation
+
+### Added
+
+- **Memory & retrieval**
+  - Metadata-aware semantic memory with project/session filtering.
+  - Hybrid dense + FTS5 search with RRF fusion.
+  - Cross-encoder and bi-encoder rerankers.
+  - Memory consolidation into `concept` memories.
+
+- **HITL & preference learning**
+  - `UserPreferenceStore` records choices from HITL checkpoints.
+  - Natural-language HITL response parsing.
+  - Adaptive HITL defaults and "Remember my choice" UI toggle.
+
+- **Intelligent planning**
+  - Probabilistic strategy scoring and beam search in `PlanEngine`.
+  - `InformationGatheringEngine` probes missing project metadata.
+  - SkillDAG schema-similarity edges and plan validation.
+
+- **Execution layer**
+  - Per-skill conda/mamba environments via `environment.yml`.
+  - Provenance recorder wired into schedulers.
+  - RO-Crate export API (`/api/projects/{id}/export/rocrate`) and CLI (`homomics export`).
+  - R skills default to `settings.r_container_image` in container sandboxes.
+
+- **Frontend & collaboration**
+  - PWA manifest, service worker, and offline fallback.
+  - Real-time presence WebSocket with remote cursor overlay.
+  - RO-Crate export button in the top bar.
+
+- **Reproducibility & governance**
+  - Project audit log endpoint (`/api/projects/{id}/audit`).
+  - Skill semantic versioning with breaking-change detection.
+
+- **Evaluation & CI/CD**
+  - Lightweight evaluation harness (`homomics_lab.evaluation.harness`).
+  - CI workflow now runs backend lint (ruff/mypy) and frontend tests.
+
+### Changed
+
+- Updated `docs/operations.md` with new API endpoints, PWA/collaboration, audit/versioning, and evaluation sections.
+
 ## [0.4.2] — Agent Execution Hardening & Domain Marketplace
 
 ### Added

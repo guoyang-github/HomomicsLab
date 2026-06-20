@@ -1,7 +1,6 @@
 """Tests for the audit logging middleware."""
 
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient

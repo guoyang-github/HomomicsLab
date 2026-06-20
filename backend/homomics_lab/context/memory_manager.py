@@ -1,5 +1,6 @@
 """Unified facade for session state and long-term memory."""
 
+import inspect
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,7 +9,6 @@ from homomics_lab.context.semantic_memory import SemanticMemory
 from homomics_lab.context.session_store import SessionState, SessionStore
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.knowledge.cbkb import CBKB
-from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
@@ -55,13 +55,24 @@ class MemoryManager:
             "recent_sops": [],
             "recent_anomalies": [],
             "parameter_preferences": [],
+            "user_preferences": [],
         }
 
         if self.semantic_memory is not None:
             try:
-                query = f"{user_message} project:{project_id}"
-                results = await self.semantic_memory.search(query, top_k=5)
+                results = await self.semantic_memory.search(
+                    user_message, top_k=5, project_id=project_id
+                )
                 context["memory_snippets"] = [r["text"] for r in results]
+
+                # Retrieve explicit user preferences for this project.
+                pref_results = await self.semantic_memory.search(
+                    "preference",
+                    memory_type="preference",
+                    top_k=3,
+                    project_id=project_id,
+                )
+                context["user_preferences"] = [r["text"] for r in pref_results]
             except Exception:
                 logger.warning("Semantic memory search failed; continuing without it", exc_info=True)
 
@@ -133,8 +144,76 @@ class MemoryManager:
 
         await self._save_session(session_id, project_id, working_memory, task_tree)
         await self._write_semantic_memory(
-            project_id, user_message, turn_result, working_memory, task_tree
+            session_id, project_id, user_message, turn_result, working_memory, task_tree
         )
+        await self._remember_preference(project_id, user_message, turn_result)
+        await self._maintain_semantic_memory(session_id)
+
+    async def _remember_preference(
+        self,
+        project_id: str,
+        user_message: str,
+        turn_result: Any,
+    ) -> None:
+        """Extract and store explicit user preferences expressed in a turn."""
+        if self.semantic_memory is None:
+            return
+
+        preference = self._extract_preference(user_message)
+        if preference is None:
+            return
+
+        # Only remember preferences on successful/direct turns.
+        mode = getattr(turn_result, "mode", None)
+        if mode is not None and "error" in str(mode).lower():
+            return
+
+        try:
+            await self.semantic_memory.add(
+                text=preference,
+                memory_type="preference",
+                metadata={"project_id": project_id, "source_message": user_message},
+                importance=0.8,
+                project_id=project_id,
+            )
+        except Exception:
+            logger.warning("Failed to store preference", exc_info=True)
+
+    async def _maintain_semantic_memory(self, session_id: str) -> None:
+        """Run periodic grooming and consolidation on semantic memory."""
+        if self.semantic_memory is None:
+            return
+
+        async def _await_if_needed(result: Any) -> Any:
+            return await result if inspect.isawaitable(result) else result
+
+        try:
+            await _await_if_needed(self.semantic_memory.prune_stale_memories())
+        except Exception:
+            logger.warning("Memory pruning failed", exc_info=True)
+
+        try:
+            await _await_if_needed(
+                self.semantic_memory.consolidate_conversation_chunks(session_id=session_id)
+            )
+        except Exception:
+            logger.warning("Memory consolidation failed", exc_info=True)
+
+    @staticmethod
+    def _extract_preference(user_message: str) -> Optional[str]:
+        """Detect explicit preference statements in user message."""
+        text = user_message.lower()
+        markers = [
+            r"(?:always|总是|总|一直)\s+(?:use|用|选择|prefer|喜欢用)\s+(.+?)(?:\.|。|$)",
+            r"(?:prefer|喜欢|偏好|倾向于)\s+(?:to use|using|用|使用)?\s*(.+?)(?:\.|。|$)",
+            r"(?:用|使用)\s+(.+?)\s*(?:做|来分析|分析|跑|运行)",
+            r"结果(?:要|需要|得|应该)(?:有|包含|带|出)(图|图片|可视化|报告|表格)",
+        ]
+        for pattern in markers:
+            match = __import__("re").search(pattern, text)
+            if match:
+                return f"User preference: {match.group(1).strip()}"
+        return None
 
     async def _save_session(
         self,
@@ -157,6 +236,7 @@ class MemoryManager:
 
     async def _write_semantic_memory(
         self,
+        session_id: str,
         project_id: str,
         user_message: str,
         turn_result: Any,
@@ -173,8 +253,11 @@ class MemoryManager:
                 memory_type="conversation",
                 metadata={
                     "project_id": project_id,
+                    "session_id": session_id,
                     "mode": str(turn_result.mode) if hasattr(turn_result, "mode") else None,
                 },
+                project_id=project_id,
+                session_id=session_id,
             )
         except Exception:
             logger.warning("Failed to write semantic memory", exc_info=True)

@@ -10,7 +10,6 @@ from homomics_lab.context.session_store import SessionState, SQLiteSessionStore
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.agent.turn_runner import TurnResult, ExecutionMode
-from homomics_lab.tasks.task_tree import TaskTree
 
 
 @pytest_asyncio.fixture
@@ -75,7 +74,7 @@ async def test_enrich_context_retrieves_semantic_memory(memory_manager):
     context = await memory_manager.enrich_context("proj_1", "how many cells were filtered", wm)
 
     assert context["memory_snippets"] == ["previous QC filtered 12% cells"]
-    memory_manager.semantic_memory.search.assert_awaited_once()
+    assert memory_manager.semantic_memory.search.await_count == 2
 
 
 @pytest.mark.asyncio

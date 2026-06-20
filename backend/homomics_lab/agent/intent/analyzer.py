@@ -17,6 +17,11 @@ from homomics_lab.agent.intent.classifiers import (
     KeywordIntentClassifier,
     LLMIntentClassifier,
 )
+from homomics_lab.agent.intent.calibration import (
+    ConfidenceCalibrator,
+    IntentDecisionLogger,
+    IntentDecisionRecord,
+)
 from homomics_lab.agent.intent.models import (
     IntentClassificationResult,
     IntentMatch,
@@ -57,6 +62,8 @@ class CascadeIntentAnalyzer:
         high_confidence_threshold: float = 0.75,
         debate: Optional[LightweightDebate] = None,
         cbkb: Optional[Any] = None,
+        decision_logger: Optional[IntentDecisionLogger] = None,
+        calibrator: Optional[ConfidenceCalibrator] = None,
     ):
         self._definitions = list(definitions or [])
         self.use_domain_registry = use_domain_registry
@@ -68,6 +75,8 @@ class CascadeIntentAnalyzer:
         self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.40)
         self.debate = debate
         self.cbkb = cbkb
+        self.decision_logger = decision_logger if decision_logger is not None else IntentDecisionLogger()
+        self.calibrator = calibrator if calibrator is not None else ConfidenceCalibrator(self.decision_logger)
 
         # Always load built-in intents (qa, general_help, file_conversion) so
         # domain-agnostic requests work even without domain registry.
@@ -290,7 +299,55 @@ class CascadeIntentAnalyzer:
             primary, message, sub_intents=fused.sub_intents, alternatives=fused.alternatives
         )
         self._enrich_with_cbkb(intent, cbkb)
+        self._record_decision(
+            message=message,
+            fused=fused,
+            keyword_matches=keyword_matches,
+            embedding_matches=embedding_matches,
+            llm_matches=llm_matches,
+        )
         return intent
+
+    def _record_decision(
+        self,
+        message: str,
+        fused: IntentClassificationResult,
+        keyword_matches: List[IntentMatch],
+        embedding_matches: List[IntentMatch],
+        llm_matches: List[IntentMatch],
+    ) -> None:
+        """Record the classification decision for observability and calibration."""
+        try:
+            from homomics_lab.metrics import (
+                record_intent_clarification,
+                record_intent_decision,
+                record_intent_low_confidence,
+            )
+
+            primary = fused.primary
+            record_intent_decision(primary.analysis_type, primary.confidence)
+            if fused.needs_clarification:
+                record_intent_clarification(primary.analysis_type)
+            elif primary.confidence < self.high_confidence_threshold:
+                record_intent_low_confidence(primary.analysis_type)
+
+            if self.decision_logger is None:
+                return
+            self.decision_logger.record(
+                IntentDecisionRecord(
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    message=message,
+                    primary_intent=primary.analysis_type,
+                    confidence=primary.confidence,
+                    needs_clarification=fused.needs_clarification,
+                    keyword_scores={m.analysis_type: m.confidence for m in keyword_matches},
+                    embedding_scores={m.analysis_type: m.confidence for m in embedding_matches},
+                    llm_scores={m.analysis_type: m.confidence for m in llm_matches},
+                )
+            )
+        except Exception:
+            # Decision logging must not break intent analysis.
+            pass
 
     def _build_context(
         self,

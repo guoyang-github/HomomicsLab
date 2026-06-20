@@ -1,6 +1,5 @@
 """homomics generate - Generate a domain from natural language (LLM-assisted)."""
 
-import json
 import os
 import sys
 from pathlib import Path

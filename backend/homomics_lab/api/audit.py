@@ -12,7 +12,7 @@ import logging
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Request
 
@@ -24,6 +24,8 @@ class AuditLogger:
     """Singleton audit logger with rotating file output."""
 
     _instance: Optional["AuditLogger"] = None
+    _logger: logging.Logger
+    _configured: bool
 
     def __new__(cls) -> "AuditLogger":
         if cls._instance is None:
@@ -77,6 +79,38 @@ class AuditLogger:
             "client_ip": client_ip,
         }
         self._logger.info(json.dumps(record, default=str))
+
+    def list_for_project(
+        self,
+        project_id: str,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Read audit log entries filtered by project_id.
+
+        Returns the most recent ``limit`` entries for the project. If audit
+        logging is disabled or the log file does not exist, an empty list is
+        returned.
+        """
+        if not settings.audit_log_enabled:
+            return []
+
+        log_path = settings.audit_log_path or Path(settings.data_dir) / "logs" / "audit.log"
+        if not log_path.exists():
+            return []
+
+        records: List[Dict[str, Any]] = []
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("project_id") == project_id:
+                records.append(record)
+
+        return records[-limit:]
 
 
 async def audit_middleware(request: Request, call_next):

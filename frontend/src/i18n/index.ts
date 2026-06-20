@@ -45,6 +45,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'topbar.expandSidebar': 'Expand sidebar',
     'topbar.collapseSidebar': 'Collapse sidebar',
     'topbar.defaultProject': 'Default Project',
+    'topbar.exportROcrate': 'Export RO-Crate',
+    'topbar.exportROcrateFailed': 'Export RO-Crate failed',
 
     // Command Palette
     'commandPalette.newChat': 'New Chat',
@@ -180,6 +182,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'hitl.recommendedAction': 'Recommended action:',
     'hitl.confirmed': 'Action confirmed',
     'hitl.confirmedAction': 'Confirmed: {{label}}',
+    'hitl.rememberMyChoice': 'Remember my choice for similar checkpoints',
 
     // Execution
     'execution.failed': 'Execution failed',
@@ -470,6 +473,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'topbar.expandSidebar': '展开侧边栏',
     'topbar.collapseSidebar': '收起侧边栏',
     'topbar.defaultProject': '默认项目',
+    'topbar.exportROcrate': '导出 RO-Crate',
+    'topbar.exportROcrateFailed': '导出 RO-Crate 失败',
 
     // Command Palette
     'commandPalette.newChat': '新建会话',
@@ -605,6 +610,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'hitl.recommendedAction': '推荐操作：',
     'hitl.confirmed': '已确认操作',
     'hitl.confirmedAction': '已确认：{{label}}',
+    'hitl.rememberMyChoice': '记住我对类似检查点的选择',
 
     // Execution
     'execution.failed': '执行失败',

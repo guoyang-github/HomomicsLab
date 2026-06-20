@@ -785,7 +785,6 @@ class Orchestrator:
         context: Dict[str, Any],
     ) -> Optional[Any]:
         """Build an Interpretation for a completed task."""
-        from homomics_lab.agent.interpretation import Interpretation
 
         output = result
         if isinstance(result, dict) and "output" in result and isinstance(result["output"], dict):

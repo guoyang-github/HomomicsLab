@@ -10,6 +10,8 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from homomics_lab.context.context_engine.models import ContextPart
+
 logger = logging.getLogger(__name__)
 
 

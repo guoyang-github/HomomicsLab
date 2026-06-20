@@ -4,7 +4,6 @@ import pytest
 
 from homomics_lab.agent.base_agent import BaseAgent
 from homomics_lab.agent.core import AgentCore, DynamicAgent, RoleDefinition, RolePermissions, RoleRegistry
-from homomics_lab.agent.agent_registry import AgentRegistry
 from homomics_lab.models.common import AgentType
 
 

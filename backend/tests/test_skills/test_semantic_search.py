@@ -1,4 +1,3 @@
-import pytest
 from homomics_lab.skills.semantic_search import SkillSemanticSearch
 from homomics_lab.skills.models import SkillDefinition
 

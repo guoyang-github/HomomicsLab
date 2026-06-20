@@ -4,6 +4,7 @@ Builds a token-safe, relevance-ranked prompt from layered memory sources.
 """
 
 import logging
+from collections import Counter
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.context.cbkb_retriever import CBKBRetriever
@@ -130,8 +131,9 @@ class ContextEngine:
         if self.semantic_memory is not None:
             try:
                 memories = await self.semantic_memory.search(
-                    query=f"{user_message} project:{project_id}",
+                    query=user_message,
                     top_k=5,
+                    project_id=project_id,
                 )
                 for mem in memories:
                     text = mem.get("text", "")
@@ -176,9 +178,23 @@ class ContextEngine:
             item.source = ContextSource.CHAT
             parts.append(item)
 
+        # Capture source-level token counts before deduplication/compression.
+        source_tokens: Dict[str, int] = Counter()
+        for part in parts:
+            source_tokens[part.source.value] += part.tokens or 0
+
+        before_counts: Dict[str, int] = Counter(p.source.value for p in parts)
+
         # Rank and deduplicate
         parts = self.ranker.deduplicate(parts)
         parts = self.ranker.rank(parts, query=user_message)
+
+        after_counts: Dict[str, int] = Counter(p.source.value for p in parts)
+        dropped_by_duplicate = {
+            source: before_counts[source] - after_counts[source]
+            for source in before_counts
+            if before_counts[source] > after_counts.get(source, 0)
+        }
 
         # Compress to budget
         compressor = DynamicContextCompressor(
@@ -214,6 +230,8 @@ class ContextEngine:
             kept_parts=len(compressed),
             total_parts=len(parts),
             dropped_by_source=dropped_by_source,
+            source_tokens=dict(source_tokens),
+            dropped_by_duplicate=dropped_by_duplicate,
         )
 
         return ContextBundle(messages=messages, metadata=metadata)

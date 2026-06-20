@@ -20,7 +20,6 @@ from homomics_lab.knowledge.cbkb import (
     CBKB,
     ExperimentEdge,
     ExperimentNode,
-    LabSOP,
     ParameterLoreEntry,
 )
 

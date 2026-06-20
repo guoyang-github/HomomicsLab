@@ -8,7 +8,6 @@ key budgets by user_id.
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,6 +44,8 @@ class CostController:
                 CREATE TABLE IF NOT EXISTS llm_costs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     request_id TEXT,
+                    session_id TEXT,
+                    project_id TEXT,
                     model TEXT,
                     prompt_tokens INTEGER,
                     completion_tokens INTEGER,
@@ -70,18 +71,23 @@ class CostController:
         total_tokens: int,
         cost_usd: float,
         request_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> None:
         """Persist an LLM call cost record."""
+        self._ensure_llm_cost_columns()
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.execute(
                 """
                 INSERT INTO llm_costs
-                (request_id, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (request_id, session_id, project_id, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     request_id,
+                    session_id,
+                    project_id,
                     model,
                     prompt_tokens,
                     completion_tokens,
@@ -91,6 +97,20 @@ class CostController:
                 ),
             )
             conn.commit()
+
+    def _ensure_llm_cost_columns(self) -> None:
+        """Add session/project id columns to legacy llm_costs tables."""
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.execute("PRAGMA table_info(llm_costs)")
+                columns = {row[1] for row in cursor.fetchall()}
+                if "session_id" not in columns:
+                    conn.execute("ALTER TABLE llm_costs ADD COLUMN session_id TEXT")
+                if "project_id" not in columns:
+                    conn.execute("ALTER TABLE llm_costs ADD COLUMN project_id TEXT")
+                conn.commit()
+        except Exception:
+            pass
 
     def get_monthly_llm_cost(self) -> float:
         """Return total LLM cost for the current calendar month."""

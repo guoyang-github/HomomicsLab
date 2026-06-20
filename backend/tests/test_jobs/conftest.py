@@ -1,6 +1,5 @@
 """Shared fixtures for the jobs test package."""
 
-import pytest
 import pytest_asyncio
 
 from homomics_lab.database import Base, async_engine

@@ -14,7 +14,6 @@ Usage (MCP protocol):
     results = await client.call_tool("pubmed_search", {"query": "scRNA-seq", "retmax": 5})
 """
 
-import asyncio
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.mcp.tools import BioDatabaseTools

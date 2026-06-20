@@ -1,6 +1,5 @@
 """Tests for Computational Biology Knowledge Base (CBKB)."""
 
-import json
 import pytest
 
 from homomics_lab.knowledge.cbkb import (

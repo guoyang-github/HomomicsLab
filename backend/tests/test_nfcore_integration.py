@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from homomics_lab.config import settings
-from homomics_lab.nfcore_integration import NFCoreManager, NFCorePipeline
+from homomics_lab.nfcore_integration import NFCoreManager
 
 
 @pytest.fixture

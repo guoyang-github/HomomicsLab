@@ -1,7 +1,6 @@
 """Tests for experiment logger and MEMORY.md generation."""
 
 import pytest
-from pathlib import Path
 
 from homomics_lab.context.experiment_logger import ExperimentLogger
 

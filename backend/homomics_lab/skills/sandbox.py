@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
 
 
@@ -44,6 +45,7 @@ class Sandbox(ABC):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        python_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute Python code and return its result dictionary."""
         pass
@@ -57,6 +59,8 @@ class Sandbox(ABC):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        r_executable: Optional[str] = None,
+        r_library_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute R code and return its result dictionary."""
         pass
@@ -72,18 +76,34 @@ class Sandbox(ABC):
         """Run a shell command and return stdout/stderr text."""
         pass
 
+    @abstractmethod
+    def get_metadata(self) -> Dict[str, Any]:
+        """Return metadata about this sandbox backend for provenance."""
+        pass
+
     @staticmethod
-    def create(backend: str, working_dir: Path, container_image: Optional[str] = None) -> "Sandbox":
+    def create(
+        backend: str,
+        working_dir: Path,
+        container_image: Optional[str] = None,
+        exec_type: Optional[str] = None,
+    ) -> "Sandbox":
         """Factory for sandboxes.
 
         Args:
             backend: ``auto``, ``local``, ``bubblewrap``, ``container``.
             working_dir: Directory for inputs/outputs.
             container_image: Image for ``container`` backend.
+            exec_type: ``python`` or ``r``; used to pick a default container image.
         """
         if backend == "auto":
-            for cls in (BubblewrapSandbox, ContainerSandbox, LocalSandbox):
-                candidate = cls(working_dir)
+            # Prefer container isolation when available, then bwrap, then local.
+            for cls in (ContainerSandbox, BubblewrapSandbox, LocalSandbox):
+                candidate = cls(
+                    working_dir,
+                    container_image=container_image,
+                    exec_type=exec_type,
+                )
                 if candidate.is_available():
                     return candidate
             return LocalSandbox(working_dir)
@@ -94,7 +114,11 @@ class Sandbox(ABC):
             "container": ContainerSandbox,
         }
         try:
-            return mapping[backend](working_dir, container_image=container_image)
+            return mapping[backend](
+                working_dir,
+                container_image=container_image,
+                exec_type=exec_type,
+            )
         except KeyError as exc:
             raise ValueError(f"Unknown sandbox backend: {backend}") from exc
 
@@ -102,12 +126,29 @@ class Sandbox(ABC):
 class LocalSandbox(Sandbox):
     """Execute Python or R code in a subprocess with resource limits."""
 
-    def __init__(self, working_dir: Path = None, container_image: Optional[str] = None):
+    def __init__(
+        self,
+        working_dir: Optional[Path] = None,
+        container_image: Optional[str] = None,
+        exec_type: Optional[str] = None,
+    ):
         super().__init__(working_dir or Path(tempfile.mkdtemp()))
 
     @classmethod
     def is_available(cls) -> bool:
         return True
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "backend": "local",
+            "container_image": None,
+            "container_digest": None,
+            "resource_limits": {
+                "memory_mb": 512,
+                "cpu_time_seconds": 60,
+                "file_size_mb": 100,
+            },
+        }
 
     async def run_python(
         self,
@@ -117,6 +158,7 @@ class LocalSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        python_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute Python code in a subprocess with resource limits."""
         inputs_json = json.dumps(inputs)
@@ -126,6 +168,7 @@ class LocalSandbox(Sandbox):
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
+        executable = python_path or "python"
 
         def _set_limits():
             """Set resource limits for the child process."""
@@ -143,7 +186,7 @@ class LocalSandbox(Sandbox):
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
-                "python", str(script_path), inputs_json,
+                executable, str(script_path), inputs_json,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
@@ -188,14 +231,18 @@ class LocalSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        r_executable: Optional[str] = None,
+        r_library_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute R code in a subprocess with resource limits."""
-        script = self._build_r_script(code, inputs)
+        extra_libs = [r_library_path] if r_library_path else []
+        script = self._build_r_script(code, inputs, extra_library_paths=extra_libs)
 
         script_path = self.working_dir / "__skill_script__.R"
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
+        executable = r_executable or "Rscript"
 
         def _set_limits():
             """Set resource limits for the child process."""
@@ -213,7 +260,7 @@ class LocalSandbox(Sandbox):
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
-                "Rscript", str(script_path),
+                executable, str(script_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
@@ -297,7 +344,7 @@ class LocalSandbox(Sandbox):
         stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_lines))
 
         async def _progress_reporter() -> None:
-            if progress_callback is None:
+            if progress_callback is None or proc.stdout is None:
                 return
             while not proc.returncode == 0 and not proc.stdout.at_eof():
                 await asyncio.sleep(1.0)
@@ -393,11 +440,18 @@ with open('__skill_result__.json', 'w') as f:
     json.dump(result, f)
 """
 
-    def _build_r_script(self, code: str, inputs: Dict[str, Any]) -> str:
+    def _build_r_script(
+        self, code: str, inputs: Dict[str, Any], extra_library_paths: Optional[List[str]] = None
+    ) -> str:
         inputs_json = json.dumps(inputs)
+        lib_paths = extra_library_paths or []
+        lib_paths_setup = ""
+        if lib_paths:
+            paths_str = ", ".join(f'"{p}"' for p in lib_paths)
+            lib_paths_setup = f".libPaths(c({paths_str}, .libPaths()))\n"
 
-        return f"""# Load inputs from JSON
-inputs_json <- '{inputs_json}'
+        template = """# Load inputs from JSON
+{lib_paths_setup}inputs_json <- '{inputs_json}'
 
 # Try jsonlite first, fall back to basic parsing
 if (requireNamespace("jsonlite", quietly = TRUE)) {{
@@ -429,6 +483,11 @@ if (requireNamespace("jsonlite", quietly = TRUE)) {{
   writeLines(result_str, "__skill_result__.json")
 }}
 """
+        return template.format(
+            lib_paths_setup=lib_paths_setup,
+            inputs_json=inputs_json.replace("'", "\\'"),
+            code=code,
+        )
 
 
 class BubblewrapSandbox(Sandbox):
@@ -438,13 +497,26 @@ class BubblewrapSandbox(Sandbox):
     the process to a read-only root filesystem and a writable working directory.
     """
 
-    def __init__(self, working_dir: Path, container_image: Optional[str] = None):
+    def __init__(
+        self,
+        working_dir: Path,
+        container_image: Optional[str] = None,
+        exec_type: Optional[str] = None,
+    ):
         super().__init__(working_dir)
         self._bwrap = shutil.which("bwrap")
 
     @classmethod
     def is_available(cls) -> bool:
         return shutil.which("bwrap") is not None
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "backend": "bubblewrap",
+            "container_image": None,
+            "container_digest": None,
+            "bwrap_path": self._bwrap,
+        }
 
     def _base_args(self, cwd: Path) -> List[str]:
         """Build the shared bubblewrap argument list."""
@@ -468,6 +540,7 @@ class BubblewrapSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        python_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         inputs_json = json.dumps(inputs)
         script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
@@ -475,8 +548,9 @@ class BubblewrapSandbox(Sandbox):
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
+        interpreter = python_path if python_path and python_path.startswith("/") else "python"
         args = self._base_args(self.working_dir) + [
-            "python", "/work/__skill_script__.py", inputs_json,
+            interpreter, "/work/__skill_script__.py", inputs_json,
         ]
         return await self._run_in_sandbox(
             args,
@@ -495,14 +569,17 @@ class BubblewrapSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        r_executable: Optional[str] = None,
+        r_library_path: Optional[str] = None,
     ) -> Dict[str, Any]:
-        script = LocalSandbox(self.working_dir)._build_r_script(code, inputs)
+        extra_libs = [r_library_path] if r_library_path else []
+        script = LocalSandbox(self.working_dir)._build_r_script(code, inputs, extra_library_paths=extra_libs)
         script_path = self.working_dir / "__skill_script__.R"
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
         args = self._base_args(self.working_dir) + [
-            "Rscript", "/work/__skill_script__.R",
+            r_executable or "Rscript", "/work/__skill_script__.R",
         ]
         return await self._run_in_sandbox(
             args,
@@ -578,14 +655,57 @@ class ContainerSandbox(Sandbox):
     default ``python:3.10-slim`` image.
     """
 
-    def __init__(self, working_dir: Path, container_image: Optional[str] = None):
+    _digest_cache: Dict[str, Optional[str]] = {}
+
+    def __init__(
+        self,
+        working_dir: Path,
+        container_image: Optional[str] = None,
+        exec_type: Optional[str] = None,
+    ):
         super().__init__(working_dir)
-        self.container_image = container_image or "python:3.10-slim"
+        if container_image is None:
+            if exec_type == "r":
+                container_image = settings.r_container_image
+            else:
+                container_image = settings.skill_container_image
+        self.container_image = container_image
         self._engine = self._detect_engine()
 
     @classmethod
     def is_available(cls) -> bool:
         return cls._detect_engine() is not None
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            "backend": "container",
+            "engine": self._engine,
+            "container_image": self.container_image,
+            "container_digest": self._get_image_digest(),
+            "network": "none",
+        }
+
+    def _get_image_digest(self) -> Optional[str]:
+        """Return the image digest if available, with caching."""
+        if self.container_image in self._digest_cache:
+            return self._digest_cache[self.container_image]
+        digest = None
+        if self._engine is not None:
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    [self._engine, "inspect", "--format", "{{index .RepoDigests 0}}", self.container_image],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    digest = result.stdout.decode().strip() or None
+            except Exception:
+                digest = None
+        self._digest_cache[self.container_image] = digest
+        return digest
 
     @staticmethod
     def _detect_engine() -> Optional[str]:
@@ -602,6 +722,7 @@ class ContainerSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        python_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         inputs_json = json.dumps(inputs)
         script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
@@ -609,8 +730,11 @@ class ContainerSandbox(Sandbox):
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("No container engine available")
         args = [
-            self._engine,
+            engine,
             "run", "--rm",
             "--network", "none",
             "-v", f"{self.working_dir}:/work",
@@ -635,20 +759,25 @@ class ContainerSandbox(Sandbox):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
+        r_executable: Optional[str] = None,
+        r_library_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         script = LocalSandbox(self.working_dir)._build_r_script(code, inputs)
         script_path = self.working_dir / "__skill_script__.R"
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("No container engine available")
         args = [
-            self._engine,
+            engine,
             "run", "--rm",
             "--network", "none",
             "-v", f"{self.working_dir}:/work",
             "-w", "/work",
             self.container_image,
-            "Rscript", "/work/__skill_script__.R",
+            r_executable or "Rscript", "/work/__skill_script__.R",
         ]
         return await self._run_in_container(
             args,
@@ -667,8 +796,11 @@ class ContainerSandbox(Sandbox):
         timeout_seconds: float = 30.0,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("No container engine available")
         args = [
-            self._engine,
+            engine,
             "run", "--rm",
             "--network", "none",
             "-v", f"{run_cwd}:/work",

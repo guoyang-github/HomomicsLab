@@ -2,16 +2,13 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from homomics_lab.reports.generator import ReportGenerator
 from homomics_lab.reports.models import (
     AnalysisReport,
-    AnalysisStep,
     ReportFigure,
-    ReportMetadata,
-    ReportSection,
     ReportTable,
     SectionType,
 )

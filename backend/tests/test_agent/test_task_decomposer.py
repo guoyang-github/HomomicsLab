@@ -4,6 +4,7 @@ from pathlib import Path
 
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.config import settings
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -39,7 +40,8 @@ def _domain_skill_registry() -> SkillRegistry:
 
 
 @pytest.fixture
-def domain_decomposer():
+def domain_decomposer(monkeypatch):
+    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     return TaskDecomposer(skill_registry=_domain_skill_registry())
 
 

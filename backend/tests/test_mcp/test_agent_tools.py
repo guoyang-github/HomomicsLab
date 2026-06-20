@@ -5,7 +5,6 @@ import pytest
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
 from homomics_lab.agent.turn_runner import ExecutionMode, TurnRunner
 from homomics_lab.context.working_memory import WorkingMemory
-from homomics_lab.mcp.client import BioMCPClient
 from homomics_lab.tools.registry import ToolRegistry
 
 

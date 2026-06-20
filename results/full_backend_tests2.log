@@ -1,0 +1,311 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+............................................FF.......................... [ 19%]
+........................................................................ [ 26%]
+...............F........................................................ [ 32%]
+........................................................................ [ 39%]
+........................................................................ [ 45%]
+........................................................................ [ 52%]
+........................................................................ [ 58%]
+........................................................................ [ 65%]
+........................................................................ [ 71%]
+........................................................................ [ 78%]
+........................................................................ [ 84%]
+........................................................................ [ 91%]
+........................................................................ [ 97%]
+...s.....................                                                [100%]
+=================================== FAILURES ===================================
+_______________ test_decompose_single_cell_uses_domain_template ________________
+tests/test_agent/test_task_decomposer.py:131: in test_decompose_single_cell_uses_domain_template
+    assert plan.strategy_name == "single_cell"
+E   AssertionError: assert 'single_cell_standard' == 'single_cell'
+E     
+E     - single_cell
+E     + single_cell_standard
+_______________ test_decompose_sub_intents_uses_domain_template ________________
+tests/test_agent/test_task_decomposer.py:166: in test_decompose_sub_intents_uses_domain_template
+    assert plan.strategy_name == "single_cell"
+E   AssertionError: assert 'single_cell_standard' == 'single_cell'
+E     
+E     - single_cell
+E     + single_cell_standard
+______________ TestProjectRbac.test_member_can_view_after_invite _______________
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:183: in execute
+    self._adapt_connection._handle_exception(error)
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:343: in _handle_exception
+    raise error
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:165: in execute
+    self.await_(_cursor.execute(operation, parameters))
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py:132: in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py:196: in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/cursor.py:40: in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+../.venv/lib/python3.11/site-packages/aiosqlite/cursor.py:32: in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/core.py:160: in _execute
+    return await future
+           ^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/core.py:63: in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+E   sqlite3.OperationalError: no such table: projects
+
+The above exception was the direct cause of the following exception:
+tests/test_api/test_projects_rbac.py:63: in test_member_can_view_after_invite
+    response = client.post(
+../.venv/lib/python3.11/site-packages/starlette/testclient.py:555: in post
+    return super().post(
+../.venv/lib/python3.11/site-packages/httpx/_client.py:1144: in post
+    return self.request(
+../.venv/lib/python3.11/site-packages/starlette/testclient.py:454: in request
+    return super().request(
+../.venv/lib/python3.11/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../.venv/lib/python3.11/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../.venv/lib/python3.11/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/starlette/testclient.py:356: in handle_request
+    raise exc
+../.venv/lib/python3.11/site-packages/starlette/testclient.py:353: in handle_request
+    portal.call(self.app, scope, receive, send)
+../.venv/lib/python3.11/site-packages/anyio/from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+../.venv/lib/python3.11/site-packages/anyio/from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/fastapi/applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+../.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+../.venv/lib/python3.11/site-packages/starlette/middleware/cors.py:88: in __call__
+    await self.app(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+homomics_lab/metrics.py:210: in prometheus_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+homomics_lab/api/audit.py:119: in audit_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+homomics_lab/main.py:107: in security_headers_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+homomics_lab/main.py:99: in correlation_id_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+../.venv/lib/python3.11/site-packages/starlette/middleware/base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+../.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../.venv/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/routing.py:680: in app
+    await route.handle(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/routing.py:276: in handle
+    await self.app(scope, receive, send)
+../.venv/lib/python3.11/site-packages/fastapi/routing.py:134: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+../.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../.venv/lib/python3.11/site-packages/fastapi/routing.py:120: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/fastapi/routing.py:674: in app
+    raw_response = await run_endpoint_function(
+../.venv/lib/python3.11/site-packages/fastapi/routing.py:328: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+homomics_lab/api/projects.py:66: in create_project
+    await db.commit()
+../.venv/lib/python3.11/site-packages/sqlalchemy/ext/asyncio/session.py:999: in commit
+    await greenlet_spawn(self.sync_session.commit)
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py:203: in greenlet_spawn
+    result = context.switch(value)
+             ^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:2034: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:1315: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:1290: in _prepare_impl
+    self.session.flush()
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:4352: in flush
+    self._flush(objects)
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:4487: in _flush
+    with util.safe_reraise():
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py:122: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/session.py:4448: in _flush
+    flush_context.execute()
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py:465: in execute
+    rec.execute(self)
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/unitofwork.py:641: in execute
+    util.preloaded.orm_persistence.save_obj(
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py:94: in save_obj
+    _emit_insert_statements(
+../.venv/lib/python3.11/site-packages/sqlalchemy/orm/persistence.py:1049: in _emit_insert_statements
+    result = connection.execute(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1421: in execute
+    return meth(
+../.venv/lib/python3.11/site-packages/sqlalchemy/sql/elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1643: in _execute_clauseelement
+    ret = self._execute_context(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:2365: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+../.venv/lib/python3.11/site-packages/sqlalchemy/engine/default.py:952: in do_execute
+    cursor.execute(statement, parameters)
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:183: in execute
+    self._adapt_connection._handle_exception(error)
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:343: in _handle_exception
+    raise error
+../.venv/lib/python3.11/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:165: in execute
+    self.await_(_cursor.execute(operation, parameters))
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py:132: in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/sqlalchemy/util/_concurrency_py3k.py:196: in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/cursor.py:40: in execute
+    await self._execute(self._cursor.execute, sql, parameters)
+../.venv/lib/python3.11/site-packages/aiosqlite/cursor.py:32: in _execute
+    return await self._conn._execute(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/core.py:160: in _execute
+    return await future
+           ^^^^^^^^^^^^
+../.venv/lib/python3.11/site-packages/aiosqlite/core.py:63: in _connection_worker_thread
+    result = function()
+             ^^^^^^^^^^
+E   sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: projects
+E   [SQL: INSERT INTO projects (project_id, name, description, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)]
+E   [parameters: ('proj_e2709c9a', 'shared', 'x', 'owner', '2026-06-19 15:50:40.098050', '2026-06-19 15:50:40.098050')]
+E   (Background on this error at: https://sqlalche.me/e/20/e3q8)
+---------------------------- Captured stdout setup -----------------------------
+Loaded 7 domains: ['database', 'genomics', 'mrnaseq', 'paperwriting', 'riboseq', 'single_cell', 'spatial']
+Registered 7 builtin tools
+{"timestamp": "2026-06-19T15:50:40.092860+00:00", "level": "INFO", "logger": "homomics_lab.scheduler", "message": "Scheduler started with 0 jobs", "correlation_id": null, "source": {"pathname": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/scheduler.py", "lineno": 113, "function": "start"}}
+------------------------------ Captured log setup ------------------------------
+INFO     homomics_lab.scheduler:scheduler.py:113 Scheduler started with 0 jobs
+--------------------------- Captured stdout teardown ---------------------------
+{"timestamp": "2026-06-19T15:50:41.905180+00:00", "level": "INFO", "logger": "homomics_lab.scheduler", "message": "Scheduler stopped", "correlation_id": null, "source": {"pathname": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/scheduler.py", "lineno": 119, "function": "shutdown"}}
+---------------------------- Captured log teardown -----------------------------
+INFO     homomics_lab.scheduler:scheduler.py:119 Scheduler stopped
+=============================== warnings summary ===============================
+../.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+backend/tests/test_doctor/test_health.py::test_detailed_health_endpoint
+backend/tests/test_doctor/test_health.py::test_health_checks_structure
+backend/tests/test_doctor/test_health.py::test_health_checker_without_executor
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/doctor/__init__.py:162: FutureWarning: `__version__` is deprecated, use `importlib.metadata.version('scanpy')` instead
+    versions[description] = getattr(mod, "__version__", "unknown")/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/.venv/lib/python3.11/site-packages/_pytest/unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function BaseSubprocessTransport.__del__ at 0x7f8ff7e247c0>
+
+Traceback (most recent call last):
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_subprocess.py", line 126, in __del__
+    self.close()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_subprocess.py", line 104, in close
+    proto.pipe.close()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/unix_events.py", line 566, in close
+    self._close(None)
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/unix_events.py", line 590, in _close
+    self._loop.call_soon(self._call_connection_lost, exc)
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_events.py", line 762, in call_soon
+    self._check_closed()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_events.py", line 520, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+
+Enable tracemalloc to get traceback where the object was allocated.
+See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+  warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+
+backend/tests/test_doctor/test_health.py::test_detailed_health_endpoint
+backend/tests/test_doctor/test_health.py::test_health_checks_structure
+backend/tests/test_doctor/test_health.py::test_health_checker_without_executor
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/doctor/__init__.py:162: FutureWarning: `__version__` is deprecated, use `importlib.metadata.version('anndata')` instead.
+    versions[description] = getattr(mod, "__version__", "unknown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_agent/test_task_decomposer.py::test_decompose_single_cell_uses_domain_template
+FAILED tests/test_agent/test_task_decomposer.py::test_decompose_sub_intents_uses_domain_template
+FAILED tests/test_api/test_projects_rbac.py::TestProjectRbac::test_member_can_view_after_invite
+3 failed, 1101 passed, 1 skipped, 7 warnings in 646.72s (0:10:46)

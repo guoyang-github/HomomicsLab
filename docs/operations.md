@@ -325,6 +325,43 @@ curl -X POST http://localhost:8000/projects/1/lock-versions
 curl http://localhost:8000/projects/1/verify-versions
 ```
 
+### Provenance & RO-Crate Export
+
+HomomicsLab records every skill execution in a provenance database. You can export a project together with its execution provenance as an RO-Crate zip archive for publication, audit, or long-term reproducibility.
+
+```bash
+# Via CLI
+homomics export <project_id> --format rocrate -o ./exports
+
+# Via API
+curl -X POST http://localhost:8000/api/projects/<project_id>/export/rocrate \
+  --output project_rocrate.zip
+```
+
+The exported archive contains `ro-crate-metadata.json` describing the dataset, each recorded execution as a `CreateAction`, and the input/output files referenced by the provenance records.
+
+### Project Audit Log
+
+HTTP requests that include a `project_id` are written to a rotating audit log when `HOMOMICS_AUDIT_LOG_ENABLED=true`. Project members can query recent entries:
+
+```bash
+curl http://localhost:8000/api/projects/<project_id>/audit?limit=50
+```
+
+### Skill Versioning
+
+Skills use semantic versioning (`major.minor.patch`). You can compare two skill definitions programmatically:
+
+```python
+from homomics_lab.skills.versioning import detect_breaking_changes, bump_version
+from homomics_lab.skills.models import SkillDefinition
+
+changes = detect_breaking_changes(old_skill, new_skill)
+new_version = bump_version(old_skill.version, changes)
+```
+
+Breaking changes include removing required inputs, adding new required inputs, removing guaranteed outputs, or changing the runtime language.
+
 ---
 
 ## Running Analyses
@@ -586,6 +623,28 @@ result = execute_skill("my_skill", {
 ```
 ```
 
+### Per-Skill Conda Environments
+
+If a skill requires packages that are easier to manage with conda, place an `environment.yml` next to `requirements.txt` in `scripts/`:
+
+```yaml
+# skills/{skill_id}/scripts/environment.yml
+name: my_skill_env
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - numpy
+  - scanpy
+```
+
+When `conda` or `mamba` is available on `PATH`, `EnvironmentManager` will create or reuse a cached conda prefix from the `environment.yml`. If neither is available, the manager falls back to `requirements.txt` and logs a warning.
+
+### R Container Image
+
+When the sandbox backend is set to `container`, R skills automatically use the image configured in `settings.r_container_image` (default: `r-base:4.3.0`). Python skills continue to use `settings.skill_container_image` (default: `python:3.10-slim`). Set `R_CONTAINER_IMAGE` in your environment or `homomics_lab.toml` to override it.
+
 ### Testing Skills
 
 ```bash
@@ -641,6 +700,22 @@ from homomics_lab.knowledge.curator import run_curation_job
 run_curation_job()
 "
 ```
+
+## Evaluation
+
+### Lightweight Evaluation Harness
+
+`homomics_lab.evaluation.harness` provides a no-framework way to benchmark skills or plans against a JSONL dataset:
+
+```python
+from homomics_lab.evaluation.harness import load_cases, run_evaluation, save_report
+
+cases = load_cases("benchmarks/rnaseq_skill.jsonl")
+report = run_evaluation(cases, evaluator=my_skill_executor)
+save_report(report, "results/rnaseq_report.json")
+```
+
+Each JSONL line must contain ``input`` and ``expected`` keys. For list-valued expectations the harness reports precision, recall, and F1 in addition to pass rate.
 
 ### Accessing Curated Knowledge
 
@@ -927,6 +1002,30 @@ sqlite3 homomics_lab.db ".backup '$BACKUP_DIR/cbkb_backup.db'"
 
 ---
 
+## Progressive Web App & Real-time Collaboration
+
+### PWA / Offline Support
+
+The frontend ships as a Progressive Web App:
+
+- `frontend/public/manifest.json` defines the app metadata and icons.
+- `frontend/public/sw.js` precaches the shell (`index.html`) and serves it as a fallback when the network is unavailable.
+- The service worker is registered from `frontend/src/main.tsx`.
+
+When deployed over HTTPS, users can install HomomicsLab to their home screen and continue viewing previously loaded pages while offline.
+
+### Real-time Collaboration
+
+HomomicsLab includes a lightweight presence channel for shared project workspaces:
+
+- **WebSocket**: `/api/collab/{project_id}/ws?user_id={user_id}` broadcasts cursor positions and editing state to other users in the same project.
+- **REST**: `GET /api/collab/{project_id}/presence` returns the list of active users.
+- The frontend renders remote cursors (`CollabLayer` / `PresenceCursors`) and an active-user indicator in the bottom-right corner.
+
+Presence data is ephemeral and scoped to the running backend process; no persistent session store is required.
+
+---
+
 ## API Quick Reference
 
 ### Chat
@@ -946,6 +1045,8 @@ sqlite3 homomics_lab.db ".backup '$BACKUP_DIR/cbkb_backup.db'"
 | GET | `/projects/{id}` | Get project details |
 | POST | `/projects/{id}/lock-versions` | Lock environment versions |
 | GET | `/projects/{id}/verify-versions` | Verify environment |
+| POST | `/projects/{id}/export/rocrate` | Export project + provenance as RO-Crate zip |
+| GET | `/projects/{id}/audit` | Project audit log |
 
 ### Skills
 
@@ -970,12 +1071,44 @@ sqlite3 homomics_lab.db ".backup '$BACKUP_DIR/cbkb_backup.db'"
 | POST | `/api/nfcore/run` | Run an nf-core pipeline |
 | GET | `/api/nfcore/status/{run_id}` | Get pipeline run status |
 
+### Collaboration
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| WS | `/api/collab/{project_id}/ws` | Presence / cursor broadcast channel |
+| GET | `/api/collab/{project_id}/presence` | List active users in a project |
+
 ### Health
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | System health check |
 | GET | `/metrics` | Prometheus metrics |
+
+---
+
+## Development & CI
+
+The repository uses GitHub Actions (`.github/workflows/ci.yml`) to run:
+
+- Backend unit tests with coverage (`pytest backend/tests/`).
+- `ruff` linting across `backend/homomics_lab` and `backend/tests`.
+- `mypy` type checking (informational).
+- Frontend tests (`npm test -- --run`) and production build (`npm run build`).
+- Backend Docker image build and smoke test.
+
+Local quick checks:
+
+```bash
+# Backend
+cd backend
+../.venv/bin/python -m pytest tests/ -q
+
+# Frontend
+cd frontend
+npm test -- --run
+npm run build
+```
 
 ---
 

@@ -1,7 +1,6 @@
 """Report generator for bioinformatics analysis pipelines."""
 
 import uuid
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.viz.generator import PlotGenerator, PlotType

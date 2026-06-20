@@ -1,6 +1,5 @@
 """Tests for Plotly JSON adapter."""
 
-import pytest
 from homomics_lab.viz.plotly_adapter import to_plotly_json
 from homomics_lab.viz.generator import PlotType
 

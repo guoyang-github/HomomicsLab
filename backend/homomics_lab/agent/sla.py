@@ -132,7 +132,7 @@ class SLAEngine:
             )
 
         # Cost estimate (rough upper bound).
-        snapshot = self.cost_controller.get_snapshot()
+        self.cost_controller.get_snapshot()
         llm_cost = self._estimate_llm_cost(complexity, has_template)
         compute_cost = self._estimate_compute_cost(analysis_type)
         risks = self._risks_for(analysis_type, missing)

@@ -1,12 +1,14 @@
-from typing import List
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import List
+
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
 
 from homomics_lab.api.auth import get_current_user
 from homomics_lab.database.connection import get_async_session
@@ -16,6 +18,10 @@ from homomics_lab.projects.permissions import (
     add_project_member,
     require_project_permission,
 )
+from homomics_lab.api.audit import AuditLogger
+from homomics_lab.config import settings
+from homomics_lab.provenance.recorder import ProvenanceRecorder
+from homomics_lab.provenance.rocrate import ROCrateExporter
 from homomics_lab.security import validate_project_id
 
 router = APIRouter()
@@ -153,6 +159,43 @@ async def export_project(
     )
 
 
+@router.post("/{project_id}/export/rocrate")
+async def export_project_rocrate(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Export a project and its provenance as an RO-Crate zip archive."""
+    try:
+        validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
+
+    result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    recorder = ProvenanceRecorder()
+    provenance_records = recorder.list_by_project(project_id)
+
+    crate_dir = Path(settings.data_dir) / "exports" / f"{project_id}_rocrate"
+    crate_dir.mkdir(parents=True, exist_ok=True)
+    exporter = ROCrateExporter(crate_dir)
+    exporter.export(project_id, provenance_records)
+
+    zip_path = crate_dir.with_suffix(".zip")
+    shutil.make_archive(str(crate_dir), "zip", root_dir=crate_dir)
+
+    return FileResponse(
+        path=zip_path,
+        media_type="application/zip",
+        filename=f"{project_id}_rocrate.zip",
+    )
+
+
 @router.post("/import")
 async def import_project(
     file: UploadFile = File(...),
@@ -232,3 +275,15 @@ async def list_members(
         MemberResponse(project_id=m.project_id, user_id=m.user_id, role=m.role)
         for m in members
     ]
+
+
+@router.get("/{project_id}/audit")
+async def get_project_audit_log(
+    project_id: str,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Return recent audit log entries for a project."""
+    await require_project_permission(project_id, "read", db, user_id)
+    return {"project_id": project_id, "entries": AuditLogger().list_for_project(project_id, limit=limit)}

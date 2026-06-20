@@ -1,8 +1,7 @@
 """HTML/Markdown report templates."""
 
-import base64
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, List
 
 from .models import AnalysisReport, ReportFigure, ReportSection, ReportTable
 
@@ -290,7 +289,6 @@ class ReportTemplateEngine:
             parts.append('<h2>Analysis Pipeline</h2>')
             parts.append('<div class="timeline">')
             for step in report.analysis_steps:
-                status_class = f"status-{step.status}" if step.status else ""
                 badge_class = f"badge-{step.status}" if step.status else ""
                 badge_text = step.status.upper() if step.status else ""
                 duration = f"{step.duration_seconds:.1f}s" if step.duration_seconds else ""

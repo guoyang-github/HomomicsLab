@@ -1,7 +1,6 @@
 """Tests for project export/import."""
 
 import zipfile
-from pathlib import Path
 
 import pytest
 

@@ -87,7 +87,6 @@ class DataStore:
             raw = json.dumps(data, default=str).encode("utf-8")
         except Exception as exc:
             if settings.allow_pickle_serialization:
-                import pickle
                 return self._store_pickle(task_id, data, reason=str(exc))
             raise ValueError(
                 "Result is not JSON-serializable and pickle serialization is disabled. "
@@ -115,7 +114,6 @@ class DataStore:
         )
 
     def _store_dataframe(self, task_id: str, df) -> ResultReference:
-        import pandas as pd
 
         path = self._artifact_path(task_id, "parquet")
         df.to_parquet(path, index=False)

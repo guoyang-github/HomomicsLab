@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import AsyncIterator, Callable, Optional, Protocol
 
+from homomics_lab.hpc.state import ExecutionState
+
 
 class QueueBackend(Protocol):
     """FIFO queue that only holds job references (job_ids)."""

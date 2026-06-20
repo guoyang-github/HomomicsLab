@@ -16,6 +16,7 @@ from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import SemanticMemory
 from homomics_lab.context.session_store import SQLiteSessionStore
+from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.database import Base, async_engine
 from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
@@ -24,6 +25,7 @@ from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.builtin import register_builtin_skills
 from homomics_lab.skills.loader import SkillLoader
+from homomics_lab.llm.cache import LLMResponseCache
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.skill_dag import SkillDAG
@@ -135,13 +137,28 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # Schema validation
     schema_validator = SchemaValidator()
 
+    # Provenance recorder for reproducibility
+    provenance_recorder = ProvenanceRecorder()
+
+    # Shared LLM response cache
+    llm_cache = (
+        LLMResponseCache(
+            ttl_seconds=settings.llm_response_cache_ttl_seconds,
+            max_entries=settings.llm_response_cache_max_entries,
+            persist_dir=settings.llm_response_cache_dir,
+        )
+        if settings.llm_response_cache_enabled
+        else None
+    )
+
     # Skills runtime
     tracker = SkillPerformanceTracker()
-    llm_client = LLMClient()
+    llm_client = LLMClient(cache=llm_cache)
     skill_executor = SkillRuntimeExecutor(
         tracker=tracker,
         tool_registry=tool_registry,
         llm_client=llm_client,
+        provenance_recorder=provenance_recorder,
     )
 
     # SkillStore manages skill lifecycle (import / enable / disable / lock)
@@ -314,4 +331,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "cbkb": cbkb,
         "context_engine": context_engine,
         "project_state_manager": project_state_manager,
+        "provenance_recorder": provenance_recorder,
+        "llm_cache": llm_cache,
     }

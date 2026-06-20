@@ -1,5 +1,4 @@
 import pytest
-import json
 from pathlib import Path
 
 from homomics_lab.skills.sandbox import LocalSandbox

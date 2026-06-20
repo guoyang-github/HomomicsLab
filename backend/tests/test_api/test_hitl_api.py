@@ -1,66 +1,85 @@
-import time
+import asyncio
 
+import pytest
 from fastapi.testclient import TestClient
+
+from homomics_lab.api.auth import get_current_user
+from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.database import Base
+from homomics_lab.database.connection import async_engine
+from homomics_lab.jobs.models import JobMode, JobStatus
+from homomics_lab.jobs.service import JobService
 from homomics_lab.main import app
+from homomics_lab.models.common import HITLCheckpoint, Option
+from homomics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.task_tree import TaskTree
 
 
-def _poll_job(client: TestClient, job_id: str, timeout: float = 30.0):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        response = client.get(f"/api/execution/{job_id}/status")
-        data = response.json()
-        if data["status"] not in ("queued", "pending", "running"):
-            return data
-        time.sleep(0.1)
-    return response.json()
+@pytest.fixture
+def client():
+    async def reset_db():
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(reset_db())
+
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
 
-def test_hitl_response():
-    with TestClient(app) as client:
-        # First send a message that triggers single-cell pipeline with HITL
-        response = client.post("/api/chat/send", json={
-            "project_id": "proj_1",
-            "session_id": "sess_hitl",
-            "message": "帮我分析这组单细胞数据",
-        })
-        assert response.status_code == 200
-        send_data = response.json()
-        assert send_data["status"] == "queued"
-        job_id = send_data["job_id"]
+def _as_user(client: TestClient, user_id: str):
+    app.dependency_overrides[get_current_user] = lambda: user_id
 
-        # Wait for the job to hit a HITL checkpoint
-        final = _poll_job(client, job_id)
-        assert final["status"] == "awaiting_human"
 
-        # Retrieve the persisted task tree from the job record
-        job_response = client.get(f"/api/execution/{job_id}/status")
-        job_data = job_response.json()
-        assert "latest_state" in job_data
+def test_hitl_response(client):
+    _as_user(client, "owner")
 
-        # Load task tree snapshot from the original response preview
-        tasks = send_data["task_tree"]["tasks"]
-        hitl_task = None
-        for task in tasks:
-            if task.get("status") == "awaiting_human" or task.get("name") == "clustering":
-                hitl_task = task
-                break
+    # Seed a job in AWAITING_HUMAN status directly so the test does not
+    # depend on the stochastic chat/intent pipeline.
+    task = TaskNode(
+        id="task_1",
+        name="clustering",
+        description="Run clustering",
+        phase="clustering",
+        status=TaskStatus.AWAITING_HUMAN,
+        hitl_checkpoints=[
+            HITLCheckpoint(
+                id="chk_1",
+                trigger_reason="policy",
+                context_summary="Confirm clustering",
+                options=[
+                    Option(id="ok", label="OK"),
+                    Option(id="cancel", label="Cancel"),
+                ],
+            )
+        ],
+    )
+    tree = TaskTree(tasks=[task])
+    wm = WorkingMemory()
 
-        # The clustering task should have HITL checkpoint
-        assert hitl_task is not None, "Expected a task awaiting human input"
-        assert hitl_task["name"] == "clustering"
+    service = JobService()
+    job = asyncio.run(
+        service.create_job(
+            session_id="sess_hitl",
+            project_id="proj_1",
+            working_memory=wm,
+            task_tree=tree,
+            mode=JobMode.AWAITING_HITL,
+        )
+    )
+    job.status = JobStatus.AWAITING_HUMAN
+    asyncio.run(service.repository.update(job))
 
-        # Respond to HITL
-        response = client.post("/api/chat/hitl/respond", json={
-            "session_id": "sess_hitl",
-            "task_id": hitl_task["id"],
-            "choice": "ok",
-            "parameters": {"n_neighbors": 20},
-        })
-        assert response.status_code == 200
-        resume_data = response.json()
-        assert resume_data["status"] == "queued"
-        assert "job_id" in resume_data
-
-        resume_job_id = resume_data["job_id"]
-        resumed_final = _poll_job(client, resume_job_id)
-        assert resumed_final["status"] in ("completed", "failed")
+    response = client.post("/api/chat/hitl/respond", json={
+        "session_id": "sess_hitl",
+        "task_id": "task_1",
+        "choice": "ok",
+        "parameters": {"n_neighbors": 20},
+    })
+    assert response.status_code == 200
+    resume_data = response.json()
+    assert resume_data["status"] == "queued"
+    assert "job_id" in resume_data

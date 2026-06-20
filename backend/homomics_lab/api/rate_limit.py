@@ -12,7 +12,7 @@ import time
 from collections import deque
 from typing import Dict, Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 from homomics_lab.config import settings
 
@@ -71,8 +71,15 @@ def update_limiter_config() -> None:
     _rate_limiter.max_requests = settings.rate_limit_requests_per_minute
 
 
-def rate_limit_dependency(request: Request) -> None:
-    """FastAPI dependency that applies rate limiting to a route."""
+def rate_limit_dependency(request: Request = None) -> None:  # type: ignore[assignment]
+    """FastAPI dependency that applies rate limiting to a route.
+
+    WebSocket connections are skipped because they are long-lived and have
+    their own backpressure logic. When ``request`` is not provided (e.g. for
+    WebSocket routes) the dependency returns immediately.
+    """
+    if request is None or request.scope.get("type") == "websocket":
+        return
     _rate_limiter.check_request(request)
 
 

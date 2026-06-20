@@ -10,7 +10,7 @@ Checks:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
+from homomics_lab.agent.plan.models import DataState, PlanResult
 from homomics_lab.skills.registry import SkillRegistry
 
 

@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 
 from homomics_lab.skills.evolution import SkillEvolution
 

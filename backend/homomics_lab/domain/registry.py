@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from homomics_lab.domain.loader import DomainLoader, DomainLoaderError
+from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.models import DomainDefinition
 
 

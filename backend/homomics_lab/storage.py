@@ -12,8 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import BinaryIO, Optional, Union
-from urllib.parse import urlparse
+from typing import Optional, Union
 
 from homomics_lab.config import settings
 

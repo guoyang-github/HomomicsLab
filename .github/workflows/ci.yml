@@ -24,6 +24,23 @@ jobs:
       - name: Run tests with coverage
         run: pytest backend/tests/ -q --tb=short --cov=backend/homomics_lab --cov-report=term-missing --cov-fail-under=70
 
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev,test]"
+      - name: Run ruff
+        run: ruff check backend/homomics_lab backend/tests
+      - name: Run mypy
+        continue-on-error: true
+        run: mypy backend/homomics_lab
+
   backend-docker:
     runs-on: ubuntu-latest
     steps:
@@ -49,5 +66,7 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: npm ci
+      - name: Run tests
+        run: npm test -- --run
       - name: Build
         run: npm run build

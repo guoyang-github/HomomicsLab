@@ -3,12 +3,11 @@
 import json
 import sqlite3
 import uuid
-from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.knowledge.cbkb import CBKB, SkillEvolutionRecord
-from homomics_lab.skills.skill_dag import EdgeStatus, EdgeType, SkillDAG
+from homomics_lab.skills.skill_dag import EdgeStatus, SkillDAG
 
 
 class SkillDAGMiner:

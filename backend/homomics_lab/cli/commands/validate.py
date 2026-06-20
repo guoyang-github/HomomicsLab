@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from homomics_lab.domain.loader import DomainLoader, DomainLoaderError
+from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.models import DomainDefinition
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.agent.plan.strategies import StrategyLibrary
@@ -25,7 +25,7 @@ def validate_domain(args):
         domain = DomainDefinition(**data)
         print(f"Syntax: OK ({domain.domain} v{domain.version})")
     except Exception as e:
-        print(f"Syntax: FAILED")
+        print("Syntax: FAILED")
         print(f"  {e}")
         sys.exit(1)
 
@@ -56,7 +56,7 @@ def validate_domain(args):
             print("Validation: OK")
 
     except Exception as e:
-        print(f"Validation: ERROR")
+        print("Validation: ERROR")
         print(f"  {e}")
         if args.strict:
             sys.exit(1)

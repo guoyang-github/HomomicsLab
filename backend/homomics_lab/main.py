@@ -1,12 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from homomics_lab.api.audit import audit_middleware
-from homomics_lab.api.auth import require_auth
-from homomics_lab.api.rate_limit import rate_limit_dependency, update_limiter_config
+from homomics_lab.api.rate_limit import update_limiter_config
 from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context
 from homomics_lab.config import settings
@@ -43,6 +42,9 @@ async def lifespan(app: FastAPI):
     app.state.memory_manager = ctx["memory_manager"]
     app.state.context_engine = ctx["context_engine"]
     app.state.project_state_manager = ctx["project_state_manager"]
+    app.state.llm_client = ctx["llm_client"]
+    app.state.provenance_recorder = ctx["provenance_recorder"]
+    app.state.llm_cache = ctx["llm_cache"]
 
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
     cbkb = ctx["cbkb"]
@@ -117,13 +119,10 @@ app.middleware("http")(audit_middleware)
 app.middleware("http")(prometheus_middleware)
 
 
-# Rate limiting applies globally. In production this should be backed by Redis.
+# Rate limiting and auth are applied at the API-router level so that
+# long-lived WebSocket routes are not forced through HTTP-only dependencies.
 update_limiter_config()
-# Auth is opt-in; when disabled get_current_user returns "anonymous" transparently.
-app.include_router(
-    api_router,
-    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
-)
+app.include_router(api_router)
 
 # CORS: default to localhost for development; override via environment for production.
 _allow_origins = getattr(settings, "cors_origins", None) or [

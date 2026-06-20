@@ -6,6 +6,8 @@ from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer as IntentAn
 from homomics_lab.agent.sla import SLAEngine
 from homomics_lab.agent.turn_runner import TurnRunner
 from homomics_lab.context.memory_manager import MemoryManager
+from homomics_lab.hitl.nlu import HITLNLUParser
+from homomics_lab.hitl.preference_resolver import HITLPreferenceResolver
 from homomics_lab.jobs import JobService, JobStatus
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.plan import PlanPresenter, PlanStore
@@ -38,6 +40,7 @@ class HITLResponseRequest(BaseModel):
     task_id: str
     choice: str
     parameters: Dict[str, Any] = {}
+    remember: bool = False
 
 
 class HITLResponseResponse(BaseModel):
@@ -167,6 +170,48 @@ async def respond_to_hitl(
     )
     if job is None:
         raise HTTPException(status_code=404, detail="No awaiting HITL job found")
+    if job.working_memory is None or job.task_tree is None:
+        raise HTTPException(status_code=500, detail="HITL job is missing required context")
+
+    choice = request.choice
+    parameters = request.parameters
+
+    # Find the checkpoint attached to the target task.
+    checkpoint = None
+    if job.task_tree is not None:
+        for task in job.task_tree.tasks:
+            if task.id == request.task_id and task.hitl_checkpoints:
+                checkpoint = task.hitl_checkpoints[0].model_dump()
+                break
+    if checkpoint is None:
+        checkpoint = getattr(job, "hitl_checkpoint", None)
+
+    # Natural-language fallback: if the choice does not match a known option,
+    # attempt to parse it as free text.
+    if checkpoint is not None:
+        option_ids = {str(o.get("id", "")) for o in checkpoint.get("options", [])}
+        if choice not in option_ids:
+            parsed = HITLNLUParser.parse(
+                choice,
+                checkpoint.get("options", []),
+                parameters,
+            )
+            if parsed["choice"]:
+                choice = parsed["choice"]
+                parameters = {**parameters, **parsed.get("parameters", {})}
+
+        # Record the resolved choice as a learned preference when requested.
+        if request.remember and checkpoint is not None:
+            preference_store = getattr(http_request.app.state, "preference_store", None)
+            if preference_store is not None:
+                resolver = HITLPreferenceResolver(preference_store)
+                resolver.record_resolution(
+                    project_id=job.project_id,
+                    checkpoint=checkpoint,
+                    choice=choice,
+                    parameters=parameters,
+                    remember=True,
+                )
 
     resume_job = await job_service.create_resume_job(
         session_id=request.session_id,
@@ -174,8 +219,8 @@ async def respond_to_hitl(
         working_memory=job.working_memory,
         task_tree=job.task_tree,
         task_id=request.task_id,
-        choice=request.choice,
-        parameters=request.parameters,
+        choice=choice,
+        parameters=parameters,
     )
 
     return HITLResponseResponse(
@@ -261,11 +306,13 @@ async def respond_to_debate(
 async def chat_websocket(websocket: WebSocket, session_id: str):
     """Realtime chat WebSocket.
 
-    Receives JSON messages of the form ``{"project_id": "...", "message": "..."}``
-    and pushes back the agent reply together with any plot attachments.
+    Receives JSON messages of the form ``{"project_id": "...", "message": "...", "stream": true}``
+    and pushes back the agent reply together with any plot attachments. When
+    ``stream`` is true the raw LLM tokens are streamed directly.
     """
     await websocket.accept()
     memory_manager: MemoryManager = websocket.app.state.memory_manager
+    llm_client = getattr(websocket.app.state, "llm_client", None)
     runner = TurnRunner(
         memory_manager=memory_manager,
         cbkb=getattr(websocket.app.state, "cbkb", None),
@@ -278,6 +325,23 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             data = await websocket.receive_json()
             project_id = data.get("project_id", "default")
             raw_message = data.get("message", "")
+
+            # Stream raw LLM tokens for direct user queries
+            if data.get("stream") and llm_client is not None:
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful bioinformatics assistant.",
+                    },
+                    {"role": "user", "content": raw_message},
+                ]
+                try:
+                    async for token in llm_client.chat_completion_stream(messages=messages):
+                        await websocket.send_json({"type": "token", "token": token})
+                    await websocket.send_json({"type": "token", "done": True})
+                except Exception as exc:
+                    await websocket.send_json({"type": "error", "error": str(exc)})
+                continue
 
             skill_executor = getattr(websocket.app.state, "skill_executor", None)
             user_message = await resolve_chat_references(

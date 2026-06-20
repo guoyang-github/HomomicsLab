@@ -1,7 +1,6 @@
 """Tests for report generator."""
 
 import pytest
-from datetime import datetime
 
 from homomics_lab.reports.generator import ReportGenerator
 from homomics_lab.reports.models import (

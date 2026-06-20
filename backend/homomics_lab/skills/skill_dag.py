@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
 
 import yaml
 
@@ -90,7 +89,8 @@ class SkillDAG:
     Core operations:
       - search(): semantic + graph-neighbor retrieval
       - get_conflicts(), get_alternatives(): relationship queries
-      - propose_edge(), record_execution(): runtime evolution
+      - propose_edge(), record_execution(), record_observation(): runtime evolution
+      - propose_schema_edges(), SkillDAGReconciler: batch inference and conflict resolution
       - validate_sequence(): check a skill sequence for conflicts
     """
 
@@ -482,24 +482,47 @@ class SkillDAG:
         from_skill: Optional[str],
         to_skill: str,
         success: bool,
+        edge_type: EdgeType = EdgeType.FOLLOWED_BY,
+        context: str = "",
     ) -> None:
         """Record an execution observation to evolve edge confidence.
 
-        If from_skill → to_skill was observed, propose or reinforce a followed_by edge.
+        If from_skill → to_skill was observed, propose or reinforce an edge of
+        the given type (followed_by by default).
         """
         if from_skill is None:
             return
 
-        edge_id = f"{from_skill}_{EdgeType.FOLLOWED_BY.value}_{to_skill}"
+        self.record_observation(from_skill, to_skill, edge_type, success, context)
+
+    def record_observation(
+        self,
+        skill_a: str,
+        skill_b: str,
+        edge_type: EdgeType,
+        success: bool,
+        context: str = "",
+    ) -> SkillDAGEdge:
+        """Record a typed observation and update edge confidence.
+
+        Works for all edge types (DEPENDS_ON, CONFLICTS_WITH, ALTERNATIVE_TO,
+        PRODUCES, FOLLOWED_BY, SPECIALIZES).  The edge is created as a
+        CANDIDATE if it does not exist, then reinforced or penalized based on
+        the observed outcome.
+        """
+        edge_id = f"{skill_a}_{edge_type.value}_{skill_b}"
         edge = self.edges.get(edge_id)
 
         if edge is None:
+            default_context = context or f"Observed: success={success}"
             edge = self.propose_edge(
-                from_skill=from_skill,
-                to_skill=to_skill,
-                edge_type=EdgeType.FOLLOWED_BY,
-                context=f"Observed in execution flow: success={success}",
+                from_skill=skill_a,
+                to_skill=skill_b,
+                edge_type=edge_type,
+                context=default_context,
             )
+        elif context:
+            edge.context = context
 
         edge.execution_count += 1
         if success:
@@ -512,14 +535,34 @@ class SkillDAG:
         edge.last_validated = datetime.now(timezone.utc).isoformat()
         self._transition_status(edge)
         self._persist_edge(edge)
+        return edge
 
     def _transition_status(self, edge: SkillDAGEdge) -> None:
         """Transition edge status based on confidence and execution stats."""
+        # Type-specific thresholds for promotion to CONFIRMED.
+        threshold_executions = {
+            EdgeType.FOLLOWED_BY: 5,
+            EdgeType.DEPENDS_ON: 8,
+            EdgeType.PRODUCES: 6,
+            EdgeType.ALTERNATIVE_TO: 7,
+            EdgeType.CONFLICTS_WITH: 6,
+            EdgeType.SPECIALIZES: 8,
+        }
+        min_success_rate = {
+            EdgeType.FOLLOWED_BY: 0.8,
+            EdgeType.DEPENDS_ON: 0.85,
+            EdgeType.PRODUCES: 0.8,
+            EdgeType.ALTERNATIVE_TO: 0.75,
+            EdgeType.CONFLICTS_WITH: 0.7,
+            EdgeType.SPECIALIZES: 0.8,
+        }
+
         if edge.status == EdgeStatus.CANDIDATE:
-            min_executions = 5 if edge.edge_type == EdgeType.FOLLOWED_BY else 10
+            min_executions = threshold_executions.get(edge.edge_type, 10)
+            min_rate = min_success_rate.get(edge.edge_type, 0.8)
             if (
                 edge.execution_count >= min_executions
-                and edge.success_count / max(edge.execution_count, 1) >= 0.8
+                and edge.success_count / max(edge.execution_count, 1) >= min_rate
                 and edge.confidence >= 0.7
             ):
                 edge.status = EdgeStatus.CONFIRMED
@@ -570,6 +613,72 @@ class SkillDAG:
 
         return inferred
 
+    def propose_schema_edges(self, overlap_threshold: float = 0.5) -> List[SkillDAGEdge]:
+        """Infer PRODUCES / DEPENDS_ON edges by comparing skill schemas.
+
+        For every ordered pair of skills, compute a Jaccard-like overlap score
+        between the property names and descriptions of ``skill_a.output_schema``
+        and ``skill_b.input_schema``.  If the score exceeds the threshold, a
+        PRODUCES edge is proposed (and equivalently a DEPENDS_ON edge in the
+        reverse direction).
+        """
+        skills = self.registry.list_all()
+        proposed: List[SkillDAGEdge] = []
+
+        def _schema_tokens(skill: SkillDefinition, is_output: bool):
+            schema = skill.output_schema if is_output else skill.input_schema
+            tokens: set[str] = set()
+            for name, prop in schema.properties.items():
+                tokens.add(name.lower())
+                desc = ""
+                if isinstance(prop, dict):
+                    desc = prop.get("description", "")
+                elif hasattr(prop, "description"):
+                    desc = getattr(prop, "description", "") or ""
+                tokens.update(w for w in desc.lower().split() if len(w) > 2)
+            return tokens
+
+        for skill_a in skills:
+            output_tokens = _schema_tokens(skill_a, is_output=True)
+            if not output_tokens:
+                continue
+            for skill_b in skills:
+                if skill_a.id == skill_b.id:
+                    continue
+                input_tokens = _schema_tokens(skill_b, is_output=False)
+                if not input_tokens:
+                    continue
+                intersection = output_tokens & input_tokens
+                union = output_tokens | input_tokens
+                score = len(intersection) / len(union) if union else 0.0
+                if score > overlap_threshold:
+                    edge = self.propose_edge(
+                        from_skill=skill_a.id,
+                        to_skill=skill_b.id,
+                        edge_type=EdgeType.PRODUCES,
+                        context=(
+                            f"Schema inference: output/input overlap score={score:.2f}"
+                        ),
+                        proposed_by="schema_inference",
+                    )
+                    edge.schema_compatibility_score = score
+                    self._persist_edge(edge)
+                    proposed.append(edge)
+
+                    # Reverse direction as DEPENDS_ON.
+                    dep_edge = self.propose_edge(
+                        from_skill=skill_b.id,
+                        to_skill=skill_a.id,
+                        edge_type=EdgeType.DEPENDS_ON,
+                        context=f"Schema inference reverse: depends on {skill_a.id} output",
+                        proposed_by="schema_inference",
+                    )
+                    dep_edge.schema_compatibility_score = score
+                    self._persist_edge(dep_edge)
+                    proposed.append(dep_edge)
+
+        return proposed
+
     def get_confirmed_edges(
         self,
         min_confidence: float = 0.7,
@@ -592,3 +701,84 @@ class SequenceValidationResult:
     valid: bool
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+
+
+class SkillDAGReconciler:
+    """Resolve conflicts between SkillDAG edges.
+
+    When contradictory edges exist between the same pair of skills
+    (e.g. a CONFIRMED DEPENDS_ON and a CANDIDATE CONFLICTS_WITH), prefer the
+    stronger edge according to status, confidence, and source authority, and
+    mark the weaker edge as REJECTED.
+    """
+
+    # Authority ranking for edge sources.
+    _SOURCE_AUTHORITY = {
+        "manual_seed": 3,
+        "domain_seed": 2,
+        "runtime_proposal": 1,
+        "history_mining": 1,
+        "schema_inference": 0,
+        "community": 0,
+        "unknown": 0,
+    }
+
+    _STATUS_RANK = {
+        EdgeStatus.CONFIRMED: 3,
+        EdgeStatus.CANDIDATE: 2,
+        EdgeStatus.DEPRECATED: 1,
+        EdgeStatus.REJECTED: 0,
+    }
+
+    def reconcile(self, edges: List[SkillDAGEdge]) -> List[SkillDAGEdge]:
+        """Reconcile a list of edges, marking losers as REJECTED.
+
+        Operates on a copy so the input list is not mutated.
+        """
+        edge_map: Dict[str, SkillDAGEdge] = {}
+        for edge in edges:
+            key = (edge.from_skill, edge.to_skill)
+            existing = edge_map.get(key)
+            if existing is None or self._edge_strength(edge) > self._edge_strength(existing):
+                edge_map[key] = edge
+
+        accepted_ids = {edge.id for edge in edge_map.values()}
+        reconciled: List[SkillDAGEdge] = []
+        for edge in edges:
+            new_edge = edge
+            if edge.id not in accepted_ids and edge.status != EdgeStatus.REJECTED:
+                new_edge = self._copy_edge(edge)
+                new_edge.status = EdgeStatus.REJECTED
+                new_edge.context = "Reconciled: weaker than conflicting edge"
+            reconciled.append(new_edge)
+
+        return reconciled
+
+    def _edge_strength(self, edge: SkillDAGEdge) -> Tuple[int, float, int]:
+        """Return a comparable strength tuple (status, confidence, source)."""
+        status_rank = self._STATUS_RANK.get(edge.status, 0)
+        source_rank = self._SOURCE_AUTHORITY.get(edge.source, 0)
+        return (status_rank, edge.confidence, source_rank)
+
+    @staticmethod
+    def _copy_edge(edge: SkillDAGEdge) -> SkillDAGEdge:
+        """Create a shallow copy of an edge."""
+        new_edge = SkillDAGEdge(
+            id=edge.id,
+            from_skill=edge.from_skill,
+            to_skill=edge.to_skill,
+            edge_type=edge.edge_type,
+            confidence=edge.confidence,
+            status=edge.status,
+            source=edge.source,
+            proposed_by=edge.proposed_by,
+            execution_count=edge.execution_count,
+            success_count=edge.success_count,
+            failure_count=edge.failure_count,
+            last_validated=edge.last_validated,
+            context=edge.context,
+            schema_compatibility_score=edge.schema_compatibility_score,
+            created_at=edge.created_at,
+            updated_at=edge.updated_at,
+        )
+        return new_edge

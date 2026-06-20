@@ -16,7 +16,6 @@ class _FakeSessionStore(SessionStore):
         self._data = {}
 
     async def get(self, session_id: str):
-        from homomics_lab.context.session_store import SessionState
         return self._data.get(session_id)
 
     async def save(self, state) -> None:
@@ -77,16 +76,17 @@ async def test_run_turn_calls_enrich_context_and_persist_turn(
     # Should complete successfully (direct response for QA)
     assert result.mode == ExecutionMode.DIRECT_RESPONSE
 
-    # enrich_context triggers semantic_memory.search
-    semantic_memory.search.assert_awaited_once()
-    call_args = semantic_memory.search.await_args
-    assert "project:proj_1" in call_args[0][0]
+    # enrich_context triggers semantic_memory.search (memory snippets + preferences)
+    assert semantic_memory.search.await_count == 2
+    search_calls = semantic_memory.search.await_args_list
+    project_calls = [c for c in search_calls if c.kwargs.get("project_id") == "proj_1"]
+    assert len(project_calls) >= 1
 
-    # persist_turn triggers semantic_memory.add
-    semantic_memory.add.assert_awaited_once()
-    add_call = semantic_memory.add.await_args
-    assert add_call.kwargs["memory_type"] == "conversation"
-    assert add_call.kwargs["metadata"]["project_id"] == "proj_1"
+    # persist_turn triggers semantic_memory.add (conversation + possibly preference)
+    assert semantic_memory.add.await_count >= 1
+    add_calls = [c for c in semantic_memory.add.await_args_list if c.kwargs.get("memory_type") == "conversation"]
+    assert add_calls
+    assert add_calls[0].kwargs["metadata"]["project_id"] == "proj_1"
 
 
 @pytest.mark.asyncio

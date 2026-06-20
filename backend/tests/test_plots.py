@@ -3,7 +3,6 @@
 import base64
 from pathlib import Path
 
-import pytest
 
 from homomics_lab.models.common import PlotAttachment
 from homomics_lab.plots import extract_plot_attachments

@@ -230,8 +230,10 @@ class PlanResult:
     gaps: List[PlannedGap] = field(default_factory=list)
     reproducibility_context: Dict[str, Any] = field(default_factory=dict)
     is_fallback: bool = False
+    is_information_request: bool = False
     suggestion_text: Optional[str] = None
     phase_transitions: List[Dict[str, str]] = field(default_factory=list)
+    risks: List[Dict[str, Any]] = field(default_factory=list)
 
     @property
     def skill_sequence(self) -> List[str]:
@@ -251,8 +253,10 @@ class PlanResult:
             "gaps": [g.to_dict() for g in self.gaps],
             "reproducibility_context": self.reproducibility_context,
             "is_fallback": self.is_fallback,
+            "is_information_request": self.is_information_request,
             "suggestion_text": self.suggestion_text,
             "phase_transitions": self.phase_transitions,
+            "risks": self.risks,
         }
 
     @classmethod
@@ -265,6 +269,8 @@ class PlanResult:
             gaps=[PlannedGap.from_dict(g) for g in data.get("gaps", [])],
             reproducibility_context=data.get("reproducibility_context", {}),
             is_fallback=data.get("is_fallback", False),
+            is_information_request=data.get("is_information_request", False),
             suggestion_text=data.get("suggestion_text"),
             phase_transitions=data.get("phase_transitions", []),
+            risks=data.get("risks", []),
         )

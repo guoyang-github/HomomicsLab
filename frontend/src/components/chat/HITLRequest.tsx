@@ -40,6 +40,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
 
   const [selectedOption, setSelectedOption] = useState(recommendedAction || checkpoint.default_option?.id || '')
   const [parameters, setParameters] = useState('{}')
+  const [remember, setRemember] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { currentSessionId, addMessage } = useChatStore()
 
@@ -72,6 +73,7 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
         task_id: taskId,
         choice: selectedOption,
         parameters: parsedParams,
+        remember,
       })
 
       const confirmedLabel = checkpoint.options.find((o) => o.id === selectedOption)?.label || selectedOption
@@ -151,6 +153,19 @@ export function HITLRequest({ checkpoint, taskId }: Props) {
             rows={2}
             placeholder='{"n_neighbors": 15}'
           />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            id={`hitl-remember-${checkpoint.id}`}
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+          <label htmlFor={`hitl-remember-${checkpoint.id}`} className="text-sm text-muted-foreground">
+            {t('hitl.rememberMyChoice')}
+          </label>
         </div>
 
         <Button onClick={handleSubmit} loading={isSubmitting} disabled={!selectedOption}>

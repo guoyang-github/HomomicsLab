@@ -4,10 +4,9 @@ Compresses a ranked list of ContextParts to fit within a token budget using a
 gradient of strategies: truncate → structured extract → LLM summarize → drop.
 """
 
-import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from homomics_lab.context.context_engine.models import (
     CompressionLevel,

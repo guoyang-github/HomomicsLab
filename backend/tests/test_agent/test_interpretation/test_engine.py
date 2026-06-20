@@ -4,7 +4,6 @@ import pytest
 
 from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.plan.models import DataState, Phase
-from homomics_lab.agent.plan.replanning import ReplanningTrigger
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import EdgeStatus, EdgeType, SkillDAG

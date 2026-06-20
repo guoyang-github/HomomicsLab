@@ -3,7 +3,7 @@
 Lightweight, no external vector DB required. Uses scikit-learn.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from homomics_lab.skills.models import SkillDefinition
 

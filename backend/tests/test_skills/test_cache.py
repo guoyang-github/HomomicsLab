@@ -1,6 +1,5 @@
 """Tests for the skill result cache (memoization)."""
 
-import pickle
 
 import pytest
 

@@ -12,11 +12,17 @@ This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 """
 
 import json
+import asyncio
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.agent.errors import (
+    ExecutionError,
+    IntentError,
+    TurnError,
+)
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
 from homomics_lab.agent.intent.models import IntentMatch
@@ -282,67 +288,47 @@ class TurnRunner:
         )
         working_memory.add_message(user_msg)
 
+        turn_result: Optional[TurnResult] = None
         try:
-            # 2. Build a token-safe context bundle from the ContextEngine.
-            extra_context = None
-            if self.memory_manager is not None:
-                try:
-                    extra_context = await self.memory_manager.enrich_context(
-                        project_id, user_message, working_memory
-                    )
-                except Exception:
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "Memory enrichment failed; continuing without it", exc_info=True
-                    )
-            self._extra_context = extra_context or {}
-
-            context_bundle = None
-            if self.context_engine is not None:
-                try:
-                    context_bundle = await self.context_engine.build(
-                        user_message=user_message,
-                        working_memory=working_memory,
-                        project_id=project_id,
-                        intent=None,
-                        reserved_output_tokens=2000,
-                    )
-                except Exception:
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "ContextEngine build failed; falling back to raw working memory", exc_info=True
-                    )
-            self._context_bundle = context_bundle
-
-            # 3. Analyze intent with conversation context
-            if debate_response is not None:
-                intent = self._build_debate_resolved_intent(
-                    debate_response, user_message
-                )
-            else:
-                intent = await self.intent_analyzer.analyze(
-                    user_message,
-                    working_memory=working_memory,
-                    extra_context=extra_context,
-                    context_bundle=context_bundle,
-                )
-
-            # 3.5 Route based on structured intent (backward compatible).
-            turn_result = await self._route_by_intent(
-                intent=intent,
+            turn_result = await self._run_turn_once(
+                session_id=session_id,
                 user_message=user_message,
                 working_memory=working_memory,
                 project_id=project_id,
-                session_id=session_id,
-                plan_store=plan_store,
+                task_tree=task_tree,
                 job_service=job_service,
                 enqueue_skills=enqueue_skills,
+                plan_store=plan_store,
+                debate_response=debate_response,
             )
-        except Exception as e:
-            turn_result = self._build_error_result(str(e), working_memory)
+        except TurnError as exc:
+            if exc.retryable:
+                try:
+                    await asyncio.sleep(0.5)
+                    turn_result = await self._run_turn_once(
+                        session_id=session_id,
+                        user_message=user_message,
+                        working_memory=working_memory,
+                        project_id=project_id,
+                        task_tree=task_tree,
+                        job_service=job_service,
+                        enqueue_skills=enqueue_skills,
+                        plan_store=plan_store,
+                        debate_response=debate_response,
+                    )
+                except TurnError as exc2:
+                    turn_result = self._build_error_result(exc2, working_memory)
+            else:
+                turn_result = self._build_error_result(exc, working_memory)
+        except Exception as exc:
+            # Wrap unexpected errors as ExecutionError for structured reporting.
+            turn_result = self._build_error_result(
+                ExecutionError(str(exc), context={"exception_type": type(exc).__name__}),
+                working_memory,
+            )
 
         # 5. Persist turn to long-term memory (best-effort)
-        if self.memory_manager is not None:
+        if self.memory_manager is not None and turn_result is not None:
             try:
                 await self.memory_manager.persist_turn(
                     session_id=session_id,
@@ -359,7 +345,7 @@ class TurnRunner:
                 )
 
         # 6. Update structured project state (best-effort)
-        if self.project_state_manager is not None:
+        if self.project_state_manager is not None and turn_result is not None:
             try:
                 project_state = self.project_state_manager.load(project_id)
                 project_state = self.project_state_manager.update_from_turn(
@@ -373,6 +359,93 @@ class TurnRunner:
                 logging.getLogger(__name__).warning(
                     "Failed to update project state", exc_info=True
                 )
+
+        return turn_result or self._build_error_result(
+            ExecutionError("Turn produced no result"), working_memory
+        )
+
+    async def _run_turn_once(
+        self,
+        session_id: str,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        task_tree: Optional[TaskTree] = None,
+        job_service=None,
+        enqueue_skills: bool = False,
+        plan_store: Optional[PlanStore] = None,
+        debate_response: Optional[Dict[str, Any]] = None,
+    ) -> TurnResult:
+        """Execute the core turn pipeline once."""
+        # 2. Build a token-safe context bundle from the ContextEngine.
+        extra_context = None
+        if self.memory_manager is not None:
+            try:
+                extra_context = await self.memory_manager.enrich_context(
+                    project_id, user_message, working_memory
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Memory enrichment failed; continuing without it", exc_info=True
+                )
+        self._extra_context = extra_context or {}
+
+        context_bundle = None
+        if self.context_engine is not None:
+            try:
+                context_bundle = await self.context_engine.build(
+                    user_message=user_message,
+                    working_memory=working_memory,
+                    project_id=project_id,
+                    intent=None,
+                    reserved_output_tokens=2000,
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "ContextEngine build failed; falling back to raw working memory", exc_info=True
+                )
+        self._context_bundle = context_bundle
+
+        # 3. Analyze intent with conversation context
+        if debate_response is not None:
+            intent = self._build_debate_resolved_intent(
+                debate_response, user_message
+            )
+        else:
+            try:
+                intent = await self.intent_analyzer.analyze(
+                    user_message,
+                    working_memory=working_memory,
+                    extra_context=extra_context,
+                    context_bundle=context_bundle,
+                )
+            except Exception as exc:
+                raise IntentError(
+                    f"Intent analysis failed: {exc}",
+                    context={"original_error": str(exc)},
+                ) from exc
+
+        # 3.5 Route based on structured intent (backward compatible).
+        try:
+            turn_result = await self._route_by_intent(
+                intent=intent,
+                user_message=user_message,
+                working_memory=working_memory,
+                project_id=project_id,
+                session_id=session_id,
+                plan_store=plan_store,
+                job_service=job_service,
+                enqueue_skills=enqueue_skills,
+            )
+        except TurnError:
+            raise
+        except Exception as exc:
+            raise ExecutionError(
+                f"Execution routing failed: {exc}",
+                context={"original_error": str(exc)},
+            ) from exc
 
         return turn_result
 
@@ -921,14 +994,33 @@ class TurnRunner:
         )
 
     def _build_error_result(
-        self, error: str, working_memory: WorkingMemory
+        self, error: Union[str, TurnError], working_memory: WorkingMemory
     ) -> TurnResult:
         """Build a TurnResult when an error occurs."""
-        response_text = f"抱歉，处理您的请求时出现了问题：{error}"
+        if isinstance(error, TurnError):
+            payload = error.to_payload()
+            recovery = payload["recovery_action"]
+            response_text = f"抱歉，处理您的请求时出现了问题：{payload['message']}"
+            if recovery == "retry":
+                response_text += " 已自动重试一次仍未成功，请稍后再试或换一种方式描述。"
+            elif recovery == "clarify":
+                response_text += " 能否补充说明一下您的具体需求？"
+            elif recovery == "approve":
+                response_text += " 该操作需要您确认授权。"
+        else:
+            payload = {
+                "error_type": "ExecutionError",
+                "message": str(error),
+                "recovery_action": "escalate",
+                "retryable": False,
+                "context": {},
+            }
+            response_text = f"抱歉，处理您的请求时出现了问题：{error}"
+
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
             type=MessageType.ERROR,
-            content={"error": error, "message": response_text},
+            content={"error": payload, "message": response_text},
             sender="agent",
         )
         working_memory.add_message(agent_msg)
@@ -936,7 +1028,7 @@ class TurnRunner:
         return TurnResult(
             mode=ExecutionMode.ERROR,
             response_text=response_text,
-            error=error,
+            error=payload["message"],
             agent_message=agent_msg,
         )
 

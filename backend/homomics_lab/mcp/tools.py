@@ -8,7 +8,7 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 class BioDatabaseTools:

@@ -4,7 +4,7 @@ Allows frontend to render interactive charts using react-plotly.js
 instead of static base64 PNG images.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from homomics_lab.viz.generator import PlotType
 
@@ -71,7 +71,7 @@ def _convert_umap(data: Dict[str, Any]) -> Dict[str, Any]:
             "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
         ]
         for i, label in enumerate(unique_labels):
-            mask = [l == label for l in labels]
+            mask = [value == label for value in labels]
             traces.append(
                 {
                     "type": "scatter",

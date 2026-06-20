@@ -7,7 +7,6 @@ be the project owner or a member with a sufficient role.
 
 from __future__ import annotations
 
-from typing import Optional
 
 from fastapi import Depends, HTTPException
 from sqlalchemy import select
@@ -15,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from homomics_lab.api.auth import get_current_user
 from homomics_lab.config import settings
-from homomics_lab.database.connection import get_async_session
 from homomics_lab.database.models import ProjectMember, ProjectRecord
 
 

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from homomics_lab.agent.turn_runner import TurnRunner
 from homomics_lab.context.working_memory import WorkingMemory
-from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.models.common import MessageType
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 

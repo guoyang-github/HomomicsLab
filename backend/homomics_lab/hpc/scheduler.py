@@ -8,6 +8,7 @@ Supports three execution backends:
 
 import asyncio
 import json
+import logging
 import shutil
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -15,11 +16,14 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
+from homomics_lab.config import settings
 from homomics_lab.hpc.pubsub import ExecutionPubSub, get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
-from homomics_lab.config import settings
+from homomics_lab.skills.environment_manager import EnvironmentManager
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.sandbox import Sandbox
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionResult:
@@ -57,7 +61,7 @@ class BaseScheduler(ABC):
 
     def __init__(
         self,
-        working_dir: Path = None,
+        working_dir: Optional[Path] = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
     ):
@@ -125,16 +129,27 @@ class LocalScheduler(BaseScheduler):
 
     def __init__(
         self,
-        working_dir: Path = None,
+        working_dir: Optional[Path] = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
         sandbox: Optional[Sandbox] = None,
+        env_manager: Optional[EnvironmentManager] = None,
+        provenance_recorder: Optional[Any] = None,
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
-        self.sandbox = sandbox or Sandbox.create(
+        self._sandbox_override = sandbox
+        self._env_manager = env_manager or EnvironmentManager()
+        self._provenance_recorder = provenance_recorder
+
+    def _get_sandbox(self, exec_type: str) -> Sandbox:
+        if self._sandbox_override is not None:
+            return self._sandbox_override
+        container_image = settings.r_container_image if exec_type == "r" else settings.skill_container_image
+        return Sandbox.create(
             settings.skill_sandbox_backend,
             self.working_dir,
-            container_image=settings.skill_container_image,
+            container_image=container_image,
+            exec_type=exec_type,
         )
 
     @classmethod
@@ -173,6 +188,12 @@ class LocalScheduler(BaseScheduler):
             }
             exec_type = "r" if primary in r_tools else "python"
 
+        # Prepare isolated environment and resolve the right sandbox image.
+        scripts_dir = Path(skill.metadata.get("scripts_dir", self.working_dir))
+        env_info = self._env_manager.prepare(skill.id, scripts_dir, exec_type)
+        sandbox = self._get_sandbox(exec_type)
+        sandbox_metadata = sandbox.get_metadata()
+
         self._report_progress(
             ExecutionState(
                 job_id=job_id,
@@ -194,22 +215,25 @@ class LocalScheduler(BaseScheduler):
 
         try:
             if exec_type == "r":
-                result = await self.sandbox.run_r(
+                result = await sandbox.run_r(
                     code,
                     inputs,
                     timeout_seconds=timeout_seconds,
                     progress_callback=_progress_callback,
                     job_id=job_id,
                     current_phase=skill.id,
+                    r_executable=env_info.r_executable,
+                    r_library_path=env_info.r_library_path,
                 )
             else:
-                result = await self.sandbox.run_python(
+                result = await sandbox.run_python(
                     code,
                     inputs,
                     timeout_seconds=timeout_seconds,
                     progress_callback=_progress_callback,
                     job_id=job_id,
                     current_phase=skill.id,
+                    python_path=env_info.python_path,
                 )
         except Exception as exc:
             self._report_progress(
@@ -227,6 +251,40 @@ class LocalScheduler(BaseScheduler):
 
         status = "COMPLETED" if result.get("status") != "error" else "FAILED"
         error_message = result.get("error") if status == "FAILED" else None
+
+        # Attach sandbox metadata for provenance / observability
+        if isinstance(result, dict):
+            result["_sandbox_metadata"] = sandbox_metadata
+
+        # Record execution provenance (best-effort)
+        if self._provenance_recorder is not None and isinstance(result, dict):
+            try:
+                from homomics_lab.provenance.models import ExecutionProvenance
+                from homomics_lab.provenance.recorder import (
+                    collect_input_files,
+                    collect_output_files,
+                )
+
+                ended_at = datetime.now(timezone.utc)
+                prov = ExecutionProvenance(
+                    execution_id=job_id,
+                    skill_id=skill.id,
+                    skill_version=skill.metadata.get("version", "1.0.0"),
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    parameters=inputs,
+                    input_files=collect_input_files(inputs),
+                    output_files=collect_output_files(self.working_dir),
+                    sandbox_backend=sandbox_metadata.get("backend", ""),
+                    container_image=sandbox_metadata.get("container_image"),
+                    container_digest=sandbox_metadata.get("container_digest"),
+                    dependency_manifest=env_info.to_dict(),
+                    result_summary={"status": status},
+                )
+                self._provenance_recorder.record(prov)
+            except Exception as exc:
+                # Provenance failures must not break skill execution.
+                logger.warning("Failed to record provenance: %s", exc)
 
         self._report_progress(
             ExecutionState(
@@ -248,10 +306,11 @@ class SlurmScheduler(BaseScheduler):
 
     def __init__(
         self,
-        working_dir: Path = None,
-        partition: str = None,
+        working_dir: Optional[Path] = None,
+        partition: Optional[str] = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
+        provenance_recorder: Optional[Any] = None,
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.partition = partition
@@ -535,11 +594,12 @@ class NextflowRunner(BaseScheduler):
 
     def __init__(
         self,
-        working_dir: Path = None,
-        config_file: Path = None,
+        working_dir: Optional[Path] = None,
+        config_file: Optional[Path] = None,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
         weblog_url: Optional[str] = None,
+        provenance_recorder: Optional[Any] = None,
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.config_file = config_file
@@ -739,7 +799,7 @@ Rscript script.R"""
             "-with-timeline", str(timeline_file),
         ])
         if weblog_url or self.weblog_url:
-            cmd.extend(["-with-weblog", weblog_url or self.weblog_url])
+            cmd.extend(["-with-weblog", str(weblog_url or self.weblog_url)])
 
         result = await self._run_with_streaming(
             cmd=cmd,
@@ -968,7 +1028,7 @@ Rscript script.R"""
             "-with-timeline", str(timeline_file),
         ])
         if weblog_url or self.weblog_url:
-            cmd.extend(["-with-weblog", weblog_url or self.weblog_url])
+            cmd.extend(["-with-weblog", str(weblog_url or self.weblog_url)])
 
         result = await self._run_with_streaming(
             cmd=cmd,
@@ -1060,7 +1120,7 @@ Rscript script.R"""
 
 def get_scheduler(
     executor_type: str = "auto",
-    working_dir: Path = None,
+    working_dir: Optional[Path] = None,
     progress_callback: Optional[Callable[[ExecutionState], None]] = None,
     pubsub: Optional[ExecutionPubSub] = None,
     **kwargs,
@@ -1083,10 +1143,11 @@ def get_scheduler(
         BaseScheduler instance
     """
     working_dir = working_dir or Path.cwd()
-    scheduler_kwargs = {
+    scheduler_kwargs: Dict[str, Any] = {
         "working_dir": working_dir,
         "progress_callback": progress_callback,
         "pubsub": pubsub,
+        "provenance_recorder": kwargs.get("provenance_recorder"),
     }
 
     resolved_type = executor_type

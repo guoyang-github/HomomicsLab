@@ -6,6 +6,7 @@ import { TopBar } from './TopBar'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 import { ToastContainer } from '@/components/ui/Toast'
 import { useToastStore } from '@/stores/toastStore'
+import { CollabLayer } from '@/components/collab'
 
 interface AppLayoutProps {
   activeItem: NavItem
@@ -85,6 +86,7 @@ export function AppLayout({ activeItem, onNavigate, children }: AppLayoutProps) 
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <CollabLayer />
     </div>
   )
 }

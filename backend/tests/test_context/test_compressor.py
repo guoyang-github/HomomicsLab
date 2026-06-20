@@ -1,6 +1,5 @@
 """Tests for context compressor."""
 
-import pytest
 
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.relevance_filter import ContextItem

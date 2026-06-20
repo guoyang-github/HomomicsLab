@@ -1,10 +1,9 @@
 """Tests for the LLM provider registry, router, and cost estimation."""
 
-import os
 
 import pytest
 
-from homomics_lab.llm import ProviderRegistry, estimate_cost_usd, get_model_pricing
+from homomics_lab.llm import ProviderRegistry, estimate_cost_usd
 from homomics_lab.llm.providers import ProviderConfig
 from homomics_lab.llm.router import LLMRouter
 

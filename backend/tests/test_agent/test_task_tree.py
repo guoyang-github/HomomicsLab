@@ -1,6 +1,5 @@
 """Tests for TaskTree serialization."""
 
-import pytest
 from homomics_lab.tasks.task_tree import TaskTree
 from homomics_lab.tasks.models import TaskNode, TaskStatus
 

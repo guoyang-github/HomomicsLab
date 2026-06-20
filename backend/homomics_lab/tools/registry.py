@@ -177,7 +177,7 @@ class ToolRegistry:
         """Basic input validation against tool's input_schema."""
         schema = tool.input_schema
         required = schema.get("required", [])
-        properties = schema.get("properties", {})
+        schema.get("properties", {})
 
         for field_name in required:
             if field_name not in inputs:

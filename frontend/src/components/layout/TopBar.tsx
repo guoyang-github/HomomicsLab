@@ -8,10 +8,13 @@ import {
   Monitor,
   PanelLeft,
   FolderKanban,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useTheme } from '@/hooks/useTheme'
 import { useProjectStore } from '@/stores/projectStore'
+import { useToastStore } from '@/stores/toastStore'
+import { projectApi } from '@/services/api'
 import { useTranslation } from '@/i18n'
 
 export interface TopBarProps {
@@ -26,11 +29,31 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
   const [notifications] = useState(0)
   const projects = useProjectStore((state) => state.projects)
   const currentProjectId = useProjectStore((state) => state.currentProjectId)
+  const addToast = useToastStore((state) => state.addToast)
   const currentProjectName = useMemo(() => {
     if (currentProjectId === 'default') return t('topbar.defaultProject')
     const project = projects.find((p) => p.id === currentProjectId)
     return project?.name || currentProjectId
   }, [projects, currentProjectId, t])
+
+  const handleExportROcrate = async () => {
+    if (currentProjectId === 'default') {
+      addToast({ type: 'error', message: t('topbar.exportROcrateFailed') })
+      return
+    }
+    try {
+      const response = await projectApi.exportROCrate(currentProjectId)
+      const blob = new Blob([response.data], { type: 'application/zip' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${currentProjectId}_rocrate.zip`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      addToast({ type: 'error', message: t('topbar.exportROcrateFailed') })
+    }
+  }
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
@@ -57,6 +80,15 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
       </div>
 
       <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          title={t('topbar.exportROcrate')}
+          onClick={handleExportROcrate}
+          disabled={currentProjectId === 'default'}
+        >
+          <Download className="h-5 w-5" />
+        </Button>
         <Button variant="ghost" size="icon" className="relative" title={t('topbar.notifications')}>
           <Bell className="h-5 w-5" />
           {notifications > 0 && (

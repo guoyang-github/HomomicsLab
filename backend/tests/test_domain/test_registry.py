@@ -1,6 +1,5 @@
 """Tests for DomainRegistry."""
 
-import pytest
 
 from homomics_lab.domain.models import DomainDefinition
 from homomics_lab.domain.registry import DomainRegistry

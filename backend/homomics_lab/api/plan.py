@@ -8,10 +8,7 @@ from pydantic import BaseModel
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.jobs import JobMode, JobService
 from homomics_lab.plan import (
-    Plan,
     PlanApprovalRequest,
-    PlanApprovalResponse,
-    PlanModification,
     PlanPresenter,
     PlanStatus,
     PlanStore,

@@ -1,6 +1,6 @@
 import pytest
 
-from homomics_lab.agent.core import DynamicAgent, RoleDefinition, RolePermissions
+from homomics_lab.agent.core import DynamicAgent, RoleDefinition
 from homomics_lab.models.common import AgentType
 
 

@@ -43,7 +43,7 @@ class LLMRouter:
 
     @staticmethod
     def _default_primary_model() -> str:
-        return os.environ.get("HOMOMICS_LLM_MODEL", getattr(settings, "llm_model", "gpt-4o-mini"))
+        return os.environ.get("HOMOMICS_LLM_MODEL") or getattr(settings, "llm_model", None) or "gpt-4o-mini"
 
     @staticmethod
     def _default_fallback_models() -> List[str]:
@@ -72,6 +72,7 @@ class LLMRouter:
         prefer_cheap: bool = False,
         expected_input_tokens: int = 1000,
         expected_output_tokens: int = 500,
+            skip: Optional[set] = None,
     ) -> RouteDecision:
         """Select the best provider/model for the current request.
 
@@ -80,6 +81,7 @@ class LLMRouter:
             prefer_cheap: If True, prefer the cheapest configured model.
             expected_input_tokens: Used for budget estimation.
             expected_output_tokens: Used for budget estimation.
+            skip: Set of model names to exclude (used after a failure).
         """
         candidates: List[str] = []
         if model:
@@ -100,7 +102,7 @@ class LLMRouter:
         seen = set()
         unique_candidates = []
         for m in candidates:
-            if m not in seen:
+            if m not in seen and m not in (skip or set()):
                 seen.add(m)
                 unique_candidates.append(m)
 
@@ -127,6 +129,52 @@ class LLMRouter:
             "No LLM provider is configured. Set one of: OPENAI_API_KEY, DEEPSEEK_API_KEY, "
             "DASHSCOPE_API_KEY, ZHIPU_API_KEY, MOONSHOT_API_KEY, or OLLAMA_API_KEY."
         )
+
+    def select_by_complexity(
+        self,
+        intent_type: str = "general",
+        input_token_count: int = 1000,
+        expected_output_tokens: int = 500,
+    ) -> RouteDecision:
+        """Pick a model based on task complexity and context size.
+
+        Cheap models are used for simple classification/clarification; strong
+        models for planning, interpretation, and code generation. Long contexts
+        prefer models with large context windows.
+        """
+        simple_intents = {"greeting", "clarification", "chitchat", "faq", "status"}
+        complex_intents = {"planning", "interpretation", "code_generation", "analysis", "debug"}
+
+        if input_token_count > 120_000:
+            candidates = ["claude-3-5-sonnet-20241022", "moonshot-v1-128k", "gpt-4o"]
+        elif intent_type in simple_intents:
+            candidates = ["gpt-4o-mini", "deepseek-chat", "glm-4-flash", "qwen-turbo"]
+        elif intent_type in complex_intents:
+            candidates = ["gpt-4o", "claude-3-5-sonnet-20241022", "deepseek-reasoner"]
+        else:
+            candidates = [self.primary_model] + self.fallback_models
+
+        seen = set()
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            provider = self.registry.infer_provider(candidate)
+            if provider is None or not provider.is_configured():
+                continue
+            estimated = estimate_cost_usd(candidate, input_token_count, expected_output_tokens)
+            try:
+                self._check_budget(estimated)
+            except BudgetExceeded:
+                continue
+            return RouteDecision(
+                provider=provider,
+                model=candidate,
+                estimated_input_cost_usd=estimated,
+                reason=f"complexity:{intent_type}",
+            )
+        # Fall back to normal selection if complexity candidates fail budget/provider.
+        return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
     def list_available_models(self) -> List[Dict[str, str]]:
         """Return all models whose providers are configured."""

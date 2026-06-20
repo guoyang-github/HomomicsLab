@@ -1,6 +1,5 @@
 """Tests for OpenTelemetry tracing setup."""
 
-import pytest
 
 from homomics_lab.config import settings
 
@@ -16,6 +15,12 @@ class TestTracingSetup:
         assert setup_tracing() is None
 
     def test_setup_tracing_console_when_enabled(self, monkeypatch):
+        pytest = __import__("pytest")
+        try:
+            __import__("opentelemetry")
+        except ImportError:
+            pytest.skip("opentelemetry packages not installed")
+
         monkeypatch.setattr(settings, "otel_enabled", True)
         monkeypatch.setattr(settings, "otel_exporter", "console")
         from homomics_lab.tracing import setup_tracing

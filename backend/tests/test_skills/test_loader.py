@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.models import SkillDefinition
@@ -148,7 +147,7 @@ class TestSkillLoader:
         registry = SkillRegistry()
         loader = SkillLoader(registry=registry)
 
-        skills = loader.load_all(sample_skills_dir)
+        loader.load_all(sample_skills_dir)
 
         assert len(registry.list_all()) == 3
         assert registry.get("bio-single-cell-preprocessing") is not None

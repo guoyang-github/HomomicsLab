@@ -153,6 +153,6 @@ def test_memory_type_enum():
     """All expected memory types are defined."""
     from homomics_lab.context.semantic_memory import MemoryType
 
-    expected = {"conversation", "task", "experiment", "note"}
-    actual = set(MemoryType)
+    expected = {"conversation", "task", "experiment", "note", "preference", "concept"}
+    actual = {m.value for m in MemoryType}
     assert actual == expected

@@ -1,7 +1,6 @@
 """Tests for StabilityGuard L2: VersionLocker + RegressionTester."""
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -14,11 +13,9 @@ from homomics_lab.skills.models import (
 from homomics_lab.stability.regression_tester import (
     RegressionTester,
     RegressionResult,
-    TestBaseline,
     _output_signature,
 )
 from homomics_lab.stability.version_locker import (
-    LockVerificationResult,
     VersionLock,
     VersionLocker,
 )

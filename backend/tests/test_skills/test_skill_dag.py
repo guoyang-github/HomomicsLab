@@ -1,6 +1,5 @@
 """Tests for SkillDAG."""
 
-from pathlib import Path
 
 import pytest
 
@@ -10,7 +9,6 @@ from homomics_lab.skills.skill_dag import (
     EdgeStatus,
     EdgeType,
     SkillDAG,
-    SkillDAGEdge,
 )
 
 

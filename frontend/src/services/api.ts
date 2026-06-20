@@ -19,7 +19,7 @@ export const chatApi = {
   getMessages: (sessionId: string) =>
     api.get<ChatMessage[]>(`/chat/messages?session_id=${sessionId}`),
 
-  respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown> }) =>
+  respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown>; remember?: boolean }) =>
     api.post('/chat/hitl/respond', data),
 
   respondToDebate: (data: { session_id: string; debate_id: string; choice_id: string; parameters?: Record<string, unknown> }) =>
@@ -55,6 +55,13 @@ export const projectApi = {
 
   listProjects: () =>
     api.get<Project[]>('/projects'),
+
+  exportROCrate: (projectId: string) =>
+    api.post(
+      `/projects/${projectId}/export/rocrate`,
+      {},
+      { responseType: 'blob' }
+    ),
 }
 
 export interface FileEntry {

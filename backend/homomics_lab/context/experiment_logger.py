@@ -125,6 +125,7 @@ class ExperimentLogger:
                     "step": step,
                     "tags": tags or [],
                 },
+                project_id=self.project_id,
             )
 
         return note_id
@@ -212,24 +213,21 @@ class ExperimentLogger:
             ).fetchall()
             return [self._row_to_dict(row) for row in rows]
 
-        # Semantic search
+        # Semantic search scoped to project
         results = await self.semantic_memory.search(
-            query, top_k=top_k * 2, memory_type="experiment"
+            query, top_k=top_k * 2, memory_type="experiment", project_id=self.project_id
         )
 
-        # Filter by time range and project
+        # Filter by time range
         filtered = []
         for r in results:
-            meta = r["metadata"]
-            if meta.get("project_id") != self.project_id:
-                continue
-            created = meta.get("created_at", "")
+            created = r.get("created_at", "")
             if start and created < start:
                 continue
             if end and created > end:
                 continue
             # Enrich with full note data
-            note_id = meta.get("note_id")
+            note_id = r["metadata"].get("note_id")
             if note_id:
                 note = await self.get(note_id)
                 if note:

@@ -7,7 +7,7 @@ or saves to file.
 import base64
 import io
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import matplotlib
 
@@ -106,7 +106,7 @@ class PlotGenerator:
             unique_labels = sorted(set(labels))
             cmap = plt.colormaps["tab20"].resampled(len(unique_labels))
             for i, label in enumerate(unique_labels):
-                mask = [l == label for l in labels]
+                mask = [value == label for value in labels]
                 ax.scatter(
                     x[mask], y[mask],
                     c=[cmap(i)], label=str(label),
