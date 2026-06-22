@@ -17,7 +17,7 @@ Usage:
         result = await execute_skill(...)
 
     tracker.record(
-        skill_id="scanpy_qc",
+        skill_id="example_skill",
         duration_ms=metrics.duration_ms,
         success=True,
         cpu_percent=metrics.cpu_percent,

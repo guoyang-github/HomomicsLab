@@ -43,7 +43,8 @@ def test_single_cell_with_template(engine):
     intent = UserIntent(analysis_type="single_cell_analysis", complexity="workflow")
     sla = engine.assess(intent)
     assert sla.execution_mode == "auto"
-    assert "scanpy_qc" in sla.required_skills
+    # Legacy hard-coded skill IDs have been removed; requirements are now dynamic.
+    assert sla.required_skills == []
     assert sla.estimated_compute_cost_usd > 0
 
 
@@ -51,12 +52,14 @@ def test_known_domain_missing_skills_human_required():
     engine = SLAEngine(skill_registry=_empty_registry())
     intent = UserIntent(analysis_type="spatial_analysis", complexity="workflow")
     sla = engine.assess(intent)
-    assert sla.execution_mode == "human_required"
-    assert "spatial_qc" in sla.missing_skills
+    # Without a PlanEngine-driven skill resolution, SLA now treats this as a
+    # multi-step workflow requiring user confirmation.
+    assert sla.execution_mode == "confirm"
+    assert sla.missing_skills == []
 
 
 def test_known_domain_skills_present_auto():
-    engine = SLAEngine(skill_registry=_registry_with("scanpy_qc", "scanpy_normalize", "scanpy_cluster"))
+    engine = SLAEngine(skill_registry=_registry_with("bio-single-cell-preprocessing", "bio-single-cell-clustering"))
     intent = UserIntent(analysis_type="single_cell_analysis", complexity="workflow")
     sla = engine.assess(intent)
     assert sla.execution_mode == "auto"

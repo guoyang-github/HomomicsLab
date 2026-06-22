@@ -18,7 +18,6 @@ from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.loader import SkillLoader
 
 _BUILTIN_DIR = Path(__file__).parent
-_LEGACY_DIR = Path(__file__).parent.parent.parent.parent / "skills" / "legacy"
 
 
 def _register_skill_dir(
@@ -33,25 +32,18 @@ def _register_skill_dir(
     skill.id = skill_dir.name
     skill.metadata["source"] = source
     skill.metadata["namespace"] = source
-    skill.metadata["trusted"] = source in {"builtin", "legacy"}
+    skill.metadata["trusted"] = source == "builtin"
     executor.registry.register(skill)
 
 
 def register_builtin_skills(executor: SkillRuntimeExecutor) -> None:
-    """Register builtin and legacy skills at discovery level.
+    """Register builtin skills at discovery level.
 
     Builtin skills use the same format as external skills (SKILL.md + optional
-    resources). Legacy business skills remain in ``backend/skills/legacy/`` for
-    backward compatibility while new meta-capability skills live under
-    ``builtin/``.
+    resources). Legacy business skills have been removed; domain-specific
+    capabilities should come from external skill collections.
     """
     # Agent meta-capability builtin skills
     for skill_dir in _BUILTIN_DIR.iterdir():
         if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
             _register_skill_dir(executor, skill_dir, source="builtin")
-
-    # Legacy business skills (formerly builtin)
-    if _LEGACY_DIR.exists():
-        for skill_dir in _LEGACY_DIR.iterdir():
-            if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
-                _register_skill_dir(executor, skill_dir, source="legacy")

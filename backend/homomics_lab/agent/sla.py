@@ -151,13 +151,9 @@ class SLAEngine:
         )
 
     def _required_skills_for(self, analysis_type: str) -> List[str]:
-        mapping = {
-            "single_cell_analysis": ["scanpy_qc", "scanpy_normalize", "scanpy_cluster"],
-            "spatial_analysis": ["spatial_qc", "spatial_cluster", "spatial_deconvolve"],
-            "metagenomics_analysis": ["metagenomics_qc", "metagenomics_taxonomy"],
-            "rnaseq_analysis": ["fastp", "salmon_quant", "multiqc"],
-        }
-        return mapping.get(analysis_type, [])
+        # Legacy hard-coded skill IDs have been removed. Required skills are now
+        # determined dynamically by the PlanEngine from the registered skill set.
+        return []
 
     def _estimate_steps(self, complexity: str, has_template: bool) -> int:
         if has_template:

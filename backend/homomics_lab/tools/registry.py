@@ -2,7 +2,7 @@
 
 Tools are distinct from skills:
   - Tool: atomic, single-call, stateless (file_read, pubmed_search, shell_exec)
-  - Skill: multi-step workflow with scripts (scanpy_qc, spatial_decon)
+  - Skill: multi-step workflow with scripts (bio-single-cell-preprocessing, spatial_decon)
 
 Tools can come from multiple sources:
   - builtin: shipped with HomomicsLab (file I/O, shell, web search)

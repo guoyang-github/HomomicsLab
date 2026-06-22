@@ -85,7 +85,7 @@ class TaskDecomposer:
         # intents. These are too trivial to warrant a dedicated domain strategy.
         if intent.analysis_type == "file_conversion":
             tree = self._build_single_step(
-                "convert_file", "Convert file format", ["data_loader"]
+                "convert_file", "Convert file format", ["core_code_act"]
             )
             return self._task_tree_to_plan_result(
                 tree, intent, strategy_name="file_conversion"

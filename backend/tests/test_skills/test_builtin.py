@@ -56,8 +56,8 @@ async def test_core_hitl_registered(executor):
 
 
 @pytest.mark.asyncio
-async def test_legacy_business_skills_migrated(executor):
-    """Legacy business skills remain discoverable under the legacy namespace."""
-    assert executor.registry.get("data_loader") is not None
-    assert executor.registry.get("scanpy_qc") is not None
-    assert executor.registry.get("scanpy_cluster") is not None
+async def test_legacy_business_skills_removed(executor):
+    """Legacy business skills have been removed from the builtin registry."""
+    assert executor.registry.get("data_loader") is None
+    assert executor.registry.get("scanpy_qc") is None
+    assert executor.registry.get("scanpy_cluster") is None

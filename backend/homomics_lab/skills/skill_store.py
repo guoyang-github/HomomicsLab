@@ -171,7 +171,7 @@ class SkillStore:
 
     @staticmethod
     def _is_trusted_source(source: str) -> bool:
-        return source in {"builtin", "legacy"}
+        return source == "builtin"
 
     # ─────────────────────────────────────────
     # Import / update / remove

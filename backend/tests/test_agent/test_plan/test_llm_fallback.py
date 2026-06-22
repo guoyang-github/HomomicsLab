@@ -177,15 +177,15 @@ async def test_task_decomposer_uses_fallback_plan(registry_with_skills, fake_llm
 
 
 @pytest.fixture
-def registry_with_code_assistant():
+def registry_with_code_act():
     reg = SkillRegistry()
     reg.register(
         SkillDefinition(
-            id="general_code_assistant",
-            name="general_code_assistant",
-            version="1.0",
-            category="utility",
-            description="Generate Python snippets for general data tasks",
+            id="core_code_act",
+            name="core_code_act",
+            version="0.1.0",
+            category="agent_core",
+            description="Generate and execute code actions for a concrete sub-task",
             input_schema=SkillInputSchema(),
         )
     )
@@ -193,12 +193,12 @@ def registry_with_code_assistant():
 
 
 @pytest.mark.asyncio
-async def test_fallback_to_general_code_assistant(registry_with_code_assistant):
-    """When no bio skill matches a code/data request, fallback uses general_code_assistant."""
+async def test_fallback_to_core_code_act(registry_with_code_act):
+    """When no bio skill matches a code/data request, fallback uses core_code_act."""
     response = json.dumps({
         "steps": [
             {
-                "skill_id": "general_code_assistant",
+                "skill_id": "core_code_act",
                 "phase": "utility",
                 "reason": "Generate a script to filter CSV rows",
                 "parameters": {
@@ -210,7 +210,7 @@ async def test_fallback_to_general_code_assistant(registry_with_code_assistant):
         "summary": "Generate a CSV filter script",
     })
     fake_client = FakeLLMClient(response=response)
-    planner = LLMFallbackPlanner(registry_with_code_assistant, llm_client=fake_client)
+    planner = LLMFallbackPlanner(registry_with_code_act, llm_client=fake_client)
 
     intent = UserIntent(
         analysis_type="unknown_type",
@@ -220,16 +220,16 @@ async def test_fallback_to_general_code_assistant(registry_with_code_assistant):
     plan = await planner.generate_plan(intent, DataState())
 
     assert len(plan.phases) == 1
-    assert plan.phases[0].selected_skill.id == "general_code_assistant"
+    assert plan.phases[0].selected_skill.id == "core_code_act"
     assert plan.phases[0].readonly is True
     assert "generated_code" in plan.phases[0].parameters
 
 
 @pytest.mark.asyncio
-async def test_graceful_plan_hints_code_assistant(registry_with_code_assistant):
+async def test_graceful_plan_hints_code_act(registry_with_code_act):
     """Without an LLM, code/data requests get a more helpful suggestion."""
     planner = LLMFallbackPlanner(
-        registry_with_code_assistant,
+        registry_with_code_act,
         llm_client=FakeLLMClient(response=""),
         allow_code_fallback=True,
     )

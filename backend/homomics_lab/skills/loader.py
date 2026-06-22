@@ -581,13 +581,13 @@ class SkillLoader:
 
         Shell commands are only executed when:
           1. ``settings.skills_shell_execution_enabled`` is True, and
-          2. the skill is builtin/legacy or explicitly trusted.
+          2. the skill is builtin or explicitly trusted.
 
         Otherwise the placeholder is replaced with a clear marker.
         """
         shell_enabled = settings.skills_shell_execution_enabled
         source = skill.metadata.get("source", "external")
-        trusted = skill.metadata.get("trusted", source in {"builtin", "legacy"})
+        trusted = skill.metadata.get("trusted", source == "builtin")
         can_run_shell = shell_enabled and trusted
 
         disabled_marker = "[shell execution disabled]"

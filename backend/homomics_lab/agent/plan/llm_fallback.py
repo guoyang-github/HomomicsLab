@@ -80,14 +80,14 @@ class LLMFallbackPlanner:
                 # LLM hallucinated a skill ID — skip it.
                 continue
 
-            is_code_assistant = skill.id == "general_code_assistant"
+            is_code_act_skill = skill.id == "core_code_act"
             phase = Phase(
                 phase_type=item.get("phase", skill.category or "analysis"),
                 required=True,
                 description=item.get("reason", f"Run {skill.name}"),
                 selected_skill=skill,
                 parameters=item.get("parameters", {}),
-                readonly=is_code_assistant,
+                readonly=is_code_act_skill,
             )
             phases.append(phase)
 
@@ -136,7 +136,7 @@ class LLMFallbackPlanner:
         if not results:
             results = [(skill, 0.0) for skill in self.skill_registry.list_all()]
         if not results and self.allow_code_fallback and self._is_code_or_data_request(query):
-            code_skill = self.skill_registry.get("general_code_assistant")
+            code_skill = self.skill_registry.get("core_code_act")
             if code_skill is not None:
                 results = [(code_skill, 0.0)]
         return [skill for skill, _ in results[: self.top_k]]
@@ -173,7 +173,7 @@ Rules:
 1. Only use skill IDs from the "available_skills" list. Do not invent new skills.
 2. Order skills in a logical execution sequence.
 3. For each selected skill, provide a brief reason and any required input parameters.
-4. If no bioinformatics skill matches the request, but the request is a general coding or data-processing task (e.g., filtering CSVs, renaming files), you MAY select "general_code_assistant" and include a "generated_code" parameter with the code snippet.
+4. If no bioinformatics skill matches the request, but the request is a general coding or data-processing task (e.g., filtering CSVs, renaming files), you MAY select "core_code_act" and include a "generated_code" parameter with the code snippet.
 5. If no skill matches the request at all, return an empty `steps` array.
 6. Prefer fewer steps when possible; avoid redundant analysis.
 

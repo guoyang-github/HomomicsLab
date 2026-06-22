@@ -9,7 +9,7 @@ Example:
     await memory.add(
         text="QC filtering removed 12% of low-quality cells",
         memory_type="task",
-        metadata={"task_id": "qc_1", "skill": "scanpy_qc"},
+        metadata={"task_id": "qc_1", "skill": "example_skill"},
     )
     results = await memory.search("how many cells were filtered", top_k=3)
 """

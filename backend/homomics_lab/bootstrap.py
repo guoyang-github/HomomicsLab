@@ -167,7 +167,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         store_dir=settings.data_dir / "skill_store",
     )
 
-    # Register builtin and legacy skills through SkillStore
+    # Register builtin skills through SkillStore
     register_builtin_skills(skill_executor)
     for skill in list(skill_executor.registry.list_all()):
         skill_store._record_meta(

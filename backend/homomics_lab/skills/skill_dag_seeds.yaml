@@ -2,87 +2,46 @@
 # These edges are loaded as CONFIRMED (confidence=1.0) to provide the initial
 # structural skeleton for the graph. The rest of the edges are learned at runtime.
 
-version: "0.3.0"
-description: "Default skill relationship seeds for single-cell and spatial analysis"
+version: "0.4.0"
+description: "Default skill relationship seeds using external NanoResearch skills"
 
 seeds:
   # === Single-cell standard flow ===
-  - from: scanpy_qc
-    to: scanpy_pca
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-clustering
     type: followed_by
-    context: "Standard single-cell pipeline: QC → dimensionality reduction"
+    context: "Standard single-cell pipeline: QC/normalization → clustering"
 
-  - from: scanpy_pca
-    to: scanpy_cluster
-    type: followed_by
-    context: "Standard single-cell pipeline: PCA → clustering"
-
-  - from: scanpy_cluster
-    to: scanpy_annotation
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-annotation-markers
     type: followed_by
     context: "Standard single-cell pipeline: clustering → cell type annotation"
 
-  - from: scanpy_cluster
-    to: scanpy_de
-    type: followed_by
-    context: "Differential expression can follow clustering directly"
-
-  - from: scanpy_annotation
-    to: scanpy_de
-    type: followed_by
-    context: "DE analysis is more meaningful after annotation"
-
   # === Hard dependencies ===
-  - from: scanpy_cluster
-    to: scanpy_qc
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-preprocessing
     type: depends_on
-    context: "Clustering requires QC-filtered data"
-
-  - from: scanpy_pca
-    to: scanpy_qc
-    type: depends_on
-    context: "PCA requires QC-filtered data"
-
-  - from: scanpy_de
-    to: scanpy_cluster
-    type: depends_on
-    context: "DE requires cluster labels"
+    context: "Clustering requires QC-filtered and normalized data"
 
   # === Conflicts ===
-  - from: scanpy_cluster
-    to: seurat_cluster
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-doublet-scrublet
     type: conflicts_with
-    context: "Redundant clustering on the same dataset"
-
-  - from: scanpy_qc
-    to: seurat_qc
-    type: conflicts_with
-    context: "Redundant QC on the same dataset"
+    context: "Clustering and doublet detection can be run independently"
 
   # === Spatial transcriptomics ===
-  - from: spatial_qc
-    to: spatial_clustering
+  - from: bio-spatial-transcriptomics-preprocessing
+    to: bio-spatial-transcriptomics-clustering
     type: followed_by
-    context: "Spatial QC → spatial clustering"
+    context: "Spatial preprocessing → spatial clustering"
 
-  - from: spatial_clustering
-    to: spatial_deconvolution
+  - from: bio-spatial-transcriptomics-clustering
+    to: bio-spatial-transcriptomics-deconvolution
     type: followed_by
     context: "Spatial clustering → deconvolution"
 
   # === Cross-domain connections ===
-  - from: scanpy_annotation
-    to: spatial_deconvolution
+  - from: bio-single-cell-annotation-markers
+    to: bio-spatial-transcriptomics-deconvolution
     type: followed_by
     context: "Single-cell annotations can guide spatial deconvolution"
-
-  # === Alternatives ===
-  - from: scanpy_cluster
-    to: leiden_clustering
-    type: alternative_to
-    context: "Leiden is an alternative clustering algorithm"
-
-  - from: leiden_clustering
-    to: louvain_clustering
-    type: alternative_to
-    context: "Louvain is an alternative clustering algorithm"
