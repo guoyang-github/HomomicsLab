@@ -1,0 +1,55 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+........................................................................ [ 19%]
+........................................................................ [ 26%]
+........................................................................ [ 32%]
+........................................................................ [ 39%]
+........................................................................ [ 45%]
+........................................................................ [ 52%]
+........................................................................ [ 58%]
+........................................................................ [ 65%]
+........................................................................ [ 71%]
+........................................................................ [ 78%]
+........................................................................ [ 84%]
+........................................................................ [ 91%]
+........................................................................ [ 97%]
+.....s.....................                                              [100%]/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/.venv/lib/python3.11/site-packages/_pytest/unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function BaseSubprocessTransport.__del__ at 0x7d8ee270c7c0>
+
+Traceback (most recent call last):
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_subprocess.py", line 126, in __del__
+    self.close()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_subprocess.py", line 104, in close
+    proto.pipe.close()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/unix_events.py", line 566, in close
+    self._close(None)
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/unix_events.py", line 590, in _close
+    self._loop.call_soon(self._call_connection_lost, exc)
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_events.py", line 762, in call_soon
+    self._check_closed()
+  File "/home/guoyang/.local/share/uv/python/cpython-3.11.14-linux-x86_64-gnu/lib/python3.11/asyncio/base_events.py", line 520, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+
+Enable tracemalloc to get traceback where the object was allocated.
+See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+  warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+=============================== warnings summary ===============================
+../.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+backend/tests/test_doctor/test_health.py::test_detailed_health_endpoint
+backend/tests/test_doctor/test_health.py::test_health_checks_structure
+backend/tests/test_doctor/test_health.py::test_health_checker_without_executor
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/doctor/__init__.py:162: FutureWarning: `__version__` is deprecated, use `importlib.metadata.version('scanpy')` instead
+    versions[description] = getattr(mod, "__version__", "unknown")
+
+backend/tests/test_doctor/test_health.py::test_detailed_health_endpoint
+backend/tests/test_doctor/test_health.py::test_health_checks_structure
+backend/tests/test_doctor/test_health.py::test_health_checker_without_executor
+  /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/homomics_lab/doctor/__init__.py:162: FutureWarning: `__version__` is deprecated, use `importlib.metadata.version('anndata')` instead.
+    versions[description] = getattr(mod, "__version__", "unknown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1106 passed, 1 skipped, 7 warnings in 617.84s (0:10:17)

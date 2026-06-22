@@ -1,7 +1,7 @@
 ---
 name: core_hitl
 description: Manage human-in-the-loop checkpoints and clarifications.
-tool_type: python
+tool_type: agent
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "hitl", "human-in-the-loop", "clarification", "meta"]

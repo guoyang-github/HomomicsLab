@@ -1,7 +1,7 @@
 ---
 name: core_skill_router
 description: Select the most appropriate skill(s) for a given task and data state.
-tool_type: python
+tool_type: agent
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "routing", "skill-selection", "meta"]

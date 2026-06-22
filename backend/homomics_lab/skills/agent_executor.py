@@ -241,6 +241,10 @@ class AgentSkillExecutor:
         Honors ``allowed-tools`` and ``disallowed-tools`` from the skill
         frontmatter. Tool specs may be space/comma-separated strings or YAML
         lists, and may include permission globs like ``Bash(git *)``.
+
+        Agentic skills that ship a ``scripts/`` directory automatically get
+        ``file_read`` so they can use those scripts as Level 3 reference
+        material, unless ``file_read`` is explicitly disallowed.
         """
         if not self.tool_registry:
             return {}
@@ -254,18 +258,29 @@ class AgentSkillExecutor:
         disallowed = self._parse_tool_specs(skill.metadata.get("disallowed_tools", []))
 
         # Remove explicitly disallowed tools.
-        for name in disallowed:
-            canonical = _TOOL_ALIASES.get(name, name)
-            all_tools.pop(canonical, None)
+        canonical_disallowed = {_TOOL_ALIASES.get(name, name) for name in disallowed}
+        for name in canonical_disallowed:
+            all_tools.pop(name, None)
 
         if not allowed:
-            return all_tools
+            resolved = dict(all_tools)
+        else:
+            resolved = {}
+            for name in allowed:
+                canonical = _TOOL_ALIASES.get(name, name)
+                if canonical in all_tools:
+                    resolved[name] = all_tools[canonical]
 
-        resolved = {}
-        for name in allowed:
-            canonical = _TOOL_ALIASES.get(name, name)
-            if canonical in all_tools:
-                resolved[name] = all_tools[canonical]
+        # Auto-grant file_read to skills with reference scripts (Level 3).
+        if (
+            skill.has_scripts
+            and "file_read" not in canonical_disallowed
+            and "file_read" not in resolved
+        ):
+            file_read_tool = self.tool_registry.get("file_read")
+            if file_read_tool is not None:
+                resolved["file_read"] = file_read_tool
+
         return resolved
 
     @staticmethod
@@ -298,6 +313,15 @@ class AgentSkillExecutor:
             desc = f"- {name}: {tool.description}\n    schema: {json.dumps(schema, ensure_ascii=False)}"
             tool_descriptions.append(desc)
 
+        source_dir = skill.source_dir
+        file_read_restriction = ""
+        if source_dir and "file_read" in tools:
+            file_read_restriction = (
+                f"\nWhen using file_read, you may only read files under the skill's "
+                f"source directory ({source_dir}), especially its scripts/ folder. "
+                f"Do not attempt to read files outside this directory.\n"
+            )
+
         return f"""You are an autonomous agent executing the skill "{skill.id}".
 
 ## Skill instructions
@@ -308,7 +332,7 @@ class AgentSkillExecutor:
 
 ## Available tools
 {chr(10).join(tool_descriptions)}
-
+{file_read_restriction}
 ## Output format
 Respond ONLY with a JSON object containing one of the following:
 
@@ -382,6 +406,9 @@ Rules:
     ) -> Dict[str, Any]:
         """Invoke a tool and return a structured output record."""
         import time
+
+        if self.tool_registry is None:
+            raise RuntimeError("ToolRegistry is not available")
 
         start = time.time()
         try:

@@ -373,6 +373,15 @@ class SkillLoader:
         if "code_act" in frontmatter:
             metadata["code_act"] = bool(frontmatter["code_act"])
 
+        # Lightweight progressive-disclosure hints so the runtime can decide
+        # agentic vs script execution without activating the full skill body.
+        metadata["has_scripts"] = (skill_dir / "scripts").is_dir()
+        has_explicit_entrypoint = False
+        if metadata.get("entrypoint"):
+            has_explicit_entrypoint = (skill_dir / metadata["entrypoint"]).is_file()
+        has_run_py = scripts_dir is not None and (scripts_dir / "run.py").is_file()
+        metadata["has_entrypoint"] = has_explicit_entrypoint or has_run_py
+
         runtime_type = self._resolve_runtime_type(tool_type)
         runtime = SkillRuntime(
             type=runtime_type,

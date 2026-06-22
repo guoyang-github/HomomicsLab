@@ -1,7 +1,7 @@
 ---
 name: core_reproducibility
 description: Capture provenance and generate reproducibility records for executed skills.
-tool_type: python
+tool_type: agent
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "reproducibility", "provenance", "meta"]

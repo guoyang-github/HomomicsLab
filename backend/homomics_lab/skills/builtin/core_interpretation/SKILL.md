@@ -1,7 +1,7 @@
 ---
 name: core_interpretation
 description: Interpret analysis outputs and generate human-readable explanations.
-tool_type: python
+tool_type: agent
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "interpretation", "explanation", "meta"]

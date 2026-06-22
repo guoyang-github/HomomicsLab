@@ -212,11 +212,12 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             if not skill_md.exists():
                 continue
             try:
-                # Peek at the skill to check for builtin collisions before copying.
-                preview = discovery_loader.load_skill(skill_path)
+                # Peek at the skill at discovery level to check for builtin
+                # collisions before copying; the runtime activates lazily.
+                preview = discovery_loader.load_discovery(skill_path)
                 if skill_executor.registry.get(preview.id) is not None:
                     continue
-                # Copy into the canonical skill store and register.
+                # Copy into the canonical skill store and register at discovery level.
                 skill = skill_store.import_skill(
                     source=str(skill_path),
                     namespace=namespace,

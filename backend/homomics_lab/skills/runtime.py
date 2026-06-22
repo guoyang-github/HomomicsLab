@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import uuid
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -438,9 +439,9 @@ class SkillRuntimeExecutor:
             return True
         if skill.metadata.get("agent") is True:
             return True
-        # A script-type skill without scripts is treated as knowledge/agentic
-        # rather than failing immediately.
-        if runtime_type in {"python", "r", "mixed"} and not skill.metadata.get("scripts_dir"):
+        # python/r/mixed skills are declarative unless they have a concrete
+        # executable entrypoint (explicit entrypoint or scripts_dir/run.py).
+        if runtime_type in {"python", "r", "mixed"} and not skill.has_entrypoint:
             return True
         return False
 
@@ -469,7 +470,7 @@ class SkillRuntimeExecutor:
         """Return True for deterministic script-based skills that may be memoized."""
         if skill.metadata.get("code_act") is True or skill.metadata.get("agent") is True:
             return False
-        return skill.runtime.type.lower() in {"python", "r", "mixed"}
+        return skill.runtime.type.lower() in {"python", "r", "mixed"} and skill.has_entrypoint
 
     @staticmethod
     def _unwrap_reference(ref: ResultReference, skill_id: str) -> Any:
@@ -718,13 +719,66 @@ class SkillRuntimeExecutor:
         exec_type: str,
         inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute a skill by reading scripts from its directory."""
+        """Execute a skill by reading its entrypoint script.
+
+        Only the configured entrypoint is executed. Concatenating every
+        ``.py``/``.R`` file in the scripts directory is retained as a
+        deprecated fallback for backward compatibility.
+        """
         # Dependency preparation is now handled by the scheduler's EnvironmentManager,
         # which creates isolated venvs/project libraries and installs dependencies when
         # settings.auto_install_dependencies is enabled.
         timeout = self._parse_timeout(skill.runtime.resources.time)
 
-        # Collect all script files
+        entrypoint_path = self._resolve_entrypoint(skill, scripts_dir)
+        if entrypoint_path is not None:
+            code = entrypoint_path.read_text(encoding="utf-8")
+            # For Python entrypoints that expose a ``main(skill_inputs)`` function,
+            # call it with the injected inputs dict and publish ``result``.
+            if exec_type != "r":
+                code = (
+                    f"{code}\n\n"
+                    "# Skill entrypoint wrapper\n"
+                    "if 'main' in dir() and callable(main):\n"
+                    "    result = main(__inputs__)\n"
+                )
+        elif settings.skill_fallback_concatenation:
+            code = self._concatenate_scripts(scripts_dir, exec_type)
+            warnings.warn(
+                f"Skill '{skill.id}' has no entrypoint; falling back to concatenating "
+                f"all {exec_type} scripts. This is deprecated.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        else:
+            raise RuntimeError(
+                f"Script-based skill '{skill.id}' has no executable entrypoint. "
+                f"Set metadata['entrypoint'] or place run.py in {scripts_dir}."
+            )
+
+        scheduler = self._get_scheduler()
+        return await scheduler.execute(skill, code, inputs, timeout_seconds=timeout)
+
+    @staticmethod
+    def _resolve_entrypoint(
+        skill: SkillDefinition, scripts_dir: Path
+    ) -> Optional[Path]:
+        """Resolve the single script file that should be executed."""
+        source_dir = skill.source_dir
+        if source_dir and skill.metadata.get("entrypoint"):
+            candidate = source_dir / skill.metadata["entrypoint"]
+            if candidate.is_file():
+                return candidate
+
+        run_py = scripts_dir / "run.py"
+        if run_py.is_file():
+            return run_py
+
+        return None
+
+    @staticmethod
+    def _concatenate_scripts(scripts_dir: Path, exec_type: str) -> str:
+        """Concatenate all scripts in a directory (deprecated fallback)."""
         if exec_type == "r":
             script_files = sorted(scripts_dir.glob("*.R"))
             if not script_files:
@@ -736,15 +790,11 @@ class SkillRuntimeExecutor:
             if not script_files:
                 raise RuntimeError(f"No .py files found in {scripts_dir}")
 
-        # Concatenate scripts
         code_parts = []
         for f in script_files:
             code_parts.append(f"# --- {f.name} ---")
             code_parts.append(f.read_text(encoding="utf-8"))
-        code = "\n".join(code_parts)
-
-        scheduler = self._get_scheduler()
-        return await scheduler.execute(skill, code, inputs, timeout_seconds=timeout)
+        return "\n".join(code_parts)
 
     def _parse_timeout(self, time_str: str) -> float:
         """Parse time string like '30m' or '1h' into seconds."""

@@ -1,7 +1,7 @@
 ---
 name: core_planning
 description: Decompose a user request into a structured, executable analysis plan.
-tool_type: python
+tool_type: agent
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "planning", "decomposition", "meta"]

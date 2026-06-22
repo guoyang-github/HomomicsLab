@@ -207,16 +207,22 @@ class SkillStore:
                 "Skill validation failed:\n" + "\n".join(f"  - {e}" for e in validation.errors)
             )
 
-        # Copy skill into store for isolation/versioning
+        # Copy skill into store for isolation/versioning before loading metadata.
+        # This keeps the canonical source_dir pointing at the imported copy and
+        # allows large external repos to be registered at discovery level.
         loader = SkillLoader(registry=self.registry)
-        skill = loader.load_skill(source_path)
-        if skill_id:
-            skill.id = skill_id
+        preview = loader.load_discovery(source_path)
+        imported_skill_id = skill_id or preview.id
 
-        target_dir = self.imported_dir / namespace / skill.id
+        target_dir = self.imported_dir / namespace / imported_skill_id
         if target_dir.exists():
             shutil.rmtree(target_dir)
         shutil.copytree(source_path, target_dir)
+
+        # Load at discovery level; the runtime will activate on first execution.
+        skill = loader.load_discovery(target_dir)
+        if skill_id:
+            skill.id = skill_id
 
         # Compute content digest and determine default trust.
         sha256 = self._compute_sha256(target_dir)
@@ -230,6 +236,7 @@ class SkillStore:
         skill.metadata["namespace"] = namespace
         skill.metadata["trusted"] = trusted
         skill.metadata["sha256"] = sha256
+        skill.metadata["disclosure_level"] = "discovery"
 
         if enable:
             self.registry.register(skill)

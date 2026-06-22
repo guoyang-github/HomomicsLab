@@ -1,4 +1,5 @@
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -73,3 +74,46 @@ class SkillDefinition(BaseModel):
                 raise ValueError(f"Missing required parameter: {key}")
 
         return validated
+
+    @property
+    def source_dir(self) -> Optional[Path]:
+        """Canonical source directory for the skill, if known."""
+        raw = self.metadata.get("source_dir") or self.metadata.get("source_path")
+        if isinstance(raw, (str, Path)):
+            return Path(raw)
+        return None
+
+    @property
+    def body_path(self) -> Optional[Path]:
+        """Path to the skill's SKILL.md body (Level 2)."""
+        src = self.source_dir
+        return src / "SKILL.md" if src else None
+
+    @property
+    def has_scripts(self) -> bool:
+        """True when the skill has a scripts directory (Level 3 reference material)."""
+        src = self.source_dir
+        if src is not None:
+            return (src / "scripts").is_dir()
+        # Discovery-level skills may record this hint before scripts_dir is resolved.
+        return bool(self.metadata.get("has_scripts"))
+
+    @property
+    def has_entrypoint(self) -> bool:
+        """True when the skill has an executable script entrypoint.
+
+        An explicit ``entrypoint`` path relative to ``source_dir`` takes
+        precedence; otherwise ``scripts_dir/run.py`` is accepted.
+        """
+        src = self.source_dir
+        if src is not None:
+            entrypoint = self.metadata.get("entrypoint")
+            if isinstance(entrypoint, (str, Path)):
+                if (src / entrypoint).is_file():
+                    return True
+            if (src / "scripts" / "python" / "run.py").is_file():
+                return True
+            if (src / "scripts" / "r" / "run.R").is_file():
+                return True
+        # Discovery-level hint.
+        return bool(self.metadata.get("has_entrypoint"))
