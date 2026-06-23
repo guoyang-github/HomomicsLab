@@ -6,21 +6,13 @@ from typing import Any, Dict, Optional
 from homomics_lab.config import settings
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
-from homomics_lab.jobs.backends import MemoryPubSubBackend, MemoryQueueBackend
+from homomics_lab.jobs.backends import create_backends
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
-from homomics_lab.jobs.backends.redis import create_redis_backends
 from homomics_lab.tasks.task_tree import TaskTree
 
 from .models import Job, JobMode, JobStatus
 from .repository import JobRepository
 from .runner import BackgroundJobRunner
-
-
-def _create_backends():
-    """Create queue + pub/sub backends according to configuration."""
-    if settings.queue_backend == "redis":
-        return create_redis_backends(settings.redis_url)
-    return MemoryQueueBackend(), MemoryPubSubBackend()
 
 
 class JobService:
@@ -32,9 +24,10 @@ class JobService:
         repository: Optional[JobRepository] = None,
         pubsub: Optional[PubSubBackend] = None,
     ):
-        self._queue = queue or _create_backends()[0]
+        queue_backend, pubsub_backend = create_backends()
+        self._queue = queue or queue_backend
         self._repository = repository or JobRepository()
-        self._pubsub = pubsub or _create_backends()[1]
+        self._pubsub = pubsub or pubsub_backend
         self._runner: Optional[BackgroundJobRunner] = None
 
     @property
