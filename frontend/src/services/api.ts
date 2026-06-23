@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 import type { PlanModification } from '@/stores/planStore'
 
@@ -170,6 +170,55 @@ export const domainsApi = {
 
   importDomain: (source: string) =>
     api.post<ImportDomainResponse>('/domains/import', { source }),
+}
+
+export const vizApi = {
+  createSession: (data: CreateVizSessionRequest) =>
+    api.post<CreateVizSessionResponse>('/viz/sessions', data),
+
+  render: (sessionId: string, data: RenderVizRequest) =>
+    api.post<RenderVizResponse>(`/viz/sessions/${sessionId}/render`, data),
+
+  listFigures: (projectId: string) =>
+    api.get<FigureItem[]>(`/projects/${projectId}/figures`),
+
+  deleteFigure: (projectId: string, figureId: string) =>
+    api.delete(`/projects/${projectId}/figures/${figureId}`),
+}
+
+export interface LlmConfigUpdate {
+  provider: string
+  model: string
+  fallback_models?: string[]
+  base_url?: string
+  api_key?: string
+  temperature: number
+  max_tokens: number
+}
+
+export interface LlmConfigOut {
+  provider: string | null
+  model: string | null
+  fallback_models: string[]
+  base_url: string | null
+  api_key: string | null
+  temperature: number
+  max_tokens: number
+}
+
+export interface TestConnectionOut {
+  ok: boolean
+  provider: string | null
+  model: string | null
+  error?: string
+}
+
+export const settingsApi = {
+  getLlmConfig: () => api.get<LlmConfigOut>('/settings/llm'),
+  updateLlmConfig: (data: LlmConfigUpdate) =>
+    api.put<LlmConfigOut>('/settings/llm', data),
+  testLlmConnection: (data?: LlmConfigUpdate) =>
+    api.post<TestConnectionOut>('/settings/llm/test', data),
 }
 
 export default api

@@ -70,8 +70,13 @@ class EnvironmentManager:
         scripts_dir: Path,
     ) -> EnvironmentInfo:
         """Return a Python environment for the skill, creating a venv or conda env if needed."""
+        skill_dir = scripts_dir.parent.parent
         req_file = scripts_dir / "requirements.txt"
+        if not req_file.exists():
+            req_file = skill_dir / "requirements.txt"
         env_yml = scripts_dir / "environment.yml"
+        if not env_yml.exists():
+            env_yml = skill_dir / "environment.yml"
 
         if env_yml.exists() and self._conda_available():
             return self._prepare_conda(skill_id, env_yml)

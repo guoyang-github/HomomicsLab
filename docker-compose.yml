@@ -13,6 +13,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    command:
+      - gunicorn
+      - homomics_lab.main:app
+      - -c
+      - /app/gunicorn.conf.py
     environment:
       - HOMOMICS_DEBUG=false
       - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
@@ -20,9 +25,16 @@ services:
       - HOMOMICS_QUEUE_BACKEND=redis
       - HOMOMICS_REDIS_URL=redis://redis:6379/0
       - HOMOMICS_WORKER_MODE=false
+      - HOMOMICS_SKILL_SANDBOX_BACKEND=container
+      - HOMOMICS_SKILL_CONTAINER_IMAGE=python:3.12-slim
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro
+      # Mount the host Docker socket so the backend can launch sibling sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Run as root so the container process can access the Docker socket.
+    # In a locked-down environment, use group_add with the host docker GID instead.
+    user: "0:0"
     depends_on:
       - redis
     restart: unless-stopped
@@ -38,9 +50,13 @@ services:
       - HOMOMICS_DATABASE_URL=sqlite+aiosqlite:///./data/homics_lab.db
       - HOMOMICS_QUEUE_BACKEND=redis
       - HOMOMICS_REDIS_URL=redis://redis:6379/0
+      - HOMOMICS_SKILL_SANDBOX_BACKEND=container
+      - HOMOMICS_SKILL_CONTAINER_IMAGE=python:3.12-slim
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: "0:0"
     depends_on:
       - redis
     restart: unless-stopped

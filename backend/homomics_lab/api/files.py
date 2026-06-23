@@ -3,9 +3,11 @@ import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from homomics_lab.config import settings
 from homomics_lab.security import validate_project_id, sanitize_filename, safe_path
 from homomics_lab.storage import get_storage_backend, StorageBackend
+from homomics_lab.workspace.manager import WorkspaceManager
 
 router = APIRouter()
 
@@ -148,6 +150,13 @@ async def upload_file(
     file_path = project_dir / filename
     file_path.write_bytes(content)
 
+    # Mirror into the project's workspace data directory so skills (e.g.
+    # bio-statistics-visualization) can find the file when creating a session.
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    ws_data_path = ws.get_data_path(filename)
+    ws_data_path.parent.mkdir(parents=True, exist_ok=True)
+    ws_data_path.write_bytes(content)
+
     return {
         "filename": filename,
         "path": str(file_path),
@@ -155,3 +164,27 @@ async def upload_file(
         "size": len(content),
         "project_id": project_id,
     }
+
+
+@router.get("/{project_id}/{path:path}")
+async def serve_project_file(project_id: str, path: str):
+    """Serve a file from a project's workspace for previews/downloads."""
+    from homomics_lab.security import validate_project_id, safe_path
+
+    try:
+        project_id = validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    root = (settings.data_dir / "workspaces" / project_id).resolve()
+    try:
+        target = safe_path(path, root=root, must_exist=True)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    mime_type, _ = mimetypes.guess_type(target.name)
+    mime_type = mime_type or "application/octet-stream"
+    return FileResponse(path=target, media_type=mime_type, filename=target.name)

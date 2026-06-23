@@ -157,29 +157,32 @@ class BiEncoderReranker:
         if not candidates:
             return []
 
-        model = self._model or get_shared_embedding_model(self.model_name)
-        try:
-            import numpy as np
+        model = self._model
+        if model is None and self.model_name:
+            model = get_shared_embedding_model(self.model_name)
+        if model is not None:
+            try:
+                import numpy as np
 
-            texts = [text_fn(c) for c in candidates]
-            embeddings = model.encode(texts, convert_to_tensor=False)
-            query_embedding = model.encode([query], convert_to_tensor=False)
-            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-            norms[norms == 0] = 1
-            embeddings = embeddings / norms
-            query_norm = np.linalg.norm(query_embedding, axis=1, keepdims=True)
-            query_norm[query_norm == 0] = 1
-            query_embedding = query_embedding / query_norm
-            scores = np.dot(embeddings, query_embedding[0])
-            scored = list(zip(candidates, scores))
-            scored.sort(key=lambda x: x[1], reverse=True)
-            ordered = [c for c, _ in scored]
-            return ordered[:top_k] if top_k else ordered
-        except Exception as exc:
-            logger.warning("Bi-encoder reranking failed: %s", exc)
-            ordered = sorted(
-                candidates,
-                key=lambda c: len(set(query.lower().split()) & set(text_fn(c).lower().split())),
-                reverse=True,
-            )
-            return ordered[:top_k] if top_k else ordered
+                texts = [text_fn(c) for c in candidates]
+                embeddings = model.encode(texts, convert_to_tensor=False)
+                query_embedding = model.encode([query], convert_to_tensor=False)
+                norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+                norms[norms == 0] = 1
+                embeddings = embeddings / norms
+                query_norm = np.linalg.norm(query_embedding, axis=1, keepdims=True)
+                query_norm[query_norm == 0] = 1
+                query_embedding = query_embedding / query_norm
+                scores = np.dot(embeddings, query_embedding[0])
+                scored = list(zip(candidates, scores))
+                scored.sort(key=lambda x: x[1], reverse=True)
+                ordered = [c for c, _ in scored]
+                return ordered[:top_k] if top_k else ordered
+            except Exception as exc:
+                logger.warning("Bi-encoder reranking failed: %s", exc)
+        ordered = sorted(
+            candidates,
+            key=lambda c: len(set(query.lower().split()) & set(text_fn(c).lower().split())),
+            reverse=True,
+        )
+        return ordered[:top_k] if top_k else ordered

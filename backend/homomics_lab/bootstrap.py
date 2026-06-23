@@ -5,9 +5,12 @@ and the distributed worker need, so both can start with the same agents,
 tools, skills, and domain registry.
 """
 
+import logging
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.config import settings
@@ -28,6 +31,7 @@ from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.llm.cache import LLMResponseCache
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
+from homomics_lab.llm.runtime_config import is_local_llm_provider, load_llm_runtime_config
 from homomics_lab.skills.skill_dag import SkillDAG
 from homomics_lab.skills.skill_store import SkillStore
 from homomics_lab.skills.tracker import SkillPerformanceTracker
@@ -49,6 +53,8 @@ def _discover_external_skill_dirs() -> List[Path]:
       - ../mRNAseq-Skills/skills
       - ../riboseq-Skills/skills
     """
+    if not settings.skill_sibling_discovery_enabled:
+        return []
     # bootstrap.py is at backend/homomics_lab/bootstrap.py
     # project root is two levels up: backend/homomics_lab -> backend -> HomomicsLab
     project_root = Path(__file__).parent.parent.parent
@@ -151,9 +157,11 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         else None
     )
 
+    print("[bootstrap] creating skill runtime...")
     # Skills runtime
     tracker = SkillPerformanceTracker()
     llm_client = LLMClient(cache=llm_cache)
+    await llm_client.reload_config()
     skill_executor = SkillRuntimeExecutor(
         tracker=tracker,
         tool_registry=tool_registry,
@@ -161,12 +169,14 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         provenance_recorder=provenance_recorder,
     )
 
+    print("[bootstrap] creating skill store...")
     # SkillStore manages skill lifecycle (import / enable / disable / lock)
     skill_store = SkillStore(
         registry=skill_executor.registry,
         store_dir=settings.data_dir / "skill_store",
     )
 
+    print("[bootstrap] registering builtin skills...")
     # Register builtin skills through SkillStore
     register_builtin_skills(skill_executor)
     for skill in list(skill_executor.registry.list_all()):
@@ -178,6 +188,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             enabled=True,
         )
 
+    print("[bootstrap] importing external skills...")
     # Import external skill directories into the canonical skill store path.
     # Each skill subdirectory is copied to data/skill_store/imported/<namespace>/
     # so the runtime no longer depends on the original external location.
@@ -187,11 +198,23 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
 
     # Normalize collection folder names to clean namespaces and remove stale
     # imported directories (e.g. old "external" or renamed collections).
+    # Preserve locally-bundled skills shipped under data/skill_store/imported/<namespace>/.
     expected_namespaces = {
         _namespace_for_external_dir(d)
         for d in external_dirs
         if d.exists()
     }
+    local_namespaces: set[str] = set()
+    if skill_store.imported_dir.exists():
+        for ns_dir in skill_store.imported_dir.iterdir():
+            if not ns_dir.is_dir():
+                continue
+            for maybe_skill in ns_dir.iterdir():
+                if maybe_skill.is_dir() and (maybe_skill / "SKILL.md").exists():
+                    local_namespaces.add(ns_dir.name)
+                    break
+    expected_namespaces |= local_namespaces
+
     if skill_store.imported_dir.exists():
         for subdir in skill_store.imported_dir.iterdir():
             if subdir.is_dir() and subdir.name not in expected_namespaces:
@@ -232,6 +255,35 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 skill_executor.register_skill(skill)
             except Exception as exc:
                 print(f"Warning: Failed to import skill from {skill_path}: {exc}")
+
+    # Register locally-bundled skills (e.g. bio-statistics-visualization) that
+    # are already staged under data/skill_store/imported/<namespace>/.
+    for namespace in local_namespaces:
+        ns_dir = skill_store.imported_dir / namespace
+        if not ns_dir.exists():
+            continue
+        for skill_path in ns_dir.iterdir():
+            if not skill_path.is_dir() or not (skill_path / "SKILL.md").exists():
+                continue
+            try:
+                if skill_executor.registry.get(skill_path.name) is not None:
+                    continue
+                skill = discovery_loader.load_discovery(skill_path)
+                skill.metadata["source"] = "local"
+                skill.metadata["source_dir"] = str(skill_path)
+                skill.metadata["namespace"] = namespace
+                skill.metadata["trusted"] = True
+                skill_store._record_meta(
+                    skill=skill,
+                    namespace=namespace,
+                    source="local",
+                    source_dir=skill_path,
+                    enabled=True,
+                    trusted=True,
+                )
+                skill_executor.register_skill(skill)
+            except Exception as exc:
+                print(f"Warning: Failed to register local skill from {skill_path}: {exc}")
 
     # Wrap MCP tools as skills so the planner can orchestrate them
     if mcp_client is not None:
@@ -307,12 +359,24 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         cbkb=cbkb,
     )
 
+    # Local/self-hosted LLMs are usually CPU-bound and much slower. Disable
+    # optional LLM-powered context summarization by default so the chat pipeline
+    # does not block on multiple LLM calls for every turn.
+    enable_llm_summary = (
+        settings.context_enable_episodic_summary and not is_local_llm_provider()
+    )
+    logger.info(
+        "ContextEngine LLM summary enabled: %s (provider=%s)",
+        enable_llm_summary,
+        getattr(load_llm_runtime_config(), "provider", None),
+    )
+
     context_engine = ContextEngine(
         cbkb=cbkb,
         semantic_memory=semantic_memory,
         default_model=settings.context_engine_model or settings.llm_model or "default",
         embedding_model_name=settings.semantic_search_model,
-        enable_llm_summary=settings.context_enable_episodic_summary,
+        enable_llm_summary=enable_llm_summary,
     )
     project_state_manager = ProjectStateManager(cbkb=cbkb)
 

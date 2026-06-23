@@ -140,7 +140,9 @@ class MemoryManager:
     ) -> None:
         """Persist the current turn and update long-term memory."""
         if turn_result.agent_message is not None:
-            working_memory.add_message(turn_result.agent_message)
+            existing_ids = {m.id for m in working_memory.messages}
+            if turn_result.agent_message.id not in existing_ids:
+                working_memory.add_message(turn_result.agent_message)
 
         await self._save_session(session_id, project_id, working_memory, task_tree)
         await self._write_semantic_memory(

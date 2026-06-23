@@ -12,6 +12,18 @@ from homomics_lab.context.context_engine.models import ContextSource
 from homomics_lab.context.context_engine.ranker import ContextRanker
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.secrets import reset_secrets_manager
+
+
+@pytest.fixture(autouse=True)
+def isolate_secrets(tmp_path, monkeypatch):
+    # Prevent any persisted runtime LLM config (e.g. from local dev) from
+    # leaking into these unit tests.
+    reset_secrets_manager()
+    monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
+    monkeypatch.setattr("homomics_lab.config.settings.secrets_master_key", "test-key")
+    yield
+    reset_secrets_manager()
 
 
 @pytest.fixture

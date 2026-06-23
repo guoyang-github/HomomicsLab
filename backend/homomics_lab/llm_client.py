@@ -8,10 +8,13 @@ import asyncio
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
+import asyncio
+
 from homomics_lab.llm.cache import LLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
-from homomics_lab.llm.providers import get_provider_registry
+from homomics_lab.llm.providers import reset_provider_registry
 from homomics_lab.llm.router import LLMRouter
+from homomics_lab.llm.runtime_config import load_llm_runtime_config
 
 
 class LLMClient:
@@ -35,7 +38,18 @@ class LLMClient:
         cache: Optional[LLMResponseCache] = None,
     ):
         self.timeout = timeout
-        self._router = router or LLMRouter()
+        self._config_lock = asyncio.Lock()
+        # By default, load the latest runtime config (UI/env) into the router.
+        if router is None:
+            runtime_config = load_llm_runtime_config()
+            router = LLMRouter(runtime_config=runtime_config)
+        self._router = router
+
+        # Local/self-hosted models running on CPU are much slower than cloud APIs.
+        # Give them a generous default timeout so the first load/prompt does not
+        # immediately trip the fallback/retry logic.
+        if self.timeout < 300 and self._is_local_provider():
+            self.timeout = 300.0
         self._clients: Dict[str, Any] = {}
         self._init_usage()
         self._cache = cache
@@ -45,12 +59,45 @@ class LLMClient:
         self._legacy_api_key = api_key
         self._legacy_base_url = base_url
 
+    async def reload_config(self) -> None:
+        """Reload runtime LLM configuration and drop cached API clients."""
+        async with self._config_lock:
+            reset_provider_registry()
+            runtime_config = load_llm_runtime_config()
+            self._router = LLMRouter(runtime_config=runtime_config)
+            self._clients = {}
+            self._legacy_model = self._router.primary_model
+
     def _init_usage(self) -> None:
         """Initialize aggregated usage counters."""
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
         self.total_tokens = 0
         self.estimated_cost_usd = 0.0
+
+    def _is_local_provider(self) -> bool:
+        runtime = getattr(self._router, "runtime_config", None)
+        if runtime is None:
+            return False
+        provider = getattr(runtime, "provider", None)
+        return provider in ("ollama", "local")
+
+    @staticmethod
+    def _supports_temperature(provider_name: str, model: str, base_url: Optional[str] = None) -> bool:
+        """Return False for models with fixed server-side sampling parameters."""
+        model_lower = model.lower()
+        # Kimi K2.x and kimi-for-coding use fixed server-side sampling.
+        if (
+            model_lower.startswith("kimi-k2")
+            or model_lower.startswith("kimi-k2.")
+            or model_lower == "kimi-for-coding"
+        ):
+            return False
+        # Kimi Code endpoint (api.kimi.com/coding) is also fixed-sampling.
+        if base_url and "api.kimi.com/coding" in base_url.lower():
+            return False
+        # Other Moonshot models (moonshot-v1-*) do support temperature.
+        return True
 
     def _get_client(self, provider) -> Any:
         """Lazy-load an OpenAI-compatible async client for the provider."""
@@ -71,9 +118,14 @@ class LLMClient:
             ) from e
 
         kwargs: Dict[str, Any] = {"api_key": api_key, "timeout": self.timeout}
-        base_url = self._legacy_base_url or provider.base_url
+        base_url = self._legacy_base_url or provider.resolved_base_url
         if base_url:
             kwargs["base_url"] = base_url
+            # Kimi Code (api.kimi.com/coding) restricts access to recognized
+            # coding-agent User-Agents. Pretend to be Claude Code so the
+            # OpenAI-compatible endpoint accepts the request.
+            if "api.kimi.com/coding" in base_url.lower():
+                kwargs["default_headers"] = {"User-Agent": "claude-code/0.1.0"}
         client = AsyncOpenAI(**kwargs)
         self._clients[provider.name] = client
         return client
@@ -171,9 +223,13 @@ class LLMClient:
         kwargs: Dict[str, Any] = {
             "model": route.model,
             "messages": messages,
-            "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        # Kimi K2.7 (and some newer Kimi models) use fixed server-side sampling
+        # parameters and reject explicit temperature. Keep it for other models.
+        base_url = self._legacy_base_url or route.provider.resolved_base_url
+        if self._supports_temperature(route.provider.name, route.model, base_url):
+            kwargs["temperature"] = temperature
         if response_format:
             kwargs["response_format"] = response_format
 

@@ -104,6 +104,7 @@ class CascadeIntentAnalyzer:
         builtins = [
             ("qa", "builtin"),
             ("general_help", "builtin"),
+            ("greeting", "builtin"),
             ("file_conversion", "builtin"),
             ("single_cell_analysis", "builtin"),
             ("spatial_analysis", "builtin"),
@@ -131,6 +132,12 @@ class CascadeIntentAnalyzer:
                     "code snippet", "python脚本", "脚本", "shell脚本",
                     "解释", "explain", "示例", "example", "怎么用",
                     "处理csv", "处理文件", "filter", "parse", "rename",
+                ]
+            elif analysis_type == "greeting":
+                keywords = [
+                    "who are you", "what can you do", "introduce yourself",
+                    "hello", "hi", "hey", "你好", "您好", "哈喽",
+                    "你是谁", "你会什么", "介绍一下你自己", "自我介绍一下",
                 ]
             elif analysis_type == "file_conversion":
                 keywords = [
@@ -641,6 +648,7 @@ class CascadeIntentAnalyzer:
         if match.analysis_type in (
             "qa",
             "general_help",
+            "greeting",
             "clarification",
             "pubmed_search",
             "pubmed_fetch",

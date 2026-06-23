@@ -8,6 +8,7 @@ import {
   FileText,
   Settings,
   Command,
+  Image,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
@@ -17,6 +18,7 @@ export type NavItem =
   | 'workflow'
   | 'reports'
   | 'files'
+  | 'figures'
   | 'skills'
   | 'domains'
   | 'settings'
@@ -33,6 +35,7 @@ const navItems: SidebarItem[] = [
   { id: 'workflow', labelKey: 'nav.workflow', icon: Workflow, shortcut: '⌘2' },
   { id: 'reports', labelKey: 'nav.reports', icon: FileText, shortcut: '⌘3' },
   { id: 'files', labelKey: 'nav.files', icon: Folder, shortcut: '⌘4' },
+  { id: 'figures', labelKey: 'nav.figures', icon: Image, shortcut: '⌘7' },
   { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘5' },
   { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘6' },
   { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘,' },

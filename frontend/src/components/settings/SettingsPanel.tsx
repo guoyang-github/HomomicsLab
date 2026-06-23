@@ -27,7 +27,7 @@ import {
   TabsContent,
 } from '@/components/ui'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { toastSuccess } from '@/stores/toastStore'
+import { toastSuccess, toastError } from '@/stores/toastStore'
 import { useTranslation } from '@/i18n'
 
 const providerOptions = [
@@ -45,7 +45,7 @@ const modelOptions: Record<string, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-3-5-sonnet-latest', 'claude-3-opus-latest', 'claude-3-haiku-latest'],
   azure: ['gpt-4o', 'gpt-4o-mini'],
-  moonshot: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
+  moonshot: ['kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
   deepseek: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
   qwen: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-coder-plus'],
   local: ['llama3.1', 'qwen2.5', 'mistral', 'deepseek-coder'],
@@ -99,9 +99,23 @@ export function SettingsPanel() {
 
   const handleChange = () => setHasChanges(true)
 
-  const handleSave = () => {
-    toastSuccess(t('settings.saveSuccess'))
-    setHasChanges(false)
+  const handleSave = async () => {
+    const ok = await settings.saveSettings()
+    if (ok) {
+      toastSuccess(t('settings.saveSuccess'))
+      setHasChanges(false)
+    } else {
+      toastError(settings.saveError || t('settings.saveFailed'))
+    }
+  }
+
+  const handleTest = async () => {
+    await settings.testConnection()
+    if (settings.testResult?.ok) {
+      toastSuccess(t('settings.testSuccess'))
+    } else {
+      toastError(settings.testResult?.message || t('settings.testFailed'))
+    }
   }
 
   const handleReset = () => {
@@ -127,13 +141,23 @@ export function SettingsPanel() {
                 {t('settings.unsaved')}
               </Badge>
             )}
+            {settings.saveError && (
+              <span className="text-sm text-destructive">{settings.saveError}</span>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              disabled={settings.isTesting || !settings.model.model}
+            >
+              {settings.isTesting ? t('common.loading') : t('settings.testConnection')}
+            </Button>
             <Button variant="outline" onClick={handleReset}>
               <RotateCcw className="mr-1.5 h-4 w-4" />
               {t('common.reset')}
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={settings.isSaving}>
               <Save className="mr-1.5 h-4 w-4" />
-              {t('common.save')}
+              {settings.isSaving ? t('common.loading') : t('common.save')}
             </Button>
           </div>
         </div>
@@ -175,22 +199,36 @@ export function SettingsPanel() {
                     value={settings.model.provider}
                     options={providerOptions}
                     onChange={(e) => {
-                      settings.updateModel({ provider: e.target.value as any })
-                      settings.updateModel({ model: modelOptions[e.target.value][0] })
+                      const provider = e.target.value as any
+                      settings.updateModel({ provider })
+                      settings.updateModel({
+                        model: provider === 'custom' ? '' : modelOptions[provider][0],
+                      })
                       handleChange()
                     }}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">{t('settings.model.model')}</label>
-                  <Select
-                    value={settings.model.model}
-                    options={modelOptions[settings.model.provider].map((m) => ({ value: m, label: m }))}
-                    onChange={(e) => {
-                      settings.updateModel({ model: e.target.value })
-                      handleChange()
-                    }}
-                  />
+                  {settings.model.provider === 'custom' ? (
+                    <Input
+                      value={settings.model.model}
+                      placeholder="e.g. kimi-for-coding"
+                      onChange={(e) => {
+                        settings.updateModel({ model: e.target.value })
+                        handleChange()
+                      }}
+                    />
+                  ) : (
+                    <Select
+                      value={settings.model.model}
+                      options={modelOptions[settings.model.provider].map((m) => ({ value: m, label: m }))}
+                      onChange={(e) => {
+                        settings.updateModel({ model: e.target.value })
+                        handleChange()
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <label className="text-sm font-medium">{t('settings.model.apiKey')}</label>

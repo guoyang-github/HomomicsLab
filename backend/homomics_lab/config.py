@@ -67,7 +67,14 @@ class Settings(BaseSettings):
     skill_sandbox_backend: str = "auto"  # "auto" | "local" | "bubblewrap" | "container"
     skill_container_image: str = "python:3.10-slim"
     r_container_image: str = "r-base:4.3.0"
+    skill_container_memory_mb: int = 1024
+    skill_container_cpus: float = 1.0
+    skill_container_pids_limit: int = 64
+    skill_container_readonly_root: bool = True
+    skill_container_venv_mount: bool = True
     auto_install_dependencies: bool = False  # create venvs and install skill deps automatically
+    skill_hot_reload_enabled: bool = True  # watch sibling skill repos and domain files at startup
+    skill_sibling_discovery_enabled: bool = True  # auto-discover ../<domain>-Skills/skills
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
     interactive_mode: bool = False  # require approval for high-risk tool calls
     force_sandbox: bool = True  # if True, shell_exec and CodeAct must run through a sandbox

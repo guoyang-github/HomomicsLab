@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm
+from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings
 from .auth import require_auth
 from .rate_limit import rate_limit_dependency
 
@@ -27,3 +27,4 @@ api_router.include_router(domains.router, prefix="/domains", tags=["domains"], d
 api_router.include_router(secrets.router, prefix="/secrets", tags=["secrets"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(checkpoints.router, prefix="/jobs", tags=["checkpoints"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(llm.router, prefix="/llm", tags=["llm"], dependencies=_PROTECTED_DEPS)
+api_router.include_router(settings.router, prefix="/settings", tags=["settings"], dependencies=_PROTECTED_DEPS)

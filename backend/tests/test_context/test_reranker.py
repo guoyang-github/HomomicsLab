@@ -45,3 +45,13 @@ def test_bi_encoder_reranker_orders_by_similarity(candidates):
     assert len(ordered) == 3
     # RNA-seq items should be top two.
     assert "RNA" in ordered[0].content or "RNA" in ordered[1].content
+
+
+def test_shared_embedding_model_accepts_sentence_transformers_kwargs():
+    """SharedEmbeddingModel is used as a sentence-transformers compatible drop-in."""
+    from homomics_lab.context.embedding_cache import get_shared_embedding_model
+
+    model = get_shared_embedding_model("sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = model.encode(["hello", "world"], convert_to_tensor=False)
+    assert len(embeddings) == 2
+    assert len(embeddings[0]) > 0

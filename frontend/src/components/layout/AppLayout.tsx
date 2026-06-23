@@ -36,8 +36,10 @@ export function AppLayout({ activeItem, onNavigate, children }: AppLayoutProps) 
           '1': 'chat',
           '2': 'workflow',
           '3': 'reports',
-          '4': 'skills',
-          '5': 'domains',
+          '4': 'files',
+          '5': 'skills',
+          '6': 'domains',
+          '7': 'figures',
         }
         if (navMap[e.key]) {
           e.preventDefault()

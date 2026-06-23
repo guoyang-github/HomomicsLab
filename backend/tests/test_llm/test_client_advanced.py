@@ -7,6 +7,18 @@ import pytest
 from homomics_lab.llm.cache import LLMResponseCache
 from homomics_lab.llm.router import LLMRouter
 from homomics_lab.llm_client import LLMClient
+from homomics_lab.secrets import reset_secrets_manager
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def reset_singletons(tmp_path, monkeypatch):
+    reset_secrets_manager()
+    monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
+    monkeypatch.setattr("homomics_lab.config.settings.secrets_master_key", "test-key")
+    yield
+    reset_secrets_manager()
 
 
 class TestLLMResponseCache:
@@ -32,6 +44,7 @@ class TestLLMResponseCache:
 class TestLLMClientCacheAndFallback:
     @pytest.mark.asyncio
     async def test_cache_avoids_api_call(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         cache = LLMResponseCache(ttl_seconds=60, max_entries=10)
         messages = [{"role": "user", "content": "hello"}]
         cache.put("gpt-4o-mini", messages, 0.3, 100, None, "cached")

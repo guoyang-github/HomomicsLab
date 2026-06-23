@@ -61,11 +61,17 @@ def collect_input_files(inputs: Dict[str, Any]) -> List[FileRecord]:
 
 
 def collect_output_files(working_dir: Path) -> List[FileRecord]:
-    """Record checksums for all files produced in the working directory."""
+    """Record checksums for files produced in the working directory.
+
+    Only the top-level files are scanned to avoid accidentally walking
+    large project trees (e.g. ``.venv``, ``node_modules``) when the
+    scheduler is given a broad working directory. Nested skill outputs are
+    tracked via explicit artifact registration instead.
+    """
     records: List[FileRecord] = []
     if not working_dir.exists():
         return records
-    for path in working_dir.rglob("*"):
+    for path in working_dir.iterdir():
         if path.is_file() and path.name not in {
             "__skill_script__.py",
             "__skill_script__.R",

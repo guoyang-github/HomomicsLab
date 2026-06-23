@@ -5,6 +5,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel'
 import { Workspace } from '@/components/workspace/Workspace'
 import { ReportPanel } from '@/components/reports/ReportPanel'
 import { FileBrowser } from '@/components/files/FileBrowser'
+import { FigureWorkbench } from '@/components/Figures'
 import { SkillSearch } from '@/components/skills/SkillSearch'
 import { SkillManager } from '@/components/skills/SkillManager'
 import { SkillGenerator } from '@/components/skills/SkillGenerator'
@@ -27,6 +28,8 @@ function App() {
         return <ReportPanel />
       case 'files':
         return <FileBrowser />
+      case 'figures':
+        return <FigureWorkbench />
       case 'skills':
         return (
           <div className="h-full p-4">

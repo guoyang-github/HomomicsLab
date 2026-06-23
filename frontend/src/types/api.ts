@@ -186,6 +186,40 @@ export interface SkillLockResponse {
   skills: Record<string, string>
 }
 
+export interface CreateVizSessionRequest {
+  project_id: string
+  source_filename: string
+  table_type_hint?: string | null
+}
+
+export interface CreateVizSessionResponse {
+  session_id: string
+  success: boolean
+  outputs: Record<string, unknown>
+  interpretation: string
+}
+
+export interface RenderVizRequest {
+  project_id: string
+  action: 'stat_test' | 'render' | 'render_plotly' | 'vision_edit' | 'full_pipeline'
+  params: Record<string, unknown>
+}
+
+export interface RenderVizResponse {
+  success: boolean
+  outputs: Record<string, unknown>
+  artifacts?: Array<{ type: string; path: string; mime: string }>
+  interpretation?: string
+  error?: string
+}
+
+export interface FigureItem {
+  figure_id: string
+  formats: Record<string, string>
+  preview_url: string
+  created_at: string
+}
+
 export interface DomainListing {
   domain_id: string
   name: string

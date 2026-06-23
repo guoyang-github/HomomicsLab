@@ -456,7 +456,9 @@ class TurnRunner:
         working_memory: WorkingMemory,
     ) -> TurnResult:
         """Handle questions and general help requests that need no skill execution."""
-        if intent.analysis_type == "general_help":
+        if intent.analysis_type == "greeting":
+            response_text = self._generate_greeting_response(user_message)
+        elif intent.analysis_type == "general_help":
             response_text = await self._generate_general_help_response(
                 user_message, working_memory
             )
@@ -1155,6 +1157,15 @@ class TurnRunner:
                 "我目前无法调用 LLM 生成代码。请检查 OPENAI_API_KEY 配置，"
                 "或把需求拆分成更具体的步骤。"
             )
+
+    def _generate_greeting_response(self, user_message: str) -> str:
+        """Return a friendly self-introduction for greeting intents."""
+        return (
+            "Hello! I'm HomomicsLab, an AI assistant specialized in bioinformatics. "
+            "I can help you design experiments, analyze omics data (single-cell, spatial, "
+            "genomics, transcriptomics, etc.), write code snippets, interpret results, "
+            "and build analysis workflows. What would you like to work on?"
+        )
 
     def _generate_qa_response(self, intent: UserIntent, user_message: str) -> str:
         """Generate a direct text response for QA-style queries.

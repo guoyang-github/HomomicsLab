@@ -7,6 +7,16 @@ from homomics_lab.agent.turn_runner import TurnRunner, ExecutionMode
 from homomics_lab.agent.intent.models import UserIntent
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.models.common import MessageType
+from homomics_lab.secrets import reset_secrets_manager
+
+
+@pytest.fixture(autouse=True)
+def isolate_secrets(tmp_path, monkeypatch):
+    reset_secrets_manager()
+    monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
+    monkeypatch.setattr("homomics_lab.config.settings.secrets_master_key", "test-key")
+    yield
+    reset_secrets_manager()
 
 
 @pytest.fixture

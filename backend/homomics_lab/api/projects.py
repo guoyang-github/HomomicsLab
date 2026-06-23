@@ -23,6 +23,7 @@ from homomics_lab.config import settings
 from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.provenance.rocrate import ROCrateExporter
 from homomics_lab.security import validate_project_id
+from homomics_lab.workspace.manager import WorkspaceManager
 
 router = APIRouter()
 
@@ -287,3 +288,51 @@ async def get_project_audit_log(
     """Return recent audit log entries for a project."""
     await require_project_permission(project_id, "read", db, user_id)
     return {"project_id": project_id, "entries": AuditLogger().list_for_project(project_id, limit=limit)}
+
+
+@router.get("/{project_id}/figures")
+async def list_project_figures(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """List figure artifacts produced in the project's workspace."""
+    await require_project_permission(project_id, "read", db, user_id)
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    figures = []
+    for artifact in ws.list_artifacts(artifact_type="output"):
+        metadata = artifact.metadata or {}
+        if metadata.get("kind") != "figure":
+            continue
+        figure_id = metadata.get("figure_id") or Path(artifact.relative_path).name
+        formats = metadata.get("formats", {})
+        preview_path = formats.get("png") or formats.get("svg") or artifact.relative_path
+        figures.append({
+            "figure_id": figure_id,
+            "formats": formats,
+            "preview_url": f"/api/files/{project_id}/{preview_path}",
+            "created_at": artifact.created_at,
+        })
+    return figures
+
+
+@router.delete("/{project_id}/figures/{figure_id}")
+async def delete_project_figure(
+    project_id: str,
+    figure_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Delete a figure and all its registered output files."""
+    await require_project_permission(project_id, "write", db, user_id)
+    try:
+        project_id = validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    deleted = ws.delete_artifacts_by_figure_id(figure_id)
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Figure not found")
+
+    return {"success": True, "deleted_files": deleted}

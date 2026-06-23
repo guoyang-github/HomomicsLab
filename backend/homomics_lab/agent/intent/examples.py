@@ -26,6 +26,16 @@ BUILTIN_INTENT_EXAMPLES: Dict[str, List[str]] = {
         "给我个 shell 命令批量重命名",
         "filter rows with p-value less than 0.05",
     ],
+    "greeting": [
+        "who are you",
+        "what can you do",
+        "introduce yourself",
+        "hello",
+        "hi",
+        "你是谁",
+        "你会做什么",
+        "介绍一下你自己",
+    ],
     "single_cell_analysis": [
         "帮我分析这组单细胞数据",
         "run scRNA-seq QC and clustering",

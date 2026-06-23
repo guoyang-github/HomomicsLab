@@ -76,8 +76,9 @@ async def test_detect_qa(analyzer):
 @pytest.mark.asyncio
 async def test_detect_generic(analyzer):
     intent = await analyzer.analyze("hello world")
-    # Unknown input triggers active clarification in the new cascade analyzer.
-    assert intent.analysis_type in ("general", "clarification")
+    # Greeting intent is recognized directly.
+    assert intent.analysis_type == "greeting"
+    assert intent.complexity == "direct_response"
     assert intent.confidence >= 0.0
 
 

@@ -6,7 +6,7 @@ instances and caches frequently used embeddings.
 
 import logging
 from functools import lru_cache
-from typing import List, Optional
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +48,17 @@ class SharedEmbeddingModel:
         normalized = embeddings / norms
         return normalized.tolist()
 
-    def encode(self, texts: List[str]) -> List[List[float]]:
-        """Return normalized embeddings for a list of texts."""
+    def encode(
+        self,
+        texts: List[str],
+        convert_to_tensor: bool = False,
+        **kwargs: Any,
+    ) -> List[List[float]]:
+        """Return normalized embeddings for a list of texts.
+
+        Accepts ``convert_to_tensor`` for compatibility with the
+        sentence-transformers API, but always returns plain normalized vectors.
+        """
         if not texts:
             return []
         return self._cached_encode_tuple(tuple(texts))

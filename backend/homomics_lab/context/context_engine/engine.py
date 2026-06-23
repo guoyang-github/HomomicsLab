@@ -72,7 +72,6 @@ class ContextEngine:
             output_reserve_tokens=reserved_output_tokens,
         )
         input_budget = budget_manager.available_input_tokens()
-
         # Collect candidate context parts
         parts: List[ContextPart] = []
 
@@ -153,23 +152,24 @@ class ContextEngine:
             except Exception as exc:
                 logger.warning("Semantic memory retrieval failed: %s", exc)
 
-        # 5. Episodic summary
-        try:
-            summary = await self.episodic_summarizer.summarize(
-                working_memory.get_recent_messages(10)
-            )
-            summary_text = summary.to_text()
-            if summary_text:
-                parts.append(
-                    ContextPart(
-                        content=summary_text,
-                        source=ContextSource.EPISODIC_SUMMARY,
-                        priority=7,
-                        tokens=budget_manager.count(summary_text),
-                    )
+        # 5. Episodic summary (optional; skip when LLM summarization is disabled)
+        if self.enable_llm_summary:
+            try:
+                summary = await self.episodic_summarizer.summarize(
+                    working_memory.get_recent_messages(10)
                 )
-        except Exception as exc:
-            logger.warning("Episodic summary failed: %s", exc)
+                summary_text = summary.to_text()
+                if summary_text:
+                    parts.append(
+                        ContextPart(
+                            content=summary_text,
+                            source=ContextSource.EPISODIC_SUMMARY,
+                            priority=7,
+                            tokens=budget_manager.count(summary_text),
+                        )
+                    )
+            except Exception as exc:
+                logger.warning("Episodic summary failed: %s", exc)
 
         # 6. Working memory chat messages
         chat_items = working_memory.to_context_items()

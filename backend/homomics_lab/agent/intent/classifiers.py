@@ -41,6 +41,11 @@ class KeywordIntentClassifier(IntentClassifier):
             "解释", "explain", "示例", "example", "怎么用",
             "处理csv", "处理文件", "filter", "parse", "rename",
         ],
+        "greeting": [
+            "who are you", "what can you do", "introduce yourself",
+            "hello", "hi ", "hi,", "hey", "你好", "您好", "哈喽",
+            "你是谁", "你会什么", "介绍一下你自己", "自我介绍一下",
+        ],
     }
 
     NEGATIVE_SIGNALS: Dict[str, List[str]] = {
@@ -248,7 +253,12 @@ class LLMIntentClassifier(IntentClassifier):
 
     def is_available(self) -> bool:
         client = self._get_client()
-        return client is not None and client.is_configured()
+        if client is None or not client.is_configured():
+            return False
+        # Local/self-hosted models are typically much slower; skip the optional
+        # LLM intent classifier and rely on keyword + embedding classifiers.
+        from homomics_lab.llm.runtime_config import is_local_llm_provider
+        return not is_local_llm_provider()
 
     async def classify(
         self,

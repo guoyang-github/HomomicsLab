@@ -234,6 +234,7 @@ class LocalScheduler(BaseScheduler):
                     job_id=job_id,
                     current_phase=skill.id,
                     python_path=env_info.python_path,
+                    unrestricted=skill.metadata.get("trusted", False),
                 )
         except Exception as exc:
             self._report_progress(

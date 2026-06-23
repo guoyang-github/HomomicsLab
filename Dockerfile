@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml uv.lock README.md ./
 COPY backend/ ./backend/
 
-# Export a locked requirements file from uv.lock (production deps only).
-RUN uv export --locked --no-dev -o requirements.txt
+# Export a locked requirements file from uv.lock (production deps only, no hashes
+# so the subsequent editable install of the project itself can succeed).
+RUN uv export --locked --no-dev --no-hashes -o requirements.txt
 
 # --- Production stage ---
 FROM python:3.12-slim AS production
@@ -37,9 +38,14 @@ RUN groupadd -r homomics && useradd -r -g homomics -d /app homomics
 # Copy locked requirements, install dependencies, then install the package.
 COPY --chown=homomics:homomics pyproject.toml README.md ./
 COPY --chown=homomics:homomics backend/ ./backend/
+COPY --chown=homomics:homomics gunicorn.conf.py ./gunicorn.conf.py
 COPY --chown=homomics:homomics --from=builder /app/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir hatchling \
     && pip install --no-cache-dir -r requirements.txt -e .
+
+# Add the Docker CLI so the backend can spawn sibling container sandboxes.
+COPY --from=docker:27.3.1-cli /usr/local/bin/docker /usr/local/bin/docker
+RUN chmod +x /usr/local/bin/docker
 
 # Ensure the editable install metadata is present so console scripts work.
 RUN python -c "import homomics_lab; print(homics_lab.__file__)"
@@ -54,4 +60,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-CMD ["uvicorn", "homomics_lab.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["gunicorn", "homomics_lab.main:app", "-c", "/app/gunicorn.conf.py"]

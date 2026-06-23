@@ -27,7 +27,7 @@ setup_tracing(service_name=settings.otel_service_name)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ctx = await bootstrap_worker_context(enable_hot_reload=True)
+    ctx = await bootstrap_worker_context(enable_hot_reload=settings.skill_hot_reload_enabled)
 
     # Expose initialized registries for API endpoints
     app.state.tool_registry = ctx["tool_registry"]

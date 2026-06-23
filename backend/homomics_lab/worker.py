@@ -30,8 +30,30 @@ class WorkerShutdown:
     def set(self):
         self._event.set()
 
+    def is_set(self) -> bool:
+        return self._event.is_set()
+
     async def wait(self):
         await self._event.wait()
+
+
+async def _reload_llm_config_loop(ctx: dict, shutdown: WorkerShutdown, interval: int = 30) -> None:
+    """Periodically reload LLM config so workers pick up UI changes."""
+    llm_client = ctx.get("llm_client")
+    if llm_client is None:
+        return
+    while not shutdown.is_set():
+        try:
+            await asyncio.wait_for(shutdown.wait(), timeout=interval)
+        except asyncio.TimeoutError:
+            pass
+        if shutdown.is_set():
+            break
+        try:
+            await llm_client.reload_config()
+            logger.debug("Worker LLM config reloaded")
+        except Exception:
+            logger.exception("Failed to reload LLM config in worker")
 
 
 async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
@@ -39,7 +61,7 @@ async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
     shutdown = shutdown or WorkerShutdown()
 
     # Initialize the same runtime context as the API process.
-    await bootstrap_worker_context(enable_hot_reload=False)
+    ctx = await bootstrap_worker_context(enable_hot_reload=False)
 
     # JobService uses the configured queue backend (Redis when enabled).
     job_service = JobService()
@@ -51,10 +73,18 @@ async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
     runner.start()
     logger.info("Worker started (backend=%s)", settings.queue_backend)
 
+    # Keep LLM config in sync with the API process / UI.
+    reload_task = asyncio.create_task(_reload_llm_config_loop(ctx, shutdown))
+
     try:
         await shutdown.wait()
     finally:
         logger.info("Worker shutting down...")
+        reload_task.cancel()
+        try:
+            await reload_task
+        except asyncio.CancelledError:
+            pass
         await job_service.close()
         logger.info("Worker stopped")
 

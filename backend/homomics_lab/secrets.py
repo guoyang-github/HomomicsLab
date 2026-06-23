@@ -77,7 +77,7 @@ class SecretsManager:
         master_key: Optional[str] = None,
         plaintext_fallback: bool = False,
     ):
-        self.db_path = db_path or (settings.data_dir / "secrets.db")
+        self.db_path = db_path or settings.secrets_db_path or (settings.data_dir / "secrets.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._plaintext = plaintext_fallback
 

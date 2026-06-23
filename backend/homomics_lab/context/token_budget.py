@@ -107,17 +107,21 @@ class TokenBudgetManager:
         except Exception:
             pass
 
-        # Fall back to transformers AutoTokenizer
-        try:
-            from transformers import AutoTokenizer
+        # Fall back to transformers AutoTokenizer for known local models.
+        # Use a tiny, commonly-cached model and require local files so the
+        # fallback never blocks on a network download.
+        if self.normalized_model not in ("default",):
+            try:
+                from transformers import AutoTokenizer
 
-            # Use a small default model tokenizer if model name is unknown
-            tokenizer_name = "sentence-transformers/all-MiniLM-L6-v2"
-            self._encoder = AutoTokenizer.from_pretrained(tokenizer_name)
-            self._encoder_kind = "transformers"
-            return self._encoder
-        except Exception:
-            pass
+                tokenizer_name = "gpt2"
+                self._encoder = AutoTokenizer.from_pretrained(
+                    tokenizer_name, local_files_only=True
+                )
+                self._encoder_kind = "transformers"
+                return self._encoder
+            except Exception:
+                pass
 
         self._encoder = None
         self._encoder_kind = "heuristic"

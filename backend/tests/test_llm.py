@@ -84,3 +84,44 @@ class TestLLMRouter:
         router = LLMRouter()
         models = router.list_available_models()
         assert any(m["provider"] == "openai" for m in models)
+
+    def test_local_provider_restricts_fallback_to_primary(self):
+        from homomics_lab.llm.runtime_config import LLMRuntimeConfig
+
+        registry = ProviderRegistry()
+        ollama = registry.get("ollama")
+        ollama.explicit_api_key = "dummy"
+        ollama.explicit_base_url = "http://localhost:11434/v1"
+
+        runtime = LLMRuntimeConfig(
+            provider="ollama",
+            model="qwen2.5:1.5b",
+            api_key="dummy",
+            base_url="http://localhost:11434/v1",
+        )
+        router = LLMRouter(registry=registry, runtime_config=runtime)
+        assert router.primary_model == "qwen2.5:1.5b"
+        assert router.fallback_models == ["qwen2.5:1.5b"]
+
+        decision = router.select()
+        assert decision.model == "qwen2.5:1.5b"
+        assert decision.provider.name == "ollama"
+
+    def test_local_provider_complexity_routing_uses_primary(self):
+        from homomics_lab.llm.runtime_config import LLMRuntimeConfig
+
+        registry = ProviderRegistry()
+        ollama = registry.get("ollama")
+        ollama.explicit_api_key = "dummy"
+        ollama.explicit_base_url = "http://localhost:11434/v1"
+
+        runtime = LLMRuntimeConfig(
+            provider="ollama",
+            model="qwen2.5:1.5b",
+            api_key="dummy",
+            base_url="http://localhost:11434/v1",
+        )
+        router = LLMRouter(registry=registry, runtime_config=runtime)
+        decision = router.select_by_complexity(intent_type="planning")
+        assert decision.model == "qwen2.5:1.5b"
+        assert decision.provider.name == "ollama"

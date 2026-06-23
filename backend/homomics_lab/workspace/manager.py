@@ -293,6 +293,42 @@ class WorkspaceManager:
             for r in rows
         ]
 
+    def delete_artifacts_by_figure_id(self, figure_id: str) -> int:
+        """Delete all tracked files and database records for a figure."""
+        db_path = self.workspace_dir / self.METADATA_SUBDIR / "workspace.db"
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM artifacts WHERE metadata LIKE ?",
+                (f'%"figure_id": "{figure_id}"%',),
+            ).fetchall()
+
+        deleted_files = 0
+        for row in rows:
+            metadata = json.loads(row["metadata"])
+            if metadata.get("figure_id") != figure_id:
+                continue
+
+            for fmt_path in metadata.get("formats", {}).values():
+                target = self.workspace_dir / fmt_path
+                if target.exists() and target.is_file():
+                    target.unlink()
+                    deleted_files += 1
+
+            abs_path = self.workspace_dir / row["relative_path"]
+            if abs_path.exists() and abs_path.is_file():
+                abs_path.unlink()
+                deleted_files += 1
+
+            with sqlite3.connect(str(db_path)) as conn:
+                conn.execute(
+                    "DELETE FROM artifacts WHERE artifact_id = ?",
+                    (row["artifact_id"],),
+                )
+                conn.commit()
+
+        return deleted_files
+
     # ─────────────────────────────────────────
     # Snapshots
     # ─────────────────────────────────────────

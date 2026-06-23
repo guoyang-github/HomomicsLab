@@ -14,10 +14,16 @@ the most secure available backend).
 import asyncio
 import json
 import shutil
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+try:
+    import resource as _resource_module
+except ImportError:
+    _resource_module = None
 
 from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
@@ -46,6 +52,7 @@ class Sandbox(ABC):
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
+        unrestricted: bool = False,
     ) -> Dict[str, Any]:
         """Execute Python code and return its result dictionary."""
         pass
@@ -144,8 +151,8 @@ class LocalSandbox(Sandbox):
             "container_image": None,
             "container_digest": None,
             "resource_limits": {
-                "memory_mb": 512,
-                "cpu_time_seconds": 60,
+                "memory_mb": 2048,
+                "cpu_time_seconds": 120,
                 "file_size_mb": 100,
             },
         }
@@ -159,29 +166,17 @@ class LocalSandbox(Sandbox):
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
+        unrestricted: bool = False,
     ) -> Dict[str, Any]:
         """Execute Python code in a subprocess with resource limits."""
         inputs_json = json.dumps(inputs)
-        script = self._build_python_script(code, inputs)
+        script = self._build_python_script(code, inputs, unrestricted=unrestricted)
 
         script_path = self.working_dir / "__skill_script__.py"
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
         executable = python_path or "python"
-
-        def _set_limits():
-            """Set resource limits for the child process."""
-            try:
-                import resource
-                # 512 MB memory limit
-                resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
-                # 60 seconds CPU time limit
-                resource.setrlimit(resource.RLIMIT_CPU, (60, 60))
-                # 100 MB file size limit
-                resource.setrlimit(resource.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024))
-            except (ImportError, OSError, ValueError):
-                pass  # resource module not available on non-Unix systems
 
         proc = None
         try:
@@ -190,7 +185,6 @@ class LocalSandbox(Sandbox):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
-                preexec_fn=_set_limits,
             )
 
             stdout_lines, stderr_lines = await self._stream_subprocess(
@@ -246,16 +240,21 @@ class LocalSandbox(Sandbox):
 
         def _set_limits():
             """Set resource limits for the child process."""
+            if _resource_module is None:
+                return
             try:
-                import resource
-                # 512 MB memory limit
-                resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
-                # 60 seconds CPU time limit
-                resource.setrlimit(resource.RLIMIT_CPU, (60, 60))
+                # 2048 MB memory limit
+                _resource_module.setrlimit(
+                    _resource_module.RLIMIT_AS, (2048 * 1024 * 1024, 2048 * 1024 * 1024)
+                )
+                # 120 seconds CPU time limit
+                _resource_module.setrlimit(_resource_module.RLIMIT_CPU, (120, 120))
                 # 100 MB file size limit
-                resource.setrlimit(resource.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024))
-            except (ImportError, OSError, ValueError):
-                pass  # resource module not available on non-Unix systems
+                _resource_module.setrlimit(
+                    _resource_module.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024)
+                )
+            except (OSError, ValueError):
+                pass
 
         proc = None
         try:
@@ -389,13 +388,47 @@ class LocalSandbox(Sandbox):
         await asyncio.gather(stdout_task, stderr_task)
         return stdout_lines, stderr_lines
 
-    def _build_python_script(self, code: str, inputs: Dict[str, Any]) -> str:
+    _RESOURCE_LIMITS_SNIPPET = """\
+try:
+    import resource
+    # 2048 MB memory limit (statsmodels/patsy imports need >512 MB)
+    resource.setrlimit(resource.RLIMIT_AS, (2048 * 1024 * 1024, 2048 * 1024 * 1024))
+    # 120 seconds CPU time limit
+    resource.setrlimit(resource.RLIMIT_CPU, (120, 120))
+    # 100 MB file size limit
+    resource.setrlimit(resource.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024))
+except Exception:
+    pass
+"""
+
+    def _build_python_script(self, code: str, inputs: Dict[str, Any], unrestricted: bool = False) -> str:
         inputs_json = json.dumps(inputs)
+        limits = self._RESOURCE_LIMITS_SNIPPET
+
+        if unrestricted:
+            return f"""import json
+
+{limits}
+# Inject inputs
+__inputs__ = json.loads({repr(inputs_json)})
+locals().update(__inputs__)
+
+# Run skill code
+{code}
+
+# Serialize result
+if 'result' not in locals():
+    result = {{}}
+
+with open('__skill_result__.json', 'w') as f:
+    json.dump(result, f)
+"""
 
         return f"""import json
 import sys
 import types
 
+{limits}
 # Delete dangerous modules if they were pre-loaded
 for _mod in ['os', 'subprocess', 'socket', 'urllib', 'http', 'ftplib',
               'telnetlib', 'smtplib', 'poplib', 'imaplib', 'nntplib',
@@ -541,9 +574,10 @@ class BubblewrapSandbox(Sandbox):
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
+        unrestricted: bool = False,
     ) -> Dict[str, Any]:
         inputs_json = json.dumps(inputs)
-        script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
+        script = LocalSandbox(self.working_dir)._build_python_script(code, inputs, unrestricted=unrestricted)
         script_path = self.working_dir / "__skill_script__.py"
         script_path.write_text(script)
 
@@ -683,7 +717,26 @@ class ContainerSandbox(Sandbox):
             "container_image": self.container_image,
             "container_digest": self._get_image_digest(),
             "network": "none",
+            "resource_limits": {
+                "memory_mb": settings.skill_container_memory_mb,
+                "cpus": settings.skill_container_cpus,
+                "pids_limit": settings.skill_container_pids_limit,
+                "readonly_root": settings.skill_container_readonly_root,
+            },
         }
+
+    def _resource_args(self) -> List[str]:
+        """Build Docker/Podman resource-limit flags."""
+        args = [
+            "--memory", f"{settings.skill_container_memory_mb}m",
+            "--cpus", str(settings.skill_container_cpus),
+            "--pids-limit", str(settings.skill_container_pids_limit),
+            "--stop-timeout", "10",
+            "--init",
+        ]
+        if settings.skill_container_readonly_root:
+            args.extend(["--read-only", "--tmpfs", "/tmp:noexec,nosuid,size=100m"])
+        return args
 
     def _get_image_digest(self) -> Optional[str]:
         """Return the image digest if available, with caching."""
@@ -723,26 +776,76 @@ class ContainerSandbox(Sandbox):
         job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
+        unrestricted: bool = False,
     ) -> Dict[str, Any]:
-        inputs_json = json.dumps(inputs)
-        script = LocalSandbox(self.working_dir)._build_python_script(code, inputs)
+        engine = self._engine
+        if engine is None:
+            raise RuntimeError("No container engine available")
+
+        # Container paths differ from the host. Remap source_dir and
+        # workspace_base to dedicated container mounts so the skill script
+        # can find its own package and write outputs to the workspace.
+        container_inputs = dict(inputs)
+        extra_mounts: List[str] = []
+
+        source_dir = container_inputs.get("source_dir")
+        if source_dir:
+            extra_mounts.extend(["-v", f"{Path(source_dir).resolve()}:/skill_source:ro"])
+            container_inputs["source_dir"] = "/skill_source"
+
+        workspace_base = container_inputs.get("workspace_base")
+        if workspace_base:
+            extra_mounts.extend(["-v", f"{Path(workspace_base).resolve()}:/workspace"])
+            container_inputs["workspace_base"] = "/workspace"
+
+        # Keep host inputs for path remapping after execution.
+        host_inputs = inputs
+        inputs_json = json.dumps(container_inputs)
+        script = LocalSandbox(self.working_dir)._build_python_script(code, container_inputs, unrestricted=unrestricted)
         script_path = self.working_dir / "__skill_script__.py"
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
-        engine = self._engine
-        if engine is None:
-            raise RuntimeError("No container engine available")
+
+        # Prefer a cached per-skill venv when available. Venvs created on the
+        # host often have a python binary that symlinks to a host interpreter,
+        # which does not exist inside the container. We therefore mount the
+        # site-packages directory and run the container's own interpreter with
+        # PYTHONPATH instead.
+        venv_python = "python"
+        venv_mount_args: List[str] = []
+        pythonpath_args: List[str] = []
+        if (
+            settings.skill_container_venv_mount
+            and python_path
+            and Path(python_path).is_file()
+        ):
+            venv_root = Path(python_path).parent.parent
+            py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            site_packages = venv_root / "lib" / f"python{py_version}" / "site-packages"
+            if site_packages.is_dir():
+                venv_mount_args = ["-v", f"{site_packages}:/skill_pkgs:ro"]
+                pythonpath_args = ["-e", "PYTHONPATH=/skill_pkgs"]
+            else:
+                # Fallback to mounting the whole venv and hoping the python
+                # binary is portable (e.g. built from a portable Python build).
+                venv_mount_args = ["-v", f"{venv_root}:/skill_venv:ro"]
+                venv_python = "/skill_venv/bin/python"
+
         args = [
             engine,
             "run", "--rm",
+            *self._resource_args(),
             "--network", "none",
+            *extra_mounts,
+            *venv_mount_args,
+            *pythonpath_args,
             "-v", f"{self.working_dir}:/work",
             "-w", "/work",
             self.container_image,
-            "python", "/work/__skill_script__.py", inputs_json,
+            venv_python, "/work/__skill_script__.py", inputs_json,
         ]
-        return await self._run_in_container(
+        result = await self._run_in_container(
             args,
             result_path,
             timeout_seconds=timeout_seconds,
@@ -750,6 +853,39 @@ class ContainerSandbox(Sandbox):
             job_id=job_id,
             current_phase=current_phase,
         )
+        return self._remap_container_paths(result, host_inputs)
+
+    def _remap_container_paths(
+        self, result: Any, host_inputs: Dict[str, Any]
+    ) -> Any:
+        """Translate container paths inside a skill result back to host paths.
+
+        Skills receive ``source_dir`` and ``workspace_base`` as dedicated
+        container mounts; any paths they return must be converted back so that
+        the host API layer can read and register artifacts.
+        """
+        mapping: Dict[str, str] = {}
+        source_dir = host_inputs.get("source_dir")
+        if source_dir:
+            mapping["/skill_source"] = str(Path(source_dir).resolve())
+        workspace_base = host_inputs.get("workspace_base")
+        if workspace_base:
+            mapping["/workspace"] = str(Path(workspace_base).resolve())
+        mapping["/work"] = str(self.working_dir.resolve())
+
+        def _walk(value: Any) -> Any:
+            if isinstance(value, str):
+                for container_path, host_path in mapping.items():
+                    if value.startswith(container_path):
+                        return host_path + value[len(container_path) :]
+                return value
+            if isinstance(value, dict):
+                return {k: _walk(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_walk(v) for v in value]
+            return value
+
+        return _walk(result)
 
     async def run_r(
         self,

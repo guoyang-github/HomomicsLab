@@ -1,0 +1,7 @@
+# Dockerfile 强制仓库、本地都使用 LF
+Dockerfile text eol=lf
+# 所有脚本文件统一 LF
+*.sh text eol=lf
+# 普通代码文件按需处理
+*.py text eol=lf
+*.js text eol=lf

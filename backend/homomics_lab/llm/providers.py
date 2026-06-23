@@ -25,9 +25,20 @@ class ProviderConfig:
     secret_key: str  # key inside secrets manager namespace "llm"
     default_models: List[str]
     secret_namespace: str = "llm"
+    explicit_api_key: Optional[str] = None
+    explicit_base_url: Optional[str] = None
+
+    @property
+    def resolved_base_url(self) -> str:
+        """Return the effective base URL, allowing runtime overrides."""
+        if self.explicit_base_url:
+            return self.explicit_base_url
+        return self.base_url
 
     def resolve_api_key(self) -> Optional[str]:
-        """Return API key from environment, then secrets manager."""
+        """Return API key from explicit value, environment, then secrets manager."""
+        if self.explicit_api_key:
+            return self.explicit_api_key
         env_key = os.environ.get(self.api_key_env)
         if env_key:
             return env_key
@@ -143,8 +154,20 @@ class ProviderRegistry:
     def list_configured(self) -> List[ProviderConfig]:
         return [p for p in self._providers.values() if p.is_configured()]
 
-    def infer_provider(self, model: str) -> Optional[ProviderConfig]:
-        """Infer provider from model name or settings."""
+    def infer_provider(
+        self,
+        model: str,
+        runtime_provider: Optional[str] = None,
+    ) -> Optional[ProviderConfig]:
+        """Infer provider from runtime config, model name, or settings."""
+        # Runtime provider (from UI / settings API) takes highest precedence.
+        if runtime_provider:
+            provider = self.get(runtime_provider)
+            if provider is not None:
+                return provider
+            # If the runtime provider is not registered yet (e.g. custom), the
+            # caller is responsible for registering it; fall through below.
+
         # Explicit provider setting takes precedence.
         explicit = os.environ.get("HOMOMICS_LLM_PROVIDER")
         if explicit:
@@ -185,3 +208,31 @@ def get_provider_registry() -> ProviderRegistry:
     if _registry is None:
         _registry = ProviderRegistry()
     return _registry
+
+
+def reset_provider_registry() -> None:
+    """Reset the module-level registry singleton so it is rebuilt on next use."""
+    global _registry
+    _registry = None
+
+
+def register_custom_provider(
+    base_url: str,
+    api_key: str,
+    model: str,
+    name: str = "custom",
+) -> ProviderConfig:
+    """Register and return a dynamic custom OpenAI-compatible provider."""
+    registry = get_provider_registry()
+    config = ProviderConfig(
+        name=name,
+        display_name="Custom Endpoint",
+        base_url=base_url,
+        api_key_env="CUSTOM_API_KEY",
+        secret_key="CUSTOM_API_KEY",
+        default_models=[model],
+        explicit_api_key=api_key,
+        explicit_base_url=base_url,
+    )
+    registry.register(config)
+    return config
