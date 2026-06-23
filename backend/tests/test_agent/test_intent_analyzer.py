@@ -77,7 +77,8 @@ async def test_detect_qa(analyzer):
 async def test_detect_information_request_suppresses_workflow(analyzer_with_single_cell_domain):
     """Knowledge-seeking questions about analysis types must not trigger execution."""
     intent = await analyzer_with_single_cell_domain.analyze("单细胞转录组有哪些分析内容？")
-    assert intent.analysis_type == "qa"
+    # With the v2 schema these map to the dedicated ``information_request`` intent.
+    assert intent.analysis_type in ("qa", "information_request")
     assert intent.complexity == "direct_response"
     assert intent.interaction_mode == "answer"
 

@@ -1,4 +1,4 @@
-"""Intent classifiers: keyword, embedding, and LLM-based."""
+"""Intent classifiers: keyword guardrail, embedding semantic match, and LLM-first."""
 
 import json
 import re
@@ -6,7 +6,11 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
-from homomics_lab.agent.intent.models import IntentDefinition, IntentMatch
+from homomics_lab.agent.intent.models import (
+    IntentDefinition,
+    IntentMatch,
+    StructuredIntent,
+)
 from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
 
@@ -28,15 +32,32 @@ class IntentClassifier(ABC):
 
 
 class KeywordIntentClassifier(IntentClassifier):
-    """Keyword-based intent classifier with weighted matching and negation."""
+    """Keyword-based guardrail classifier.
 
-    # Strong domain-agnostic signals
+    This classifier is intentionally narrow. It does not try to enumerate every
+    possible user utterance; instead it provides:
+
+    1. High-confidence fast-path signals for unambiguous domain-agnostic intents
+       (qa, information_request, general_help, greeting).
+    2. A guardrail that suppresses workflow execution when the user is clearly
+       asking for information or code rather than asking the system to run an
+       analysis.
+    3. Strong domain keywords for known analysis domains.
+
+    The heavy lifting is left to the LLM-first classifier.
+    """
+
+    # Strong domain-agnostic signals. Keep these minimal and precise.
     DOMAIN_KEYWORDS: Dict[str, List[str]] = {
         "qa": [
-            "什么是", "what is", "有哪些", "what are", "包括哪些",
-            "怎么", "如何", "how to", "how do", "explain", "what is",
-            "告诉我", "介绍", "概述", " overview", "include",
-            "单细胞转录组有哪些分析内容",
+            "什么是", "what is", "怎么", "如何", "how to", "how do",
+            "explain", "告诉我", "介绍", "概述", "overview",
+            "什么是.*分析", ".*是什么",
+        ],
+        "information_request": [
+            "有哪些", "what are", "包括哪些", "what can you do",
+            "你会什么", "你能做什么", "what do you support",
+            "有哪些分析内容", "有哪些步骤", "how do i get started",
         ],
         "general_help": [
             "写一段", "写个脚本", "写代码", "生成代码", "generate code",
@@ -51,23 +72,19 @@ class KeywordIntentClassifier(IntentClassifier):
         ],
     }
 
-    NEGATIVE_SIGNALS: Dict[str, List[str]] = {
-        "qa": ["generate code", "写代码", "code snippet", "脚本"],
-        "general_help": ["什么是", "what is", "how does", "解释", "有哪些", "what are"],
-    }
-
-    # Information-seeking patterns that should suppress workflow execution intents.
-    INFORMATION_REQUEST_PATTERNS: List[str] = [
+    # Phrases that should suppress any workflow/analysis intent.
+    GUARDRAIL_PATTERNS: List[str] = [
         r"有哪些分析内容",
         r"有哪些步骤",
         r"包括哪些",
-        r"什么是.*分析",
-        r"介绍一下.*分析",
-        r".*是什么",
-        r".*有哪些",
+        r"what are the (steps|analyses|analyses available)",
+        r"what can you do",
+        r"how do i get started",
+        r"你能做什么",
+        r"你会什么",
     ]
 
-    def __init__(self, weight: float = 0.3):
+    def __init__(self, weight: float = 0.2):
         super().__init__(weight=weight)
 
     async def classify(
@@ -82,21 +99,31 @@ class KeywordIntentClassifier(IntentClassifier):
 
         # Built-in domain-agnostic keywords
         for analysis_type, keywords in self.DOMAIN_KEYWORDS.items():
-            matches = [kw for kw in keywords if kw.lower() in text]
+            matches = []
+            for kw in keywords:
+                if kw.startswith(".*") or kw.endswith(".*") or "what is" in kw:
+                    # Treat as regex pattern.
+                    try:
+                        if re.search(kw, message, re.IGNORECASE):
+                            matches.append(kw)
+                    except re.error:
+                        if kw.lower() in text:
+                            matches.append(kw)
+                else:
+                    if kw.lower() in text:
+                        matches.append(kw)
             if matches:
-                scores[analysis_type] += len(matches) * 0.8
+                # Stronger weight for explicit information-request patterns.
+                boost = 1.2 if analysis_type == "information_request" else 0.8
+                scores[analysis_type] += len(matches) * boost
                 reasons[analysis_type] = f"matched keywords: {', '.join(matches)}"
 
         # Domain-specific keywords
         for definition in definitions:
             atype = definition.analysis_type
-            keyword_matches = []
-            for kw in definition.keywords:
-                if kw.lower() in text:
-                    keyword_matches.append(kw)
-                    scores[atype] += 1.0
-
+            keyword_matches = [kw for kw in definition.keywords if kw.lower() in text]
             if keyword_matches:
+                scores[atype] += 1.0
                 reasons[atype] = f"matched keywords: {', '.join(keyword_matches)}"
 
             # Complexity indicators boost confidence for multi-step requests
@@ -107,27 +134,21 @@ class KeywordIntentClassifier(IntentClassifier):
             if complexity_hits:
                 scores[atype] += len(complexity_hits) * 0.2
 
-        # Apply negation penalties. For example, "generate code" should suppress
-        # a QA classification even if the message also contains "explain".
-        for target_type, neg_keywords in self.NEGATIVE_SIGNALS.items():
-            if target_type in scores and any(kw in text for kw in neg_keywords):
-                scores[target_type] *= 0.3
-                reasons[target_type] = reasons.get(target_type, "") + " (negated by opposing signals)"
-
-        # Strong information-request patterns should suppress workflow/analysis intents.
-        is_info_request = any(re.search(p, message) for p in self.INFORMATION_REQUEST_PATTERNS)
-        if is_info_request:
+        # Guardrail: information-seeking or coding requests suppress workflow/analysis intents.
+        is_guardrail = any(re.search(p, message, re.IGNORECASE) for p in self.GUARDRAIL_PATTERNS)
+        if is_guardrail:
             workflow_types = {
                 "single_cell_analysis", "spatial_analysis", "metagenomics_analysis",
                 "genomics_analysis", "proteomics_analysis", "transcriptomics_analysis",
+                "epigenomics_analysis",
             }
             for atype in list(scores):
                 if atype in workflow_types:
-                    scores[atype] *= 0.2
-                    reasons[atype] = reasons.get(atype, "") + " (suppressed by information-request pattern)"
-            if "qa" not in scores:
-                scores["qa"] = 0.8
-                reasons["qa"] = "information-request pattern detected"
+                    scores[atype] *= 0.1
+                    reasons[atype] = reasons.get(atype, "") + " (suppressed by guardrail)"
+            if "information_request" not in scores and "qa" not in scores:
+                scores["information_request"] = 0.95
+                reasons["information_request"] = "guardrail pattern detected"
 
         # Normalize to [0, 1]
         for atype in scores:
@@ -140,12 +161,37 @@ class KeywordIntentClassifier(IntentClassifier):
                 source="keyword",
                 reason=reasons.get(atype, ""),
                 weight=self.weight,
+                structured=self._to_structured(atype, score, reasons.get(atype, "")),
             )
             for atype, score in scores.items()
             if score > 0
         ]
         matches.sort(key=lambda m: m.confidence, reverse=True)
         return matches
+
+    @staticmethod
+    def _to_structured(analysis_type: str, confidence: float, reason: str) -> Optional[StructuredIntent]:
+        """Map a keyword analysis_type to a minimal StructuredIntent when possible."""
+        mapping = {
+            "qa": ("qa", "answer", None, "answer_question", "single_step"),
+            "information_request": ("information_request", "answer", None, None, "single_step"),
+            "general_help": ("general_help", "answer", None, "generate_code", "single_step"),
+            "greeting": ("greeting", "answer", None, None, "single_step"),
+            "file_conversion": ("file_conversion", "execute", None, "convert_file", "single_step"),
+        }
+        if analysis_type in mapping:
+            intent_type, interaction_mode, domain, target, scope = mapping[analysis_type]
+            return StructuredIntent(
+                intent_type=intent_type,
+                interaction_mode=interaction_mode,
+                domain=domain,
+                target=target,
+                scope=scope,
+                confidence=confidence,
+                reason=reason,
+            )
+        # Domain workflow intents are better left for the LLM/embedding classifiers.
+        return None
 
 
 class EmbeddingIntentClassifier(IntentClassifier):
@@ -155,7 +201,7 @@ class EmbeddingIntentClassifier(IntentClassifier):
     back to TF-IDF + cosine similarity so tests and offline usage still work.
     """
 
-    def __init__(self, weight: float = 0.3, model_name: Optional[str] = None):
+    def __init__(self, weight: float = 0.2, model_name: Optional[str] = None):
         super().__init__(weight=weight)
         # Only use dense embeddings when explicitly configured. Otherwise the
         # default TF-IDF fallback avoids network/model download stalls.
@@ -256,6 +302,7 @@ class EmbeddingIntentClassifier(IntentClassifier):
             if score <= 0.05:
                 continue
             atype = self._analysis_types[idx]
+            definition = definitions[idx] if idx < len(definitions) else None
             matches.append(
                 IntentMatch(
                     analysis_type=atype,
@@ -263,15 +310,29 @@ class EmbeddingIntentClassifier(IntentClassifier):
                     source="embedding",
                     reason=f"semantic similarity {score:.2f}",
                     weight=self.weight,
+                    structured=StructuredIntent(
+                        intent_type="analysis" if (definition and definition.domain) else atype,
+                        interaction_mode="execute",
+                        domain=definition.domain if definition else None,
+                        target=atype,
+                        scope="full",
+                        confidence=float(min(1.0, score)),
+                        reason=f"semantic similarity {score:.2f}",
+                    ) if definition and definition.domain else None,
                 )
             )
         return matches
 
 
 class LLMIntentClassifier(IntentClassifier):
-    """LLM-based intent classifier with structured JSON output."""
+    """LLM-based intent classifier with structured JSON output.
 
-    def __init__(self, weight: float = 0.4, llm_client: Optional[LLMClient] = None):
+    This classifier produces the v2 ``StructuredIntent`` schema. It is the
+    primary decision maker in the cascade; keyword and embedding classifiers
+    provide guardrails and alternatives.
+    """
+
+    def __init__(self, weight: float = 0.6, llm_client: Optional[LLMClient] = None):
         super().__init__(weight=weight)
         self._client = llm_client
 
@@ -317,28 +378,62 @@ class LLMIntentClassifier(IntentClassifier):
 
         matches = []
         primary = parsed.get("primary_intent", {})
-        if primary and primary.get("analysis_type"):
+        if primary and primary.get("intent_type"):
+            structured = self._parse_structured_intent(primary)
             matches.append(
                 IntentMatch(
-                    analysis_type=primary["analysis_type"],
-                    confidence=float(primary.get("confidence", 0.0)),
+                    analysis_type=structured.to_legacy_analysis_type(),
+                    confidence=structured.confidence,
                     source="llm",
-                    reason=primary.get("reason", ""),
+                    reason=structured.reason,
                     weight=self.weight,
+                    structured=structured,
                 )
             )
 
         for alt in parsed.get("alternative_intents", []):
-            if alt.get("analysis_type"):
+            if alt.get("intent_type"):
+                structured = self._parse_structured_intent(alt)
                 matches.append(
                     IntentMatch(
-                        analysis_type=alt["analysis_type"],
-                        confidence=float(alt.get("confidence", 0.0)),
+                        analysis_type=structured.to_legacy_analysis_type(),
+                        confidence=structured.confidence,
                         source="llm",
                         reason="alternative",
                         weight=self.weight,
+                        structured=structured,
+                    )
+                )
+
+        # Propagate sub-intents as additional matches so the analyzer can build
+        # a multi-step workflow when the LLM detects one.
+        for sub in parsed.get("sub_intents", []):
+            if sub.get("intent_type"):
+                structured = self._parse_structured_intent(sub)
+                matches.append(
+                    IntentMatch(
+                        analysis_type=structured.to_legacy_analysis_type(),
+                        confidence=structured.confidence,
+                        source="llm",
+                        reason="sub_intent",
+                        weight=self.weight,
+                        structured=structured,
                     )
                 )
 
         matches.sort(key=lambda m: m.confidence, reverse=True)
         return matches
+
+    @staticmethod
+    def _parse_structured_intent(data: Dict[str, Any]) -> StructuredIntent:
+        """Parse a JSON intent object into a StructuredIntent."""
+        return StructuredIntent(
+            intent_type=data.get("intent_type", "general"),
+            interaction_mode=data.get("interaction_mode", "answer"),
+            domain=data.get("domain") or None,
+            target=data.get("target") or None,
+            scope=data.get("scope", "single_step"),
+            entities=data.get("entities") or {},
+            confidence=float(data.get("confidence", 0.0)),
+            reason=data.get("reason", ""),
+        )

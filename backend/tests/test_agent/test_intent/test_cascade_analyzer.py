@@ -51,8 +51,9 @@ async def test_analyze_file_conversion(analyzer):
 @pytest.mark.asyncio
 async def test_analyze_unknown_returns_general_or_clarification(analyzer):
     intent = await analyzer.analyze("hello world")
-    # Without LLM and with low keyword coverage, should be general or clarification.
-    assert intent.analysis_type in ("general", "clarification")
+    # The keyword guardrail now confidently recognizes greetings as direct-response.
+    assert intent.analysis_type in ("general", "clarification", "greeting")
+    assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio

@@ -1,47 +1,213 @@
 """Prompt templates for the LLM intent classifier."""
 
+from typing import List
 
-INTENT_CLASSIFICATION_PROMPT = """You are an intent classifier for a bioinformatics analysis assistant.
+from homomics_lab.agent.intent.models import IntentDefinition
 
-Your job is to classify the user's latest message into one of the intent types below.
 
-Available intent types and examples:
+INTENT_CLASSIFICATION_PROMPT = """You are an intent classifier for HomomicsLab, a bioinformatics analysis assistant.
+
+Your job is to analyze the user's latest message and produce a structured intent classification.
+
+# Available intent categories
+
+- ``qa``: the user asks for a definition, explanation, or interpretation of a concept, method, or result (e.g., "什么是 UMAP？", "how does PCA work").
+- ``information_request``: the user asks what the system can do, what analyses are available, or what steps an analysis includes (e.g., "单细胞转录组有哪些分析内容？", "what can you do?", "how do I get started?"). This is NOT a request to execute an analysis.
+- ``general_help``: the user asks for code, scripts, examples, or general help that is not a bioinformatics workflow (e.g., "帮我写个 Python 脚本过滤 CSV", "generate code to rename files").
+- ``greeting``: greeting, self-introduction, or small talk (e.g., "hello", "你是谁").
+- ``file_conversion``: format conversion only (e.g., "把 CSV 转成 h5ad").
+- ``analysis``: a domain-specific bioinformatics analysis request (e.g., single-cell, spatial, metagenomics, genomics, proteomics). Use this for any request that should actually run analysis skills.
+- ``tool_call``: explicit request for an external tool such as PubMed search, GEO search, or UniProt search.
+- ``clarification``: the message is ambiguous and the system must ask a follow-up question before acting.
+- ``general``: anything else.
+
+# Interaction modes
+
+- ``answer``: respond directly with text; do NOT run skills or workflows. Used for ``qa``, ``information_request``, ``greeting``.
+- ``execute``: run skills / workflows. Used for ``analysis`` and ``file_conversion``.
+- ``explore``: retrieve/browse external information. Used for ``tool_call``.
+- ``clarify``: ask the user a follow-up question. Used only when ``intent_type`` is ``clarification``.
+- ``modify``: user wants to change an existing plan or result.
+- ``approve``: user is confirming or rejecting a plan.
+
+# Scope
+
+- ``single_step``: one discrete action or a direct answer.
+- ``partial``: a subset of a standard workflow (e.g., "只做质控和聚类").
+- ``full``: a complete multi-step workflow (e.g., "做一个完整的单细胞分析流程").
+
+# Available analysis types (for ``target`` when intent_type == "analysis")
 __INTENT_DESCRIPTIONS__
 
-Recent conversation context:
+# Domain tags
+
+Use one of: single_cell, spatial, metagenomics, genomics, transcriptomics, proteomics, epigenomics, or null.
+
+# Rules
+
+1. Distinguish carefully:
+   - ``qa`` = asking *what/why* (explanation).
+   - ``information_request`` = asking *what can be done / what is included*.
+   - ``analysis`` = asking the system to *actually do* an analysis.
+   - ``general_help`` = asking for code/scripts/examples.
+2. Any phrase like "有哪些分析内容", "包括哪些", "what are the steps", "what can you do", "how do I get started" MUST be ``information_request`` with ``interaction_mode=answer``.
+3. Greetings and self-introductions are ``greeting``.
+4. Code/script/file processing requests are ``general_help`` even if they mention bioinformatics terms in passing.
+5. Explicit PubMed/GEO/UniProt requests are ``tool_call`` with ``interaction_mode=explore``.
+6. If the message mentions "it", "this", "that", or "上一个文件", use the conversation context to resolve the referent and set ``target``/``domain`` accordingly.
+7. Set ``needs_clarification=true`` only when the intent is genuinely ambiguous and you cannot make a reasonable best guess.
+8. Output confidence between 0.0 and 1.0. Be calibrated: high confidence only when the intent is clear.
+9. If multiple independent analysis steps are requested, set ``intent_type=analysis``, ``scope=partial`` or ``full``, and list the sub-steps in ``sub_intents``.
+10. Use the exact ``domain`` value listed under the matching intent type in ``# Available analysis types``; do not invent your own domain names.
+11. Set ``target`` using these conventions:
+    - ``file_conversion`` -> ``convert_file``
+    - ``qa`` or ``information_request`` -> ``answer_question``
+    - ``general_help`` -> ``generate_code``
+    - ``greeting`` -> null
+    - ``analysis`` -> the matching analysis_type id from ``# Available analysis types``
+    - ``tool_call`` -> the tool name (e.g. ``pubmed_search``)
+12. If nothing matches, use ``intent_type=general``, ``interaction_mode=answer``.
+
+# Few-shot examples
+
+User: "帮我分析这组单细胞数据"
+Output: {
+  "primary_intent": {
+    "intent_type": "analysis",
+    "interaction_mode": "execute",
+    "domain": "single_cell",
+    "target": "single_cell_analysis",
+    "scope": "full",
+    "entities": {},
+    "confidence": 0.95,
+    "reason": "User asks to analyze single-cell data"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "单细胞转录组有哪些分析内容？"
+Output: {
+  "primary_intent": {
+    "intent_type": "information_request",
+    "interaction_mode": "answer",
+    "domain": "single_cell",
+    "target": null,
+    "scope": "single_step",
+    "entities": {},
+    "confidence": 0.98,
+    "reason": "User asks what analyses are available, not to run one"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "帮我写个 Python 脚本过滤 CSV"
+Output: {
+  "primary_intent": {
+    "intent_type": "general_help",
+    "interaction_mode": "answer",
+    "domain": null,
+    "target": "generate_code",
+    "scope": "single_step",
+    "entities": {"language": "python", "task": "filter CSV"},
+    "confidence": 0.97,
+    "reason": "User asks for code/script"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "什么是 UMAP？"
+Output: {
+  "primary_intent": {
+    "intent_type": "qa",
+    "interaction_mode": "answer",
+    "domain": null,
+    "target": "answer_question",
+    "scope": "single_step",
+    "entities": {},
+    "confidence": 0.99,
+    "reason": "User asks for an explanation"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "先做单细胞质控，然后聚类"
+Output: {
+  "primary_intent": {
+    "intent_type": "analysis",
+    "interaction_mode": "execute",
+    "domain": "single_cell",
+    "target": "single_cell_analysis",
+    "scope": "partial",
+    "entities": {},
+    "confidence": 0.93,
+    "reason": "User requests two sequential single-cell analysis steps"
+  },
+  "alternative_intents": [],
+  "sub_intents": [
+    {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single_cell", "target": "qc", "scope": "single_step", "confidence": 0.9},
+    {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single_cell", "target": "clustering", "scope": "single_step", "confidence": 0.9}
+  ],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "请帮我选择分析类型"
+Output: {
+  "primary_intent": {
+    "intent_type": "clarification",
+    "interaction_mode": "clarify",
+    "domain": null,
+    "target": null,
+    "scope": "single_step",
+    "entities": {},
+    "confidence": 0.0,
+    "reason": "User explicitly asks the system to help choose an analysis type"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": true,
+  "clarification_question": "您希望进行哪类分析？例如单细胞分析、空间转录组分析、宏基因组分析等。"
+}
+
+# Recent conversation context
 __CONTEXT__
 
-User message:
+# User message
 __MESSAGE__
 
 Respond with a single JSON object in this exact format (no markdown fences):
 {
   "primary_intent": {
-    "analysis_type": "intent_id",
+    "intent_type": "...",
+    "interaction_mode": "...",
+    "domain": "...",
+    "target": "...",
+    "scope": "single_step|partial|full",
+    "entities": {},
     "confidence": 0.0,
-    "reason": "short reason"
+    "reason": "..."
   },
   "alternative_intents": [
-    {"analysis_type": "intent_id", "confidence": 0.0}
+    {"intent_type": "...", "interaction_mode": "...", "domain": "...", "target": "...", "scope": "...", "confidence": 0.0}
   ],
   "sub_intents": [
-    {"analysis_type": "intent_id", "confidence": 0.0}
+    {"intent_type": "...", "interaction_mode": "...", "domain": "...", "target": "...", "scope": "...", "confidence": 0.0}
   ],
-  "data_scale_hint": "optional string, e.g. '5000 cells'",
   "needs_clarification": false,
-  "clarification_question": "optional question if ambiguous"
+  "clarification_question": null
 }
-
-Rules:
-1. Distinguish "qa" (asking for explanation/knowledge) from "general_help" (asking for code/script).
-2. "single_cell_analysis" includes scRNA-seq, clustering, UMAP, PCA, QC, differential expression.
-3. "spatial_analysis" includes Visium, Xenium, MERFISH, spatial transcriptomics.
-4. "file_conversion" is for format conversion requests only.
-5. If the user asks for multiple analysis steps (e.g., "QC then cluster"), include them in sub_intents.
-6. If the message refers to "it", "this", "that", or "上一个文件", use the conversation context to resolve the referent.
-7. Set needs_clarification=true if the top confidence is below 0.7 and alternatives are close.
-8. If nothing matches, use analysis_type "general" with low confidence.
-9. CRITICAL: If the user asks "what are", "有哪些", "includes", "介绍", or similar information-seeking phrases about an analysis type, classify as "qa" (direct_response), NOT as an execution workflow.
 """
 
 
@@ -50,7 +216,7 @@ CLARIFICATION_TEMPLATE = (
 )
 
 
-def format_intent_descriptions(definitions: list) -> str:
+def format_intent_descriptions(definitions: List[IntentDefinition]) -> str:
     """Format intent definitions for the LLM prompt."""
     lines = []
     for d in definitions:

@@ -8,11 +8,9 @@ import asyncio
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-import asyncio
-
 from homomics_lab.llm.cache import LLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
-from homomics_lab.llm.providers import reset_provider_registry
+from homomics_lab.llm.providers import get_provider_registry, reset_provider_registry
 from homomics_lab.llm.router import LLMRouter
 from homomics_lab.llm.runtime_config import load_llm_runtime_config
 

@@ -44,7 +44,12 @@ def definitions():
 def fake_llm_response():
     return json.dumps({
         "primary_intent": {
-            "analysis_type": "single_cell_analysis",
+            "intent_type": "analysis",
+            "interaction_mode": "execute",
+            "domain": "single_cell",
+            "target": "single_cell_analysis",
+            "scope": "full",
+            "entities": {},
             "confidence": 0.9,
             "reason": "User asks for single-cell analysis",
         },
@@ -63,6 +68,9 @@ async def test_llm_classifier_parses_json(definitions, fake_llm_response):
     assert len(matches) == 1
     assert matches[0].analysis_type == "single_cell_analysis"
     assert matches[0].source == "llm"
+    assert matches[0].structured is not None
+    assert matches[0].structured.intent_type == "analysis"
+    assert matches[0].structured.domain == "single_cell"
 
 
 @pytest.mark.asyncio

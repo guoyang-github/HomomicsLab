@@ -5,6 +5,7 @@ from homomics_lab.agent.intent.models import (
     IntentClassificationResult,
     IntentDefinition,
     IntentMatch,
+    StructuredIntent,
     UserIntent,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "IntentClassificationResult",
     "IntentDefinition",
     "IntentMatch",
+    "StructuredIntent",
     "UserIntent",
 ]

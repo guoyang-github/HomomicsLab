@@ -469,6 +469,8 @@ class TurnRunner:
             response_text = await self._generate_general_help_response(
                 user_message, working_memory
             )
+        elif intent.analysis_type == "information_request":
+            response_text = self._generate_information_request_response(intent)
         else:
             response_text = self._generate_qa_response(intent, user_message)
 
@@ -1220,17 +1222,38 @@ class TurnRunner:
     def _generate_qa_response(self, intent: UserIntent, user_message: str) -> str:
         """Generate a direct text response for QA-style queries.
 
-        In production this delegates to an LLM. For MVP we use templates.
+        Uses structured intent metadata to pick a domain-specific explanation
+        when available, falling back to a generic answer.
         """
-        # Simple template-based responses for MVP
+        domain = intent.domain or intent.analysis_type
         qa_responses = {
-            "single_cell_analysis": (
+            "single_cell": (
                 "单细胞测序（scRNA-seq）是一种在单个细胞水平上分析基因表达的技术。"
                 "它可以揭示细胞异质性，发现稀有细胞类型，并追踪细胞发育轨迹。"
             ),
-            "spatial_analysis": (
+            "spatial": (
                 "空间转录组学结合了基因表达分析和空间位置信息，"
                 "可以在组织切片上绘制基因表达图谱。"
+            ),
+            "metagenomics": (
+                "宏基因组学通过直接提取环境样本中全部微生物基因组 DNA，"
+                "研究群落组成、功能和多样性，无需培养。"
+            ),
+            "genomics": (
+                "基因组学是对生物体全部 DNA 的研究，包括变异检测、结构变异、"
+                "功能注释等分析内容。"
+            ),
+            "transcriptomics": (
+                "转录组学研究细胞或组织中全部 RNA 分子的表达情况，"
+                "常用于差异表达、通路富集等分析。"
+            ),
+            "proteomics": (
+                "蛋白质组学是对生物体全部蛋白质的研究，包括蛋白鉴定、定量、"
+                "翻译后修饰等分析。"
+            ),
+            "epigenomics": (
+                "表观基因组学研究不改变 DNA 序列的遗传调控机制，"
+                "如 DNA 甲基化、组蛋白修饰、染色质可及性等。"
             ),
             "file_conversion": (
                 "我可以帮您转换常见的生物信息学数据格式，"
@@ -1241,7 +1264,52 @@ class TurnRunner:
                 "空间转录组分析、实验设计等任务。请问有什么具体需求？"
             ),
         }
-        return qa_responses.get(
-            intent.analysis_type,
-            qa_responses["general"],
+        return qa_responses.get(domain, qa_responses["general"])
+
+    def _generate_information_request_response(self, intent: UserIntent) -> str:
+        """Respond to "what can you do / what are the steps" style queries."""
+        domain = intent.domain
+        if domain == "single_cell":
+            return (
+                "单细胞转录组分析通常包括以下主要步骤：\n"
+                "1. 数据质控（QC）：过滤低质量细胞和基因；\n"
+                "2. 标准化与归一化；\n"
+                "3. 高变基因选择；\n"
+                "4. 降维（PCA、UMAP/t-SNE）；\n"
+                "5. 聚类与细胞类型注释；\n"
+                "6. 差异表达分析；\n"
+                "7. 通路富集与可视化。\n\n"
+                "您可以上传数据后，让我直接帮您跑完整流程或只做其中某一步。"
+            )
+        if domain == "spatial":
+            return (
+                "空间转录组分析通常包括以下主要步骤：\n"
+                "1. 数据加载与质控；\n"
+                "2. 空间坐标与表达矩阵整合；\n"
+                "3. 降维与聚类；\n"
+                "4. 空间可变基因分析；\n"
+                "5. 组织区域注释与细胞类型去卷积；\n"
+                "6. 可视化（spot/细胞空间表达图）。\n\n"
+                "请上传数据或告诉我您想重点关注的空间生物学问题。"
+            )
+        if domain == "metagenomics":
+            return (
+                "宏基因组分析通常包括以下主要步骤：\n"
+                "1. 原始数据质控与去宿主；\n"
+                "2. 序列拼接与基因预测；\n"
+                "3. 物种注释与分类；\n"
+                "4. 功能注释（KEGG/GO/CAZy 等）；\n"
+                "5. Alpha/Beta 多样性分析；\n"
+                "6. 差异物种/功能分析。\n\n"
+                "您可以提供原始测序数据或 OTU/ASV 表，让我帮您分析。"
+            )
+        return (
+            "HomomicsLab 支持多种生物信息学分析，包括：\n"
+            "- 单细胞转录组分析（质控、聚类、差异表达、细胞注释等）\n"
+            "- 空间转录组分析\n"
+            "- 宏基因组/微生物组分析\n"
+            "- 基因组、转录组、蛋白质组、表观组分析\n"
+            "- 文献检索（PubMed）、蛋白查询（UniProt）、数据集查询（GEO）\n"
+            "- 代码/脚本生成与数据处理帮助\n\n"
+            "请告诉我您想进行哪类分析，或上传数据让我开始。"
         )

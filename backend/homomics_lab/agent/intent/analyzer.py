@@ -1,9 +1,8 @@
-"""Cascade intent analyzer — combines keyword, embedding, and LLM classifiers."""
+"""Cascade intent analyzer — LLM-first classification with keyword guardrails."""
 
 import json
 import re
 import weakref
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +24,7 @@ from homomics_lab.agent.intent.calibration import (
 from homomics_lab.agent.intent.models import (
     IntentClassificationResult,
     IntentMatch,
+    StructuredIntent,
     UserIntent,
 )
 from homomics_lab.agent.debate import LightweightDebate
@@ -43,12 +43,22 @@ _analyzer_instances: weakref.WeakSet = weakref.WeakSet()
 
 
 class CascadeIntentAnalyzer:
-    """Hybrid intent analyzer with layered classification and active clarification.
+    """LLM-first intent analyzer with keyword guardrails and active clarification.
 
-    Layer 1: Keyword classifier (fast path, high-confidence direct return)
-    Layer 2: Embedding classifier (semantic similarity over intent examples)
-    Layer 3: LLM classifier (complex/ambiguous/context-dependent requests)
-    Layer 4: Clarification (when ensemble confidence is too low)
+    The analyzer now treats the LLM classifier as the primary decision maker.
+    Keyword and embedding classifiers provide:
+
+    1. Fast-path guardrails for unambiguous domain-agnostic intents.
+    2. Safety overrides when the LLM misclassifies an information request as an
+       execution workflow.
+    3. Alternative candidates and sub-intent signals for ambiguous messages.
+
+    Decision flow:
+      1. Keyword guardrail fast path (only for very strong direct-response signals).
+      2. LLM structured classification.
+      3. Embedding semantic alternatives.
+      4. Fusion with guardrail override.
+      5. Clarification if confidence is low and alternatives are close.
     """
 
     def __init__(
@@ -70,9 +80,10 @@ class CascadeIntentAnalyzer:
         self.clarification_threshold = clarification_threshold
         self.high_confidence_threshold = high_confidence_threshold
 
-        self.keyword_classifier = keyword_classifier or KeywordIntentClassifier(weight=0.25)
-        self.embedding_classifier = embedding_classifier or EmbeddingIntentClassifier(weight=0.35)
-        self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.40)
+        # LLM-first: give the LLM classifier the highest weight.
+        self.keyword_classifier = keyword_classifier or KeywordIntentClassifier(weight=0.15)
+        self.embedding_classifier = embedding_classifier or EmbeddingIntentClassifier(weight=0.25)
+        self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.60)
         self.debate = debate
         self.cbkb = cbkb
         self.decision_logger = decision_logger if decision_logger is not None else IntentDecisionLogger()
@@ -103,6 +114,7 @@ class CascadeIntentAnalyzer:
 
         builtins = [
             ("qa", "builtin"),
+            ("information_request", "builtin"),
             ("general_help", "builtin"),
             ("greeting", "builtin"),
             ("file_conversion", "builtin"),
@@ -123,10 +135,14 @@ class CascadeIntentAnalyzer:
             complexity_indicators = []
             if analysis_type == "qa":
                 keywords = [
-                    "什么是", "what is", "有哪些", "what are", "包括哪些",
-                    "怎么", "如何", "how to", "how do", "explain",
-                    "告诉我", "介绍", "概述", "include",
-                    "单细胞转录组有哪些分析内容",
+                    "什么是", "what is", "怎么", "如何", "how to", "how do",
+                    "explain", "告诉我", "介绍", "概述", "overview",
+                ]
+            elif analysis_type == "information_request":
+                keywords = [
+                    "有哪些", "what are", "包括哪些", "what can you do",
+                    "你会什么", "你能做什么", "what do you support",
+                    "有哪些分析内容", "有哪些步骤", "how do i get started",
                 ]
             elif analysis_type == "general_help":
                 keywords = [
@@ -267,37 +283,35 @@ class CascadeIntentAnalyzer:
             context_bundle=context_bundle,
         )
 
-        # Layer 1: keyword fast path
+        # Layer 1: keyword guardrail fast path for unambiguous direct-response signals.
         keyword_matches = await self.keyword_classifier.classify(
             message, self._definitions, context
         )
         top_keyword = keyword_matches[0] if keyword_matches else None
         if top_keyword and top_keyword.confidence >= self.high_confidence_threshold:
-            top_keyword = self._apply_mcp_override(
-                top_keyword, message, keyword_matches[1:]
-            )
-            intent = self._to_user_intent(
-                top_keyword, message, alternatives=keyword_matches[1:]
-            )
-            self._enrich_with_cbkb(intent, cbkb)
-            return intent
+            if top_keyword.structured and top_keyword.structured.interaction_mode == "answer":
+                intent = self._to_user_intent(
+                    top_keyword, message, alternatives=keyword_matches[1:]
+                )
+                self._enrich_with_cbkb(intent, cbkb)
+                return intent
 
-        # Layer 2: embedding semantic match
-        embedding_matches = await self.embedding_classifier.classify(
-            message, self._definitions, context
-        )
-
-        # Layer 3: LLM classifier
+        # Layer 2: LLM-first structured classification.
         llm_matches = []
         if isinstance(self.llm_classifier, LLMIntentClassifier) and self.llm_classifier.is_available():
             llm_matches = await self.llm_classifier.classify(
                 message, self._definitions, context
             )
 
-        # Ensemble fusion
+        # Layer 3: embedding semantic alternatives.
+        embedding_matches = await self.embedding_classifier.classify(
+            message, self._definitions, context
+        )
+
+        # Layer 4: fusion with keyword guardrail override.
         fused = self._fuse_matches(keyword_matches, embedding_matches, llm_matches)
 
-        # Layer 4: clarification only when the ensemble signals genuine ambiguity.
+        # Layer 5: clarification only when the ensemble signals genuine ambiguity.
         if fused.needs_clarification:
             intent = await self._build_clarification_intent(fused, message)
             self._enrich_with_cbkb(intent, cbkb)
@@ -484,7 +498,13 @@ class CascadeIntentAnalyzer:
         embedding: List[IntentMatch],
         llm: List[IntentMatch],
     ) -> IntentClassificationResult:
-        """Fuse scores from all classifiers into a single result."""
+        """Fuse scores from all classifiers into a single result.
+
+        LLM-first: the primary intent comes from the highest-confidence LLM
+        match unless a keyword guardrail strongly disagrees and the keyword
+        signal corresponds to a direct-response intent (qa, information_request,
+        general_help, greeting).
+        """
         # If no strong keyword signal, ignore weak embedding noise.
         min_embedding_confidence = 0.25
         if not keyword and embedding:
@@ -492,72 +512,94 @@ class CascadeIntentAnalyzer:
             if max_emb < min_embedding_confidence:
                 embedding = []
 
-        scores: Dict[str, List[tuple[float, float]]] = defaultdict(list)
-        reasons: Dict[str, List[str]] = defaultdict(list)
+        # --- LLM-first primary selection ---
+        primary: Optional[IntentMatch] = None
+        llm_primary = llm[0] if llm else None
+        keyword_primary = keyword[0] if keyword else None
 
-        for m in keyword:
-            scores[m.analysis_type].append((m.confidence * m.weight, m.weight))
-            reasons[m.analysis_type].append(f"keyword:{m.confidence:.2f}")
-        for m in embedding:
-            scores[m.analysis_type].append((m.confidence * m.weight, m.weight))
-            reasons[m.analysis_type].append(f"embedding:{m.confidence:.2f}")
-        for m in llm:
-            scores[m.analysis_type].append((m.confidence * m.weight, m.weight))
-            reasons[m.analysis_type].append(f"llm:{m.confidence:.2f}")
+        if llm_primary:
+            primary = llm_primary
 
-        aggregated: List[IntentMatch] = []
-        for atype, pairs in scores.items():
-            total_weight = sum(w for _, w in pairs)
-            avg_score = sum(s for s, _ in pairs) / total_weight if total_weight else 0.0
-            aggregated.append(
-                IntentMatch(
-                    analysis_type=atype,
-                    confidence=min(1.0, avg_score),
-                    source="ensemble",
-                    reason="; ".join(reasons[atype]),
-                )
-            )
+        # Keyword guardrail override: if the keyword classifier is very confident
+        # that this is a direct-response intent, prefer it over a conflicting LLM
+        # execution intent. This protects against LLM hallucinations such as
+        # classifying "有哪些分析内容" as an analysis workflow.
+        if keyword_primary and keyword_primary.confidence >= self.high_confidence_threshold:
+            if keyword_primary.structured and keyword_primary.structured.interaction_mode == "answer":
+                if primary is None or primary.structured is None or primary.structured.interaction_mode != "answer":
+                    primary = keyword_primary
 
-        aggregated.sort(key=lambda m: m.confidence, reverse=True)
-        if not aggregated:
+        # If LLM is unavailable and keyword has a moderate signal, use keyword.
+        if primary is None and keyword_primary and keyword_primary.confidence >= self.clarification_threshold:
+            primary = keyword_primary
+
+        # If still nothing, use the best embedding match.
+        if primary is None and embedding:
+            primary = embedding[0]
+
+        if primary is None:
             return IntentClassificationResult(
                 primary=IntentMatch(
                     analysis_type="general",
                     confidence=0.0,
                     source="fallback",
                     reason="no classifier produced a match",
+                    structured=StructuredIntent(
+                        intent_type="general",
+                        interaction_mode="answer",
+                        confidence=0.0,
+                        reason="no classifier produced a match",
+                    ),
                 ),
                 needs_clarification=True,
                 clarification_question="我不太确定您的需求，请再具体描述一下您想做什么分析。",
             )
 
-        primary = aggregated[0]
-        alternatives = aggregated[1:]
+        # --- Build alternatives from the union of non-primary signals ---
+        seen = {primary.analysis_type}
+        alternatives: List[IntentMatch] = []
+        for m in keyword + embedding + llm:
+            if m.analysis_type == primary.analysis_type:
+                continue
+            if m.analysis_type in seen:
+                continue
+            seen.add(m.analysis_type)
+            alternatives.append(m)
+        alternatives.sort(key=lambda m: m.confidence, reverse=True)
 
-        # Detect multi-intent: if top-2 are close and both are analysis intents,
-        # or if an LLM explicitly provided sub_intents (approximated here by
-        # looking for near-tied high-confidence matches).
+        # --- Sub-intent detection ---
         sub_intents: List[IntentMatch] = []
-        if len(aggregated) >= 2:
-            second = aggregated[1]
+        # Use explicit sub_intents from the LLM output first.
+        for m in llm:
+            if m.reason == "sub_intent" and m.analysis_type != primary.analysis_type:
+                sub_intents.append(m)
+        # If top-2 are close and both are analysis intents, treat runner-up as sub-intent.
+        if len(alternatives) >= 2:
+            second = alternatives[0]
             if primary.confidence > 0 and (second.confidence / primary.confidence) > 0.5:
-                if second.confidence > 0.2:
+                if second.confidence > 0.2 and second.analysis_type not in {s.analysis_type for s in sub_intents}:
                     sub_intents.append(second)
-
         # If primary is a broad analysis type and we have strong specific signals,
         # treat the specific ones as sub_intents.
         broad_types = {"single_cell_analysis", "spatial_analysis", "metagenomics_analysis"}
         if primary.analysis_type in broad_types:
             for alt in alternatives[:2]:
                 if alt.confidence > 0.4 and alt.analysis_type not in broad_types:
-                    sub_intents.append(alt)
+                    if alt.analysis_type not in {s.analysis_type for s in sub_intents}:
+                        sub_intents.append(alt)
 
-        # Only ask for clarification when there is genuine ambiguity:
-        # the top candidate is below threshold and at least one alternative is
-        # close enough to be a plausible interpretation.
+        # --- Clarification logic ---
         needs_clarification = False
         clarification_question = None
-        if primary.confidence < self.clarification_threshold and alternatives:
+
+        # If the LLM itself asked for clarification, respect it.
+        if llm_primary and llm_primary.structured and llm_primary.structured.intent_type == "clarification":
+            needs_clarification = True
+            clarification_question = (
+                llm_primary.structured.entities.get("clarification_question")
+                or "我不太确定您的需求，请再具体描述一下。"
+            )
+        elif primary.confidence < self.clarification_threshold and alternatives:
             top_alt = alternatives[0]
             gap = primary.confidence - top_alt.confidence
             if top_alt.confidence > 0.2 and gap < 0.15:
@@ -609,6 +651,14 @@ class CascadeIntentAnalyzer:
                     confidence=0.8,
                     source="mcp_override",
                     reason=f"explicit mcp keyword detected while primary was {primary.analysis_type}",
+                    structured=StructuredIntent(
+                        intent_type="tool_call",
+                        interaction_mode="explore",
+                        target=analysis_type,
+                        scope="single_step",
+                        confidence=0.8,
+                        reason=f"explicit mcp keyword detected while primary was {primary.analysis_type}",
+                    ),
                 )
         return primary
 
@@ -644,11 +694,16 @@ class CascadeIntentAnalyzer:
         has_sub_intents: bool = False,
     ) -> str:
         """Determine complexity from indicators and message."""
+        # Honor structured intent first.
+        if match.structured is not None:
+            return match.structured.to_legacy_complexity()
+
         text = message.lower()
 
         # Direct-response intents
         if match.analysis_type in (
             "qa",
+            "information_request",
             "general_help",
             "greeting",
             "clarification",
@@ -658,6 +713,12 @@ class CascadeIntentAnalyzer:
             "geo_search",
         ):
             return "direct_response"
+
+        # Sequential markers (e.g. "先...再...") strongly imply a multi-step workflow.
+        sequential_markers = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
+        if any(m in text for m in sequential_markers):
+            if match.structured is None or match.structured.intent_type == "analysis":
+                return "complex"
 
         # Multiple explicit sub-intents always imply a complex workflow.
         if has_sub_intents:
@@ -773,10 +834,32 @@ class CascadeIntentAnalyzer:
             metadata["tool_inputs"] = self._extract_mcp_inputs(match.analysis_type, message)
 
         # Structured intent decomposition (best-practice v2).
-        interaction_mode = self._determine_interaction_mode(match, complexity, metadata)
-        scope = self._determine_scope(complexity, has_sub_intents)
-        domain = self._determine_domain(match, definition)
-        target = self._determine_target(match, definition)
+        structured = match.structured
+        if structured is None:
+            # Synthesize a StructuredIntent from the legacy match for consistency.
+            structured = StructuredIntent(
+                intent_type=self._legacy_to_intent_type(match.analysis_type, complexity, metadata),
+                interaction_mode=self._determine_interaction_mode(match, complexity, metadata),
+                domain=self._determine_domain(match, definition),
+                target=self._determine_target(match, definition),
+                scope=self._determine_scope(complexity, has_sub_intents),
+                confidence=match.confidence,
+                reason=match.reason,
+            )
+        else:
+            # Definition-level metadata is authoritative over the LLM's guess.
+            if definition and definition.domain:
+                structured.domain = definition.domain
+            canonical_target = self._determine_target(match, definition)
+            if canonical_target:
+                structured.target = canonical_target
+            # Ensure the structured scope matches the complexity heuristic when
+            # the LLM returns an inconsistent scope.
+            if complexity == "direct_response":
+                structured.scope = "single_step"
+                structured.interaction_mode = "answer"
+            elif complexity == "complex" and structured.scope == "single_step":
+                structured.scope = "full"
 
         return UserIntent(
             analysis_type=match.analysis_type,
@@ -787,10 +870,11 @@ class CascadeIntentAnalyzer:
             domain_knowledge=domain_knowledge,
             sub_intents=sub_user_intents,
             metadata=metadata,
-            interaction_mode=interaction_mode,
-            domain=domain,
-            target=target,
-            scope=scope,
+            interaction_mode=structured.interaction_mode,
+            domain=structured.domain,
+            target=structured.target,
+            scope=structured.scope,
+            structured_intent=structured,
         )
 
     def _enrich_with_cbkb(
@@ -869,11 +953,35 @@ class CascadeIntentAnalyzer:
             pass
 
     @staticmethod
+    def _legacy_to_intent_type(
+        analysis_type: str,
+        complexity: str,
+        metadata: Dict[str, Any],
+    ) -> str:
+        if analysis_type == "clarification":
+            return "clarification"
+        if analysis_type in ("qa", "information_request"):
+            return "qa"
+        if analysis_type == "general_help":
+            return "general_help"
+        if analysis_type == "greeting":
+            return "greeting"
+        if analysis_type == "file_conversion":
+            return "file_conversion"
+        if metadata.get("tool_name"):
+            return "tool_call"
+        if complexity == "direct_response":
+            return "qa"
+        return "analysis"
+
+    @staticmethod
     def _determine_interaction_mode(
         match: IntentMatch,
         complexity: str,
         metadata: Dict[str, Any],
     ) -> str:
+        if match.structured is not None:
+            return match.structured.interaction_mode
         if match.analysis_type == "clarification":
             return "clarify"
         if metadata.get("tool_name"):
@@ -897,6 +1005,8 @@ class CascadeIntentAnalyzer:
         match: IntentMatch,
         definition: Optional[Any],
     ) -> Optional[str]:
+        if match.structured is not None and match.structured.domain:
+            return match.structured.domain
         if definition and definition.domain:
             return definition.domain
         domain_from_analysis = UserIntent(analysis_type=match.analysis_type, complexity="single_step").domain
@@ -907,10 +1017,12 @@ class CascadeIntentAnalyzer:
         match: IntentMatch,
         definition: Optional[Any],
     ) -> Optional[str]:
+        if match.structured is not None and match.structured.target:
+            return match.structured.target
         # Explicit single-step helpers.
         if match.analysis_type == "file_conversion":
             return "convert_file"
-        if match.analysis_type == "qa":
+        if match.analysis_type in ("qa", "information_request"):
             return "answer_question"
         if match.analysis_type == "general_help":
             return "generate_code"
@@ -941,6 +1053,14 @@ class CascadeIntentAnalyzer:
         question = result.clarification_question or (
             "我不太确定您的需求，请再具体描述一下您想做什么分析。"
         )
+        structured = StructuredIntent(
+            intent_type="clarification",
+            interaction_mode="clarify",
+            scope="single_step",
+            confidence=0.0,
+            reason="low confidence or ambiguous",
+            entities={"clarification_question": question},
+        )
         metadata: Dict[str, Any] = {
             "clarification_question": question,
             "alternatives": [
@@ -966,4 +1086,9 @@ class CascadeIntentAnalyzer:
             confidence=0.0,
             original_message=message,
             metadata=metadata,
+            interaction_mode="clarify",
+            scope="single_step",
+            target=None,
+            domain=None,
+            structured_intent=structured,
         )

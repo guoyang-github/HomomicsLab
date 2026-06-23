@@ -17,6 +17,15 @@ BUILTIN_INTENT_EXAMPLES: Dict[str, List[str]] = {
         "how to interpret a volcano plot",
         "告诉我什么是 batch effect",
     ],
+    "information_request": [
+        "单细胞转录组有哪些分析内容？",
+        "空间转录组分析包括哪些步骤？",
+        "what can you do",
+        "你能做什么分析",
+        "系统支持哪些功能",
+        "宏基因组分析有哪些流程",
+        "how do I get started",
+    ],
     "general_help": [
         "帮我写个 Python 脚本过滤 CSV",
         "generate code to rename sample files",
