@@ -79,6 +79,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'sessionList.loadFailed': 'Failed to load projects',
 
     // Chat
+    'chat.planMode': 'Plan mode: show execution plan before running',
+    'chat.planModeActive': 'Plan mode active',
     'chat.placeholder': 'Describe your analysis... Type @file:path or @skill:id to reference',
     'chat.sendHint': 'Enter to send, Shift+Enter for new line',
     'chat.formatHint': 'Supports Markdown, LaTeX and code highlighting',
@@ -105,6 +107,7 @@ const resources: Record<Locale, Record<string, string>> = {
 
     // Plan
     'plan.approved': 'Plan approved, executing',
+    'plan.startedExecution': 'Execution started',
     'plan.rejected': 'Plan rejected',
     'plan.approvedMessage': 'Plan approved, executing.',
     'plan.rejectedMessage': 'Plan rejected.',
@@ -133,6 +136,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'planEditor.discard': 'Discard',
     'planEditor.saveDraft': 'Save Draft',
     'planEditor.approveExecute': 'Approve & Execute',
+    'planEditor.saveAsTemplate': 'Save as Template',
+    'planEditor.templateSaved': 'Template saved',
+    'planEditor.templateSaveFailed': 'Failed to save template',
     'planEditor.selectNodeHint': 'Select a node to edit parameters, skill and dependencies',
     'planEditor.description': 'Description',
     'planEditor.skillId': 'Skill ID',
@@ -569,6 +575,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'sessionList.loadFailed': '加载项目失败',
 
     // Chat
+    'chat.planMode': 'Plan 模式：执行前先展示执行计划',
+    'chat.planModeActive': 'Plan 模式已开启',
     'chat.placeholder': '描述您的分析需求... 输入 @file:路径 或 @skill:技能ID 引用',
     'chat.sendHint': 'Enter 发送，Shift+Enter 换行',
     'chat.formatHint': '支持 Markdown、LaTeX、代码高亮',
@@ -595,6 +603,7 @@ const resources: Record<Locale, Record<string, string>> = {
 
     // Plan
     'plan.approved': '计划已批准，开始执行',
+    'plan.startedExecution': '已开始执行',
     'plan.rejected': '计划已拒绝',
     'plan.approvedMessage': '已批准计划，开始执行。',
     'plan.rejectedMessage': '已拒绝计划。',
@@ -623,6 +632,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'planEditor.discard': '放弃',
     'planEditor.saveDraft': '保存草稿',
     'planEditor.approveExecute': '批准执行',
+    'planEditor.saveAsTemplate': '保存为模板',
+    'planEditor.templateSaved': '模板已保存',
+    'planEditor.templateSaveFailed': '保存模板失败',
     'planEditor.selectNodeHint': '选择节点以编辑参数、Skill 与依赖',
     'planEditor.description': '描述',
     'planEditor.skillId': 'Skill ID',

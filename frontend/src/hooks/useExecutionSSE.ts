@@ -2,6 +2,42 @@ import { useEffect, useRef } from 'react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useTranslation } from '@/i18n'
+import type { TaskNode, TaskProgress } from '@/types/tasks'
+
+interface ExecutionStatePayload {
+  job_id: string
+  status: string
+  current_phase?: string
+  progress_pct: number
+  error_message?: string | null
+  tasks?: TaskNode[]
+  active_task_id?: string | null
+}
+
+function buildProgress(tasks: TaskNode[]): TaskProgress {
+  const total = tasks.length
+  const counts = {
+    pending: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    awaiting_human: 0,
+  }
+  tasks.forEach((task) => {
+    if (task.status in counts) {
+      counts[task.status as keyof typeof counts]++
+    }
+  })
+  return {
+    total,
+    pending: counts.pending,
+    running: counts.running,
+    completed: counts.completed,
+    failed: counts.failed,
+    awaiting_human: counts.awaiting_human,
+    percent: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
+  }
+}
 
 export function useExecutionSSE(jobId: string | null) {
   const { t } = useTranslation()
@@ -9,7 +45,8 @@ export function useExecutionSSE(jobId: string | null) {
   const addLog = useExecutionStore((state) => state.addLog)
   const setConnected = useExecutionStore((state) => state.setConnected)
   const setStatus = useExecutionStore((state) => state.setStatus)
-  const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
+  const setTaskTree = useTaskStore((state) => state.setTaskTree)
+  const setProgress = useTaskStore((state) => state.setProgress)
 
   useEffect(() => {
     if (!jobId) {
@@ -18,65 +55,68 @@ export function useExecutionSSE(jobId: string | null) {
       return
     }
 
-    const url = `/api/execution/${jobId}/status`
+    const url = `/api/execution/${jobId}/events`
     const es = new EventSource(url)
     eventSourceRef.current = es
 
     es.onopen = () => {
       setConnected(true)
+      addLog({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: t('executionLog.running') + ` (${jobId.slice(0, 8)})`,
+      })
     }
 
-    es.onmessage = (event) => {
+    es.addEventListener('state', (event) => {
       try {
-        const data = JSON.parse(event.data)
+        const data: ExecutionStatePayload = JSON.parse(event.data)
 
-        if (data.type === 'status' && data.task_id && data.status) {
-          updateTaskStatus(data.task_id, data.status)
-          setStatus(data.overall_status || 'running', data.percent)
+        const status = data.status.toLowerCase()
+        const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+
+        if (data.tasks && data.tasks.length > 0) {
+          setTaskTree(data.tasks)
+          setProgress(buildProgress(data.tasks))
         }
 
-        if (data.type === 'log') {
-          addLog({
-            timestamp: data.timestamp || new Date().toISOString(),
-            level: data.level || 'info',
-            message: data.message,
-            taskId: data.task_id,
-          })
-        }
-
-        if (data.type === 'stdout') {
+        if (data.active_task_id) {
           addLog({
             timestamp: new Date().toISOString(),
-            level: 'stdout',
-            message: data.message,
-            taskId: data.task_id,
+            level: 'info',
+            message: `${data.current_phase || data.active_task_id}`,
+            taskId: data.active_task_id,
           })
         }
 
-        if (data.type === 'stderr') {
-          addLog({
-            timestamp: new Date().toISOString(),
-            level: 'stderr',
-            message: data.message,
-            taskId: data.task_id,
-          })
-        }
+        setStatus(
+          status === 'completed'
+            ? 'completed'
+            : status === 'failed' || status === 'cancelled'
+            ? 'failed'
+            : status === 'awaiting_human'
+            ? 'running'
+            : 'running',
+          data.progress_pct
+        )
 
-        if (data.type === 'complete') {
-          setStatus('completed', 100)
-          es.close()
-          setConnected(false)
-        }
-
-        if (data.type === 'error' || data.type === 'failed') {
-          setStatus('failed')
+        if (data.error_message) {
           addLog({
             timestamp: new Date().toISOString(),
             level: 'error',
-            message: data.message || t('execution.failed'),
+            message: data.error_message,
+            taskId: data.active_task_id || undefined,
           })
+        }
+
+        if (isTerminal) {
           es.close()
           setConnected(false)
+          addLog({
+            timestamp: new Date().toISOString(),
+            level: status === 'completed' ? 'success' : 'error',
+            message: status === 'completed' ? t('executionLog.completed') : t('executionLog.failed'),
+          })
         }
       } catch {
         addLog({
@@ -85,7 +125,7 @@ export function useExecutionSSE(jobId: string | null) {
           message: event.data,
         })
       }
-    }
+    })
 
     es.onerror = () => {
       setConnected(false)
@@ -96,5 +136,5 @@ export function useExecutionSSE(jobId: string | null) {
       es.close()
       setConnected(false)
     }
-  }, [jobId, addLog, setConnected, setStatus, updateTaskStatus, t])
+  }, [jobId, addLog, setConnected, setStatus, setTaskTree, setProgress, t])
 }

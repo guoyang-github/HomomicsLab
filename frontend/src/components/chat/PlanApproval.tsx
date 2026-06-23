@@ -235,6 +235,21 @@ function PlanPhaseRow({ index, phase, editing, values, onChange }: PhaseRowProps
           })}
         </div>
       )}
+      {phase.parameter_recommendations && Object.keys(phase.parameter_recommendations).length > 0 && (
+        <div className="mt-2 rounded-lg border border-primary/10 bg-primary/5 p-2 text-xs">
+          <div className="mb-1 font-medium text-primary">{t('common.recommended')}</div>
+          <ul className="space-y-0.5 text-muted-foreground">
+            {Object.entries(phase.parameter_recommendations).map(([key, rec]) => (
+              <li key={key}>
+                <span className="font-medium">{key}</span>: {rec}
+                {phase.parameter_sources?.[key] && (
+                  <span className="ml-1 text-[10px]">({phase.parameter_sources[key]})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

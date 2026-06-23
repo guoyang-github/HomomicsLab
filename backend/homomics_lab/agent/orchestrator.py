@@ -93,15 +93,7 @@ class Orchestrator:
                 if task.status in (TaskStatus.COMPLETED, TaskStatus.ABORTED):
                     continue
 
-                self._report_progress(
-                    ExecutionState(
-                        job_id="",
-                        status="RUNNING",
-                        current_phase=task.name,
-                        progress_pct=self._compute_progress(tree),
-                        scheduler_type="agent",
-                    )
-                )
+                self._publish_task_update(tree, task, "RUNNING")
 
                 # Check HITL
                 checkpoint = self.hitl_detector.check(task, context)
@@ -109,30 +101,13 @@ class Orchestrator:
                     self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
                     results[task.id] = {"hitl": checkpoint.model_dump()}
                     hitl_triggered = True
-                    self._report_progress(
-                        ExecutionState(
-                            job_id="",
-                            status="AWAITING_HUMAN",
-                            current_phase=task.name,
-                            progress_pct=self._compute_progress(tree),
-                            scheduler_type="agent",
-                        )
-                    )
+                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
                     continue
 
                 try:
                     result = await self._execute_task(task, context, results)
                 except Exception as exc:
-                    self._report_progress(
-                        ExecutionState(
-                            job_id="",
-                            status="FAILED",
-                            current_phase=task.name,
-                            progress_pct=self._compute_progress(tree),
-                            scheduler_type="agent",
-                            error_message=str(exc),
-                        )
-                    )
+                    self._publish_task_update(tree, task, "FAILED", error_message=str(exc))
                     raise
 
                 # SWR: escalate worker failures that survived retries.
@@ -151,15 +126,7 @@ class Orchestrator:
                         self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
                         results[task.id] = {"hitl": checkpoint.model_dump()}
                         hitl_triggered = True
-                        self._report_progress(
-                            ExecutionState(
-                                job_id="",
-                                status="AWAITING_HUMAN",
-                                current_phase=task.name,
-                                progress_pct=self._compute_progress(tree),
-                                scheduler_type="agent",
-                            )
-                        )
+                        self._publish_task_update(tree, task, "AWAITING_HUMAN")
                         continue
 
                 # Snapshot before gate evaluation if needed.
@@ -188,15 +155,7 @@ class Orchestrator:
                     self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
                     results[task.id] = {"hitl": checkpoint.model_dump()}
                     hitl_triggered = True
-                    self._report_progress(
-                        ExecutionState(
-                            job_id="",
-                            status="AWAITING_HUMAN",
-                            current_phase=task.name,
-                            progress_pct=self._compute_progress(tree),
-                            scheduler_type="agent",
-                        )
-                    )
+                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
                     continue
 
                 # SWR: reviewer checks gate-passed results.
@@ -222,15 +181,7 @@ class Orchestrator:
                         self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
                         results[task.id] = {"hitl": checkpoint.model_dump()}
                         hitl_triggered = True
-                        self._report_progress(
-                            ExecutionState(
-                                job_id="",
-                                status="AWAITING_HUMAN",
-                                current_phase=task.name,
-                                progress_pct=self._compute_progress(tree),
-                                scheduler_type="agent",
-                            )
-                        )
+                        self._publish_task_update(tree, task, "AWAITING_HUMAN")
                         continue
 
                 # Gate passed — interpret the result and adaptively replan if
@@ -239,27 +190,12 @@ class Orchestrator:
 
                 # Gate passed.
                 self.state_machine.transition(task, TaskStatus.COMPLETED)
+                self._publish_task_update(tree, task, "COMPLETED")
 
         if hitl_triggered:
-            self._report_progress(
-                ExecutionState(
-                    job_id="",
-                    status="AWAITING_HUMAN",
-                    current_phase="workflow",
-                    progress_pct=self._compute_progress(tree),
-                    scheduler_type="agent",
-                )
-            )
+            self._publish_task_update(tree, status="AWAITING_HUMAN")
         else:
-            self._report_progress(
-                ExecutionState(
-                    job_id="",
-                    status="COMPLETED",
-                    current_phase="workflow",
-                    progress_pct=100.0,
-                    scheduler_type="agent",
-                )
-            )
+            self._publish_task_update(tree, status="COMPLETED")
 
         if self._ingestion_service is not None:
             try:
@@ -1054,3 +990,30 @@ class Orchestrator:
             except Exception:
                 # Never break execution because of a monitoring callback.
                 pass
+
+    @staticmethod
+    def _build_task_snapshot(tree: TaskTree) -> List[Dict[str, Any]]:
+        """Return a JSON-serializable snapshot of the task tree."""
+        return [t.model_dump(mode="json") for t in tree.tasks]
+
+    def _publish_task_update(
+        self,
+        tree: TaskTree,
+        active_task: Optional[TaskNode] = None,
+        status: str = "RUNNING",
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Publish a task-level update with the current tree snapshot."""
+        if self._progress_callback is None:
+            return
+        state = ExecutionState(
+            job_id="",
+            status=status,
+            current_phase=active_task.name if active_task else "workflow",
+            progress_pct=self._compute_progress(tree),
+            scheduler_type="agent",
+            tasks=self._build_task_snapshot(tree),
+            active_task_id=active_task.id if active_task else None,
+            error_message=error_message,
+        )
+        self._report_progress(state)

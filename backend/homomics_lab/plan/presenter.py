@@ -32,6 +32,8 @@ class PlanPresenter:
                     "skill_id": skill_id,
                     "readonly": phase.readonly,
                     "parameters": phase.parameters,
+                    "parameter_recommendations": phase.parameter_recommendations,
+                    "parameter_sources": phase.parameter_sources,
                 }
             )
 

@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { TodoList } from './TodoList'
+import { ExecutionPlan } from './ExecutionPlan'
 import { HITLRequest } from './HITLRequest'
 import { PlanApproval } from './PlanApproval'
 import { DebateRequest } from './DebateRequest'
@@ -11,6 +12,7 @@ import { useTranslation } from '@/i18n'
 import type {
   ChatMessage,
   TodoListContent,
+  ExecutionPlanContent,
   HITLContent,
   PlotContent,
   PlotDataContent,
@@ -33,6 +35,15 @@ function isHITLContent(content: unknown): content is HITLContent {
     content !== null &&
     'checkpoint' in content &&
     'task_id' in content
+  )
+}
+
+function isExecutionPlanContent(content: unknown): content is ExecutionPlanContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'plan_id' in content &&
+    'tasks' in content
   )
 }
 
@@ -99,6 +110,11 @@ export function MessageBubble({ message, onRegenerate }: Props) {
       case 'todo_list':
         if (isTodoListContent(message.content)) {
           return <TodoList content={message.content} />
+        }
+        return null
+      case 'execution_plan':
+        if (isExecutionPlanContent(message.content)) {
+          return <ExecutionPlan content={message.content} />
         }
         return null
       case 'hitl_request':
@@ -207,7 +223,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
             <span>•</span>
             <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
           </div>
-          {!isUser && message.type !== 'hitl_request' && message.type !== 'plan_request' && message.type !== 'debate_request' && (
+          {!isUser && message.type !== 'hitl_request' && message.type !== 'plan_request' && message.type !== 'debate_request' && message.type !== 'execution_plan' && (
             <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 onClick={handleCopy}

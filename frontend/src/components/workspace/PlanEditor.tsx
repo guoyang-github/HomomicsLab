@@ -27,6 +27,7 @@ import {
   Wrench,
   Settings,
   AlertCircle,
+  BookMarked,
 } from 'lucide-react'
 import { usePlanStore } from '@/stores/planStore'
 import { planApi } from '@/services/api'
@@ -117,6 +118,21 @@ export function PlanEditor() {
 
   const addMessage = useChatStore((state) => state.addMessage)
   const setTaskTree = useTaskStore((state) => state.setTaskTree)
+
+  const saveAsTemplate = async () => {
+    if (!draftPlan) return
+    const name = window.prompt(t('planEditor.saveAsTemplate'))
+    if (!name) return
+    setSaving(true)
+    try {
+      await planApi.saveTemplate(draftPlan.plan_id, name)
+      toastSuccess(t('planEditor.templateSaved'))
+    } catch (error: any) {
+      toastError(error?.response?.data?.detail || t('planEditor.templateSaveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const [nodes, setNodes] = useState(applyNodeChanges([], []))
   const [edges, setEdges] = useState(applyEdgeChanges([], []))
@@ -327,6 +343,10 @@ export function PlanEditor() {
               <Save className="mr-1 h-3.5 w-3.5" />
               {t('planEditor.saveDraft')}
             </Button>
+            <Button variant="outline" size="sm" onClick={saveAsTemplate} loading={isSaving}>
+              <BookMarked className="mr-1 h-3.5 w-3.5" />
+              {t('planEditor.saveAsTemplate')}
+            </Button>
             <Button size="sm" onClick={() => submitPlan(true)} loading={isSaving}>
               <Check className="mr-1 h-3.5 w-3.5" />
               {t('planEditor.approveExecute')}
@@ -446,11 +466,19 @@ function ParameterPanel() {
         {Object.entries(params).map(([key, value]) => (
           <div key={key} className="flex items-center gap-2">
             <span className="w-20 truncate text-xs text-muted-foreground">{key}</span>
-            <Input
-              value={String(value ?? '')}
-              onChange={(e) => updateParameter(phase.phase_type, key, parseValue(e.target.value, value))}
-              className="flex-1"
-            />
+            <div className="flex flex-1 flex-col gap-1">
+              <Input
+                value={String(value ?? '')}
+                onChange={(e) => updateParameter(phase.phase_type, key, parseValue(e.target.value, value))}
+                className="w-full"
+              />
+              {phase.parameter_recommendations?.[key] && (
+                <span className="text-[10px] text-muted-foreground">
+                  {t('common.recommended')}: {phase.parameter_recommendations[key]}
+                  {phase.parameter_sources?.[key] && ` · ${phase.parameter_sources[key]}`}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => {
                 const next = { ...params }

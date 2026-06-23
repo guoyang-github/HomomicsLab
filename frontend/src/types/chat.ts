@@ -1,6 +1,7 @@
 export type MessageType =
   | 'text'
   | 'todo_list'
+  | 'execution_plan'
   | 'hitl_request'
   | 'plan_request'
   | 'debate_request'
@@ -17,6 +18,14 @@ import type { TaskNode, TaskProgress } from './tasks'
 
 export interface TodoListContent {
   text: string
+  tasks: TaskNode[]
+  progress?: TaskProgress
+  job_id?: string
+}
+
+export interface ExecutionPlanContent {
+  plan_id: string
+  response_text: string
   tasks: TaskNode[]
   progress?: TaskProgress
 }
@@ -47,12 +56,28 @@ export interface PlanPhase {
   skill_id?: string
   readonly?: boolean
   parameters?: Record<string, unknown>
+  parameter_recommendations?: Record<string, string>
+  parameter_sources?: Record<string, string>
 }
 
 export interface PlanTransition {
   from: string
   to: string
   type: string
+}
+
+export interface PlanModification {
+  phase_type: string
+  action: 'update' | 'remove' | 'add' | 'update_dependency'
+  parameter?: string
+  old_value?: unknown
+  new_value?: unknown
+  after?: string
+  before?: string
+  description?: string
+  required?: boolean
+  skill_id?: string
+  dependencies?: string[]
 }
 
 export interface PlanRequestContent {

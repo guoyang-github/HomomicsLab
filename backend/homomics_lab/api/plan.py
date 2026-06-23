@@ -13,8 +13,26 @@ from homomics_lab.plan import (
     PlanStatus,
     PlanStore,
 )
-
 router = APIRouter()
+
+
+class SaveTemplateRequest(BaseModel):
+    name: str
+
+
+class TemplateResponse(BaseModel):
+    template_id: str
+    name: str
+    created_at: Optional[str] = None
+
+
+class TemplateListResponse(BaseModel):
+    templates: List[TemplateResponse]
+
+
+class LoadTemplateRequest(BaseModel):
+    session_id: str
+    project_id: str
 
 
 class PlanApproveResponse(BaseModel):
@@ -285,4 +303,61 @@ async def get_plan_job(plan_id: str, request: Request):
         plan_id=plan_id,
         job_id=latest.job_id,
         job_status=latest.status.value,
+    )
+
+
+@router.post("/{plan_id}/template", response_model=TemplateResponse)
+async def save_plan_template(
+    plan_id: str,
+    request: SaveTemplateRequest,
+    http_request: Request,
+):
+    """Save a plan as a reusable template."""
+    plan_store = _get_plan_store(http_request)
+    try:
+        template_id = await plan_store.save_template(plan_id, request.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return TemplateResponse(
+        template_id=template_id,
+        name=request.name,
+    )
+
+
+@router.get("/templates", response_model=TemplateListResponse)
+async def list_plan_templates(http_request: Request):
+    """List all reusable plan templates."""
+    plan_store = _get_plan_store(http_request)
+    templates = await plan_store.list_templates()
+    return TemplateListResponse(
+        templates=[
+            TemplateResponse(
+                template_id=t["template_id"],
+                name=t["name"],
+                created_at=t.get("created_at"),
+            )
+            for t in templates
+        ]
+    )
+
+
+@router.post("/template/{template_id}/load", response_model=PlanApproveResponse)
+async def load_plan_template(
+    template_id: str,
+    request: LoadTemplateRequest,
+    http_request: Request,
+):
+    """Load a template as a new pending plan."""
+    plan_store = _get_plan_store(http_request)
+    try:
+        new_plan = await plan_store.load_template(
+            template_id,
+            session_id=request.session_id,
+            project_id=request.project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return PlanApproveResponse(
+        plan_id=new_plan.plan_id,
+        status=new_plan.status,
     )

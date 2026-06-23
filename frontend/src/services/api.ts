@@ -47,6 +47,15 @@ export const planApi = {
 
   getJob: (plan_id: string) =>
     api.get(`/plan/${plan_id}/job`),
+
+  saveTemplate: (plan_id: string, name: string) =>
+    api.post(`/plan/${plan_id}/template`, { name }),
+
+  listTemplates: () =>
+    api.get('/plan/templates'),
+
+  loadTemplate: (template_id: string) =>
+    api.post(`/plan/template/${template_id}/load`),
 }
 
 export const projectApi = {

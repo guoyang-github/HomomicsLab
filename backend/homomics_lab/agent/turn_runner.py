@@ -269,6 +269,7 @@ class TurnRunner:
         enqueue_skills: bool = False,
         plan_store: Optional[PlanStore] = None,
         debate_response: Optional[Dict[str, Any]] = None,
+        plan_mode: bool = False,
     ) -> TurnResult:
         """Execute one full turn: from user message to agent response.
 
@@ -278,6 +279,8 @@ class TurnRunner:
             job_service: Optional JobService for background execution.
             enqueue_skills: If True, skill-executing turns are enqueued instead of
                 awaited synchronously.
+            plan_mode: If True, always present an execution plan for approval before
+                running non-domain tasks.
         """
         # 1. Record user message
         user_msg = ChatMessage(
@@ -300,6 +303,7 @@ class TurnRunner:
                 enqueue_skills=enqueue_skills,
                 plan_store=plan_store,
                 debate_response=debate_response,
+                plan_mode=plan_mode,
             )
         except TurnError as exc:
             if exc.retryable:
@@ -315,6 +319,7 @@ class TurnRunner:
                         enqueue_skills=enqueue_skills,
                         plan_store=plan_store,
                         debate_response=debate_response,
+                        plan_mode=plan_mode,
                     )
                 except TurnError as exc2:
                     turn_result = self._build_error_result(exc2, working_memory)
@@ -375,6 +380,7 @@ class TurnRunner:
         enqueue_skills: bool = False,
         plan_store: Optional[PlanStore] = None,
         debate_response: Optional[Dict[str, Any]] = None,
+        plan_mode: bool = False,
     ) -> TurnResult:
         """Execute the core turn pipeline once."""
         # 2. Build a token-safe context bundle from the ContextEngine.
@@ -438,6 +444,7 @@ class TurnRunner:
                 plan_store=plan_store,
                 job_service=job_service,
                 enqueue_skills=enqueue_skills,
+                plan_mode=plan_mode,
             )
         except TurnError:
             raise
@@ -600,6 +607,7 @@ class TurnRunner:
         plan_store: Optional[PlanStore],
         job_service: Optional[Any],
         enqueue_skills: bool,
+        plan_mode: bool = False,
     ) -> TurnResult:
         """Route a user intent to the right execution path.
 
@@ -664,12 +672,18 @@ class TurnRunner:
                 project_id=project_id,
                 job_service=job_service,
                 plan_store=plan_store,
+                plan_mode=plan_mode,
             )
 
         if scope == "single_step" or intent.complexity == "single_step":
             return await self._handle_single_step(tree, working_memory, project_id)
 
         return await self._handle_workflow(tree, working_memory, project_id)
+
+    @staticmethod
+    def _is_domain_template_analysis(intent: UserIntent) -> bool:
+        """Return True for domain-specific analysis workflows that belong on canvas."""
+        return intent.domain is not None
 
     async def _enqueue_execution(
         self,
@@ -681,21 +695,39 @@ class TurnRunner:
         project_id: str,
         job_service: Any,
         plan_store: Optional[PlanStore],
+        plan_mode: bool = False,
     ) -> TurnResult:
-        """Submit a task tree to the background job queue."""
-        if plan is not None and plan.is_fallback:
-            response_text = "我为您生成了一个分析计划，请确认后再执行。"
-            plan_payload = PlanPresenter.to_user_payload(plan)
-            agent_msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.PLAN_REQUEST,
-                content={
-                    "plan_id": plan.plan_id,
-                    "plan": plan_payload,
-                    "response_text": response_text,
-                },
-                sender="agent",
-            )
+        """Submit a task tree to the background job queue or request approval."""
+        is_domain = self._is_domain_template_analysis(intent)
+        needs_approval = plan_mode or is_domain or intent.complexity == "complex"
+
+        if plan is not None and needs_approval:
+            if is_domain:
+                response_text = "我为您生成了一个分析计划，请确认后再执行。"
+                plan_payload = PlanPresenter.to_user_payload(plan)
+                agent_msg = ChatMessage(
+                    id=f"msg_{len(working_memory.messages)}",
+                    type=MessageType.PLAN_REQUEST,
+                    content={
+                        "plan_id": plan.plan_id,
+                        "plan": plan_payload,
+                        "response_text": response_text,
+                    },
+                    sender="agent",
+                )
+            else:
+                response_text = "我为您规划了以下执行步骤，请确认后再执行。"
+                agent_msg = ChatMessage(
+                    id=f"msg_{len(working_memory.messages)}",
+                    type=MessageType.EXECUTION_PLAN,
+                    content={
+                        "plan_id": plan.plan_id,
+                        "response_text": response_text,
+                        "tasks": [t.model_dump() for t in tree.tasks],
+                        "progress": self._build_initial_progress(tree),
+                    },
+                    sender="agent",
+                )
             working_memory.add_message(agent_msg)
             return TurnResult(
                 mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
@@ -726,8 +758,13 @@ class TurnRunner:
         response_text = "已提交后台执行，完成后会通知您。"
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TEXT,
-            content=response_text,
+            type=MessageType.TODO_LIST,
+            content={
+                "text": response_text,
+                "tasks": [t.model_dump() for t in tree.tasks],
+                "progress": self._build_initial_progress(tree),
+                "job_id": job.job_id,
+            },
             sender="agent",
         )
         working_memory.add_message(agent_msg)
@@ -739,6 +776,19 @@ class TurnRunner:
             job_id=job.job_id,
             plan_id=plan.plan_id if plan is not None else None,
         )
+
+    @staticmethod
+    def _build_initial_progress(tree: TaskTree) -> Dict[str, Any]:
+        total = len(tree.tasks)
+        return {
+            "total": total,
+            "pending": total,
+            "running": 0,
+            "completed": 0,
+            "failed": 0,
+            "awaiting_human": 0,
+            "percent": 0,
+        }
 
     async def _handle_single_step(
         self,

@@ -3,6 +3,7 @@ import { FlowCanvas } from './FlowCanvas'
 import { DetailPanel } from './DetailPanel'
 import { ExecutionLogPanel } from './ExecutionLogPanel'
 import { PlanEditor } from './PlanEditor'
+import { ExecutionSSEConnector } from './ExecutionSSEConnector'
 import { usePlanStore } from '@/stores/planStore'
 
 export function Workspace() {
@@ -10,6 +11,7 @@ export function Workspace() {
 
   return (
     <div className="flex h-full flex-col">
+      <ExecutionSSEConnector />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 overflow-hidden">

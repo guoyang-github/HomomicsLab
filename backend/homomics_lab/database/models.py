@@ -64,6 +64,24 @@ class PlanRecord(Base):
     )
 
 
+class PlanTemplateRecord(Base):
+    """Persisted reusable plan template."""
+
+    __tablename__ = "plan_templates"
+
+    template_id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    plan_result_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class ScheduledJobRun(Base):
     """Audit record of a scheduled task execution."""
 

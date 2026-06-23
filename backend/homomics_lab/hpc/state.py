@@ -19,6 +19,9 @@ class ExecutionState:
     logs: List[str] = field(default_factory=list)
     error_message: Optional[str] = None
     scheduler_type: str = "unknown"
+    # Optional per-task snapshot for agent-driven workflows.
+    tasks: Optional[List[Dict[str, Any]]] = None
+    active_task_id: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
@@ -37,6 +40,8 @@ class ExecutionState:
             logs=data.get("logs", []),
             error_message=data.get("error_message"),
             scheduler_type=data.get("scheduler_type", "unknown"),
+            tasks=data.get("tasks"),
+            active_task_id=data.get("active_task_id"),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -56,4 +61,6 @@ class ExecutionState:
             "logs": self.logs,
             "error_message": self.error_message,
             "scheduler_type": self.scheduler_type,
+            "tasks": self.tasks,
+            "active_task_id": self.active_task_id,
         }

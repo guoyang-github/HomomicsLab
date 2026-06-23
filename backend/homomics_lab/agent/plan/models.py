@@ -189,6 +189,8 @@ class Phase:
     description: str = ""
     selected_skill: Optional[SkillDefinition] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
+    parameter_recommendations: Dict[str, str] = field(default_factory=dict)
+    parameter_sources: Dict[str, str] = field(default_factory=dict)
     agent_code: Optional[str] = None  # Agent-generated bridging code
     readonly: bool = False  # True for suggestion-only phases (e.g., LLM-generated code)
     success_criteria: List[SuccessCriterion] = field(default_factory=list)

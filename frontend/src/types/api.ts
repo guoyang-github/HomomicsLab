@@ -13,15 +13,18 @@ export interface SendMessageRequest {
   project_id: string
   session_id: string
   message: string
+  plan_mode?: boolean
 }
 
 export interface SendMessageResponse {
   response: string
   task_tree: { tasks: TaskNode[] }
   messages: ChatMessage[]
-  status: string
+  attachments: { type: string; content: Record<string, unknown> }[]
+  job_id: string | null
   plan_id: string | null
   plan: PlanRequestContent['plan'] | null
+  status: string
 }
 
 export interface FileUploadResponse {

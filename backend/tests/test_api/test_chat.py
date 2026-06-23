@@ -27,11 +27,12 @@ def test_send_message():
         assert "response" in data
         assert "task_tree" in data
         assert "job_id" in data
-        assert data["status"] == "queued"
+        assert data["status"] in ("queued", "awaiting_plan_approval")
 
-        job_id = data["job_id"]
-        final = _poll_job(client, job_id)
-        assert final["status"] in ("awaiting_human", "completed", "failed")
+        if data["status"] == "queued":
+            job_id = data["job_id"]
+            final = _poll_job(client, job_id)
+            assert final["status"] in ("awaiting_human", "completed", "failed")
 
 
 def test_get_messages():

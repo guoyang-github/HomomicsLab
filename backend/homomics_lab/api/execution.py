@@ -51,6 +51,61 @@ async def execution_status(
     }
 
 
+@router.get("/{job_id}/tasks")
+async def execution_tasks(
+    job_id: str,
+    request: Request,
+) -> Dict[str, Any]:
+    """Return the current task tree snapshot for a background job."""
+    job_service: JobService = getattr(
+        request.app.state, "job_service", None
+    ) or JobService()
+    job = await job_service.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+
+    tasks = []
+    if job.task_tree is not None:
+        tasks = [t.model_dump(mode="json") for t in job.task_tree.tasks]
+    progress = _job_progress(job.task_tree)
+    return {
+        "job_id": job.job_id,
+        "status": job.status.value,
+        "tasks": tasks,
+        "progress": progress,
+    }
+
+
+def _job_progress(tree: Optional[Any]) -> Dict[str, Any]:
+    total = len(tree.tasks) if tree else 0
+    if total == 0:
+        return {
+            "total": 0,
+            "pending": 0,
+            "running": 0,
+            "completed": 0,
+            "failed": 0,
+            "awaiting_human": 0,
+            "percent": 0,
+        }
+    from homomics_lab.tasks.models import TaskStatus
+
+    counts = {
+        "pending": 0,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+        "awaiting_human": 0,
+    }
+    for task in tree.tasks:
+        status = task.status.value
+        if status in counts:
+            counts[status] += 1
+    counts["total"] = total
+    counts["percent"] = int((counts["completed"] / total) * 100)
+    return counts
+
+
 @router.post("/{job_id}/cancel")
 async def cancel_job(
     job_id: str,

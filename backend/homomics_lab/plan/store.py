@@ -9,7 +9,7 @@ from sqlalchemy import desc, select
 
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.database.connection import AsyncSessionLocal
-from homomics_lab.database.models import PlanRecord
+from homomics_lab.database.models import PlanRecord, PlanTemplateRecord
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
@@ -296,3 +296,85 @@ class PlanStore:
             created_at=record.created_at,
             updated_at=record.updated_at,
         )
+
+    async def save_template(
+        self,
+        plan_id: str,
+        name: str,
+    ) -> str:
+        """Save a plan as a reusable template."""
+        plan = await self.get(plan_id)
+        if plan is None:
+            raise ValueError(f"Plan {plan_id} not found")
+        template_id = f"template_{uuid.uuid4().hex[:12]}"
+        record = PlanTemplateRecord(
+            template_id=template_id,
+            name=name,
+            plan_result_json=json.dumps(plan.plan_result.to_dict()),
+        )
+        async with self._session_factory() as session:
+            session.add(record)
+            await session.commit()
+        return template_id
+
+    async def list_templates(self) -> List[Dict[str, Any]]:
+        """List all reusable plan templates."""
+        async with self._session_factory() as session:
+            stmt = select(PlanTemplateRecord).order_by(desc(PlanTemplateRecord.created_at))
+            result = await session.execute(stmt)
+            return [
+                {
+                    "template_id": r.template_id,
+                    "name": r.name,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in result.scalars().all()
+            ]
+
+    async def load_template(
+        self,
+        template_id: str,
+        session_id: str,
+        project_id: str,
+    ) -> Plan:
+        """Create a new plan from a reusable template."""
+        from homomics_lab.agent.plan.models import PlanResult
+
+        async with self._session_factory() as session:
+            record = await session.get(PlanTemplateRecord, template_id)
+        if record is None:
+            raise ValueError(f"Template {template_id} not found")
+        plan_result = PlanResult.from_dict(json.loads(record.plan_result_json))
+        task_tree = TaskTree(
+            tasks=[
+                TaskNode(
+                    id=phase.phase_type,
+                    name=phase.phase_type,
+                    description=phase.description,
+                    phase=phase.phase_type,
+                    skills_required=[phase.selected_skill.id]
+                    if phase.selected_skill is not None
+                    else [],
+                    parameters=phase.parameters,
+                    dependencies=[],
+                )
+                for phase in plan_result.phases
+            ]
+        )
+        new_plan_id = _new_plan_id()
+        new_plan = Plan(
+            plan_id=new_plan_id,
+            session_id=session_id,
+            project_id=project_id,
+            status=PlanStatus.PENDING_APPROVAL,
+            is_fallback=False,
+            intent_analysis_type="template",
+            intent_complexity="complex",
+            plan_result=plan_result,
+            task_tree=task_tree,
+            version=1,
+        )
+        async with self._session_factory() as session:
+            session.add(self._to_record(new_plan))
+            await session.commit()
+        return new_plan

@@ -22,6 +22,7 @@ class SendMessageRequest(BaseModel):
     project_id: str
     session_id: str
     message: str
+    plan_mode: bool = False
 
 
 class SendMessageResponse(BaseModel):
@@ -101,6 +102,7 @@ async def send_message(
         job_service=job_service,
         enqueue_skills=True,
         plan_store=plan_store,
+        plan_mode=request.plan_mode,
     )
 
     # Extract plot attachments produced during execution

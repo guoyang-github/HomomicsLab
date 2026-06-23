@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { clsx } from 'clsx'
-import { Send, Paperclip, Loader2, X, FileText, Command } from 'lucide-react'
+import { Send, Paperclip, Loader2, X, FileText, Command, Map } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
+import { useExecutionStore } from '@/stores/executionStore'
 import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
 import { Button } from '@/components/ui'
@@ -29,6 +30,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [planMode, setPlanMode] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const consumedDraftRef = useRef<string | null>(null)
@@ -44,6 +46,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { loadPlan, discardDraft } = usePlanStore()
+  const { setJobId, reset: resetExecution } = useExecutionStore()
 
   useEffect(() => {
     if (!draftInput || consumedDraftRef.current === draftInput) return
@@ -92,22 +95,13 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         project_id: currentProjectId,
         session_id: currentSessionId,
         message: input,
+        plan_mode: planMode,
       })
 
       const tasks = response.data.task_tree.tasks
       setTaskTree(tasks)
+      setProgress(_extractProgress(tasks))
       const lastMsg = response.data.messages[response.data.messages.length - 1]
-      if (
-        lastMsg?.content &&
-        typeof lastMsg.content === 'object' &&
-        lastMsg.content !== null &&
-        'progress' in lastMsg.content
-      ) {
-        const content = lastMsg.content as Record<string, unknown>
-        if (content.progress && typeof content.progress === 'object') {
-          setProgress(content.progress as TaskProgress)
-        }
-      }
 
       let agentMessage: ChatMessage
       if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
@@ -124,19 +118,39 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
           sender: 'agent',
           timestamp: new Date().toISOString(),
         }
+      } else if (lastMsg?.type === 'execution_plan') {
+        agentMessage = {
+          id: `msg_${Date.now()}_agent`,
+          type: 'execution_plan',
+          content: lastMsg.content,
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+        }
       } else {
+        const progress = _extractProgress(response.data.task_tree?.tasks || [])
         agentMessage = {
           id: `msg_${Date.now()}_agent`,
           type: 'todo_list',
           content: {
             text: response.data.response,
             tasks: tasks,
+            progress,
+            job_id: response.data.job_id || undefined,
           },
           sender: 'agent',
           timestamp: new Date().toISOString(),
         }
       }
       addMessage(agentMessage)
+
+      // Start monitoring any queued job.
+      if (response.data.job_id) {
+        resetExecution()
+        setJobId(response.data.job_id)
+        setTaskTree(tasks)
+        const progress = _extractProgress(tasks)
+        setProgress(progress)
+      }
     } catch (error: any) {
       const detail = error?.response?.data?.detail
       const errorMessage: ChatMessage = {
@@ -158,6 +172,31 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+  }
+
+  function _extractProgress(tasks: { status: string }[]): TaskProgress {
+    const total = tasks.length
+    const counts = {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      awaiting_human: 0,
+    }
+    tasks.forEach((task) => {
+      if (task.status in counts) {
+        counts[task.status as keyof typeof counts]++
+      }
+    })
+    return {
+      total,
+      pending: counts.pending,
+      running: counts.running,
+      completed: counts.completed,
+      failed: counts.failed,
+      awaiting_human: counts.awaiting_human,
+      percent: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
     }
   }
 
@@ -273,6 +312,14 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
             }}
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-1">
+            <Button
+              variant={planMode ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setPlanMode((prev) => !prev)}
+              title={planMode ? t('chat.planModeActive') : t('chat.planMode')}
+            >
+              <Map className={clsx('h-4 w-4', planMode && 'text-primary')} />
+            </Button>
             <Button variant="ghost" size="icon" onClick={open} title={t('chat.uploadFile')}>
               <Paperclip className="h-4 w-4" />
             </Button>

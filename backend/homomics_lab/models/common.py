@@ -24,6 +24,7 @@ class TaskStatus(str, Enum):
 class MessageType(str, Enum):
     TEXT = "text"
     TODO_LIST = "todo_list"
+    EXECUTION_PLAN = "execution_plan"
     HITL_REQUEST = "hitl_request"
     PLAN_REQUEST = "plan_request"
     DEBATE_REQUEST = "debate_request"
