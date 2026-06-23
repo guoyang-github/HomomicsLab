@@ -16,9 +16,11 @@ Usage:
 
 import shutil
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse, urlunparse
 
 
 @dataclass
@@ -38,7 +40,7 @@ class HealthReport:
     overall: str  # "healthy", "degraded", "unhealthy"
     checks: List[CheckResult]
     timestamp: str
-    version: str = "0.1.0"
+    version: str = "0.5.0"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,12 +65,15 @@ class HealthChecker:
     def __init__(self, skill_executor=None):
         self.skill_executor = skill_executor
 
-    def run_all_checks(self) -> HealthReport:
+    async def run_all_checks(self) -> HealthReport:
         """Execute all health checks and compile report."""
         checks = [
             self._check_python_version(),
             self._check_core_dependencies(),
             self._check_optional_dependencies(),
+            await self._check_database(),
+            await self._check_redis(),
+            await self._check_storage(),
             self._check_skill_system(),
             self._check_disk_space(),
             self._check_hpc_schedulers(),
@@ -282,3 +287,129 @@ class HealthChecker:
             message=f"Available: {', '.join(available)}",
             details={"available": available},
         )
+
+    async def _check_database(self) -> CheckResult:
+        """Ping the configured SQL database."""
+        from homomics_lab.config import settings
+        from homomics_lab.database.connection import get_engine
+
+        start = time.perf_counter()
+        try:
+            engine = get_engine()
+            async with engine.connect() as conn:
+                result = await conn.exec_driver_sql("SELECT 1")
+                ok = result.scalar() == 1
+            latency = (time.perf_counter() - start) * 1000
+            if ok:
+                return CheckResult(
+                    name="database",
+                    status="ok",
+                    message="Database connection succeeded",
+                    details={"url": self._mask_url(settings.database_url), "latency_ms": round(latency, 2)},
+                )
+            return CheckResult(
+                name="database",
+                status="error",
+                message="Database ping returned unexpected result",
+                details={"latency_ms": round(latency, 2)},
+            )
+        except Exception as exc:
+            latency = (time.perf_counter() - start) * 1000
+            return CheckResult(
+                name="database",
+                status="error",
+                message=f"Database connection failed: {exc}",
+                details={"latency_ms": round(latency, 2)},
+            )
+
+    async def _check_redis(self) -> CheckResult:
+        """Ping Redis when the Redis queue backend is configured."""
+        from homomics_lab.config import settings
+
+        start = time.perf_counter()
+        if settings.queue_backend != "redis":
+            return CheckResult(
+                name="redis",
+                status="ok",
+                message="Redis backend is not enabled",
+                details={},
+            )
+        try:
+            from redis.asyncio import Redis
+
+            client = Redis.from_url(settings.redis_url)
+            try:
+                ok = await client.ping()
+            finally:
+                await client.close()
+            latency = (time.perf_counter() - start) * 1000
+            if ok:
+                return CheckResult(
+                    name="redis",
+                    status="ok",
+                    message="Redis ping succeeded",
+                    details={"url": self._mask_url(settings.redis_url), "latency_ms": round(latency, 2)},
+                )
+            return CheckResult(
+                name="redis",
+                status="error",
+                message="Redis ping returned unexpected result",
+                details={"latency_ms": round(latency, 2)},
+            )
+        except Exception as exc:
+            latency = (time.perf_counter() - start) * 1000
+            return CheckResult(
+                name="redis",
+                status="error",
+                message=f"Redis connection failed: {exc}",
+                details={"latency_ms": round(latency, 2)},
+            )
+
+    async def _check_storage(self) -> CheckResult:
+        """Verify that the configured object storage backend is usable."""
+        from homomics_lab.config import settings
+
+        start = time.perf_counter()
+        try:
+            from homomics_lab.storage import get_storage_backend
+
+            backend = get_storage_backend()
+            ok = await backend.health_check()
+            latency = (time.perf_counter() - start) * 1000
+            if ok:
+                return CheckResult(
+                    name="storage",
+                    status="ok",
+                    message="Object storage backend is reachable",
+                    details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+                )
+            return CheckResult(
+                name="storage",
+                status="error",
+                message="Object storage backend health check failed",
+                details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+            )
+        except Exception as exc:
+            latency = (time.perf_counter() - start) * 1000
+            return CheckResult(
+                name="storage",
+                status="error",
+                message=f"Storage backend check failed: {exc}",
+                details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+            )
+
+    @staticmethod
+    def _mask_url(url: Optional[str]) -> Optional[str]:
+        """Strip credentials from URLs before returning them in responses."""
+        if not url:
+            return url
+        try:
+            parsed = urlparse(url)
+            if parsed.username or parsed.password:
+                netloc = parsed.hostname or ""
+                if parsed.port:
+                    netloc += f":{parsed.port}"
+                parsed = parsed._replace(netloc=netloc)
+            return urlunparse(parsed)
+        except Exception:
+            return "<masked>"

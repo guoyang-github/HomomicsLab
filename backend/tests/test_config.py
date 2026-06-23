@@ -53,3 +53,34 @@ def test_database_url_validator_preserves_asyncpg_url():
     url = "postgresql+asyncpg://user:pass@localhost/db"
     settings = Settings(database_url=url)
     assert settings.database_url == url
+
+
+def test_session_store_url_validator_rejects_legacy_sqlite_driver():
+    with pytest.raises(ValueError):
+        Settings(session_store_url="sqlite:///./test.db")
+
+
+def test_session_store_url_validator_normalizes_postgres_url():
+    settings = Settings(session_store_url="postgres://user:pass@localhost/db")
+    assert settings.session_store_url == "postgresql+asyncpg://user:pass@localhost/db"
+
+
+def test_storage_backend_validator_rejects_unknown_backend():
+    with pytest.raises(ValueError):
+        Settings(storage_backend="gcs")
+
+
+def test_queue_backend_validator_rejects_unknown_backend():
+    with pytest.raises(ValueError):
+        Settings(queue_backend="rabbitmq")
+
+
+def test_masked_dump_redacts_secrets():
+    settings = Settings(
+        api_key="super-secret-key",
+        storage_s3_secret_key="s3-secret",
+    )
+    data = settings.masked_dump()
+    assert "super-secret-key" not in data["api_key"]
+    assert "s3-secret" not in data["storage_s3_secret_key"]
+    assert len(data["api_key"]) > 0

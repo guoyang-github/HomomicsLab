@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,6 +57,37 @@ class Settings(BaseSettings):
             elif isinstance(item, Path):
                 paths.append(item)
         return paths
+
+    @field_validator("session_store_url")
+    @classmethod
+    def _validate_session_store_url(cls, v: str) -> str:
+        """Normalize and validate the session store database URL."""
+        v = v.strip()
+        if v.startswith("sqlite://") and not v.startswith("sqlite+aiosqlite://"):
+            raise ValueError(
+                "session_store_url must use the aiosqlite driver "
+                "(e.g. sqlite+aiosqlite:///path/to/db.db)"
+            )
+        if v.startswith("postgresql://") or v.startswith("postgres://"):
+            if not v.startswith("postgresql+asyncpg://"):
+                v = "postgresql+asyncpg://" + v.split("://", 1)[1]
+        return v
+
+    @field_validator("storage_backend")
+    @classmethod
+    def _validate_storage_backend(cls, v: str) -> str:
+        allowed = {"local", "s3"}
+        if v not in allowed:
+            raise ValueError(f"storage_backend must be one of {allowed}, got {v}")
+        return v
+
+    @field_validator("queue_backend")
+    @classmethod
+    def _validate_queue_backend(cls, v: str) -> str:
+        allowed = {"memory", "redis"}
+        if v not in allowed:
+            raise ValueError(f"queue_backend must be one of {allowed}, got {v}")
+        return v
 
     @property
     def external_skills_dir(self) -> Optional[Path]:
@@ -203,6 +234,28 @@ class Settings(BaseSettings):
     context_enable_project_state: bool = True
     context_enable_episodic_summary: bool = True
     context_output_reserve_tokens: int = 2000
+
+    def masked_dump(self) -> Dict[str, Any]:
+        """Return a copy of the settings with sensitive values redacted.
+
+        Use this for logs, health checks, or any user-facing output.
+        """
+        data = self.model_dump()
+        sensitive_keys = {
+            "api_key",
+            "secrets_master_key",
+            "storage_s3_secret_key",
+            "llm_api_key",
+            "openai_api_key",
+            "anthropic_api_key",
+        }
+
+        def _mask(value: Any) -> Any:
+            if isinstance(value, str) and value:
+                return "*" * min(len(value), 8)
+            return value
+
+        return {k: _mask(v) if k in sensitive_keys else v for k, v in data.items()}
 
 
 settings = Settings()

@@ -152,7 +152,7 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "0.5.0"}
 
 
 @app.get("/health/memory")

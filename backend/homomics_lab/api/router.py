@@ -9,6 +9,9 @@ api_router = APIRouter(prefix="/api")
 # dependencies. Their own handlers perform any needed validation.
 _PROTECTED_DEPS = [Depends(rate_limit_dependency), Depends(require_auth)]
 
+# Health endpoints must be publicly reachable for load balancers / orchestrators.
+api_router.include_router(health.router, tags=["health"])
+
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(collab.router, prefix="/collab", tags=["collaboration"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"], dependencies=_PROTECTED_DEPS)
@@ -17,7 +20,6 @@ api_router.include_router(skills.router, prefix="/skills", tags=["skills"], depe
 api_router.include_router(viz.router, prefix="/viz", tags=["visualization"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(skill_generator.router, prefix="/skill-generator", tags=["skill-generator"], dependencies=_PROTECTED_DEPS)
-api_router.include_router(health.router, tags=["health"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(cost.router, prefix="/costs", tags=["costs"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(nfcore.router, prefix="/nfcore", tags=["nfcore"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(execution.router, prefix="/execution", tags=["execution"], dependencies=_PROTECTED_DEPS)

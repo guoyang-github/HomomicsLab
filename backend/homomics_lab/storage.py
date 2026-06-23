@@ -45,6 +45,11 @@ class StorageBackend(ABC):
         """Return a stable URI/URL for the object."""
         pass
 
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Return True if the backend is reachable and usable."""
+        pass
+
     @staticmethod
     def make_key(project_id: str, *parts: str) -> str:
         """Build a safe object key from project_id and path parts."""
@@ -89,6 +94,15 @@ class LocalStorageBackend(StorageBackend):
 
     def get_uri(self, key: str) -> str:
         return f"file://{self._path(key).resolve()}"
+
+    async def health_check(self) -> bool:
+        try:
+            probe = self.base_dir / ".health_probe"
+            probe.write_bytes(b"ok")
+            probe.unlink()
+            return True
+        except Exception:
+            return False
 
 
 class S3StorageBackend(StorageBackend):
@@ -164,6 +178,13 @@ class S3StorageBackend(StorageBackend):
         if self._public_url_prefix:
             return f"{self._public_url_prefix.rstrip('/')}/{key}"
         return f"s3://{self.bucket}/{key}"
+
+    async def health_check(self) -> bool:
+        try:
+            self._client.head_bucket(Bucket=self.bucket)
+            return True
+        except Exception:
+            return False
 
 
 # Global backend instance cache.
