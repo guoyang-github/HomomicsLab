@@ -123,6 +123,24 @@ class S3StorageBackend(StorageBackend):
             aws_secret_access_key=secret_key or settings.storage_s3_secret_key,
         )
         self._public_url_prefix = settings.storage_s3_public_url_prefix
+        self._ensure_bucket_exists()
+
+    def _ensure_bucket_exists(self) -> None:
+        """Create the bucket if it does not already exist (best-effort)."""
+        try:
+            self._client.head_bucket(Bucket=self.bucket)
+        except Exception:
+            try:
+                self._client.create_bucket(Bucket=self.bucket)
+            except Exception:
+                # Re-raise only if the bucket genuinely cannot be created.
+                # Some S3-compatible services require a location constraint.
+                try:
+                    self._client.head_bucket(Bucket=self.bucket)
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Could not ensure S3 bucket '{self.bucket}' exists"
+                    ) from exc
 
     def put(self, key: str, data: bytes) -> str:
         self._client.put_object(Bucket=self.bucket, Key=key, Body=data)

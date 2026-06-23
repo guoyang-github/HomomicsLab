@@ -18,9 +18,9 @@ from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import SemanticMemory
-from homomics_lab.context.session_store import SQLiteSessionStore
+from homomics_lab.context.session_store import create_session_store_from_settings
 from homomics_lab.provenance.recorder import ProvenanceRecorder
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base, get_engine
 from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
 from homomics_lab.domain.hot_reload import DomainHotReloader, SkillHotReloader
@@ -95,7 +95,7 @@ async def _ensure_database_schema() -> None:
     avoid event-loop conflicts inside test runners.
     """
     if settings.database_url.startswith("sqlite"):
-        async with async_engine.begin() as conn:
+        async with get_engine().begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         return
 
@@ -115,7 +115,7 @@ async def _ensure_database_schema() -> None:
     except Exception as exc:
         print(f"Alembic migration failed: {exc}. Falling back to create_all.")
 
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -339,11 +339,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             await skill_reloader.start()
 
     # Session / memory management
-    if settings.session_store_url.startswith("sqlite+aiosqlite:///"):
-        db_path = settings.session_store_url.replace("sqlite+aiosqlite:///", "")
-    else:
-        db_path = str(settings.data_dir / "sessions.db")
-    session_store = SQLiteSessionStore(db_path=db_path)
+    session_store = create_session_store_from_settings()
     await session_store.init()
 
     semantic_memory = None

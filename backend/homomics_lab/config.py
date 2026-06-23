@@ -13,10 +13,32 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     debug: bool = False
     database_url: str = "sqlite+aiosqlite:///./homomics_lab.db"
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
     data_dir: Path = Path("./data")
     skills_dir: Path = Path("./skills")
     external_skills_dirs: List[Path] = Field(default_factory=list)
     semantic_search_model: Optional[str] = None  # e.g., "all-MiniLM-L6-v2" for dense embeddings
+
+    @field_validator("database_url")
+    @classmethod
+    def _validate_database_url(cls, v: str) -> str:
+        """Normalize and validate the database URL.
+
+        - SQLite URLs must use the async ``aiosqlite`` driver.
+        - PostgreSQL URLs must use the async ``asyncpg`` driver.
+        """
+        v = v.strip()
+        if v.startswith("sqlite://") and not v.startswith("sqlite+aiosqlite://"):
+            raise ValueError(
+                "SQLite database_url must use the aiosqlite driver "
+                "(e.g. sqlite+aiosqlite:///path/to/db.db)"
+            )
+        if v.startswith("postgresql://") or v.startswith("postgres://"):
+            # Normalize legacy prefixes to asyncpg.
+            if not v.startswith("postgresql+asyncpg://"):
+                v = "postgresql+asyncpg://" + v.split("://", 1)[1]
+        return v
 
     @field_validator("external_skills_dirs", mode="before")
     @classmethod

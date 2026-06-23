@@ -4,7 +4,12 @@ from .relevance_filter import ContextItem as ContextItem
 from .summarizer import ContextSummarizer as ContextSummarizer
 from .summarizer import ContextSummary as ContextSummary
 from .compressor import ContextCompressor as ContextCompressor
-from .session_store import SessionStore, SQLiteSessionStore
+from .session_store import (
+    SessionStore,
+    SQLiteSessionStore,
+    SQLAlchemySessionStore,
+    create_session_store_from_settings,
+)
 from .memory_manager import MemoryManager
 from .context_engine import (
     ContextEngine,
@@ -27,6 +32,8 @@ __all__ = [
     "ContextCompressor",
     "SessionStore",
     "SQLiteSessionStore",
+    "SQLAlchemySessionStore",
+    "create_session_store_from_settings",
     "MemoryManager",
     "ContextEngine",
     "ContextBundle",
