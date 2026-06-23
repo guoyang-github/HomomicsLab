@@ -1,6 +1,7 @@
 """Intent classifiers: keyword, embedding, and LLM-based."""
 
 import json
+import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
@@ -32,13 +33,15 @@ class KeywordIntentClassifier(IntentClassifier):
     # Strong domain-agnostic signals
     DOMAIN_KEYWORDS: Dict[str, List[str]] = {
         "qa": [
-            "什么是", "how to", "怎么", "如何", "explain", "what is",
-            "how do", "解释", "什么是", "告诉我",
+            "什么是", "what is", "有哪些", "what are", "包括哪些",
+            "怎么", "如何", "how to", "how do", "explain", "what is",
+            "告诉我", "介绍", "概述", " overview", "include",
+            "单细胞转录组有哪些分析内容",
         ],
         "general_help": [
             "写一段", "写个脚本", "写代码", "生成代码", "generate code",
             "code snippet", "python脚本", "脚本", "shell脚本",
-            "解释", "explain", "示例", "example", "怎么用",
+            "示例", "example", "怎么用",
             "处理csv", "处理文件", "filter", "parse", "rename",
         ],
         "greeting": [
@@ -50,8 +53,19 @@ class KeywordIntentClassifier(IntentClassifier):
 
     NEGATIVE_SIGNALS: Dict[str, List[str]] = {
         "qa": ["generate code", "写代码", "code snippet", "脚本"],
-        "general_help": ["什么是", "what is", "how does", "解释"],
+        "general_help": ["什么是", "what is", "how does", "解释", "有哪些", "what are"],
     }
+
+    # Information-seeking patterns that should suppress workflow execution intents.
+    INFORMATION_REQUEST_PATTERNS: List[str] = [
+        r"有哪些分析内容",
+        r"有哪些步骤",
+        r"包括哪些",
+        r"什么是.*分析",
+        r"介绍一下.*分析",
+        r".*是什么",
+        r".*有哪些",
+    ]
 
     def __init__(self, weight: float = 0.3):
         super().__init__(weight=weight)
@@ -99,6 +113,21 @@ class KeywordIntentClassifier(IntentClassifier):
             if target_type in scores and any(kw in text for kw in neg_keywords):
                 scores[target_type] *= 0.3
                 reasons[target_type] = reasons.get(target_type, "") + " (negated by opposing signals)"
+
+        # Strong information-request patterns should suppress workflow/analysis intents.
+        is_info_request = any(re.search(p, message) for p in self.INFORMATION_REQUEST_PATTERNS)
+        if is_info_request:
+            workflow_types = {
+                "single_cell_analysis", "spatial_analysis", "metagenomics_analysis",
+                "genomics_analysis", "proteomics_analysis", "transcriptomics_analysis",
+            }
+            for atype in list(scores):
+                if atype in workflow_types:
+                    scores[atype] *= 0.2
+                    reasons[atype] = reasons.get(atype, "") + " (suppressed by information-request pattern)"
+            if "qa" not in scores:
+                scores["qa"] = 0.8
+                reasons["qa"] = "information-request pattern detected"
 
         # Normalize to [0, 1]
         for atype in scores:

@@ -123,14 +123,16 @@ class CascadeIntentAnalyzer:
             complexity_indicators = []
             if analysis_type == "qa":
                 keywords = [
-                    "什么是", "how to", "怎么", "如何", "explain", "what is",
-                    "how do", "解释", "告诉我",
+                    "什么是", "what is", "有哪些", "what are", "包括哪些",
+                    "怎么", "如何", "how to", "how do", "explain",
+                    "告诉我", "介绍", "概述", "include",
+                    "单细胞转录组有哪些分析内容",
                 ]
             elif analysis_type == "general_help":
                 keywords = [
                     "写一段", "写个脚本", "写代码", "生成代码", "generate code",
                     "code snippet", "python脚本", "脚本", "shell脚本",
-                    "解释", "explain", "示例", "example", "怎么用",
+                    "示例", "example", "怎么用",
                     "处理csv", "处理文件", "filter", "parse", "rename",
                 ]
             elif analysis_type == "greeting":

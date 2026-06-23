@@ -74,6 +74,15 @@ async def test_detect_qa(analyzer):
 
 
 @pytest.mark.asyncio
+async def test_detect_information_request_suppresses_workflow(analyzer_with_single_cell_domain):
+    """Knowledge-seeking questions about analysis types must not trigger execution."""
+    intent = await analyzer_with_single_cell_domain.analyze("单细胞转录组有哪些分析内容？")
+    assert intent.analysis_type == "qa"
+    assert intent.complexity == "direct_response"
+    assert intent.interaction_mode == "answer"
+
+
+@pytest.mark.asyncio
 async def test_detect_generic(analyzer):
     intent = await analyzer.analyze("hello world")
     # Greeting intent is recognized directly.

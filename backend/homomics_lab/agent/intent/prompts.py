@@ -33,7 +33,7 @@ Respond with a single JSON object in this exact format (no markdown fences):
 }
 
 Rules:
-1. Distinguish "qa" (asking for explanation) from "general_help" (asking for code/script).
+1. Distinguish "qa" (asking for explanation/knowledge) from "general_help" (asking for code/script).
 2. "single_cell_analysis" includes scRNA-seq, clustering, UMAP, PCA, QC, differential expression.
 3. "spatial_analysis" includes Visium, Xenium, MERFISH, spatial transcriptomics.
 4. "file_conversion" is for format conversion requests only.
@@ -41,6 +41,7 @@ Rules:
 6. If the message refers to "it", "this", "that", or "上一个文件", use the conversation context to resolve the referent.
 7. Set needs_clarification=true if the top confidence is below 0.7 and alternatives are close.
 8. If nothing matches, use analysis_type "general" with low confidence.
+9. CRITICAL: If the user asks "what are", "有哪些", "includes", "介绍", or similar information-seeking phrases about an analysis type, classify as "qa" (direct_response), NOT as an execution workflow.
 """
 
 
