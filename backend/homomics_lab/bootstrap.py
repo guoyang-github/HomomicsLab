@@ -17,7 +17,7 @@ from homomics_lab.config import settings
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
-from homomics_lab.context.semantic_memory import SemanticMemory
+from homomics_lab.context.semantic_memory import create_semantic_memory
 from homomics_lab.context.session_store import create_session_store_from_settings
 from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.database import Base, get_engine
@@ -334,12 +334,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     session_store = create_session_store_from_settings()
     await session_store.init()
 
-    semantic_memory = None
-    if settings.enable_semantic_memory and settings.semantic_search_model:
-        semantic_memory = SemanticMemory(
-            db_path=str(settings.data_dir / ".metadata" / "semantic_memory.db"),
-            model_name=settings.semantic_search_model,
-        )
+    semantic_memory = create_semantic_memory(settings)
 
     memory_manager = MemoryManager(
         session_store=session_store,

@@ -29,6 +29,23 @@ def test_session_memory_settings():
     assert settings.session_store_url == "sqlite+aiosqlite:///./data/sessions.db"
     assert settings.session_ttl_days == 90
     assert settings.enable_semantic_memory is True
+    assert settings.semantic_memory_backend == "sqlite"
+    assert settings.semantic_memory_postgres_url is None
+
+
+def test_semantic_memory_backend_default_is_sqlite():
+    settings = Settings()
+    assert settings.semantic_memory_backend == "sqlite"
+
+
+def test_semantic_memory_backend_accepts_postgres():
+    settings = Settings(semantic_memory_backend="postgres")
+    assert settings.semantic_memory_backend == "postgres"
+
+
+def test_semantic_memory_backend_rejects_unknown():
+    with pytest.raises(ValueError):
+        Settings(semantic_memory_backend="redis")
 
 
 def test_database_url_validator_accepts_sqlite_async_driver():

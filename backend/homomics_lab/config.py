@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     skills_dir: Path = Path("./skills")
     external_skills_dirs: List[Path] = Field(default_factory=list)
     semantic_search_model: Optional[str] = None  # e.g., "all-MiniLM-L6-v2" for dense embeddings
+    semantic_memory_backend: str = "sqlite"  # "sqlite" | "postgres"
+    semantic_memory_postgres_url: Optional[str] = None
+
+    @field_validator("semantic_memory_backend")
+    @classmethod
+    def _validate_semantic_memory_backend(cls, v: str) -> str:
+        allowed = {"sqlite", "postgres"}
+        if v not in allowed:
+            raise ValueError(f"semantic_memory_backend must be one of {allowed}, got {v}")
+        return v
 
     @field_validator("database_url")
     @classmethod
