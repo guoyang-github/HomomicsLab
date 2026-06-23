@@ -146,6 +146,17 @@ class Settings(BaseSettings):
     # Auth / rate limiting (opt-in for local development)
     auth_enabled: bool = False
     api_key: Optional[str] = None  # production single-shared-key or bootstrap key
+
+    # JWT settings (required when auth_enabled=True and no OIDC is configured)
+    jwt_secret_key: Optional[str] = None
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24  # 1 day
+
+    # OIDC settings (optional; if set, JWT access tokens are verified via JWKS)
+    oidc_discovery_url: Optional[str] = None
+    oidc_client_id: Optional[str] = None
+    oidc_client_secret: Optional[str] = None
+
     rate_limit_enabled: bool = False
     rate_limit_requests_per_minute: int = 60
     rate_limit_upload_max_bytes: int = 1024 * 1024 * 1024  # 1 GB

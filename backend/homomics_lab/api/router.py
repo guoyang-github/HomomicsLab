@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings
-from .auth import require_auth
+from .auth import auth_router, require_auth
 from .rate_limit import rate_limit_dependency
 
 api_router = APIRouter(prefix="/api")
@@ -11,6 +11,9 @@ _PROTECTED_DEPS = [Depends(rate_limit_dependency), Depends(require_auth)]
 
 # Health endpoints must be publicly reachable for load balancers / orchestrators.
 api_router.include_router(health.router, tags=["health"])
+
+# Authentication endpoints are public by design.
+api_router.include_router(auth_router)
 
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(collab.router, prefix="/collab", tags=["collaboration"])

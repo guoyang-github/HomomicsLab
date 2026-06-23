@@ -1,10 +1,44 @@
 """SQLAlchemy ORM models for persistent entities."""
 
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+
+class Tenant(Base):
+    """Multi-tenant workspace."""
+
+    __tablename__ = "tenants"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    users: Mapped[list["User"]] = relationship("User", back_populates="tenant")
+
+
+class User(Base):
+    """Application user account."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=True)
+    role: Mapped[str] = mapped_column(String, default="analyst")  # admin / analyst / viewer
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="users")
 
 
 class JobRecord(Base):
@@ -15,6 +49,8 @@ class JobRecord(Base):
     job_id: Mapped[str] = mapped_column(String, primary_key=True)
     session_id: Mapped[str] = mapped_column(String, index=True)
     project_id: Mapped[str] = mapped_column(String, index=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String, index=True)
     mode: Mapped[str] = mapped_column(String)
     task_tree_json: Mapped[str] = mapped_column(Text, nullable=True)
@@ -43,6 +79,8 @@ class PlanRecord(Base):
     plan_id: Mapped[str] = mapped_column(String, primary_key=True)
     session_id: Mapped[str] = mapped_column(String, index=True)
     project_id: Mapped[str] = mapped_column(String, index=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String, index=True)
     is_fallback: Mapped[bool] = mapped_column(Boolean, default=False)
     intent_analysis_type: Mapped[str] = mapped_column(String)
@@ -110,6 +148,8 @@ class ProjectRecord(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
     owner_id: Mapped[str] = mapped_column(String, index=True, default="anonymous")
+    user_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )

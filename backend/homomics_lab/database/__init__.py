@@ -10,5 +10,7 @@ from .models import (
     PlanRecord as PlanRecord,
     ProjectRecord as ProjectRecord,
     ScheduledJobRun as ScheduledJobRun,
+    Tenant as Tenant,
     TraceRecord as TraceRecord,
+    User as User,
 )

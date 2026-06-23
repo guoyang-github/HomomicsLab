@@ -44,6 +44,8 @@ dependencies = [
     "sentence-transformers>=2.2.0",
     "weasyprint>=60.0",
     "pgvector>=0.4.2",
+    "passlib[bcrypt]>=1.7.4",
+    "python-jose>=3.5.0",
 ]
 
 [project.optional-dependencies]

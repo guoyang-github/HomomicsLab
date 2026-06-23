@@ -132,6 +132,14 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # for SQLite/dev/test environments where Alembic may not have been run yet.
     await _ensure_database_schema()
 
+    # Seed a default admin user/tenant when auth is enabled and the user table is
+    # empty. This is only a convenience for first-boot local deployments.
+    if settings.auth_enabled:
+        from homomics_lab.database.connection import get_session_factory
+        from homomics_lab.api.auth import create_default_admin_if_missing
+        async with get_session_factory()() as session:
+            await create_default_admin_if_missing(session)
+
     # CBKB is created early so domain loading and memory management can use it.
     cbkb = CBKB(base_dir=settings.data_dir)
 
