@@ -3,7 +3,7 @@ import type { SendMessageRequest, SendMessageResponse, Project, FileUploadRespon
 import type { ChatMessage } from '@/types/chat'
 import type { PlanModification } from '@/stores/planStore'
 
-const API_BASE = '/api'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api'
 
 const api = axios.create({
   baseURL: API_BASE,
