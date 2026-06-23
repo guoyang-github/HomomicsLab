@@ -8,7 +8,7 @@ import asyncio
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from homomics_lab.llm.cache import LLMResponseCache
+from homomics_lab.llm.cache import BaseLLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
 from homomics_lab.llm.providers import get_provider_registry, reset_provider_registry
 from homomics_lab.llm.router import LLMRouter
@@ -33,7 +33,7 @@ class LLMClient:
         base_url: Optional[str] = None,
         timeout: float = 60.0,
         router: Optional[LLMRouter] = None,
-        cache: Optional[LLMResponseCache] = None,
+        cache: Optional[BaseLLMResponseCache] = None,
     ):
         self.timeout = timeout
         self._config_lock = asyncio.Lock()
@@ -159,7 +159,7 @@ class LLMClient:
 
         # Check cache first
         if self._cache is not None:
-            cached = self._cache.get(
+            cached = await self._cache.get(
                 route.model, messages, temperature, max_tokens, response_format
             )
             if cached is not None:
@@ -178,7 +178,7 @@ class LLMClient:
                     response_format=response_format,
                 )
                 if self._cache is not None:
-                    self._cache.put(
+                    await self._cache.put(
                         route.model,
                         messages,
                         temperature,

@@ -22,23 +22,26 @@ def reset_singletons(tmp_path, monkeypatch):
 
 
 class TestLLMResponseCache:
-    def test_cache_hit_returns_same_content(self):
+    @pytest.mark.asyncio
+    async def test_cache_hit_returns_same_content(self):
         cache = LLMResponseCache(ttl_seconds=60, max_entries=10)
         messages = [{"role": "user", "content": "hello"}]
-        cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
-        assert cache.get("gpt-4o-mini", messages, 0.3, 100, None) == "world"
+        await cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
+        assert await cache.get("gpt-4o-mini", messages, 0.3, 100, None) == "world"
 
-    def test_cache_miss_with_different_temperature(self):
+    @pytest.mark.asyncio
+    async def test_cache_miss_with_different_temperature(self):
         cache = LLMResponseCache(ttl_seconds=60, max_entries=10)
         messages = [{"role": "user", "content": "hello"}]
-        cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
-        assert cache.get("gpt-4o-mini", messages, 0.5, 100, None) is None
+        await cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
+        assert await cache.get("gpt-4o-mini", messages, 0.5, 100, None) is None
 
-    def test_cache_expires(self):
+    @pytest.mark.asyncio
+    async def test_cache_expires(self):
         cache = LLMResponseCache(ttl_seconds=0, max_entries=10)
         messages = [{"role": "user", "content": "hello"}]
-        cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
-        assert cache.get("gpt-4o-mini", messages, 0.3, 100, None) is None
+        await cache.put("gpt-4o-mini", messages, 0.3, 100, None, "world")
+        assert await cache.get("gpt-4o-mini", messages, 0.3, 100, None) is None
 
 
 class TestLLMClientCacheAndFallback:
@@ -47,7 +50,7 @@ class TestLLMClientCacheAndFallback:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         cache = LLMResponseCache(ttl_seconds=60, max_entries=10)
         messages = [{"role": "user", "content": "hello"}]
-        cache.put("gpt-4o-mini", messages, 0.3, 100, None, "cached")
+        await cache.put("gpt-4o-mini", messages, 0.3, 100, None, "cached")
 
         client = LLMClient(cache=cache)
         with patch.object(client, "_get_client") as mock_get_client:

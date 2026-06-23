@@ -28,7 +28,7 @@ from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.builtin import register_builtin_skills
 from homomics_lab.skills.loader import SkillLoader
-from homomics_lab.llm.cache import LLMResponseCache
+from homomics_lab.llm.cache import get_llm_response_cache
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.llm.runtime_config import is_local_llm_provider, load_llm_runtime_config
@@ -147,15 +147,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     provenance_recorder = ProvenanceRecorder()
 
     # Shared LLM response cache
-    llm_cache = (
-        LLMResponseCache(
-            ttl_seconds=settings.llm_response_cache_ttl_seconds,
-            max_entries=settings.llm_response_cache_max_entries,
-            persist_dir=settings.llm_response_cache_dir,
-        )
-        if settings.llm_response_cache_enabled
-        else None
-    )
+    llm_cache = get_llm_response_cache(settings)
 
     print("[bootstrap] creating skill runtime...")
     # Skills runtime

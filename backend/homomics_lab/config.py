@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -161,10 +161,26 @@ class Settings(BaseSettings):
 
     # LLM infrastructure (P5)
     llm_response_cache_enabled: bool = True
+    llm_response_cache_backend: str = "local"  # "local" | "redis"
+    llm_response_cache_redis_url: Optional[str] = None
     llm_response_cache_dir: Path = Field(default_factory=lambda: Path("./data/llm_cache"))
     llm_response_cache_ttl_seconds: float = 3600.0
     llm_response_cache_max_entries: int = 1000
     llm_complexity_routing_enabled: bool = False
+
+    @field_validator("llm_response_cache_backend")
+    @classmethod
+    def _validate_llm_response_cache_backend(cls, v: str) -> str:
+        allowed = {"local", "redis"}
+        if v not in allowed:
+            raise ValueError(f"llm_response_cache_backend must be one of {allowed}, got {v}")
+        return v
+
+    @model_validator(mode="after")
+    def _default_llm_response_cache_redis_url(self):
+        if self.llm_response_cache_redis_url is None:
+            self.llm_response_cache_redis_url = self.redis_url
+        return self
 
     # OpenTelemetry tracing
     otel_enabled: bool = False
