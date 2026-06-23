@@ -87,6 +87,11 @@ class BaseScheduler(ABC):
         """Execute a skill and return its output."""
         pass
 
+    @abstractmethod
+    async def terminate(self, job_id: str) -> bool:
+        """Cancel/terminate a running job. Returns True if action was taken."""
+        pass
+
     def _new_job_id(self, prefix: str = "job") -> str:
         """Generate a unique job id."""
         return f"{prefix}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
@@ -138,6 +143,7 @@ class LocalScheduler(BaseScheduler):
     ):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self._sandbox_override = sandbox
+        self._last_sandbox: Optional[Sandbox] = None
         self._env_manager = env_manager or EnvironmentManager()
         self._provenance_recorder = provenance_recorder
 
@@ -145,16 +151,25 @@ class LocalScheduler(BaseScheduler):
         if self._sandbox_override is not None:
             return self._sandbox_override
         container_image = settings.r_container_image if exec_type == "r" else settings.skill_container_image
-        return Sandbox.create(
+        sandbox = Sandbox.create(
             settings.skill_sandbox_backend,
             self.working_dir,
             container_image=container_image,
             exec_type=exec_type,
         )
+        self._last_sandbox = sandbox
+        return sandbox
 
     @classmethod
     def is_available(cls) -> bool:
         return True
+
+    async def terminate(self, job_id: str) -> bool:
+        """Terminate the sandbox subprocess for a running local job."""
+        sandbox = self._sandbox_override or self._last_sandbox
+        if sandbox is None:
+            return False
+        return await sandbox.terminate(job_id)
 
     async def execute(
         self,
@@ -319,6 +334,18 @@ class SlurmScheduler(BaseScheduler):
     @classmethod
     def is_available(cls) -> bool:
         return shutil.which("sbatch") is not None
+
+    async def terminate(self, job_id: str) -> bool:
+        """Cancel a running SLURM job."""
+        if not shutil.which("scancel"):
+            return False
+        proc = await asyncio.create_subprocess_exec(
+            "scancel", job_id,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        return proc.returncode == 0
 
     def _build_sbatch_script(
         self,
@@ -605,10 +632,23 @@ class NextflowRunner(BaseScheduler):
         super().__init__(working_dir, progress_callback=progress_callback, pubsub=pubsub)
         self.config_file = config_file
         self.weblog_url = weblog_url
+        self._running: Dict[str, asyncio.subprocess.Process] = {}
 
     @classmethod
     def is_available(cls) -> bool:
         return shutil.which("nextflow") is not None
+
+    async def terminate(self, job_id: str) -> bool:
+        """Kill a running Nextflow process."""
+        proc = self._running.pop(job_id, None)
+        if proc is None or proc.returncode is not None:
+            return False
+        try:
+            proc.kill()
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+            return True
+        except (asyncio.TimeoutError, ProcessLookupError):
+            return False
 
     def _build_process_config(self, skill: SkillDefinition) -> str:
         """Generate Nextflow process configuration."""
@@ -842,6 +882,7 @@ Rscript script.R"""
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self.working_dir),
         )
+        self._running[job_id] = proc
 
         self._report_progress(
             ExecutionState(
@@ -887,72 +928,69 @@ Rscript script.R"""
         reporter_task = asyncio.create_task(_progress_reporter())
 
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
-        except asyncio.TimeoutError:
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
+            except asyncio.TimeoutError:
+                if proc.returncode is None:
+                    proc.kill()
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        pass
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="CANCELLED",
+                        current_phase=current_phase,
+                        progress_pct=0.0,
+                        started_at=started_at,
+                        error_message=f"Timed out after {timeout_seconds}s",
+                        scheduler_type="nextflow",
+                    )
+                )
+                raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
+
+            await asyncio.gather(stdout_task, stderr_task)
+
+            if proc.returncode != 0:
+                error_message = "\n".join(stderr_lines)
+                self._report_progress(
+                    ExecutionState(
+                        job_id=job_id,
+                        status="FAILED",
+                        current_phase=current_phase,
+                        progress_pct=0.0,
+                        started_at=started_at,
+                        error_message=error_message,
+                        logs=stdout_lines,
+                        scheduler_type="nextflow",
+                    )
+                )
+                raise RuntimeError(f"Nextflow failed: {error_message}")
+
+            self._report_progress(
+                ExecutionState(
+                    job_id=job_id,
+                    status="COMPLETED",
+                    current_phase=current_phase,
+                    progress_pct=100.0,
+                    started_at=started_at,
+                    logs=stdout_lines,
+                    scheduler_type="nextflow",
+                )
+            )
+
+            if result_path is not None and result_path.exists():
+                return json.loads(result_path.read_text())
+
+            return {"raw_output": "\n".join(stdout_lines)}
+        finally:
+            self._running.pop(job_id, None)
             reporter_task.cancel()
             try:
                 await reporter_task
             except asyncio.CancelledError:
                 pass
-            if proc.returncode is None:
-                proc.kill()
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    pass
-            self._report_progress(
-                ExecutionState(
-                    job_id=job_id,
-                    status="CANCELLED",
-                    current_phase=current_phase,
-                    progress_pct=0.0,
-                    started_at=started_at,
-                    error_message=f"Timed out after {timeout_seconds}s",
-                    scheduler_type="nextflow",
-                )
-            )
-            raise TimeoutError(f"Nextflow execution timed out after {timeout_seconds}s")
-
-        reporter_task.cancel()
-        try:
-            await reporter_task
-        except asyncio.CancelledError:
-            pass
-
-        await asyncio.gather(stdout_task, stderr_task)
-
-        if proc.returncode != 0:
-            error_message = "\n".join(stderr_lines)
-            self._report_progress(
-                ExecutionState(
-                    job_id=job_id,
-                    status="FAILED",
-                    current_phase=current_phase,
-                    progress_pct=0.0,
-                    started_at=started_at,
-                    error_message=error_message,
-                    logs=stdout_lines,
-                    scheduler_type="nextflow",
-                )
-            )
-            raise RuntimeError(f"Nextflow failed: {error_message}")
-
-        self._report_progress(
-            ExecutionState(
-                job_id=job_id,
-                status="COMPLETED",
-                current_phase=current_phase,
-                progress_pct=100.0,
-                started_at=started_at,
-                logs=stdout_lines,
-                scheduler_type="nextflow",
-            )
-        )
-
-        if result_path is not None and result_path.exists():
-            return json.loads(result_path.read_text())
-
-        return {"raw_output": "\n".join(stdout_lines)}
 
     async def run_plan(
         self,

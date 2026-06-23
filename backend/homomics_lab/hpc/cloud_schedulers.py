@@ -39,6 +39,14 @@ class AWSBatchScheduler(BaseScheduler):
             self._client = boto3.client("batch")
         return self._client
 
+    async def terminate(self, job_id: str) -> bool:
+        """Cancel a running AWS Batch job."""
+        try:
+            self._get_client().terminate_job(jobId=job_id, reason="HomomicsLab user cancellation")
+            return True
+        except Exception:
+            return False
+
     async def execute(
         self,
         skill: SkillDefinition,
@@ -132,6 +140,15 @@ class GCPLifeSciencesScheduler(BaseScheduler):
             from google.cloud import lifesciences_v2beta
             self._client = lifesciences_v2beta.WorkflowsServiceV2BetaClient()
         return self._client
+
+    async def terminate(self, job_id: str) -> bool:
+        """Cancel a running GCP Life Sciences operation."""
+        try:
+            client = self._get_client()
+            client.transport.operations_client.cancel_operation(job_id)
+            return True
+        except Exception:
+            return False
 
     async def execute(
         self,
@@ -239,6 +256,14 @@ class AzureBatchScheduler(BaseScheduler):
             cred = DefaultAzureCredential()
             self._client = BatchServiceClient(credential=cred, batch_url=self.account_url)
         return self._client
+
+    async def terminate(self, job_id: str) -> bool:
+        """Cancel a running Azure Batch task."""
+        try:
+            self._get_client().task.terminate(job_id=self.batch_job_id, task_id=job_id)
+            return True
+        except Exception:
+            return False
 
     async def execute(
         self,

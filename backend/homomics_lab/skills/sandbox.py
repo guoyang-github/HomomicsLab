@@ -35,6 +35,8 @@ class Sandbox(ABC):
     def __init__(self, working_dir: Path):
         self.working_dir = Path(working_dir)
         self.working_dir.mkdir(parents=True, exist_ok=True)
+        # Track running subprocesses by job_id so execution can be cancelled.
+        self._running: Dict[str, asyncio.subprocess.Process] = {}
 
     @classmethod
     @abstractmethod
@@ -87,6 +89,29 @@ class Sandbox(ABC):
     def get_metadata(self) -> Dict[str, Any]:
         """Return metadata about this sandbox backend for provenance."""
         pass
+
+    async def terminate(self, job_id: Optional[str] = None) -> bool:
+        """Terminate a running sandbox subprocess.
+
+        If ``job_id`` is provided, only that subprocess is killed. Otherwise the
+        most recently tracked subprocess is terminated. Returns True if a
+        process was actually terminated.
+        """
+        if job_id is not None and job_id in self._running:
+            proc = self._running.pop(job_id)
+        elif self._running:
+            proc = self._running.popitem()[1]
+        else:
+            return False
+
+        if proc.returncode is None:
+            try:
+                proc.kill()
+                await asyncio.wait_for(proc.wait(), timeout=5.0)
+                return True
+            except (asyncio.TimeoutError, ProcessLookupError):
+                return False
+        return False
 
     @staticmethod
     def create(
@@ -186,6 +211,8 @@ class LocalSandbox(Sandbox):
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
             )
+            if job_id:
+                self._running[job_id] = proc
 
             stdout_lines, stderr_lines = await self._stream_subprocess(
                 proc=proc,
@@ -210,6 +237,8 @@ class LocalSandbox(Sandbox):
             return json.loads(result_text)
 
         finally:
+            if job_id:
+                self._running.pop(job_id, None)
             if proc is not None and proc.returncode is None:
                 try:
                     proc.kill()
@@ -265,6 +294,8 @@ class LocalSandbox(Sandbox):
                 cwd=str(self.working_dir),
                 preexec_fn=_set_limits,
             )
+            if job_id:
+                self._running[job_id] = proc
 
             stdout_lines, stderr_lines = await self._stream_subprocess(
                 proc=proc,
@@ -289,6 +320,8 @@ class LocalSandbox(Sandbox):
             return json.loads(result_text)
 
         finally:
+            if job_id:
+                self._running.pop(job_id, None)
             if proc is not None and proc.returncode is None:
                 try:
                     proc.kill()
@@ -302,6 +335,7 @@ class LocalSandbox(Sandbox):
         cwd: Optional[Path] = None,
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
+        job_id: Optional[str] = None,
     ) -> str:
         """Run a shell command locally."""
         proc = await asyncio.create_subprocess_shell(
@@ -311,10 +345,16 @@ class LocalSandbox(Sandbox):
             cwd=str(cwd or self.working_dir),
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(),
-            timeout=timeout_seconds,
-        )
+        if job_id:
+            self._running[job_id] = proc
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=timeout_seconds,
+            )
+        finally:
+            if job_id:
+                self._running.pop(job_id, None)
         output = stdout.decode(errors="replace")
         if stderr:
             output += "\n" + stderr.decode(errors="replace")
@@ -630,6 +670,7 @@ class BubblewrapSandbox(Sandbox):
         cwd: Optional[Path] = None,
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
+        job_id: Optional[str] = None,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
         args = self._base_args(run_cwd) + ["/bin/sh", "-c", command]
@@ -639,7 +680,13 @@ class BubblewrapSandbox(Sandbox):
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        if job_id:
+            self._running[job_id] = proc
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        finally:
+            if job_id:
+                self._running.pop(job_id, None)
         output = stdout.decode(errors="replace")
         if stderr:
             output += "\n" + stderr.decode(errors="replace")
@@ -659,26 +706,32 @@ class BubblewrapSandbox(Sandbox):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        if job_id:
+            self._running[job_id] = proc
 
-        stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
-            proc=proc,
-            timeout_seconds=timeout_seconds,
-            progress_callback=progress_callback,
-            job_id=job_id,
-            current_phase=current_phase,
-        )
+        try:
+            stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
+                proc=proc,
+                timeout_seconds=timeout_seconds,
+                progress_callback=progress_callback,
+                job_id=job_id,
+                current_phase=current_phase,
+            )
 
-        if proc.returncode != 0:
-            error_text = "\n".join(stderr_lines)
-            raise RuntimeError(f"Sandbox execution failed: {error_text}")
+            if proc.returncode != 0:
+                error_text = "\n".join(stderr_lines)
+                raise RuntimeError(f"Sandbox execution failed: {error_text}")
 
-        if not result_path.exists():
-            return {"raw_output": "\n".join(stdout_lines)}
+            if not result_path.exists():
+                return {"raw_output": "\n".join(stdout_lines)}
 
-        result_text = result_path.read_text()
-        if len(result_text) > 10 * 1024 * 1024:
-            raise RuntimeError("Skill result exceeds 10MB limit")
-        return json.loads(result_text)
+            result_text = result_path.read_text()
+            if len(result_text) > 10 * 1024 * 1024:
+                raise RuntimeError("Skill result exceeds 10MB limit")
+            return json.loads(result_text)
+        finally:
+            if job_id:
+                self._running.pop(job_id, None)
 
 
 class ContainerSandbox(Sandbox):
@@ -930,6 +983,7 @@ class ContainerSandbox(Sandbox):
         cwd: Optional[Path] = None,
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
+        job_id: Optional[str] = None,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
         engine = self._engine
@@ -950,7 +1004,13 @@ class ContainerSandbox(Sandbox):
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        if job_id:
+            self._running[job_id] = proc
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+        finally:
+            if job_id:
+                self._running.pop(job_id, None)
         output = stdout.decode(errors="replace")
         if stderr:
             output += "\n" + stderr.decode(errors="replace")
@@ -970,23 +1030,29 @@ class ContainerSandbox(Sandbox):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        if job_id:
+            self._running[job_id] = proc
 
-        stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
-            proc=proc,
-            timeout_seconds=timeout_seconds,
-            progress_callback=progress_callback,
-            job_id=job_id,
-            current_phase=current_phase,
-        )
+        try:
+            stdout_lines, stderr_lines = await LocalSandbox(self.working_dir)._stream_subprocess(
+                proc=proc,
+                timeout_seconds=timeout_seconds,
+                progress_callback=progress_callback,
+                job_id=job_id,
+                current_phase=current_phase,
+            )
 
-        if proc.returncode != 0:
-            error_text = "\n".join(stderr_lines)
-            raise RuntimeError(f"Container execution failed: {error_text}")
+            if proc.returncode != 0:
+                error_text = "\n".join(stderr_lines)
+                raise RuntimeError(f"Container execution failed: {error_text}")
 
-        if not result_path.exists():
-            return {"raw_output": "\n".join(stdout_lines)}
+            if not result_path.exists():
+                return {"raw_output": "\n".join(stdout_lines)}
 
-        result_text = result_path.read_text()
-        if len(result_text) > 10 * 1024 * 1024:
-            raise RuntimeError("Skill result exceeds 10MB limit")
-        return json.loads(result_text)
+            result_text = result_path.read_text()
+            if len(result_text) > 10 * 1024 * 1024:
+                raise RuntimeError("Skill result exceeds 10MB limit")
+            return json.loads(result_text)
+        finally:
+            if job_id:
+                self._running.pop(job_id, None)
