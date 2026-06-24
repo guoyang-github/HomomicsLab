@@ -157,6 +157,86 @@ async def get_messages(session_id: str, http_request: Request) -> List[dict]:
     return [m.model_dump() for m in working_memory.get_recent_messages()]
 
 
+@router.post("/regenerate", response_model=SendMessageResponse)
+async def regenerate_message(
+    request: SendMessageRequest,
+    http_request: Request,
+):
+    """Regenerate the last assistant response for the most recent user message."""
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    working_memory, task_tree = await memory_manager.load_session(
+        request.session_id, request.project_id
+    )
+
+    job_service: JobService = getattr(
+        http_request.app.state, "job_service", None
+    ) or JobService()
+    plan_store: PlanStore = getattr(
+        http_request.app.state, "plan_store", None
+    ) or PlanStore()
+
+    runner = TurnRunner(
+        tool_registry=getattr(http_request.app.state, "tool_registry", None),
+        memory_manager=memory_manager,
+        cbkb=getattr(http_request.app.state, "cbkb", None),
+        context_engine=getattr(http_request.app.state, "context_engine", None),
+        project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
+        llm_client=getattr(http_request.app.state, "llm_client", None),
+    )
+    result = await runner.regenerate_response(
+        session_id=request.session_id,
+        working_memory=working_memory,
+        project_id=request.project_id,
+        task_tree=task_tree,
+        job_service=job_service,
+        enqueue_skills=True,
+        plan_store=plan_store,
+        plan_mode=request.plan_mode,
+    )
+
+    plot_messages = result.attachments
+    response_text = result.response_text
+
+    agent_msg = result.agent_message
+    if agent_msg is None:
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TEXT,
+            content=response_text,
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+    status = "completed"
+    job_id = None
+    plan_id = result.plan_id
+    plan_payload = None
+    if result.mode == "queued":
+        status = "queued"
+        job_id = result.job_id
+    elif result.mode == "awaiting_plan_approval":
+        status = "awaiting_plan_approval"
+        if plan_id is not None:
+            plan = await plan_store.get(plan_id)
+            if plan is not None:
+                plan_payload = PlanPresenter.to_user_payload(plan)
+    elif result.mode == "awaiting_debate":
+        status = "awaiting_debate"
+        if result.agent_message is not None and isinstance(result.agent_message.content, dict):
+            _debates[request.session_id] = dict(result.agent_message.content)
+
+    return SendMessageResponse(
+        response=response_text,
+        task_tree={"tasks": [t.model_dump() for t in result.task_tree.tasks]} if result.task_tree else {},
+        messages=[m.model_dump() for m in working_memory.get_recent_messages()],
+        attachments=[m.model_dump() for m in plot_messages],
+        job_id=job_id,
+        plan_id=plan_id,
+        plan=plan_payload,
+        status=status,
+    )
+
+
 @router.post("/hitl/respond", response_model=HITLResponseResponse)
 async def respond_to_hitl(
     request: HITLResponseRequest,

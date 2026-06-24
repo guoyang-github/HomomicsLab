@@ -24,6 +24,9 @@ export const chatApi = {
 
   respondToDebate: (data: { session_id: string; debate_id: string; choice_id: string; parameters?: Record<string, unknown> }) =>
     api.post('/chat/debate/respond', data),
+
+  regenerate: (data: SendMessageRequest) =>
+    api.post<SendMessageResponse>('/chat/regenerate', data),
 }
 
 export const planApi = {

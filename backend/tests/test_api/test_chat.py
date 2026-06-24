@@ -76,3 +76,34 @@ def test_respond_to_debate():
         assert "message" in data
         assert data["status"] == "completed"
         assert data["result"]["task_tree"] is not None
+
+
+def test_regenerate_message():
+    with TestClient(app) as client:
+        session_id = "sess_regenerate_api"
+        # Seed a session with a user message.
+        response = client.post("/api/chat/send", json={
+            "project_id": "proj_1",
+            "session_id": session_id,
+            "message": "什么是单细胞测序？",
+        })
+        assert response.status_code == 200
+        original = response.json()
+
+        # Regenerate the last assistant response.
+        response = client.post("/api/chat/regenerate", json={
+            "project_id": "proj_1",
+            "session_id": session_id,
+            "message": "",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        assert "task_tree" in data
+        assert "messages" in data
+        assert len(data["messages"]) >= len(original["messages"]) - 1
+
+        # Ensure the assistant response count stays the same (one reply for the last user message).
+        assistant_messages = [m for m in data["messages"] if m.get("sender") == "agent"]
+        original_assistant = [m for m in original["messages"] if m.get("sender") == "agent"]
+        assert len(assistant_messages) == len(original_assistant)

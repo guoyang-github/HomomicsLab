@@ -306,6 +306,81 @@ class TurnRunner:
         )
         working_memory.add_message(user_msg)
 
+        return await self._run_turn_with_state(
+            session_id=session_id,
+            user_message=user_message,
+            working_memory=working_memory,
+            project_id=project_id,
+            task_tree=task_tree,
+            job_service=job_service,
+            enqueue_skills=enqueue_skills,
+            plan_store=plan_store,
+            debate_response=debate_response,
+            plan_mode=plan_mode,
+        )
+
+    async def regenerate_response(
+        self,
+        session_id: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        task_tree: Optional[TaskTree] = None,
+        job_service=None,
+        enqueue_skills: bool = False,
+        plan_store: Optional[PlanStore] = None,
+        plan_mode: bool = False,
+    ) -> TurnResult:
+        """Regenerate the last assistant response without adding a new user message.
+
+        Finds the most recent user message, removes any assistant messages that
+        followed it, and re-runs the turn so the caller gets a fresh response.
+        """
+        recent = list(working_memory.messages)
+        last_user_index = None
+        for i in range(len(recent) - 1, -1, -1):
+            if recent[i].sender == "user":
+                last_user_index = i
+                break
+
+        if last_user_index is None:
+            return self._build_error_result(
+                ExecutionError("No user message found to regenerate from"),
+                working_memory,
+            )
+
+        user_message = str(recent[last_user_index].content)
+
+        # Drop all messages after the last user message (assistant replies,
+        # tool results, etc.) so the turn can be replayed cleanly.
+        while len(working_memory.messages) > last_user_index + 1:
+            working_memory.messages.pop()
+
+        return await self._run_turn_with_state(
+            session_id=session_id,
+            user_message=user_message,
+            working_memory=working_memory,
+            project_id=project_id,
+            task_tree=task_tree,
+            job_service=job_service,
+            enqueue_skills=enqueue_skills,
+            plan_store=plan_store,
+            plan_mode=plan_mode,
+        )
+
+    async def _run_turn_with_state(
+        self,
+        session_id: str,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        task_tree: Optional[TaskTree] = None,
+        job_service=None,
+        enqueue_skills: bool = False,
+        plan_store: Optional[PlanStore] = None,
+        debate_response: Optional[Dict[str, Any]] = None,
+        plan_mode: bool = False,
+    ) -> TurnResult:
+        """Run the turn pipeline once and persist state."""
         turn_result: Optional[TurnResult] = None
         try:
             turn_result = await self._run_turn_once(
