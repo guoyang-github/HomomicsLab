@@ -12,6 +12,11 @@ SKILL_ID = "bio-statistics-visualization"
 SKILL_DIR = Path(__file__).parents[2] / "data" / "skill_store" / "imported" / "local" / "bio-statistics-visualization"
 SKILL_DIR = SKILL_DIR.resolve()
 
+pytestmark = pytest.mark.skipif(
+    not SKILL_DIR.exists(),
+    reason="bio-statistics-visualization skill not present",
+)
+
 
 @pytest.fixture
 def executor(tmp_path):
