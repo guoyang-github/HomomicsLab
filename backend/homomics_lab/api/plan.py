@@ -2,8 +2,11 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from homomics_lab.api.auth import require_analyst_or_admin, require_auth
+from homomics_lab.api.rate_limit import rate_limit_dependency
 
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.jobs import JobMode, JobService
@@ -66,7 +69,11 @@ def _get_job_service(request: Request) -> JobService:
     return getattr(request.app.state, "job_service", None) or JobService()
 
 
-@router.post("/{plan_id}/approve", response_model=PlanApproveResponse)
+@router.post(
+    "/{plan_id}/approve",
+    response_model=PlanApproveResponse,
+    dependencies=[Depends(rate_limit_dependency), Depends(require_analyst_or_admin)],
+)
 async def approve_plan(
     plan_id: str,
     request: PlanApprovalRequest,
@@ -133,7 +140,11 @@ async def approve_plan(
     )
 
 
-@router.post("/{plan_id}/reject", response_model=PlanApproveResponse)
+@router.post(
+    "/{plan_id}/reject",
+    response_model=PlanApproveResponse,
+    dependencies=[Depends(rate_limit_dependency), Depends(require_analyst_or_admin)],
+)
 async def reject_plan(
     plan_id: str,
     http_request: Request,
@@ -158,7 +169,11 @@ async def reject_plan(
     )
 
 
-@router.post("/{plan_id}/modify", response_model=PlanApproveResponse)
+@router.post(
+    "/{plan_id}/modify",
+    response_model=PlanApproveResponse,
+    dependencies=[Depends(rate_limit_dependency), Depends(require_analyst_or_admin)],
+)
 async def modify_plan(
     plan_id: str,
     request: PlanApprovalRequest,

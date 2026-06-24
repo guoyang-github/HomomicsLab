@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from homomics_lab.api.auth import require_admin, require_auth
 from homomics_lab.skills.promotion import TransientSkillPromoter
 from homomics_lab.skills.skill_store import SkillStore
 from homomics_lab.tools.approval import get_default_approval_store
@@ -94,7 +95,7 @@ class LockResponse(BaseModel):
 
 
 
-@router.get("/", response_model=List[SkillSummary])
+@router.get("/", response_model=List[SkillSummary], dependencies=[Depends(require_auth)])
 async def list_skills(request: Request):
     """List all registered skills."""
     executor = request.app.state.skill_executor
@@ -117,7 +118,7 @@ async def list_skills(request: Request):
     ]
 
 
-@router.get("/search", response_model=List[SkillSummary])
+@router.get("/search", response_model=List[SkillSummary], dependencies=[Depends(require_auth)])
 async def search_skills(request: Request, q: str):
     """Search skills by keyword."""
     executor = request.app.state.skill_executor
@@ -140,7 +141,7 @@ async def search_skills(request: Request, q: str):
     ]
 
 
-@router.get("/tools/pending")
+@router.get("/tools/pending", dependencies=[Depends(require_auth)])
 async def list_pending_tool_approvals():
     """List high-risk tool calls awaiting user approval."""
     store = get_default_approval_store()
@@ -155,7 +156,7 @@ async def list_pending_tool_approvals():
     ]
 
 
-@router.post("/approve-tool/{call_id}")
+@router.post("/approve-tool/{call_id}", dependencies=[Depends(require_admin)])
 async def approve_tool_call(call_id: str):
     """Approve a pending high-risk tool call."""
     store = get_default_approval_store()
@@ -164,7 +165,7 @@ async def approve_tool_call(call_id: str):
     return {"call_id": call_id, "approved": True}
 
 
-@router.post("/reject-tool/{call_id}")
+@router.post("/reject-tool/{call_id}", dependencies=[Depends(require_admin)])
 async def reject_tool_call(call_id: str):
     """Reject a pending high-risk tool call."""
     store = get_default_approval_store()
@@ -173,7 +174,7 @@ async def reject_tool_call(call_id: str):
     return {"call_id": call_id, "approved": False}
 
 
-@router.get("/{skill_id}", response_model=SkillDetail)
+@router.get("/{skill_id}", response_model=SkillDetail, dependencies=[Depends(require_auth)])
 async def get_skill(request: Request, skill_id: str):
     """Get detailed information about a specific skill."""
     executor = request.app.state.skill_executor
@@ -202,7 +203,7 @@ async def get_skill(request: Request, skill_id: str):
     )
 
 
-@router.get("/{skill_id}/metrics")
+@router.get("/{skill_id}/metrics", dependencies=[Depends(require_auth)])
 async def get_skill_metrics(request: Request, skill_id: str):
     """Get performance metrics for a skill."""
     executor = request.app.state.skill_executor
@@ -217,7 +218,7 @@ async def get_skill_metrics(request: Request, skill_id: str):
     return executor.tracker.get_stats(skill_id)
 
 
-@router.get("/{skill_id}/executions")
+@router.get("/{skill_id}/executions", dependencies=[Depends(require_auth)])
 async def get_skill_executions(request: Request, skill_id: str, limit: int = 100):
     """Get recent execution records for a skill."""
     executor = request.app.state.skill_executor
@@ -244,7 +245,7 @@ async def get_skill_executions(request: Request, skill_id: str, limit: int = 100
     ]
 
 
-@router.get("/metrics/top")
+@router.get("/metrics/top", dependencies=[Depends(require_auth)])
 async def get_top_skills(request: Request, limit: int = 10):
     """Get top skills by execution count."""
     executor = request.app.state.skill_executor
@@ -255,7 +256,7 @@ async def get_top_skills(request: Request, limit: int = 10):
     return executor.tracker.get_top_skills(limit=limit)
 
 
-@router.post("/import", response_model=ImportSkillResponse)
+@router.post("/import", response_model=ImportSkillResponse, dependencies=[Depends(require_admin)])
 async def import_skill(request: Request, body: ImportSkillRequest):
     """Import a skill from a local path, git URL, or zip archive."""
     store = _get_store(request)
@@ -278,7 +279,7 @@ async def import_skill(request: Request, body: ImportSkillRequest):
     )
 
 
-@router.post("/{skill_id}/update", response_model=ImportSkillResponse)
+@router.post("/{skill_id}/update", response_model=ImportSkillResponse, dependencies=[Depends(require_admin)])
 async def update_skill(request: Request, skill_id: str, body: ImportSkillRequest):
     """Re-import a skill from a new source."""
     store = _get_store(request)
@@ -300,7 +301,7 @@ async def update_skill(request: Request, skill_id: str, body: ImportSkillRequest
     )
 
 
-@router.delete("/{skill_id}")
+@router.delete("/{skill_id}", dependencies=[Depends(require_admin)])
 async def remove_skill(
     request: Request,
     skill_id: str,
@@ -315,7 +316,7 @@ async def remove_skill(
     return {"skill_id": skill_id, "namespace": namespace, "removed": True}
 
 
-@router.post("/{skill_id}/enable")
+@router.post("/{skill_id}/enable", dependencies=[Depends(require_admin)])
 async def enable_skill(
     request: Request,
     skill_id: str,
@@ -330,7 +331,7 @@ async def enable_skill(
     return {"skill_id": skill.id, "namespace": namespace, "enabled": True}
 
 
-@router.post("/{skill_id}/disable")
+@router.post("/{skill_id}/disable", dependencies=[Depends(require_admin)])
 async def disable_skill(
     request: Request,
     skill_id: str,
@@ -345,7 +346,7 @@ async def disable_skill(
     return {"skill_id": skill_id, "namespace": namespace, "enabled": False}
 
 
-@router.post("/{skill_id}/validate", response_model=ValidationResponse)
+@router.post("/{skill_id}/validate", response_model=ValidationResponse, dependencies=[Depends(require_admin)])
 async def validate_skill(
     request: Request,
     skill_id: str,
@@ -365,7 +366,7 @@ async def validate_skill(
     )
 
 
-@router.post("/{skill_id}/test", response_model=TestResponse)
+@router.post("/{skill_id}/test", response_model=TestResponse, dependencies=[Depends(require_admin)])
 async def test_skill(
     request: Request,
     skill_id: str,
@@ -388,7 +389,7 @@ async def test_skill(
     )
 
 
-@router.post("/promote")
+@router.post("/promote", dependencies=[Depends(require_admin)])
 async def promote_skill(request: Request, body: PromoteSkillRequest):
     """Promote a successful CodeAct run into a curated skill.
 
@@ -432,7 +433,7 @@ async def promote_skill(request: Request, body: PromoteSkillRequest):
     }
 
 
-@router.post("/{skill_id}/trust")
+@router.post("/{skill_id}/trust", dependencies=[Depends(require_admin)])
 async def trust_skill(
     request: Request,
     skill_id: str,
@@ -456,7 +457,7 @@ async def trust_skill(
     }
 
 
-@router.post("/lock", response_model=LockResponse)
+@router.post("/lock", response_model=LockResponse, dependencies=[Depends(require_admin)])
 async def lock_skills(request: Request, project_id: str):
     """Create a version lock for currently enabled skills."""
     store = _get_store(request)

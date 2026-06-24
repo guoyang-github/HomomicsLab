@@ -158,9 +158,26 @@ class Settings(BaseSettings):
     oidc_client_secret: Optional[str] = None
 
     rate_limit_enabled: bool = False
+    rate_limit_backend: str = "memory"  # "memory" | "redis"
+    rate_limit_redis_url: Optional[str] = None
+    rate_limit_trust_proxy: bool = False
     rate_limit_requests_per_minute: int = 60
     rate_limit_upload_max_bytes: int = 1024 * 1024 * 1024  # 1 GB
     max_upload_file_bytes: int = 1024 * 1024 * 1024  # 1 GB per file
+
+    @field_validator("rate_limit_backend")
+    @classmethod
+    def _validate_rate_limit_backend(cls, v: str) -> str:
+        allowed = {"memory", "redis"}
+        if v not in allowed:
+            raise ValueError(f"rate_limit_backend must be one of {allowed}, got {v}")
+        return v
+
+    @model_validator(mode="after")
+    def _default_rate_limit_redis_url(self):
+        if self.rate_limit_redis_url is None:
+            self.rate_limit_redis_url = self.redis_url
+        return self
 
     # Audit logging
     audit_log_enabled: bool = False
@@ -212,6 +229,19 @@ class Settings(BaseSettings):
     # CORS / host security
     cors_origins: Optional[List[str]] = None  # e.g. ["https://app.homomics.lab"]
     trusted_hosts: Optional[List[str]] = None  # e.g. ["app.homomics.lab"]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: Any) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            parts = [part.strip() for part in v.split(",") if part.strip()]
+            return parts if parts else None
+        if isinstance(v, list):
+            origins = [str(item).strip() for item in v if str(item).strip()]
+            return origins if origins else None
+        return None
 
     # Object storage abstraction
     storage_backend: str = "local"  # "local" | "s3"

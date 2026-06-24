@@ -29,6 +29,16 @@ from homomics_lab.database.connection import get_async_session
 from homomics_lab.database.models import User
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# ---------------------------------------------------------------------------
+# Role constants
+# ---------------------------------------------------------------------------
+
+ROLE_ADMIN = "admin"
+ROLE_ANALYST = "analyst"
+ROLE_VIEWER = "viewer"
+
+ALL_ROLES = {ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER}
 bearer_scheme = HTTPBearer(auto_error=False)
 # Use pbkdf2_sha256 instead of bcrypt because newer ``bcrypt`` releases are
 # incompatible with the passlib version currently pinned in this environment.
@@ -245,6 +255,22 @@ async def _resolve_token_user_id(token: str) -> Optional[str]:
     return None
 
 
+def _resolve_role_from_token(token: str) -> str:
+    """Extract a recognised role claim from a local JWT or OIDC token."""
+    payload = _decode_local_token(token)
+    if payload is not None:
+        role = payload.get("role")
+        return role if role in ALL_ROLES else ROLE_VIEWER
+
+    if settings.oidc_discovery_url:
+        oidc_result = verify_oidc_token(token)
+        if oidc_result is not None:
+            role = oidc_result.get("payload", {}).get("role")
+            return role if role in ALL_ROLES else ROLE_VIEWER
+
+    return ROLE_VIEWER
+
+
 async def get_current_user(
     request: Request,
     api_key: Optional[str] = Depends(_extract_api_key),
@@ -256,11 +282,14 @@ async def get_current_user(
       2. Bearer token that looks like a JWT -> validate locally or via OIDC.
       3. Configured API key (via X-API-Key or Authorization Bearer) -> 'authenticated_user'.
 
+    The resolved role is stored in ``request.state.role`` for RBAC dependencies.
+
     Raises:
         HTTPException 401/403/500 when auth is enabled and no valid credential is found.
     """
     if not settings.auth_enabled:
         request.state.user_id = "anonymous"
+        request.state.role = "anonymous"
         return "anonymous"
 
     if api_key is None:
@@ -276,6 +305,7 @@ async def get_current_user(
         user_id = await _resolve_token_user_id(api_key)
         if user_id:
             request.state.user_id = user_id
+            request.state.role = _resolve_role_from_token(api_key)
             return user_id
 
     # Fall back to configured single shared API key.
@@ -289,6 +319,7 @@ async def get_current_user(
     if hmac.compare_digest(api_key, expected):
         user_id = "authenticated_user"
         request.state.user_id = user_id
+        request.state.role = ROLE_ADMIN
         return user_id
 
     raise HTTPException(
@@ -305,6 +336,60 @@ class RequireAuth:
 
 
 require_auth = RequireAuth()
+
+
+# ---------------------------------------------------------------------------
+# RBAC dependencies
+# ---------------------------------------------------------------------------
+
+class RequireRole:
+    """FastAPI dependency that enforces a role-based access control check.
+
+    When authentication is disabled the check is bypassed so local development
+    keeps working. API-key authenticated users are treated as ``admin``.
+    """
+
+    def __init__(self, allowed_roles):
+        self.allowed_roles = set(allowed_roles)
+
+    async def __call__(
+        self,
+        request: Request,
+        user_id: str = Depends(require_auth),
+    ) -> str:
+        if not settings.auth_enabled:
+            return user_id
+
+        role = getattr(request.state, "role", None) or ROLE_VIEWER
+        if role not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions. Required one of: {sorted(self.allowed_roles)}",
+            )
+        return user_id
+
+
+require_admin = RequireRole([ROLE_ADMIN])
+require_analyst_or_admin = RequireRole([ROLE_ADMIN, ROLE_ANALYST])
+require_analyst = require_analyst_or_admin
+require_viewer_or_above = RequireRole([ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
+
+
+# ---------------------------------------------------------------------------
+# Admin-only placeholder router
+# ---------------------------------------------------------------------------
+
+admin_router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+@admin_router.get("/status")
+async def admin_status():
+    """Simple admin-only health/status endpoint."""
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------

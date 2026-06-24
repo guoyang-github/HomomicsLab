@@ -4,8 +4,11 @@ import asyncio
 import json
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
+from homomics_lab.api.auth import require_analyst_or_admin, require_auth
+from homomics_lab.api.rate_limit import rate_limit_dependency
 
 from homomics_lab.hpc.pubsub import get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
@@ -26,7 +29,10 @@ def _format_sse(data: str, event: Optional[str] = None) -> str:
     return message
 
 
-@router.get("/{job_id}/status")
+@router.get(
+    "/{job_id}/status",
+    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
+)
 async def execution_status(
     job_id: str,
     request: Request,
@@ -51,7 +57,10 @@ async def execution_status(
     }
 
 
-@router.get("/{job_id}/tasks")
+@router.get(
+    "/{job_id}/tasks",
+    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
+)
 async def execution_tasks(
     job_id: str,
     request: Request,
@@ -106,7 +115,10 @@ def _job_progress(tree: Optional[Any]) -> Dict[str, Any]:
     return counts
 
 
-@router.post("/{job_id}/cancel")
+@router.post(
+    "/{job_id}/cancel",
+    dependencies=[Depends(rate_limit_dependency), Depends(require_analyst_or_admin)],
+)
 async def cancel_job(
     job_id: str,
     request: Request,
@@ -125,7 +137,10 @@ async def cancel_job(
     }
 
 
-@router.get("/{job_id}/trace")
+@router.get(
+    "/{job_id}/trace",
+    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
+)
 async def get_job_trace(
     job_id: str,
     request: Request,
@@ -137,7 +152,10 @@ async def get_job_trace(
     return trace.model_dump(mode="json")
 
 
-@router.get("/{job_id}/events")
+@router.get(
+    "/{job_id}/events",
+    dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
+)
 async def execution_events(
     job_id: str,
     request: Request,

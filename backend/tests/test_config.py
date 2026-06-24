@@ -101,3 +101,33 @@ def test_masked_dump_redacts_secrets():
     assert "super-secret-key" not in data["api_key"]
     assert "s3-secret" not in data["storage_s3_secret_key"]
     assert len(data["api_key"]) > 0
+
+
+def test_rate_limit_backend_defaults_to_memory():
+    settings = Settings()
+    assert settings.rate_limit_backend == "memory"
+
+
+def test_rate_limit_backend_rejects_unknown():
+    with pytest.raises(ValueError):
+        Settings(rate_limit_backend="memcached")
+
+
+def test_rate_limit_redis_url_defaults_to_redis_url():
+    settings = Settings(redis_url="redis://custom:6379/0")
+    assert settings.rate_limit_redis_url == "redis://custom:6379/0"
+
+
+def test_cors_origins_parses_comma_separated_string():
+    settings = Settings(cors_origins="https://app.homomics.lab,https://admin.homomics.lab")
+    assert settings.cors_origins == ["https://app.homomics.lab", "https://admin.homomics.lab"]
+
+
+def test_cors_origins_accepts_list():
+    settings = Settings(cors_origins=["https://a.lab", "https://b.lab"])
+    assert settings.cors_origins == ["https://a.lab", "https://b.lab"]
+
+
+def test_cors_origins_empty_string_becomes_none():
+    settings = Settings(cors_origins="")
+    assert settings.cors_origins is None

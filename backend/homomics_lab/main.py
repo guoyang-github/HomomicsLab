@@ -124,11 +124,15 @@ app.middleware("http")(prometheus_middleware)
 update_limiter_config()
 app.include_router(api_router)
 
-# CORS: default to localhost for development; override via environment for production.
-_allow_origins = getattr(settings, "cors_origins", None) or [
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
+# CORS: production defaults to no cross-origin access. In debug mode with no
+# explicit origins, allow common local frontend dev servers for convenience.
+# Override via ``HOMOMICS_CORS_ORIGINS`` in production.
+if settings.cors_origins:
+    _allow_origins = settings.cors_origins
+elif settings.debug:
+    _allow_origins = ["http://localhost:5173", "http://localhost:3000"]
+else:
+    _allow_origins = []
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
