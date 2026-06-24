@@ -196,7 +196,7 @@ async def test_general_help_direct_response_with_llm(runner, working_memory):
 
 @pytest.mark.asyncio
 async def test_clarification_response(runner, working_memory):
-    """Ambiguous requests return a clarification question."""
+    """Ambiguous requests return a debate request for user resolution."""
     result = await runner.run_turn(
         session_id="sess_clarify",
         user_message="分析数据",
@@ -204,9 +204,11 @@ async def test_clarification_response(runner, working_memory):
         project_id="proj_1",
     )
 
-    assert result.mode == ExecutionMode.DIRECT_RESPONSE
+    assert result.mode == ExecutionMode.AWAITING_DEBATE
     assert result.task_tree is None or len(result.task_tree.tasks) == 0
-    assert "具体" in result.response_text or "什么" in result.response_text
+    assert result.agent_message is not None
+    assert result.agent_message.type == MessageType.DEBATE_REQUEST
+    assert "分析数据" in result.response_text
 
 
 def test_handle_clarification_with_debate(runner, working_memory):

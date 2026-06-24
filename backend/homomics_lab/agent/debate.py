@@ -1,9 +1,12 @@
 """LightweightDebate — short multi-agent debate for ambiguous decisions."""
 
+import json
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.core.dynamic_agent import DynamicAgent
+from homomics_lab.llm_client import LLMClient
 
 
 @dataclass
@@ -48,11 +51,142 @@ class DebateResult:
         }
 
 
+class DebateJudge(ABC):
+    """Abstract judge that scores a debate option from an expert's perspective."""
+
+    @abstractmethod
+    async def score(
+        self,
+        expert: DynamicAgent,
+        option: DebateOption,
+        context: Dict[str, Any],
+    ) -> float:
+        """Return a score in [0.0, 1.0] for ``option`` from ``expert``'s view."""
+        ...
+
+
+class RuleBasedDebateJudge(DebateJudge):
+    """Deterministic, rule-based debate judge.
+
+    Fast and fully reproducible; used as the default and as a fallback for the
+    LLM-based judge.
+    """
+
+    async def score(
+        self,
+        expert: DynamicAgent,
+        option: DebateOption,
+        context: Dict[str, Any],
+    ) -> float:
+        return self._score_sync(expert, option, context)
+
+    @staticmethod
+    def _score_sync(
+        expert: DynamicAgent,
+        option: DebateOption,
+        context: Dict[str, Any],
+    ) -> float:
+        """Score an option from a single expert's perspective."""
+        role = expert.role
+        skill_hint = option.metadata.get("skill") or option.id
+
+        # Direct skill match (including wildcards) gives high score.
+        if skill_hint and (
+            skill_hint in role.allowed_skills
+            or any(
+                s.endswith("*") and skill_hint.startswith(s[:-1])
+                for s in role.allowed_skills
+            )
+        ):
+            return 0.9
+
+        # Category match gives medium score.
+        category = option.metadata.get("category")
+        if category and category in role.allowed_skill_categories:
+            return 0.7
+
+        # Generalists give a neutral score.
+        if not role.allowed_skills and not role.allowed_skill_categories:
+            return 0.6
+
+        # Otherwise low score.
+        return 0.3
+
+
+class LLMDebateJudge(DebateJudge):
+    """LLM-based debate judge with rule-based fallback.
+
+    Asks an LLM to score how well an option fits an expert's role, parses the
+    structured JSON response, and falls back to :class:`RuleBasedDebateJudge` on
+    any parsing or validation failure.
+    """
+
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        fallback_judge: Optional[DebateJudge] = None,
+    ):
+        self._llm_client = llm_client
+        self._fallback_judge = fallback_judge or RuleBasedDebateJudge()
+
+    async def score(
+        self,
+        expert: DynamicAgent,
+        option: DebateOption,
+        context: Dict[str, Any],
+    ) -> float:
+        try:
+            prompt = self._build_prompt(expert, option, context)
+            response = await self._llm_client.chat_completion(
+                [
+                    {"role": "system", "content": "You are an impartial debate judge."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.0,
+                max_tokens=256,
+            )
+            data = json.loads(response)
+            score = float(data["score"])
+            if not 0.0 <= score <= 1.0:
+                raise ValueError(f"Score {score} out of [0.0, 1.0] range")
+            return score
+        except Exception:
+            return await self._fallback_judge.score(expert, option, context)
+
+    @staticmethod
+    def _build_prompt(
+        expert: DynamicAgent,
+        option: DebateOption,
+        context: Dict[str, Any],
+    ) -> str:
+        role = expert.role
+        topic = context.get("topic", "")
+        user_message = context.get("user_message", "")
+        allowed_skills = ", ".join(role.allowed_skills) or "generalist"
+        allowed_categories = ", ".join(role.allowed_skill_categories) or "any"
+        return (
+            "You are a debate judge evaluating how well an option matches an expert's role.\n\n"
+            f"Debate topic: {topic}\n"
+            f"User message: {user_message}\n\n"
+            f"Expert role ID: {role.role_id}\n"
+            f"Expert name: {role.name}\n"
+            f"Expert description: {role.description}\n"
+            f"Expert allowed skills: {allowed_skills}\n"
+            f"Expert allowed skill categories: {allowed_categories}\n\n"
+            f"Option ID: {option.id}\n"
+            f"Option label: {option.label}\n"
+            f"Option description: {option.description}\n"
+            f"Option metadata: {option.metadata}\n\n"
+            'Return a JSON object with exactly two keys: '
+            '{"score": <float between 0.0 and 1.0>, "reason": "<brief explanation>"}.'
+        )
+
+
 class LightweightDebate:
     """Run a 1-2 round debate among experts and let the Supervisor recommend.
 
-    The debate is deterministic and rule-based so that it is fast and testable.
-    In production the scoring can be replaced with LLM-based evaluations.
+    The debate is deterministic and rule-based by default so that it is fast and
+    testable. In production the scoring can be replaced with an LLM-based judge.
     """
 
     def __init__(
@@ -62,12 +196,14 @@ class LightweightDebate:
         max_rounds: int = 2,
         auto_decide_threshold: float = 0.8,
         auto_decide_gap: float = 0.2,
+        judge: Optional[DebateJudge] = None,
     ):
         self.supervisor = supervisor
         self.experts = experts or []
         self.max_rounds = max(1, max_rounds)
         self.auto_decide_threshold = auto_decide_threshold
         self.auto_decide_gap = auto_decide_gap
+        self.judge = judge or RuleBasedDebateJudge()
 
     async def run(
         self,
@@ -77,6 +213,7 @@ class LightweightDebate:
     ) -> DebateResult:
         """Run the debate and return options + optional recommendation."""
         context = context or {}
+        score_context = {**context, "topic": topic}
         options = [
             DebateOption(
                 id=c.get("id") or str(i),
@@ -94,7 +231,7 @@ class LightweightDebate:
             round_scores: Dict[str, List[float]] = {opt.id: [] for opt in options}
             for expert in self.experts:
                 for opt in options:
-                    score = self._score_option(expert, opt, context)
+                    score = await self.judge.score(expert, opt, score_context)
                     round_scores[opt.id].append(score)
 
             # Update running average score per option.
@@ -138,25 +275,11 @@ class LightweightDebate:
 
     @staticmethod
     def _score_option(expert: DynamicAgent, option: DebateOption, context: Dict[str, Any]) -> float:
-        """Score an option from a single expert's perspective."""
-        role = expert.role
-        skill_hint = option.metadata.get("skill") or option.id
+        """Backward-compatible synchronous scoring helper.
 
-        # Direct skill match (including wildcards) gives high score.
-        if role.can_handle_skill(skill_hint):
-            return 0.9
-
-        # Category match gives medium score.
-        category = option.metadata.get("category")
-        if category and role.can_handle_skill("x", skill_category=category):
-            return 0.7
-
-        # Generalists give a neutral score.
-        if not role.allowed_skills and not role.allowed_skill_categories:
-            return 0.6
-
-        # Otherwise low score.
-        return 0.3
+        Delegates to :class:`RuleBasedDebateJudge`.
+        """
+        return RuleBasedDebateJudge._score_sync(expert, option, context)
 
     def _supervisor_adjust(self, options: List[DebateOption], context: Dict[str, Any]) -> List[DebateOption]:
         """Supervisor applies a small bonus to the option best aligned with context."""

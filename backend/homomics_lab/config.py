@@ -282,6 +282,17 @@ class Settings(BaseSettings):
     hitl_confidence_threshold: float = 0.7
     hitl_risk_threshold: float = 0.6
 
+    # Debate judge backend ("rule" | "llm")
+    debate_judge_backend: str = "rule"
+
+    @field_validator("debate_judge_backend")
+    @classmethod
+    def _validate_debate_judge_backend(cls, v: str) -> str:
+        allowed = {"rule", "llm"}
+        if v not in allowed:
+            raise ValueError(f"debate_judge_backend must be one of {allowed}, got {v}")
+        return v
+
     # CodeAct safety settings
     codeact_hitl_level: str = "high"  # "low" | "medium" | "high" | "critical" | "never"
 

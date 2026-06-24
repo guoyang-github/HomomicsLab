@@ -137,3 +137,18 @@ def test_hitl_threshold_defaults():
     settings = Settings()
     assert settings.hitl_confidence_threshold == 0.7
     assert settings.hitl_risk_threshold == 0.6
+
+
+def test_debate_judge_backend_defaults_to_rule():
+    settings = Settings()
+    assert settings.debate_judge_backend == "rule"
+
+
+def test_debate_judge_backend_accepts_llm():
+    settings = Settings(debate_judge_backend="llm")
+    assert settings.debate_judge_backend == "llm"
+
+
+def test_debate_judge_backend_rejects_unknown():
+    with pytest.raises(ValueError):
+        Settings(debate_judge_backend="human")

@@ -19,6 +19,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.agent.errors import (
     ExecutionError,
     IntentError,
@@ -156,8 +157,7 @@ class TurnRunner:
         llm_client: Optional[LLMClient] = None,
     ):
         self._cbkb = cbkb
-        self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=debate, cbkb=self._cbkb)
-        self.task_decomposer = task_decomposer or TaskDecomposer(cbkb=self._cbkb)
+        self._llm_client = llm_client
         self._orchestrator = orchestrator
         self._registry = registry
         self._progress_callback = progress_callback
@@ -167,16 +167,27 @@ class TurnRunner:
         self._supervisor = supervisor
         self._reviewer = reviewer
         self._message_bus = message_bus
-        self._debate = debate
         self._tool_registry = tool_registry
         self.memory_manager = memory_manager
         self.prompter = prompter or Prompter()
         self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
         self.context_engine = context_engine
         self.project_state_manager = project_state_manager
-        self._llm_client = llm_client
         self._extra_context: Dict[str, Any] = {}
         self._context_bundle: Optional[ContextBundle] = None
+
+        # Configure debate judge based on settings and available LLM client.
+        if debate is not None:
+            self._debate = debate
+        else:
+            judge = None
+            if settings.debate_judge_backend == "llm" and self._llm_client is not None:
+                from homomics_lab.agent.debate import LLMDebateJudge
+                judge = LLMDebateJudge(self._llm_client)
+            self._debate = LightweightDebate(judge=judge)
+
+        self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=self._debate, cbkb=self._cbkb)
+        self.task_decomposer = task_decomposer or TaskDecomposer(cbkb=self._cbkb)
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
