@@ -15,19 +15,28 @@ Usage:
     imported_id = importer.import_from(Path("/tmp/proj_1.homomics"))
 """
 
+import importlib.metadata
 import json
+import logging
+import platform
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.config import settings
+from homomics_lab.context.project_state import ProjectStateManager
+from homomics_lab.knowledge.cbkb import CBKB
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectExporter:
     """Export a project and all its data to a .homomics archive."""
 
     EXTENSION = ".homomics"
+    EXPORTER_VERSION = "1.1"
+    APP_VERSION = "0.5.0"
 
     def __init__(self, project_id: str):
         self.project_id = project_id
@@ -77,8 +86,10 @@ class ProjectExporter:
         """Collect project metadata."""
         return {
             "project_id": self.project_id,
+            "original_project_id": self.project_id,
             "exported_at": datetime.now(timezone.utc).isoformat(),
             "version": "1.0",
+            "exporter_version": self.EXPORTER_VERSION,
         }
 
     def _gather_notes(self) -> List[Dict[str, Any]]:
@@ -110,13 +121,110 @@ class ProjectExporter:
         ]
 
     def _gather_config(self) -> Dict[str, Any]:
-        """Collect project configuration."""
-        # In MVP, config is minimal. Future versions may include
-        # analysis parameters, skill versions, environment info.
+        """Collect rich project configuration for reproducibility."""
         return {
             "project_id": self.project_id,
             "data_dir": str(settings.data_dir),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exporter_version": self.EXPORTER_VERSION,
+            "analysis_state": self._gather_analysis_state(),
+            "skill_versions": self._gather_skill_versions(),
+            "environment": self._gather_environment(),
+            "settings_snapshot": self._gather_settings_snapshot(),
+            "sop_references": self._gather_sop_references(),
         }
+
+    def _gather_analysis_state(self) -> Dict[str, Any]:
+        """Load project analysis state from CBKB."""
+        try:
+            cbkb = CBKB(settings.data_dir)
+            manager = ProjectStateManager(cbkb)
+            return manager.load(self.project_id).to_dict()
+        except Exception:
+            logger.exception("Failed to gather analysis state for project %s", self.project_id)
+            return {}
+
+    def _gather_skill_versions(self) -> List[Dict[str, Any]]:
+        """Read enabled skill versions from the skill store metadata."""
+        skills_path = settings.data_dir / "skill_store" / "skills.json"
+        if not skills_path.exists():
+            return []
+
+        try:
+            raw = json.loads(skills_path.read_text(encoding="utf-8"))
+        except Exception:
+            logger.exception("Failed to read skill store metadata")
+            return []
+
+        entries: List[Dict[str, Any]] = []
+        for entry in raw.values():
+            if not isinstance(entry, dict):
+                continue
+            entries.append(
+                {
+                    "id": entry.get("id"),
+                    "namespace": entry.get("namespace"),
+                    "version": entry.get("version"),
+                    "source": entry.get("source"),
+                    "trusted": entry.get("trusted"),
+                    "enabled": entry.get("enabled"),
+                }
+            )
+        return entries
+
+    def _gather_environment(self) -> Dict[str, Any]:
+        """Capture environment versions relevant to reproducibility."""
+        dependencies = {}
+        for package in ("scanpy", "anndata", "pandas", "numpy", "sqlalchemy"):
+            try:
+                dependencies[package] = importlib.metadata.version(package)
+            except Exception:
+                dependencies[package] = None
+
+        return {
+            "python_version": platform.python_version(),
+            "app_version": self.APP_VERSION,
+            "dependencies": dependencies,
+        }
+
+    def _gather_settings_snapshot(self) -> Dict[str, Any]:
+        """Return a safe, reproducibility-oriented settings snapshot."""
+        masked = settings.masked_dump()
+        database_url = masked.get("database_url", "")
+        if database_url.startswith("sqlite"):
+            database_url_driver = "sqlite"
+        elif database_url.startswith("postgresql"):
+            database_url_driver = "postgresql"
+        else:
+            database_url_driver = "unknown"
+
+        return {
+            "app_name": masked.get("app_name"),
+            "database_url_driver": database_url_driver,
+            "storage_backend": masked.get("storage_backend"),
+            "queue_backend": masked.get("queue_backend"),
+            "llm_model": masked.get("llm_model"),
+            "llm_provider": masked.get("llm_provider"),
+            "semantic_search_model": masked.get("semantic_search_model"),
+        }
+
+    def _gather_sop_references(self) -> List[str]:
+        """Collect relevant SOP identifiers from CBKB or filesystem."""
+        try:
+            cbkb = CBKB(settings.data_dir)
+            sops = cbkb.list_sops()
+            return [sop.id for sop in sops[:10]]
+        except Exception:
+            logger.exception("Failed to list CBKB SOPs, falling back to filesystem")
+
+        fallback_dir = settings.data_dir / "cbkb" / "sops"
+        if not fallback_dir.exists():
+            return []
+        return [
+            p.name
+            for p in fallback_dir.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        ][:10]
 
     def _generate_readme(self, meta: Dict[str, Any]) -> str:
         lines = [
@@ -126,12 +234,13 @@ class ProjectExporter:
             f"Project ID: {meta['project_id']}",
             f"Exported: {meta['exported_at']}",
             f"Format Version: {meta['version']}",
+            f"Exporter Version: {meta.get('exporter_version', 'unknown')}",
             "",
             "Files:",
-            "  project.json   - Project metadata",
+            "  project.json   - Project metadata and provenance",
             "  MEMORY.md      - Human-readable experiment log",
             "  notes.json     - Structured experiment notes",
-            "  config.json    - Project configuration",
+            "  config.json    - Project configuration, analysis state, skill versions, environment, and SOP references",
             "",
             "Import this archive into HomomicsLab to restore the project.",
         ]
@@ -140,6 +249,14 @@ class ProjectExporter:
 
 class ProjectImporter:
     """Import a project from a .homomics archive."""
+
+    REQUIRED_REPRODUCIBILITY_FIELDS = {
+        "analysis_state",
+        "skill_versions",
+        "environment",
+        "settings_snapshot",
+        "sop_references",
+    }
 
     def import_from(
         self,
@@ -165,6 +282,19 @@ class ProjectImporter:
             original_id = meta["project_id"]
             project_id = target_project_id or f"{original_id}_imported"
 
+            # Validate reproducibility config
+            if "config.json" not in zf.namelist():
+                raise ValueError(f"Archive missing config.json: {archive_path}")
+
+            config = json.loads(zf.read("config.json"))
+            missing_fields = self.REQUIRED_REPRODUCIBILITY_FIELDS - set(config.keys())
+            if missing_fields:
+                logger.warning(
+                    "Archive %s is missing reproducibility fields: %s",
+                    archive_path,
+                    ", ".join(sorted(missing_fields)),
+                )
+
             # Create project directory
             project_dir = settings.data_dir / "projects" / project_id
             project_dir.mkdir(parents=True, exist_ok=True)
@@ -181,8 +311,7 @@ class ProjectImporter:
                 self._import_notes(project_id, notes)
 
             # Extract config
-            if "config.json" in zf.namelist():
-                (project_dir / "config.json").write_bytes(zf.read("config.json"))
+            (project_dir / "config.json").write_bytes(zf.read("config.json"))
 
         return project_id
 
