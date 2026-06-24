@@ -253,7 +253,7 @@ class SkillRuntimeExecutor:
             skill_registry=self.registry,
             tool_registry=self.tool_registry,
         )
-        retrieval_context = retriever.retrieve(
+        retrieval_context = await retriever.retrieve(
             query=inputs.get("task", ""),
             intent_type=skill.category or "general",
             include_sops=False,

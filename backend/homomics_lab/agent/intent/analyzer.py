@@ -289,6 +289,19 @@ class CascadeIntentAnalyzer:
         )
         top_keyword = keyword_matches[0] if keyword_matches else None
         if top_keyword and top_keyword.confidence >= self.high_confidence_threshold:
+            # Strong keyword signals for built-in tool intents should bypass the
+            # LLM so that deterministic tool routing is not swayed by domain noise.
+            if top_keyword.analysis_type in (
+                "pubmed_search",
+                "pubmed_fetch",
+                "uniprot_search",
+                "geo_search",
+            ):
+                intent = self._to_user_intent(
+                    top_keyword, message, alternatives=keyword_matches[1:]
+                )
+                self._enrich_with_cbkb(intent, cbkb)
+                return intent
             if top_keyword.structured and top_keyword.structured.interaction_mode == "answer":
                 intent = self._to_user_intent(
                     top_keyword, message, alternatives=keyword_matches[1:]
@@ -694,6 +707,16 @@ class CascadeIntentAnalyzer:
         has_sub_intents: bool = False,
     ) -> str:
         """Determine complexity from indicators and message."""
+        # Tool-only intents are always direct responses regardless of how the
+        # LLM structured classifier labelled scope/complexity.
+        if match.analysis_type in (
+            "pubmed_search",
+            "pubmed_fetch",
+            "uniprot_search",
+            "geo_search",
+        ):
+            return "direct_response"
+
         # Honor structured intent first.
         if match.structured is not None:
             return match.structured.to_legacy_complexity()
@@ -707,10 +730,6 @@ class CascadeIntentAnalyzer:
             "general_help",
             "greeting",
             "clarification",
-            "pubmed_search",
-            "pubmed_fetch",
-            "uniprot_search",
-            "geo_search",
         ):
             return "direct_response"
 
@@ -855,7 +874,10 @@ class CascadeIntentAnalyzer:
                 structured.target = canonical_target
             # Ensure the structured scope matches the complexity heuristic when
             # the LLM returns an inconsistent scope.
-            if complexity == "direct_response":
+            if metadata.get("tool_name"):
+                structured.interaction_mode = "execute"
+                structured.intent_type = "tool_call"
+            elif complexity == "direct_response":
                 structured.scope = "single_step"
                 structured.interaction_mode = "answer"
             elif complexity == "complex" and structured.scope == "single_step":
@@ -980,12 +1002,14 @@ class CascadeIntentAnalyzer:
         complexity: str,
         metadata: Dict[str, Any],
     ) -> str:
+        # MCP tool intents must always execute, even if the LLM structured
+        # classifier labelled them as a plain answer.
+        if metadata.get("tool_name"):
+            return "execute"
         if match.structured is not None:
             return match.structured.interaction_mode
         if match.analysis_type == "clarification":
             return "clarify"
-        if metadata.get("tool_name"):
-            return "execute"
         if complexity == "direct_response":
             return "answer"
         return "execute"

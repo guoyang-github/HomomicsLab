@@ -134,6 +134,20 @@ class KeywordIntentClassifier(IntentClassifier):
             if complexity_hits:
                 scores[atype] += len(complexity_hits) * 0.2
 
+        # Built-in tool intents (MCP) get a strong boost so their precise
+        # keywords outrank broad domain workflow signals.
+        TOOL_KEYWORDS = {
+            "pubmed_search": ["pubmed"],
+            "pubmed_fetch": ["pmid"],
+            "uniprot_search": ["uniprot"],
+            "geo_search": ["geo", "gene expression omnibus"],
+        }
+        for atype, kws in TOOL_KEYWORDS.items():
+            matches = [kw for kw in kws if kw.lower() in text]
+            if matches:
+                scores[atype] += 2.0
+                reasons[atype] = f"tool keyword matched: {', '.join(matches)}"
+
         # Guardrail: information-seeking or coding requests suppress workflow/analysis intents.
         is_guardrail = any(re.search(p, message, re.IGNORECASE) for p in self.GUARDRAIL_PATTERNS)
         if is_guardrail:
