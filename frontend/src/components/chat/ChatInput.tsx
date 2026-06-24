@@ -161,7 +161,9 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         setProgress(progress)
       }
     } catch (error: any) {
-      const detail = error?.response?.data?.detail
+      // eslint-disable-next-line no-console
+      console.error('Chat send failed:', error)
+      const detail = error?.response?.data?.detail || error?.message
       const errorMessage: ChatMessage = {
         id: `msg_${Date.now()}_error`,
         type: 'error',

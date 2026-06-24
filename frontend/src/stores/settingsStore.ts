@@ -186,14 +186,19 @@ export const useSettingsStore = create<SettingsState>()(
         set({ isTesting: true, testResult: null })
         try {
           const state = get()
-          const { data } = await settingsApi.testLlmConnection({
-            provider: state.model.provider,
-            model: state.model.model,
-            base_url: state.model.baseUrl || undefined,
-            api_key: state.model.apiKey || undefined,
-            temperature: state.model.temperature,
-            max_tokens: state.model.maxTokens,
-          })
+          // If the user has not typed an API key into this session, test against
+          // the server-side persisted config (which retains the real key) instead
+          // of sending an empty key.
+          const { data } = state.model.apiKey
+            ? await settingsApi.testLlmConnection({
+                provider: state.model.provider,
+                model: state.model.model,
+                base_url: state.model.baseUrl || undefined,
+                api_key: state.model.apiKey,
+                temperature: state.model.temperature,
+                max_tokens: state.model.maxTokens,
+              })
+            : await settingsApi.testLlmConnection()
           set({
             isTesting: false,
             testResult: {
