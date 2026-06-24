@@ -421,6 +421,15 @@ class SlurmScheduler(BaseScheduler):
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
     ) -> Dict[str, Any]:
+        """Submit a skill as a SLURM batch job and return a submitted handle.
+
+        The submission is non-blocking: control returns immediately with the
+        SLURM job id and a ``submitted`` flag. A background asyncio task polls
+        SLURM via ``sacct`` and publishes state updates (PENDING/RUNNING/
+        COMPLETED/FAILED) to the configured pub/sub bus. Callers that need the
+        final result can either subscribe to the pub/sub channel for this job
+        or call ``await poll_job(job_id, ...)`` directly.
+        """
         started_at = datetime.now(timezone.utc)
         job_name = f"homomics_{skill.id}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
@@ -467,12 +476,24 @@ class SlurmScheduler(BaseScheduler):
             )
         )
 
-        # For MVP, poll until job completes (fire-and-forget for async workflows)
-        # In production, this would be async with callbacks
-        result = await self._poll_job(
-            job_id, job_name, timeout_seconds, skill.id, started_at
+        # Start an event-driven background monitor instead of blocking the caller.
+        asyncio.create_task(
+            self._monitor_slurm_job(
+                job_id=job_id,
+                job_name=job_name,
+                timeout_seconds=timeout_seconds,
+                phase=skill.id,
+                started_at=started_at,
+            )
         )
-        return result
+
+        return {
+            "status": "submitted",
+            "job_id": job_id,
+            "job_name": job_name,
+            "scheduler": "slurm",
+            "started_at": started_at.isoformat(),
+        }
 
     def _inject_python_inputs(self, code: str, inputs_path: str) -> str:
         """Prepend code to load inputs from JSON file."""
@@ -495,6 +516,32 @@ for (var_name in names(skill_inputs)) {{
 {code}
 """
 
+    async def _monitor_slurm_job(
+        self,
+        job_id: str,
+        job_name: str,
+        timeout_seconds: float,
+        phase: str = "",
+        started_at: Optional[datetime] = None,
+    ) -> None:
+        """Background monitor for a submitted SLURM job.
+
+        Polls ``sacct`` and publishes ExecutionState events to the pub/sub bus
+        until the job reaches a terminal state. Errors are reported as events
+        and logged; they do not propagate to the original caller.
+        """
+        try:
+            await self._poll_job(
+                job_id=job_id,
+                job_name=job_name,
+                timeout_seconds=timeout_seconds,
+                phase=phase,
+                started_at=started_at,
+                raise_on_error=False,
+            )
+        except Exception:
+            logger.exception("SLURM monitor failed for job %s", job_id)
+
     async def _poll_job(
         self,
         job_id: str,
@@ -502,8 +549,15 @@ for (var_name in names(skill_inputs)) {{
         timeout_seconds: float,
         phase: str = "",
         started_at: Optional[datetime] = None,
+        raise_on_error: bool = True,
     ) -> Dict[str, Any]:
-        """Poll SLURM job until completion."""
+        """Poll SLURM job until completion.
+
+        Args:
+            raise_on_error: If False, terminal failures are reported as events
+                and returned instead of raising. This is used by the background
+                event-driven monitor so exceptions do not kill the task.
+        """
         start = started_at or datetime.now(timezone.utc)
         poll_interval = 5  # seconds
         status_progress = {
@@ -520,6 +574,7 @@ for (var_name in names(skill_inputs)) {{
             if elapsed > timeout_seconds:
                 # Cancel job on timeout
                 await self._cancel_job(job_id)
+                error_message = f"Timed out after {timeout_seconds}s"
                 self._report_progress(
                     ExecutionState(
                         job_id=job_id,
@@ -527,11 +582,13 @@ for (var_name in names(skill_inputs)) {{
                         current_phase=phase,
                         progress_pct=0.0,
                         started_at=start,
-                        error_message=f"Timed out after {timeout_seconds}s",
+                        error_message=error_message,
                         scheduler_type="slurm",
                     )
                 )
-                raise TimeoutError(f"SLURM job {job_id} timed out after {timeout_seconds}s")
+                if raise_on_error:
+                    raise TimeoutError(f"SLURM job {job_id} timed out after {timeout_seconds}s")
+                return {"status": "cancelled", "job_id": job_id, "error": error_message}
 
             # Check job status
             proc = await asyncio.create_subprocess_exec(
@@ -585,8 +642,10 @@ for (var_name in names(skill_inputs)) {{
                 # Read output
                 result_path = self.working_dir / f"{job_name}_result.json"
                 if result_path.exists():
-                    return json.loads(result_path.read_text())
-                return {"status": "completed", "job_id": job_id}
+                    result = json.loads(result_path.read_text())
+                else:
+                    result = {"status": "completed", "job_id": job_id}
+                return result
 
             elif slurm_status in ("FAILED", "CANCELLED", "TIMEOUT"):
                 err_path = self.working_dir / f"{job_name}.err"
@@ -603,7 +662,10 @@ for (var_name in names(skill_inputs)) {{
                         scheduler_type="slurm",
                     )
                 )
-                raise RuntimeError(f"SLURM job {job_id} {slurm_status}: {err_msg}")
+                error_message = f"SLURM job {job_id} {slurm_status}: {err_msg}"
+                if raise_on_error:
+                    raise RuntimeError(error_message)
+                return {"status": "failed", "job_id": job_id, "error": error_message}
 
             # Otherwise: PENDING, etc. — keep polling
 

@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from pathlib import Path
 from homomics_lab.hpc.scheduler import LocalScheduler, SlurmScheduler, NextflowRunner, get_scheduler
@@ -73,6 +74,67 @@ class TestSlurmScheduler:
         assert "#SBATCH --mem=4G" in script
         assert "#SBATCH --cpus-per-task=2" in script
         assert "#SBATCH --time=0:30:00" in script
+
+    @pytest.mark.asyncio
+    async def test_execute_returns_submitted_handle_and_polls_in_background(self, tmp_path, monkeypatch):
+        """execute() must be non-blocking and publish terminal state via pub/sub."""
+        from homomics_lab.hpc.state import ExecutionState
+        from homomics_lab.jobs.backends.memory import MemoryPubSubBackend
+
+        pubsub = MemoryPubSubBackend()
+        scheduler = SlurmScheduler(working_dir=tmp_path, pubsub=pubsub)
+        skill = SkillDefinition(
+            id="test", name="Test", version="1.0", category="test",
+            runtime=SkillRuntime(
+                type="python",
+                resources=SkillResources(memory="4G", cpu=2, time="30m"),
+            ),
+        )
+
+        submitted = {"job_id": "12345"}
+
+        async def fake_sbatch(*args, **kwargs):
+            class Proc:
+                returncode = 0
+                async def communicate(self):
+                    return b"Submitted batch job 12345", b""
+            return Proc()
+
+        async def fake_poll_job(*args, **kwargs):
+            scheduler._report_progress(
+                ExecutionState(
+                    job_id="12345",
+                    status="COMPLETED",
+                    current_phase=skill.id,
+                    progress_pct=100.0,
+                    scheduler_type="slurm",
+                )
+            )
+            return {"status": "completed", "job_id": "12345"}
+
+        import homomics_lab.hpc.scheduler as scheduler_module
+        _real_asyncio = asyncio
+        class FakeAsyncio:
+            @staticmethod
+            async def create_subprocess_exec(*args, **kwargs):
+                return await fake_sbatch(*args, **kwargs)
+            @staticmethod
+            def create_task(coro, *, name=None):
+                return _real_asyncio.create_task(coro, name=name)
+            subprocess = _real_asyncio.subprocess
+        monkeypatch.setattr(scheduler_module, "asyncio", FakeAsyncio())
+        monkeypatch.setattr(scheduler, "_poll_job", fake_poll_job)
+
+        result = await scheduler.execute(skill, "result = {'x': 1}", {})
+        assert result["status"] == "submitted"
+        assert result["job_id"] == "12345"
+
+        # Give the background monitor task a chance to run.
+        await asyncio.sleep(0.05)
+
+        latest = await pubsub.latest("12345")
+        assert latest is not None
+        assert latest.status == "COMPLETED"
 
 
 class TestNextflowRunner:

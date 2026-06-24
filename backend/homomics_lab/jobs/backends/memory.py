@@ -9,34 +9,51 @@ from .base import ExecutionSubscription as BaseExecutionSubscription
 
 
 class MemoryQueueBackend:
-    """FIFO queue of job_ids backed by asyncio.Queue."""
+    """FIFO queue of job_ids backed by asyncio.Queue.
+
+    The internal queue is created lazily on first use in the running event
+    loop. This avoids the common test anti-pattern where a module-level
+    cached backend is created in one event loop and reused in another.
+    """
 
     def __init__(self):
-        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._queue: Optional[asyncio.Queue[str]] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def _get_queue(self) -> asyncio.Queue[str]:
+        loop = asyncio.get_running_loop()
+        if self._queue is None or self._loop is not loop:
+            self._queue = asyncio.Queue()
+            self._loop = loop
+        return self._queue
 
     async def enqueue(self, job_id: str) -> None:
-        await self._queue.put(job_id)
+        await self._get_queue().put(job_id)
 
     async def dequeue(self, timeout: Optional[float] = None) -> Optional[str]:
+        queue = self._get_queue()
         if timeout is None:
-            return await self._queue.get()
+            return await queue.get()
         try:
-            return await asyncio.wait_for(self._queue.get(), timeout=timeout)
+            return await asyncio.wait_for(queue.get(), timeout=timeout)
         except asyncio.TimeoutError:
             return None
 
     def task_done(self) -> None:
-        self._queue.task_done()
+        if self._queue is not None:
+            self._queue.task_done()
 
     async def join(self) -> None:
-        await self._queue.join()
+        if self._queue is not None:
+            await self._queue.join()
 
     async def remove(self, job_id: str) -> int:
         """Remove all occurrences of a job_id from the queue."""
+        queue = self._get_queue()
         items: List[str] = []
-        while not self._queue.empty():
+        while not queue.empty():
             try:
-                items.append(self._queue.get_nowait())
+                items.append(queue.get_nowait())
             except asyncio.QueueEmpty:
                 break
         removed = 0
@@ -44,11 +61,12 @@ class MemoryQueueBackend:
             if item == job_id:
                 removed += 1
             else:
-                await self._queue.put(item)
+                await queue.put(item)
         return removed
 
     async def close(self) -> None:
-        pass
+        self._queue = None
+        self._loop = None
 
 
 class MemoryPubSubBackend:
