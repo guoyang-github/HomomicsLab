@@ -5,8 +5,11 @@ DeepSeek, Qwen (DashScope), Zhipu GLM, Moonshot (Kimi), and Ollama/local.
 """
 
 import asyncio
+import logging
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from homomics_lab.llm.cache import BaseLLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
@@ -235,7 +238,15 @@ class LLMClient:
         span = self._start_llm_span(route.model, route.provider.name, kwargs)
         try:
             response = await client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content.strip()
+            choice = response.choices[0]
+            content = choice.message.content.strip()
+            finish_reason = getattr(choice, "finish_reason", None)
+            if finish_reason == "length":
+                logger.warning(
+                    "LLM response truncated by max_tokens (max_tokens=%s, model=%s)",
+                    max_tokens,
+                    route.model,
+                )
 
             usage = getattr(response, "usage", None)
             prompt_tokens = 0

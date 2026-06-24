@@ -63,9 +63,10 @@ async def test_turn_runner_invokes_mcp_tool(tool_registry):
     )
 
     assert result.mode == ExecutionMode.DIRECT_RESPONSE
-    assert "pubmed_search" in result.response_text
     assert result.agent_message is not None
     assert result.agent_message.type == "result_preview"
+    # The response text should be a human-readable summary, not the raw tool name.
+    assert "PubMed" in result.response_text or "找到" in result.response_text
 
 
 @pytest.mark.asyncio

@@ -603,7 +603,7 @@ class TurnRunner:
 
         if result.success:
             content = result.output
-            response_text = self._summarize_mcp_result(tool_name, content)
+            response_text = self._summarize_mcp_result(tool_name, content, tool_inputs)
         else:
             content = {"error": result.error_message}
             response_text = f"调用工具 {tool_name} 失败：{result.error_message}"
@@ -628,16 +628,111 @@ class TurnRunner:
         )
 
     @staticmethod
-    def _summarize_mcp_result(tool_name: str, output: Any) -> str:
-        """Generate a short text summary from an MCP tool output."""
-        if isinstance(output, dict):
-            count = output.get("count")
-            if count is not None:
-                return f"{tool_name} 返回 {count} 条结果"
-            error = output.get("error")
-            if error:
-                return f"工具返回错误：{error}"
+    def _summarize_mcp_result(
+        tool_name: str,
+        output: Any,
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Generate a useful text summary from an MCP tool output."""
+        if not isinstance(output, dict):
+            return f"{tool_name} 调用完成"
+
+        error = output.get("error")
+        if error:
+            return f"工具返回错误：{error}"
+
+        if tool_name == "pubmed_search":
+            return TurnRunner._format_pubmed_search(output, tool_inputs)
+        if tool_name == "pubmed_fetch":
+            return TurnRunner._format_pubmed_fetch(output, tool_inputs)
+
+        count = output.get("count")
+        if count is not None:
+            return f"{tool_name} 返回 {count} 条结果"
         return f"{tool_name} 调用完成"
+
+    @staticmethod
+    def _format_pubmed_search(
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Format PubMed search results into a readable Markdown list."""
+        from urllib.parse import quote
+
+        query = ""
+        if isinstance(tool_inputs, dict):
+            query = tool_inputs.get("query", "") or ""
+        count = output.get("count", "0")
+        try:
+            count_int = int(count)
+        except (TypeError, ValueError):
+            count_int = 0
+
+        encoded_query = quote(query.encode("utf-8")) if query else ""
+        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={encoded_query}"
+
+        if count_int == 0:
+            return (
+                f"未找到与“{query}”相关的 PubMed 文献。\n\n"
+                "建议：\n"
+                "- 尝试用英文关键词或同义词；\n"
+                "- 去掉过于具体的限定词，扩大检索范围；\n"
+                "- 直接提供 PMID 或 DOI，我可以帮你解读。\n\n"
+                f"[在 PubMed 中打开检索]({pubmed_url})"
+            )
+
+        articles = output.get("articles", []) or []
+        lines = [f"找到 {count_int} 条相关文献，以下是前 {len(articles)} 条：\n"]
+        for idx, article in enumerate(articles, start=1):
+            if not isinstance(article, dict):
+                continue
+            title = article.get("title", "未知标题") or "未知标题"
+            authors = article.get("authors", []) or []
+            authors_str = ", ".join(authors[:3])
+            if len(authors) > 3:
+                authors_str += " et al."
+            journal = article.get("journal", "") or ""
+            pubdate = article.get("pubdate", "") or ""
+            pmid = article.get("pmid", "") or ""
+            doi = article.get("doi", "") or ""
+            pmid_link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
+            parts = [p for p in [authors_str, f"*{journal}*" if journal else "", pubdate] if p]
+            meta = " · ".join(parts)
+            pmid_part = f" · PMID: [{pmid}]({pmid_link})" if pmid else ""
+            doi_part = f" · DOI: {doi}" if doi else ""
+            lines.append(
+                f"{idx}. **{title}**  \n"
+                f"   {meta}{pmid_part}{doi_part}"
+            )
+
+        lines.append(f"\n[在 PubMed 中查看全部结果]({pubmed_url})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_pubmed_fetch(
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Format a fetched PubMed article into a readable summary."""
+        # `pubmed_fetch` returns the article directly, not wrapped in an `articles` list.
+        if isinstance(output, dict) and output.get("articles"):
+            article = output["articles"][0]
+        elif isinstance(output, dict) and output.get("pmid"):
+            article = output
+        else:
+            return "未获取到 PubMed 文章详情。"
+        if not isinstance(article, dict):
+            return "PubMed 返回格式异常。"
+        title = article.get("title", "未知标题") or "未知标题"
+        abstract = article.get("abstract", "") or ""
+        pmid = article.get("pmid", "") or ""
+        pmid_link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
+        lines = [f"**{title}**"]
+        if pmid:
+            lines.append(f"PMID: [{pmid}]({pmid_link})")
+        if abstract:
+            lines.append(f"\n{abstract}")
+        return "\n".join(lines)
 
     def _handle_clarification(
         self,
@@ -1475,82 +1570,71 @@ class TurnRunner:
                 "experiment design, code snippets, and workflow building."
             ),
             "qa": (
-                "Answer the user's question concisely and accurately in a bioinformatics context. "
-                "If the domain is ambiguous, give a general but useful explanation."
+                "Answer the user's question accurately in a bioinformatics context. "
+                "When project context, SOPs, or skills are relevant, use them to give "
+                "actionable HomomicsLab-specific guidance rather than a generic answer."
             ),
             "information_request": (
-                "Explain what HomomicsLab can do or outline the typical analysis steps "
-                "for the requested domain. Keep it structured and actionable."
+                "Explain what HomomicsLab can do for the requested domain. List relevant "
+                "analysis steps, SOPs, and executable skills when known, and offer to run "
+                "them for the user. Keep the response structured and actionable."
             ),
         }
 
         system_prompt = (
             "You are HomomicsLab, an AI assistant specialized in bioinformatics and computational biology. "
-            "Respond to the user in a helpful, accurate, and concise way.\n\n"
+            "You have access to project context, SOPs, CBKB knowledge, and executable skills/workflows. "
+            "Respond to the user in a helpful, accurate, and structured way.\n\n"
             f"Task type: {response_type}\n"
             f"Instructions: {type_instructions.get(response_type, type_instructions['qa'])}\n\n"
-            "Use the provided intent and context when relevant, but do not mention internal fields. "
-            "Keep your answer under 800 tokens."
+            "Use the provided context and intent, but do not mention internal fields or system internals."
         )
 
-        context_parts: List[str] = []
+        messages: List[Dict[str, str]] = []
 
-        # Intent summary
-        context_parts.append(
-            f"Intent: type={intent.analysis_type}, domain={intent.domain or 'none'}, "
-            f"analysis_type={intent.analysis_type or 'none'}, confidence={intent.confidence:.2f}"
-        )
+        if self._context_bundle is not None:
+            # The ContextEngine already assembles token-safe project state, CBKB
+            # retrieval, semantic memory, and conversation history. Prepend our
+            # direct-response system instruction so the model knows how to answer.
+            messages = self._context_bundle.to_prompt(user_message)
+            messages.insert(0, {"role": "system", "content": system_prompt})
+        else:
+            # Fallback minimal context when the context engine is not used.
+            context_parts: List[str] = [
+                f"Intent: type={intent.analysis_type}, domain={intent.domain or 'none'}, "
+                f"analysis_type={intent.analysis_type or 'none'}, confidence={intent.confidence:.2f}"
+            ]
+            recent_messages = working_memory.get_recent_messages()[-6:]
+            if recent_messages:
+                history_lines = []
+                for msg in recent_messages:
+                    content = msg.content
+                    if not isinstance(content, str):
+                        try:
+                            content = json.dumps(content, ensure_ascii=False)
+                        except Exception:
+                            content = str(content)
+                    history_lines.append(f"{msg.sender}: {content}")
+                context_parts.append("Recent conversation:\n" + "\n".join(history_lines))
 
-        # Recent conversation history (last 6 turns)
-        recent_messages = working_memory.get_recent_messages()[-6:]
-        if recent_messages:
-            history_lines = []
-            for msg in recent_messages:
-                content = msg.content
-                if not isinstance(content, str):
-                    try:
-                        content = json.dumps(content, ensure_ascii=False)
-                    except Exception:
-                        content = str(content)
-                history_lines.append(f"{msg.sender}: {content}")
-            context_parts.append("Recent conversation:\n" + "\n".join(history_lines))
+            if self.project_state_manager is not None and project_id is not None:
+                try:
+                    project_state = self.project_state_manager.load(project_id)
+                    context_parts.append(project_state.to_prompt_text())
+                except Exception:
+                    logger.debug("Failed to load project state for LLM direct response", exc_info=True)
 
-        # Project state summary
-        if self.project_state_manager is not None and project_id is not None:
-            try:
-                project_state = self.project_state_manager.load(project_id)
-                context_parts.append(project_state.to_prompt_text())
-            except Exception:
-                logger.debug("Failed to load project state for LLM direct response", exc_info=True)
-
-        # Relevant CBKB SOP snippets (best-effort; not all CBKB implementations expose search)
-        if self._cbkb is not None and getattr(self._cbkb, "search", None) is not None:
-            try:
-                search_results = self._cbkb.search(intent.domain or intent.analysis_type, top_k=2)
-                if search_results:
-                    sop_lines = []
-                    for idx, snippet in enumerate(search_results[:2], start=1):
-                        text = snippet.get("text") if isinstance(snippet, dict) else str(snippet)
-                        if text:
-                            sop_lines.append(f"{idx}. {text}")
-                    if sop_lines:
-                        context_parts.append("Relevant SOP snippets:\n" + "\n".join(sop_lines))
-            except Exception:
-                logger.debug("CBKB search failed for LLM direct response", exc_info=True)
-
-        context_text = "\n\n".join(context_parts)
-        messages: List[Dict[str, str]] = [
-            {"role": "system", "content": system_prompt},
-        ]
-        if context_text:
-            messages.append({"role": "system", "content": context_text})
-        messages.append({"role": "user", "content": user_message})
+            context_text = "\n\n".join(context_parts)
+            messages = [{"role": "system", "content": system_prompt}]
+            if context_text:
+                messages.append({"role": "system", "content": context_text})
+            messages.append({"role": "user", "content": user_message})
 
         try:
             return await self._llm_client.chat_completion(
                 messages=messages,
                 temperature=0.3,
-                max_tokens=800,
+                max_tokens=2000,
             )
         except Exception:
             logger.warning("LLM direct response failed for type %s; using fallback", response_type, exc_info=True)

@@ -335,9 +335,11 @@ class CascadeIntentAnalyzer:
             "geo_search",
         ):
             tool_inputs = self._extract_mcp_inputs(primary.analysis_type, message)
-            if self._is_meta_source_question(message) or self._is_meaningless_query(
-                tool_inputs.get("query", "")
-            ):
+            if primary.analysis_type == "pubmed_fetch":
+                lacks_usable_input = not tool_inputs.get("pmid")
+            else:
+                lacks_usable_input = self._is_meaningless_query(tool_inputs.get("query", ""))
+            if self._is_meta_source_question(message) or lacks_usable_input:
                 primary = IntentMatch(
                     analysis_type="qa",
                     confidence=0.9,
