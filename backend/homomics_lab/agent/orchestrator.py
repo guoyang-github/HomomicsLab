@@ -110,6 +110,19 @@ class Orchestrator:
                     self._publish_task_update(tree, task, "FAILED", error_message=str(exc))
                     raise
 
+                # A skill may request HITL by returning a ``hitl`` payload.
+                # Treat this the same as a pre-execution checkpoint.
+                if isinstance(result, dict) and result.get("status") == "awaiting_human" and "hitl" in result:
+                    from homomics_lab.models.common import HITLCheckpoint
+
+                    checkpoint = HITLCheckpoint(**result["hitl"])
+                    task.hitl_checkpoints.insert(0, checkpoint)
+                    self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+                    results[task.id] = {"hitl": checkpoint.model_dump()}
+                    hitl_triggered = True
+                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
+                    continue
+
                 # SWR: escalate worker failures that survived retries.
                 if self.supervisor is not None:
                     worker_result = results.get(task.id, result)
@@ -285,6 +298,15 @@ class Orchestrator:
         if "parameters" in human_response:
             task.parameters.update(human_response["parameters"])
 
+        # If the task was paused by a skill that requested HITL, feed the human
+        # response back into the skill as a ``resolution`` input so it can
+        # finalize its output on retry.
+        if self._is_skill_requested_hitl(task):
+            task.parameters["resolution"] = {
+                "choice": choice,
+                "parameters": human_response.get("parameters", {}),
+            }
+
         context = context or {}
         results: Dict[str, Any] = {}
 
@@ -367,6 +389,14 @@ class Orchestrator:
         results.update(remaining_results)
 
         return results
+
+    @staticmethod
+    def _is_skill_requested_hitl(task: TaskNode) -> bool:
+        """Return True when the task was paused by a skill's HITL payload."""
+        result = task.result
+        if not isinstance(result, dict):
+            return False
+        return result.get("status") == "awaiting_human" and "hitl" in result
 
     def _ensure_workspace_manager(self, context: Dict[str, Any]) -> None:
         if self.workspace_manager is not None:

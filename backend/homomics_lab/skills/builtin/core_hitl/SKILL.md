@@ -1,7 +1,7 @@
 ---
 name: core_hitl
 description: Manage human-in-the-loop checkpoints and clarifications.
-tool_type: agent
+tool_type: python
 primary_tool: agent_core
 supported_tools: []
 keywords: ["agent", "hitl", "human-in-the-loop", "clarification", "meta"]
@@ -24,10 +24,19 @@ inputs:
   payload:
     type: object
     description: Optional data associated with the checkpoint.
+  resolution:
+    type: object
+    description: Human resolution provided on resume (choice, parameters).
 outputs:
+  status:
+    type: string
+    description: awaiting_human when a checkpoint is open, completed after resolution.
   resolution:
     type: object
     description: Human resolution (choice, text, approved flag).
+  hitl:
+    type: object
+    description: Checkpoint payload when status is awaiting_human.
 ---
 
 # Core HITL
@@ -46,7 +55,10 @@ Manage human-in-the-loop checkpoints and clarifications.
 - `message` (required) - Human-readable message.
 - `options` - Options for choice checkpoints.
 - `payload` - Associated data.
+- `resolution` - Human resolution provided on resume.
 
 ## Outputs
 
-- `resolution` - Human resolution.
+- `status` - `awaiting_human` when a checkpoint is open, `completed` after resolution.
+- `resolution` - Human resolution after resume.
+- `hitl` - Checkpoint payload when status is `awaiting_human`.

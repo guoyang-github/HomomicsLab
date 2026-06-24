@@ -56,6 +56,34 @@ async def test_core_hitl_registered(executor):
 
 
 @pytest.mark.asyncio
+async def test_core_hitl_skill_requests_human_input(executor):
+    """core_hitl returns an awaiting_human payload when no resolution is given."""
+    result = await executor.execute("core_hitl", {
+        "checkpoint_type": "approval",
+        "message": "Approve before continuing",
+        "options": [{"id": "yes", "label": "Yes"}, {"id": "no", "label": "No"}],
+    })
+    assert result["status"] == "awaiting_human"
+    assert "hitl" in result
+    assert result["hitl"]["context_summary"] == "Approve before continuing"
+    option_ids = {o["id"] for o in result["hitl"]["options"]}
+    assert option_ids == {"yes", "no"}
+
+
+@pytest.mark.asyncio
+async def test_core_hitl_skill_finalizes_on_resolution(executor):
+    """core_hitl returns the resolved payload when a resolution is provided."""
+    result = await executor.execute("core_hitl", {
+        "checkpoint_type": "approval",
+        "message": "Approve before continuing",
+        "resolution": {"choice": "yes", "parameters": {"threshold": 0.5}},
+    })
+    assert result["status"] == "completed"
+    assert result["resolution"]["choice"] == "yes"
+    assert result["resolution"]["parameters"]["threshold"] == 0.5
+
+
+@pytest.mark.asyncio
 async def test_legacy_business_skills_removed(executor):
     """Legacy business skills have been removed from the builtin registry."""
     assert executor.registry.get("data_loader") is None
