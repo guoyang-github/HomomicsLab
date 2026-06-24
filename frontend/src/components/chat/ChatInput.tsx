@@ -62,8 +62,9 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
-    if (!currentSessionId) {
-      createSession()
+    let sessionId = currentSessionId
+    if (!sessionId) {
+      sessionId = createSession()
     }
 
     const currentSession = useChatStore.getState().getCurrentSession()
@@ -93,12 +94,12 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     try {
       const response = await chatApi.sendMessage({
         project_id: currentProjectId,
-        session_id: currentSessionId,
+        session_id: sessionId,
         message: input,
         plan_mode: planMode,
       })
 
-      const tasks = response.data.task_tree.tasks
+      const tasks = response.data.task_tree?.tasks || []
       setTaskTree(tasks)
       setProgress(_extractProgress(tasks))
       const lastMsg = response.data.messages[response.data.messages.length - 1]
@@ -126,8 +127,16 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
           sender: 'agent',
           timestamp: new Date().toISOString(),
         }
+      } else if (response.data.status === 'completed' && tasks.length === 0) {
+        agentMessage = {
+          id: `msg_${Date.now()}_agent`,
+          type: 'text',
+          content: response.data.response,
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+        }
       } else {
-        const progress = _extractProgress(response.data.task_tree?.tasks || [])
+        const progress = _extractProgress(tasks)
         agentMessage = {
           id: `msg_${Date.now()}_agent`,
           type: 'todo_list',
@@ -290,7 +299,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
@@ -334,7 +343,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         <Button
           onClick={handleSend}
           disabled={isLoading || !input.trim()}
-          className="h-11 w-11 shrink-0 rounded-xl p-0"
+          className="h-12 w-12 shrink-0 rounded-xl p-0"
         >
           {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
         </Button>

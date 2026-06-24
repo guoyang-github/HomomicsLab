@@ -1558,22 +1558,18 @@ class TurnRunner:
     ) -> str:
         """Return a friendly self-introduction for greeting intents.
 
-        Uses the configured LLM when available; falls back to a static English template.
+        Greetings are answered instantly with a static template to avoid blocking the
+        chat on an LLM call; the LLM is still used for substantive questions.
         """
-        llm_response = await self._generate_direct_response_via_llm(
-            response_type="greeting",
-            user_message=user_message,
-            intent=UserIntent(analysis_type="greeting", complexity="direct_response", domain=None),
-            working_memory=working_memory,
-            project_id=project_id,
-        )
-        if llm_response:
-            return llm_response
         return (
-            "Hello! I'm HomomicsLab, an AI assistant specialized in bioinformatics. "
-            "I can help you design experiments, analyze omics data (single-cell, spatial, "
-            "genomics, transcriptomics, etc.), write code snippets, interpret results, "
-            "and build analysis workflows. What would you like to work on?"
+            "Hello! I'm **HomomicsLab**, your AI assistant specialized in bioinformatics "
+            "and computational biology.\n\n"
+            "I can help you with:\n"
+            "- Bioinformatics analysis (genomics, transcriptomics, single-cell, proteomics, etc.)\n"
+            "- Experimental design and statistical frameworks\n"
+            "- Code snippets in Python, R, bash, SQL, Nextflow, Snakemake, and WDL\n"
+            "- Workflow building, automation, reproducibility, and HPC/cloud optimization\n\n"
+            "What project or analysis can I help you with today?"
         )
 
     async def _generate_qa_response(
