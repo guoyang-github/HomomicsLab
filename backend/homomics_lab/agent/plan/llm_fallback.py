@@ -24,13 +24,6 @@ class LLMFallbackPlanner:
     it returns a graceful suggestion instead of crashing.
     """
 
-    # Keywords that suggest a request can be handled by general code generation
-    # when no registered bioinformatics skill matches.
-    CODE_REQUEST_KEYWORDS = [
-        "code", "script", "python", "bash", "shell",
-        "filter", "parse", "rename", "process", "csv", "tsv", "json",
-        "写代码", "脚本", "处理", "过滤", "解析", "重命名",
-    ]
 
     def __init__(
         self,
@@ -54,7 +47,7 @@ class LLMFallbackPlanner:
         user_message = getattr(intent, "original_message", None) or intent.analysis_type
 
         # 1. Retrieve candidate skills.
-        candidate_skills = self._retrieve_skills(user_message)
+        candidate_skills = self._retrieve_skills(intent)
         if not candidate_skills:
             return self._graceful_plan(
                 intent,
@@ -92,6 +85,18 @@ class LLMFallbackPlanner:
             phases.append(phase)
 
         if not phases:
+            if (
+                self.allow_code_fallback
+                and self._is_code_or_data_request(intent)
+                and self.skill_registry.get("core_code_act") is not None
+            ):
+                return self._graceful_plan(
+                    intent,
+                    data_state,
+                    "This looks like a general coding or data-processing task. "
+                    "I can write a script for you using core_code_act. "
+                    "Please provide more details or confirm you'd like me to generate code.",
+                )
             return self._graceful_plan(
                 intent,
                 data_state,
@@ -118,24 +123,27 @@ class LLMFallbackPlanner:
             suggestion_text=suggestion_text,
         )
 
-    def _is_code_or_data_request(self, query: str) -> bool:
-        """Return True if the query looks like a general code/data task."""
-        lowered = query.lower()
-        return any(kw in lowered for kw in self.CODE_REQUEST_KEYWORDS)
+    def _is_code_or_data_request(self, intent: UserIntent) -> bool:
+        """Return True if the intent indicates a general code/data task."""
+        structured = getattr(intent, "structured_intent", None)
+        if structured is not None:
+            return structured.intent_type == "general_help"
+        return False
 
-    def _retrieve_skills(self, query: str) -> List[SkillDefinition]:
+    def _retrieve_skills(self, intent: UserIntent) -> List[SkillDefinition]:
         """Retrieve candidate skills via semantic search.
 
         Falls back to keyword search, then to all registered skills,
         and finally to the general code assistant for code/data tasks,
         so the LLM always has something to reason about.
         """
+        query = intent.original_message or intent.analysis_type
         results = self.skill_registry.semantic_search(query, top_k=self.top_k)
         if not results:
             results = [(skill, 0.0) for skill in self.skill_registry.search(query)]
         if not results:
             results = [(skill, 0.0) for skill in self.skill_registry.list_all()]
-        if not results and self.allow_code_fallback and self._is_code_or_data_request(query):
+        if not results and self.allow_code_fallback and self._is_code_or_data_request(intent):
             code_skill = self.skill_registry.get("core_code_act")
             if code_skill is not None:
                 results = [(code_skill, 0.0)]

@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from homomics_lab.agent.intent.models import StructuredIntent
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
@@ -216,6 +217,7 @@ async def test_fallback_to_core_code_act(registry_with_code_act):
         analysis_type="unknown_type",
         complexity="single_step",
         original_message="帮我写个脚本过滤 CSV 行",
+        structured_intent=StructuredIntent(intent_type="general_help"),
     )
     plan = await planner.generate_plan(intent, DataState())
 
@@ -238,9 +240,38 @@ async def test_graceful_plan_hints_code_act(registry_with_code_act):
         analysis_type="unknown_type",
         complexity="single_step",
         original_message="rename sample files in batch",
+        structured_intent=StructuredIntent(intent_type="general_help"),
     )
     plan = await planner.generate_plan(intent, DataState())
 
     assert plan.is_fallback is True
     assert not plan.phases
-    assert "general coding" in plan.suggestion_text or "write a script" in plan.suggestion_text
+    assert "write a script" in plan.suggestion_text
+
+
+@pytest.mark.asyncio
+async def test_code_fallback_uses_intent_not_keywords(registry_with_code_act):
+    """Only general_help intent triggers core_code_act fallback, not bio analysis."""
+    planner = LLMFallbackPlanner(
+        registry_with_code_act,
+        llm_client=FakeLLMClient(response=""),
+        allow_code_fallback=True,
+    )
+
+    code_intent = UserIntent(
+        analysis_type="unknown_type",
+        complexity="single_step",
+        original_message="filter a CSV",
+        structured_intent=StructuredIntent(intent_type="general_help"),
+    )
+    code_plan = await planner.generate_plan(code_intent, DataState())
+    assert "write a script" in code_plan.suggestion_text
+
+    bio_intent = UserIntent(
+        analysis_type="unknown_type",
+        complexity="single_step",
+        original_message="single cell clustering",
+        structured_intent=StructuredIntent(intent_type="analysis", domain="single_cell"),
+    )
+    bio_plan = await planner.generate_plan(bio_intent, DataState())
+    assert "No suitable skills" in bio_plan.suggestion_text or "install" in bio_plan.suggestion_text
