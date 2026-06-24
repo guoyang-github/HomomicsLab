@@ -151,6 +151,7 @@ class TurnRunner:
         compressor: Optional[ContextCompressor] = None,
         context_engine: Optional[ContextEngine] = None,
         project_state_manager: Optional[ProjectStateManager] = None,
+        llm_client: Optional[LLMClient] = None,
     ):
         self._cbkb = cbkb
         self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=debate, cbkb=self._cbkb)
@@ -171,6 +172,7 @@ class TurnRunner:
         self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
         self.context_engine = context_engine
         self.project_state_manager = project_state_manager
+        self._llm_client = llm_client
         self._extra_context: Dict[str, Any] = {}
         self._context_bundle: Optional[ContextBundle] = None
 
@@ -461,18 +463,25 @@ class TurnRunner:
         intent: UserIntent,
         user_message: str,
         working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
     ) -> TurnResult:
         """Handle questions and general help requests that need no skill execution."""
         if intent.analysis_type == "greeting":
-            response_text = self._generate_greeting_response(user_message)
+            response_text = await self._generate_greeting_response(
+                user_message, working_memory, project_id
+            )
         elif intent.analysis_type == "general_help":
             response_text = await self._generate_general_help_response(
                 user_message, working_memory
             )
         elif intent.analysis_type == "information_request":
-            response_text = self._generate_information_request_response(intent)
+            response_text = await self._generate_information_request_response(
+                intent, working_memory, project_id
+            )
         else:
-            response_text = self._generate_qa_response(intent, user_message)
+            response_text = await self._generate_qa_response(
+                intent, user_message, working_memory, project_id
+            )
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -631,7 +640,7 @@ class TurnRunner:
 
         if interaction_mode == "answer":
             return await self._handle_direct_response(
-                intent, user_message, working_memory
+                intent, user_message, working_memory, project_id
             )
 
         # MCP tool fast path.
@@ -1210,8 +1219,133 @@ class TurnRunner:
                 "或把需求拆分成更具体的步骤。"
             )
 
-    def _generate_greeting_response(self, user_message: str) -> str:
-        """Return a friendly self-introduction for greeting intents."""
+    async def _generate_direct_response_via_llm(
+        self,
+        response_type: str,
+        user_message: str,
+        intent: UserIntent,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Generate a greeting/QA/information direct response via the configured LLM.
+
+        Falls back to static templates when the LLM client is unavailable or fails.
+        """
+        if self._llm_client is None:
+            return None
+
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Build response-type-specific instructions.
+        type_instructions = {
+            "greeting": (
+                "Greet the user warmly and briefly introduce HomomicsLab. "
+                "Mention that you can help with bioinformatics analysis, "
+                "experiment design, code snippets, and workflow building."
+            ),
+            "qa": (
+                "Answer the user's question concisely and accurately in a bioinformatics context. "
+                "If the domain is ambiguous, give a general but useful explanation."
+            ),
+            "information_request": (
+                "Explain what HomomicsLab can do or outline the typical analysis steps "
+                "for the requested domain. Keep it structured and actionable."
+            ),
+        }
+
+        system_prompt = (
+            "You are HomomicsLab, an AI assistant specialized in bioinformatics and computational biology. "
+            "Respond to the user in a helpful, accurate, and concise way.\n\n"
+            f"Task type: {response_type}\n"
+            f"Instructions: {type_instructions.get(response_type, type_instructions['qa'])}\n\n"
+            "Use the provided intent and context when relevant, but do not mention internal fields. "
+            "Keep your answer under 800 tokens."
+        )
+
+        context_parts: List[str] = []
+
+        # Intent summary
+        context_parts.append(
+            f"Intent: type={intent.analysis_type}, domain={intent.domain or 'none'}, "
+            f"analysis_type={intent.analysis_type or 'none'}, confidence={intent.confidence:.2f}"
+        )
+
+        # Recent conversation history (last 6 turns)
+        recent_messages = working_memory.get_recent_messages()[-6:]
+        if recent_messages:
+            history_lines = []
+            for msg in recent_messages:
+                content = msg.content
+                if not isinstance(content, str):
+                    try:
+                        content = json.dumps(content, ensure_ascii=False)
+                    except Exception:
+                        content = str(content)
+                history_lines.append(f"{msg.sender}: {content}")
+            context_parts.append("Recent conversation:\n" + "\n".join(history_lines))
+
+        # Project state summary
+        if self.project_state_manager is not None and project_id is not None:
+            try:
+                project_state = self.project_state_manager.load(project_id)
+                context_parts.append(project_state.to_prompt_text())
+            except Exception:
+                logger.debug("Failed to load project state for LLM direct response", exc_info=True)
+
+        # Relevant CBKB SOP snippets (best-effort; not all CBKB implementations expose search)
+        if self._cbkb is not None and getattr(self._cbkb, "search", None) is not None:
+            try:
+                search_results = self._cbkb.search(intent.domain or intent.analysis_type, top_k=2)
+                if search_results:
+                    sop_lines = []
+                    for idx, snippet in enumerate(search_results[:2], start=1):
+                        text = snippet.get("text") if isinstance(snippet, dict) else str(snippet)
+                        if text:
+                            sop_lines.append(f"{idx}. {text}")
+                    if sop_lines:
+                        context_parts.append("Relevant SOP snippets:\n" + "\n".join(sop_lines))
+            except Exception:
+                logger.debug("CBKB search failed for LLM direct response", exc_info=True)
+
+        context_text = "\n\n".join(context_parts)
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": system_prompt},
+        ]
+        if context_text:
+            messages.append({"role": "system", "content": context_text})
+        messages.append({"role": "user", "content": user_message})
+
+        try:
+            return await self._llm_client.chat_completion(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=800,
+            )
+        except Exception:
+            logger.warning("LLM direct response failed for type %s; using fallback", response_type, exc_info=True)
+            return None
+
+    async def _generate_greeting_response(
+        self,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        """Return a friendly self-introduction for greeting intents.
+
+        Uses the configured LLM when available; falls back to a static English template.
+        """
+        llm_response = await self._generate_direct_response_via_llm(
+            response_type="greeting",
+            user_message=user_message,
+            intent=UserIntent(analysis_type="greeting", complexity="direct_response", domain=None),
+            working_memory=working_memory,
+            project_id=project_id,
+        )
+        if llm_response:
+            return llm_response
         return (
             "Hello! I'm HomomicsLab, an AI assistant specialized in bioinformatics. "
             "I can help you design experiments, analyze omics data (single-cell, spatial, "
@@ -1219,12 +1353,28 @@ class TurnRunner:
             "and build analysis workflows. What would you like to work on?"
         )
 
-    def _generate_qa_response(self, intent: UserIntent, user_message: str) -> str:
+    async def _generate_qa_response(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
         """Generate a direct text response for QA-style queries.
 
-        Uses structured intent metadata to pick a domain-specific explanation
-        when available, falling back to a generic answer.
+        Uses the configured LLM when available; falls back to domain-specific
+        Chinese templates.
         """
+        llm_response = await self._generate_direct_response_via_llm(
+            response_type="qa",
+            user_message=user_message,
+            intent=intent,
+            working_memory=working_memory,
+            project_id=project_id,
+        )
+        if llm_response:
+            return llm_response
+
         domain = intent.domain or intent.analysis_type
         qa_responses = {
             "single_cell": (
@@ -1266,8 +1416,27 @@ class TurnRunner:
         }
         return qa_responses.get(domain, qa_responses["general"])
 
-    def _generate_information_request_response(self, intent: UserIntent) -> str:
-        """Respond to "what can you do / what are the steps" style queries."""
+    async def _generate_information_request_response(
+        self,
+        intent: UserIntent,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        """Respond to "what can you do / what are the steps" style queries.
+
+        Uses the configured LLM when available; falls back to step-by-step
+        Chinese templates.
+        """
+        llm_response = await self._generate_direct_response_via_llm(
+            response_type="information_request",
+            user_message=intent.original_message or "",
+            intent=intent,
+            working_memory=working_memory,
+            project_id=project_id,
+        )
+        if llm_response:
+            return llm_response
+
         domain = intent.domain
         if domain == "single_cell":
             return (
