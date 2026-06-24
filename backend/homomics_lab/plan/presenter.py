@@ -1,12 +1,24 @@
 """Convert persisted plans into user-facing payloads."""
 
-from typing import Any, Dict, List
+import json
+from typing import Any, Dict, List, Optional
 
 from .models import Plan
 
 
 class PlanPresenter:
     """Build human-readable plan previews for the frontend."""
+
+    _SUMMARY_TEMPLATES = {
+        "zh": {
+            "fallback": "LLM 生成的分析计划，包含 {phase_count} 个步骤，需要您确认。",
+            "standard": "分析计划包含 {phase_count} 个步骤。",
+        },
+        "en": {
+            "fallback": "LLM-generated analysis plan with {phase_count} step(s); please review.",
+            "standard": "Analysis plan with {phase_count} step(s).",
+        },
+    }
 
     @staticmethod
     def to_user_payload(plan: Plan) -> Dict[str, Any]:
@@ -70,10 +82,61 @@ class PlanPresenter:
             "version": plan.version,
         }
 
-    @staticmethod
-    def to_summary(plan: Plan) -> str:
-        """Return a one-sentence summary of a plan."""
+    @classmethod
+    async def to_summary(
+        cls,
+        plan: Plan,
+        language: str = "zh",
+        llm_client: Optional[Any] = None,
+    ) -> str:
+        """Return a one-sentence summary of a plan.
+
+        If an ``llm_client`` is provided, the summary is generated dynamically
+        from plan metadata and localized to ``language`` (``en`` or ``zh``).
+        Otherwise a localized template fallback is returned.
+        """
         phase_count = len(plan.plan_result.phases)
-        if plan.is_fallback:
-            return f"LLM 生成的分析计划，包含 {phase_count} 个步骤，需要您确认。"
-        return f"分析计划包含 {phase_count} 个步骤。"
+
+        if llm_client is None or not getattr(llm_client, "is_configured", lambda: False)():
+            return cls._fallback_summary(plan, language, phase_count)
+
+        plan_metadata = {
+            "intent": plan.intent_analysis_type,
+            "is_fallback": plan.is_fallback,
+            "phase_count": phase_count,
+            "phases": [
+                {
+                    "type": p.phase_type,
+                    "description": p.description,
+                    "skill": p.selected_skill.id if p.selected_skill else None,
+                }
+                for p in plan.plan_result.phases
+            ],
+        }
+
+        system_prompt = (
+            f"You are a bioinformatics plan summarizer. Produce a concise, "
+            f"one-sentence summary of the following analysis plan in {language}. "
+            f"Respond with only the summary sentence, no markdown."
+        )
+        user_prompt = f"Plan metadata: {json.dumps(plan_metadata, ensure_ascii=False)}"
+
+        try:
+            summary = await llm_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=200,
+            )
+            return summary.strip() or cls._fallback_summary(plan, language, phase_count)
+        except Exception:
+            return cls._fallback_summary(plan, language, phase_count)
+
+    @classmethod
+    def _fallback_summary(cls, plan: Plan, language: str, phase_count: int) -> str:
+        """Localized template fallback when LLM is unavailable."""
+        templates = cls._SUMMARY_TEMPLATES.get(language, cls._SUMMARY_TEMPLATES["en"])
+        key = "fallback" if plan.is_fallback else "standard"
+        return templates[key].format(phase_count=phase_count)
