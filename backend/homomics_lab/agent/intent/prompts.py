@@ -54,6 +54,7 @@ Use one of: single_cell, spatial, metagenomics, genomics, transcriptomics, prote
 3. Greetings and self-introductions are ``greeting``.
 4. Code/script/file processing requests are ``general_help`` even if they mention bioinformatics terms in passing.
 5. Explicit PubMed/GEO/UniProt requests are ``tool_call`` with ``interaction_mode=explore``.
+5a. If the user asks whether previous information came from a database (e.g. "Is this from PubMed?", "你这个信息是从 pubmed 查的？", "数据来源于 GEO 吗？"), do NOT classify as ``tool_call``; classify as ``qa`` or ``information_request`` with ``interaction_mode=answer``.
 6. If the message mentions "it", "this", "that", or "上一个文件", use the conversation context to resolve the referent and set ``target``/``domain`` accordingly.
 7. Set ``needs_clarification=true`` only when the intent is genuinely ambiguous and you cannot make a reasonable best guess.
 8. Output confidence between 0.0 and 1.0. Be calibrated: high confidence only when the intent is clear.
@@ -179,6 +180,42 @@ Output: {
   "sub_intents": [],
   "needs_clarification": true,
   "clarification_question": "您希望进行哪类分析？例如单细胞分析、空间转录组分析、宏基因组分析等。"
+}
+
+User: "pubmed 搜索 single-cell RNA-seq"
+Output: {
+  "primary_intent": {
+    "intent_type": "tool_call",
+    "interaction_mode": "explore",
+    "domain": null,
+    "target": "pubmed_search",
+    "scope": "single_step",
+    "entities": {"query": "single-cell RNA-seq"},
+    "confidence": 0.97,
+    "reason": "User explicitly asks to search PubMed"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
+}
+
+User: "你这个信息是从 pubmed 查的？"
+Output: {
+  "primary_intent": {
+    "intent_type": "qa",
+    "interaction_mode": "answer",
+    "domain": null,
+    "target": "answer_question",
+    "scope": "single_step",
+    "entities": {},
+    "confidence": 0.96,
+    "reason": "User asks about the source of information, not requesting a PubMed search"
+  },
+  "alternative_intents": [],
+  "sub_intents": [],
+  "needs_clarification": false,
+  "clarification_question": null
 }
 
 # Recent conversation context

@@ -289,46 +289,10 @@ class CascadeIntentAnalyzer:
         )
         top_keyword = keyword_matches[0] if keyword_matches else None
         if top_keyword and top_keyword.confidence >= self.high_confidence_threshold:
-            # Strong keyword signals for built-in tool intents should bypass the
-            # LLM so that deterministic tool routing is not swayed by domain noise.
-            if top_keyword.analysis_type in (
-                "pubmed_search",
-                "pubmed_fetch",
-                "uniprot_search",
-                "geo_search",
-            ):
-                # Some users mention a database name to ask where the previous
-                # answer came from, not to run a search. If the query is missing
-                # or meaningless, answer directly instead of calling the tool.
-                tool_inputs = self._extract_mcp_inputs(top_keyword.analysis_type, message)
-                if self._is_meta_source_question(message) or self._is_meaningless_query(
-                    tool_inputs.get("query", "")
-                ):
-                    guard_match = IntentMatch(
-                        analysis_type="qa",
-                        confidence=0.9,
-                        source="keyword_guardrail",
-                        reason="tool keyword present but message asks about source or lacks a usable query",
-                        weight=top_keyword.weight,
-                        structured=StructuredIntent(
-                            intent_type="qa",
-                            interaction_mode="answer",
-                            target="answer_question",
-                            scope="single_step",
-                            confidence=0.9,
-                            reason="tool keyword present but message asks about source or lacks a usable query",
-                        ),
-                    )
-                    intent = self._to_user_intent(
-                        guard_match, message, alternatives=keyword_matches
-                    )
-                    self._enrich_with_cbkb(intent, cbkb)
-                    return intent
-                intent = self._to_user_intent(
-                    top_keyword, message, alternatives=keyword_matches[1:]
-                )
-                self._enrich_with_cbkb(intent, cbkb)
-                return intent
+            # Only direct-response intents (qa, greeting, information_request,
+            # general_help) are allowed to bypass the LLM. Tool intents such as
+            # pubmed_search are intentionally left for the LLM-first classifier so
+            # that nuanced utterances like "是从 pubmed 查的？" are not mis-routed.
             if top_keyword.structured and top_keyword.structured.interaction_mode == "answer":
                 intent = self._to_user_intent(
                     top_keyword, message, alternatives=keyword_matches[1:]
@@ -358,6 +322,39 @@ class CascadeIntentAnalyzer:
             return intent
 
         primary = self._apply_mcp_override(fused.primary, message, fused.alternatives)
+
+        # Lightweight safety net: if the fused intent still routes to an MCP tool
+        # but the user is asking about the source of information or we cannot
+        # extract a usable query, fall back to a direct answer. This protects
+        # against LLM misclassification and keyword-only fallback without
+        # bypassing the LLM-first decision path.
+        if primary.analysis_type in (
+            "pubmed_search",
+            "pubmed_fetch",
+            "uniprot_search",
+            "geo_search",
+        ):
+            tool_inputs = self._extract_mcp_inputs(primary.analysis_type, message)
+            if self._is_meta_source_question(message) or self._is_meaningless_query(
+                tool_inputs.get("query", "")
+            ):
+                primary = IntentMatch(
+                    analysis_type="qa",
+                    confidence=0.9,
+                    source="keyword_guardrail",
+                    reason="fused tool intent lacks usable query or asks about source",
+                    weight=0.15,
+                    structured=StructuredIntent(
+                        intent_type="qa",
+                        interaction_mode="answer",
+                        target="answer_question",
+                        scope="single_step",
+                        confidence=0.9,
+                        reason="fused tool intent lacks usable query or asks about source",
+                    ),
+                )
+                fused.alternatives.insert(0, fused.primary)
+
         intent = self._to_user_intent(
             primary, message, sub_intents=fused.sub_intents, alternatives=fused.alternatives
         )
