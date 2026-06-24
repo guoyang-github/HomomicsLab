@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from homomics_lab.config import settings
 from homomics_lab.data import DataStore, ResultReference
+from homomics_lab.metrics import record_skill_execution
 from homomics_lab.skills.agent_executor import AgentSkillExecutor
 from homomics_lab.skills.cache import SkillCache
 from homomics_lab.execution.code_act import run_code_act
@@ -347,6 +348,7 @@ class SkillRuntimeExecutor:
                         executor_type=self._executor_type,
                         cache_hit=True,
                     )
+                record_skill_execution(skill_id, self._executor_type, True)
                 return result
 
         result = None
@@ -404,6 +406,7 @@ class SkillRuntimeExecutor:
                     executor_type=self._executor_type,
                     error_message=error_msg,
                 )
+            record_skill_execution(skill_id, self._executor_type, success)
 
     async def _dispatch_execute(
         self,

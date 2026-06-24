@@ -10,6 +10,7 @@ from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
+from homomics_lab.metrics import set_active_jobs
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
@@ -127,6 +128,7 @@ class BackgroundJobRunner:
             if job.plan_id:
                 await self._update_plan_status(job.plan_id, PlanStatus.EXECUTING)
             self._publish_state(job_id, JobStatus.RUNNING, "Job started")
+            await self._update_active_jobs()
 
             progress_callback = self._make_progress_callback(job_id)
             runner = self._runner_factory(progress_callback)
@@ -233,6 +235,7 @@ class BackgroundJobRunner:
                 except Exception:
                     logger.exception("Failed to finalize reproducibility bundle for job %s", job_id)
         finally:
+            await self._update_active_jobs()
             await self._release_lock(job_id)
 
     def _publish_state(
@@ -254,6 +257,21 @@ class BackgroundJobRunner:
             state.error_message = None  # not an error
             state.current_phase = f"awaiting_human:{hitl_checkpoint.get('task_id')}"
         self._pubsub.publish(job_id, state)
+
+    async def _update_active_jobs(self) -> None:
+        """Refresh the active jobs gauge from the repository."""
+        active_statuses = {
+            JobStatus.QUEUED.value,
+            JobStatus.PENDING.value,
+            JobStatus.RUNNING.value,
+            JobStatus.AWAITING_HUMAN.value,
+        }
+        try:
+            jobs = await self._repository.list_all()
+            count = sum(1 for job in jobs if job.status.value in active_statuses)
+            set_active_jobs(count)
+        except Exception:
+            pass
 
     @staticmethod
     async def _update_plan_status(plan_id: Optional[str], status: str) -> None:

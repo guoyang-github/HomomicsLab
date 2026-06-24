@@ -8,6 +8,7 @@ from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends import create_backends
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
+from homomics_lab.metrics import set_active_jobs
 from homomics_lab.tasks.task_tree import TaskTree
 
 from .models import Job, JobMode, JobStatus
@@ -63,6 +64,7 @@ class JobService:
         await self._repository.create(job)
         await self._queue.enqueue(job.job_id)
         await self._publish_state(job.job_id, JobStatus.QUEUED, "Job queued")
+        await self._update_active_jobs()
         return job
 
     async def create_resume_job(
@@ -89,6 +91,7 @@ class JobService:
         await self._repository.create(job)
         await self._queue.enqueue(job.job_id)
         await self._publish_state(job.job_id, JobStatus.QUEUED, "Resume job queued")
+        await self._update_active_jobs()
         return job
 
     async def create_checkpoint_resume_job(
@@ -108,6 +111,7 @@ class JobService:
         await self._repository.create(job)
         await self._queue.enqueue(job.job_id)
         await self._publish_state(job.job_id, JobStatus.QUEUED, "Checkpoint resume job queued")
+        await self._update_active_jobs()
         return job
 
     async def get_job(self, job_id: str) -> Optional[Job]:
@@ -141,7 +145,23 @@ class JobService:
             except Exception:
                 pass
         await self._publish_state(job_id, JobStatus.CANCELLED, "Job cancelled")
+        await self._update_active_jobs()
         return job
+
+    async def _update_active_jobs(self) -> None:
+        """Update the Prometheus gauge for active (non-terminal) jobs."""
+        try:
+            jobs = await self._repository.list_all()
+            active_statuses = {
+                JobStatus.QUEUED.value,
+                JobStatus.PENDING.value,
+                JobStatus.RUNNING.value,
+                JobStatus.AWAITING_HUMAN.value,
+            }
+            count = sum(1 for job in jobs if job.status.value in active_statuses)
+            set_active_jobs(count)
+        except Exception:
+            pass
 
     async def start_worker(self) -> None:
         if not settings.worker_mode:
