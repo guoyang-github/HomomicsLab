@@ -37,11 +37,30 @@ run_singler_annotation <- function(seurat_obj,
     stop("SingleCellExperiment package required")
   }
 
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
+    stop("Seurat package required")
+  }
+
+  # Locate the as.SingleCellExperiment generic. In different Bioconductor/Seurat
+  # versions it is exported from SingleCellExperiment, Seurat, or SeuratObject.
+  # Using :: on the wrong package fails, so we dispatch dynamically.
+  as_sce <- NULL
+  for (pkg in c("SingleCellExperiment", "Seurat", "SeuratObject")) {
+    if (requireNamespace(pkg, quietly = TRUE) &&
+        exists("as.SingleCellExperiment", envir = asNamespace(pkg))) {
+      as_sce <- get("as.SingleCellExperiment", envir = asNamespace(pkg))
+      break
+    }
+  }
+  if (is.null(as_sce)) {
+    stop("Could not find as.SingleCellExperiment(). Please ensure SingleCellExperiment and Seurat are installed.")
+  }
+
   # Convert to SingleCellExperiment (assay param for Seurat v5 compatibility)
   if (!is.null(assay)) {
-    sce <- SingleCellExperiment::as.SingleCellExperiment(seurat_obj, assay = assay)
+    sce <- as_sce(seurat_obj, assay = assay)
   } else {
-    sce <- SingleCellExperiment::as.SingleCellExperiment(seurat_obj)
+    sce <- as_sce(seurat_obj)
   }
 
   # Default to MonacoImmuneData if no reference provided

@@ -49,6 +49,7 @@ export interface SettingsState {
   saveError: string | null
   isTesting: boolean
   testResult: { ok: boolean; message: string } | null
+  apiKeySet: boolean
   updateModel: (config: Partial<ModelConfig>) => void
   updateExecution: (config: Partial<ExecutionConfig>) => void
   updateSearch: (config: Partial<SearchConfig>) => void
@@ -115,8 +116,9 @@ export const useSettingsStore = create<SettingsState>()(
       saveError: null,
       isTesting: false,
       testResult: null,
+      apiKeySet: false,
 
-      updateModel: (config) => set((state) => ({ model: { ...state.model, ...config } })),
+      updateModel: (config) => set((state) => ({ model: { ...state.model, ...config }, apiKeySet: config.apiKey !== undefined ? Boolean(config.apiKey) : state.apiKeySet })),
       updateExecution: (config) => set((state) => ({ execution: { ...state.execution, ...config } })),
       updateSearch: (config) => set((state) => ({ search: { ...state.search, ...config } })),
       updateBudget: (config) => set((state) => ({ budget: { ...state.budget, ...config } })),
@@ -138,6 +140,7 @@ export const useSettingsStore = create<SettingsState>()(
               maxTokens: data.max_tokens,
               // Never overwrite the in-memory API key from server; server returns masked/null.
             },
+            apiKeySet: data.api_key_set,
             saveError: null,
           }))
         } catch (err: any) {
@@ -170,6 +173,7 @@ export const useSettingsStore = create<SettingsState>()(
               // (model, temperature, etc.) and save again without re-entering it.
               apiKey: state.model.apiKey,
             },
+            apiKeySet: data.api_key_set,
             saveError: null,
           }))
           return true
@@ -233,6 +237,7 @@ export const useSettingsStore = create<SettingsState>()(
           saveError: null,
           isTesting: false,
           testResult: null,
+          apiKeySet: false,
         }),
     }),
     {

@@ -112,6 +112,7 @@ class LLMRuntimeConfig:
             "fallback_models": self.fallback_models,
             "base_url": self.base_url,
             "api_key": mask_key(self.api_key),
+            "api_key_set": bool(self.api_key),
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }

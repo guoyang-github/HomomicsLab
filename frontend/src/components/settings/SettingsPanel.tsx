@@ -231,7 +231,12 @@ export function SettingsPanel() {
                   )}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-medium">{t('settings.model.apiKey')}</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">{t('settings.model.apiKey')}</label>
+                    {settings.apiKeySet && !settings.model.apiKey && (
+                      <Badge variant="success" size="sm">{t('settings.apiKeySaved')}</Badge>
+                    )}
+                  </div>
                   <Input
                     type="password"
                     value={settings.model.apiKey}

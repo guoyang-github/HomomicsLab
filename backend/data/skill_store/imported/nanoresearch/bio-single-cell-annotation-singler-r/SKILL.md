@@ -90,6 +90,7 @@ ref <- load_singler_reference("monaco")
 **Goal**: Convert your data to `SingleCellExperiment` format.
 
 ```r
+library(Seurat)
 library(SingleCellExperiment)
 
 # From Seurat

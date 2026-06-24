@@ -56,6 +56,7 @@ class LLMConfigOut(BaseModel):
     fallback_models: List[str]
     base_url: Optional[str]
     api_key: Optional[str]  # masked, never raw
+    api_key_set: bool = False
     temperature: float
     max_tokens: int
 
@@ -158,6 +159,13 @@ async def test_llm_connection(
         model = body.model.strip()
         base_url = _normalize_base_url(provider, body.base_url)
         api_key = body.api_key.strip() if body.api_key else None
+
+        # If the frontend did not provide an API key (it is masked after load),
+        # fall back to the persisted key so the test can still succeed.
+        if not api_key:
+            existing = load_llm_runtime_config()
+            api_key = existing.api_key or api_key
+
         if provider == "custom":
             if not base_url:
                 raise HTTPException(status_code=422, detail="Custom provider requires a base URL")

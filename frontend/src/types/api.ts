@@ -27,6 +27,24 @@ export interface SendMessageResponse {
   status: string
 }
 
+export interface LlmConfigOut {
+  provider: string | null
+  model: string | null
+  fallback_models: string[]
+  base_url: string | null
+  api_key: string | null
+  api_key_set: boolean
+  temperature: number
+  max_tokens: number
+}
+
+export interface TestConnectionOut {
+  ok: boolean
+  provider: string | null
+  model: string | null
+  error: string | null
+}
+
 export interface FileUploadResponse {
   filename: string
   path: string

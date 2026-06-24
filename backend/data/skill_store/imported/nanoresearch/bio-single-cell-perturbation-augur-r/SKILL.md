@@ -2,16 +2,18 @@
 name: bio-single-cell-perturbation-augur-r
 description: |
   Augur prioritizes cell types by their response to perturbations using machine
-  learning. Trains classifiers to predict perturbation labels and ranks cell types
-  by classification accuracy (AUC). Supports differential prioritization between
-  conditions and comprehensive visualization. R implementation based on the
-  original neurorestore/Augur package.
+  learning. Trains classifiers to predict perturbation labels and ranks cell
+  types by classification accuracy (AUC). Supports differential prioritization
+  between conditions and visualization. R implementation based on
+  neurorestore/Augur.
+version: "1.1"
 tool_type: r
 primary_tool: Augur
-language: r
+supported_tools: [Seurat, dplyr, ggplot2, randomForest, parsnip, yardstick, pbmcapply]
+languages: [r]
 dependencies:
   - Augur (>= 1.0.0)
-  - Seurat (>= 4.0.0, < 5.0.0; Augur uses `GetAssayData()` without `layer` parameter, incompatible with Seurat v5)
+  - Seurat (>= 4.0.0, < 5.0.0)
   - dplyr
   - ggplot2
   - randomForest
@@ -25,103 +27,69 @@ keywords: ["perturb-seq", "augur", "cell-type-prioritization",
            "feature-importance", "R"]
 ---
 
-## Version Compatibility
+## Version Compatibility & Installation
 
-- **R**: >= 4.0.0
-- **Augur**: >= 1.0.0 (install from GitHub: neurorestore/Augur)
-- **Seurat**: >= 4.0.0, < 5.0.0 (for Seurat object input; Augur's internal `GetAssayData()` call does not support Seurat v5 `layer` parameter)
-- **randomForest**: >= 4.6-14
-- **parsnip**: >= 0.0.2
-- **yardstick**: >= 0.0.3
-
-## Installation
+| Package | Required | Notes |
+|---------|----------|-------|
+| R | >= 4.0.0 | |
+| Augur | >= 1.0.0 | Install from GitHub `neurorestore/Augur` |
+| Seurat | >= 4.0.0, < 5.0.0 | Seurat v4 only; Augur uses `slot` not `layer` |
+| randomForest | >= 4.6-14 | For RF classifier |
+| parsnip | >= 0.0.2 | Model interface |
+| yardstick | >= 0.0.3 | Metrics |
+| pbmcapply | | Parallel processing |
 
 ```r
-# Install devtools if needed
 install.packages("devtools")
-
-# Install dependencies
 install.packages(c("dplyr", "ggplot2", "randomForest", "parsnip",
                    "yardstick", "pbmcapply", "tibble", "purrr",
                    "magrittr", "rsample", "recipes", "tester",
                    "Matrix", "sparseMatrixStats", "glmnet"))
-
-# Install Augur from GitHub
 devtools::install_github("neurorestore/Augur")
 ```
 
-## Data Requirements
+> **Agent warning:** This skill requires **Seurat v4** (`SeuratObject < 5.0.0`). Passing a Seurat v5 object raises an explicit error. To use with v5 data, extract the matrix and metadata manually and pass them to `run_augur()`.
 
-Input requirements:
-- **Single-cell expression data**: Seurat object, monocle3 cds, SingleCellExperiment, matrix, or data frame (genes x cells)
-- **Perturbation labels**: Column in metadata with condition labels (e.g., 'control', 'treatment')
-- **Cell type annotations**: Column in metadata with cell type labels
-- **Minimum requirements**:
-  - At least 2 perturbation conditions
-  - Minimum 20 cells per cell type per condition (default `subsample_size`)
-  - Minimum 1000 genes recommended for feature selection
+## Skill Overview
 
-## Module Structure
+Augur trains machine-learning classifiers to predict perturbation labels within each cell type and ranks cell types by classification accuracy (AUC). A higher AUC means the cell type's transcriptome is more distinguishable between conditions, indicating a stronger perturbation response.
 
-```
-scripts/r/
-└── augur_analysis.R          # Utility functions for Augur analysis
-                                 # - run_augur()
-                                 # - run_differential_prioritization()
-                                 # - summarize_augur_results()
-                                 # - get_prioritized_cell_types()
-                                 # - get_top_features()
-                                 # - plot_augur_lollipop()
-                                 # - plot_augur_scatterplot()
-                                 # - plot_augur_umap()
-                                 # - plot_augur_differential()
-                                 # - export_augur_results()
-                                 # - validate_augur_data()
+**Key characteristics:** AUC = 0.5 means no effect; AUC near 1.0 means strong effect; supports binary/class labels (AUC) and continuous labels (CCC regression mode); requires cell type annotations.
 
-examples/
-├── minimal_example.R         # Basic Augur workflow
-└── advanced_example.R        # Multi-condition, differential prioritization
+**When to use:**
+- You want to prioritize which cell types are most affected by a perturbation.
+- You have at least two perturbation conditions and pre-defined cell type labels.
+- You want to compare perturbation sensitivity across batches or backgrounds.
+- You want feature-importance scores for marker discovery (with random forest).
 
-tests/
-└── test_augur_analysis.R     # Unit tests
-```
+**When NOT to use:**
+- You do not have cell type annotations → annotate first.
+- You have only one condition → Augur needs >= 2 labels.
+- Cell types have very few cells (<20 per condition) → results will be unreliable.
+- You have strong batch confounding → correct batch effects first.
+- You need perturbation effect magnitude per gene → use [bio-single-cell-perturbation-pertpy](../bio-single-cell-perturbation-pertpy/SKILL.md) or [bio-single-cell-perturbation-mixscape](../bio-single-cell-perturbation-mixscape/SKILL.md).
 
-## Core Analysis Workflow
+## Core Workflow
 
-### 1. Run Augur
+### Step 1: Validate Input
 
-**Function:** `run_augur()`
-
-**Purpose:** Train classifiers and calculate AUC for each cell type.
-
-**Key Parameters:**
-- `input`: Seurat object, matrix, or data frame (genes x cells)
-- `meta`: Metadata data frame (required for matrix/df input)
-- `label_col`: Column with perturbation labels. Default: `"label"`
-- `cell_type_col`: Column with cell type annotations. Default: `"cell_type"`
-- `classifier`: `"rf"` (random forest, default) or `"lr"` (logistic regression)
-- `n_subsamples`: Number of random subsamples per cell type. Default: 50
-- `subsample_size`: Cells per subsample per condition. Default: 20
-- `folds`: Cross-validation folds. Default: 3
-- `min_cells`: Minimum cells per cell type. Default: subsample_size
-- `var_quantile`: Quantile for HVG selection. Default: 0.5
-- `feature_perc`: Proportion of genes as features. Default: 0.5
-- `n_threads`: Parallel threads. Default: 4
-- `augur_mode`: `"default"`, `"velocity"`, or `"permute"`
-- `rf_params`: Random forest parameters (trees, mtry, min_n, importance)
-- `lr_params`: Logistic regression parameters (mixture, penalty)
-
-**Returns:** List of class `"Augur"` with:
-- `AUC`: Mean AUC per cell type (classification)
-- `CCC`: Mean CCC per cell type (regression)
-- `feature_importance`: Gene importance scores
-- `results`: Detailed CV results
-
-**Example:**
 ```r
 source("scripts/r/augur_analysis.R")
 
-# Default random forest classifier
+validation <- validate_augur_data(
+  seurat_obj,
+  label_col = "condition",
+  cell_type_col = "cell_type",
+  min_cells = 20
+)
+print_validation_results(validation)
+```
+
+**Requirements:** Seurat v4 object, matrix, or data frame with genes as rows; metadata columns for labels and cell types; at least 2 labels; >= `subsample_size` cells per cell type per condition.
+
+### Step 2: Run Augur
+
+```r
 augur <- run_augur(
   seurat_obj,
   label_col = "condition",
@@ -133,336 +101,276 @@ augur <- run_augur(
   n_threads = 4
 )
 
-# View results
 augur$AUC
 ```
 
-### 2. Score Interpretation
+**Output:** list of class `Augur` containing `AUC`, `feature_importance`, `results`, etc.
 
-| Score Range | Interpretation |
-|-------------|----------------|
-| 0.5 | Random (no effect) |
-| 0.5-0.7 | Weak effect |
-| 0.7-0.9 | Moderate effect |
-| 0.9-1.0 | Strong effect |
-
-**Important:**
-- AUC = 0.5 indicates the classifier cannot distinguish conditions
-- Higher AUC = cell type is more affected by perturbation
-- Rank cell types by AUC to prioritize for follow-up
-
-### 3. Differential Prioritization
-
-Compare cell type prioritization between two conditions using permutation test.
-
-**Function:** `run_differential_prioritization()`
-
-**Parameters:**
-- `augur1`, `augur2`: Augur results for two conditions
-- `permuted1`, `permuted2`: Permuted Augur results (`augur_mode = "permute"`)
-- `n_permutations`: Number of permutations. Default: 1000
-
-**Example:**
-```r
-# Run Augur for condition A
-augur_a <- run_augur(adata_a, label_col = "condition")
-
-# Run Augur for condition B
-augur_b <- run_augur(adata_b, label_col = "condition")
-
-# Run permuted versions for null distribution
-perm_a <- run_augur(adata_a, label_col = "condition", augur_mode = "permute")
-perm_b <- run_augur(adata_b, label_col = "condition", augur_mode = "permute")
-
-# Differential prioritization
-diff <- run_differential_prioritization(
-  augur_a, augur_b, perm_a, perm_b,
-  n_permutations = 1000
-)
-
-# View significant cell types
-diff[diff$padj < 0.05, ]
-```
-
-### 4. Feature Importance
-
-Access gene importance scores from trained classifiers.
-
-**Function:** `get_top_features()`
-
-**Example:**
-```r
-# Top genes across all cell types
-top_genes <- get_top_features(augur, top_n = 10)
-
-# Top genes for specific cell type
-t_t_cell_genes <- get_top_features(augur, cell_type = "T_cell", top_n = 10)
-```
-
-### 5. Visualization
-
-#### Lollipop Plot
+### Step 3: Interpret and Visualize
 
 ```r
+summarize_augur_results(augur)
 plot_augur_lollipop(augur)
+plot_augur_umap(augur, seurat_obj, reduction = "umap", top_n = 5)
 ```
 
-#### Scatterplot Comparison
+### Step 4: Differential Prioritization (Optional)
 
 ```r
-plot_augur_scatterplot(augur1, augur2, top_n = 5)
+augur1 <- run_augur(batch1, label_col = "condition")
+augur2 <- run_augur(batch2, label_col = "condition")
+perm1 <- run_augur(batch1, label_col = "condition", augur_mode = "permute")
+perm2 <- run_augur(batch2, label_col = "condition", augur_mode = "permute")
+
+diff <- run_differential_prioritization(augur1, augur2, perm1, perm2)
+plot_augur_differential(diff, top_n = 5)
 ```
 
-#### UMAP Overlay
+### Input Format Examples
 
+Seurat v4 object:
 ```r
-plot_augur_umap(augur, seurat_obj, reduction = "umap", palette = "cividis")
+seurat_obj <- readRDS("data.rds")
+table(seurat_obj$condition, seurat_obj$cell_type)  # must have >= 2 labels
 ```
 
-#### Differential Prioritization Plot
-
+Matrix + metadata:
 ```r
-plot_augur_differential(diff_results, top_n = 5)
+expr <- as.matrix(GetAssayData(seurat_obj, slot = "data"))
+meta <- seurat_obj@meta.data
+augur <- run_augur(expr, meta = meta, label_col = "condition", cell_type_col = "cell_type")
 ```
 
-## Utility Functions
+Check for missing labels:
+```r
+any(is.na(meta$condition)) | any(is.na(meta$cell_type))
+```
 
-### Data Validation
+## Complete Pipeline (Copy-Pasteable)
 
 ```r
-# Validate input data
+library(Seurat)
+source("scripts/r/augur_analysis.R")
+
+seurat_obj <- readRDS("your_data.rds")
+
 validation <- validate_augur_data(
   seurat_obj,
   label_col = "condition",
   cell_type_col = "cell_type",
   min_cells = 20
 )
-
-# Print validation results
 print_validation_results(validation)
-```
 
-### Result Summary
-
-```r
-# Get summary statistics
-stats <- summarize_augur_results(augur)
-print(sprintf("Most affected: %s (AUC = %.3f)", stats$most_affected, stats$max_auc))
-
-# Interpret individual scores
-for (i in seq_len(nrow(augur$AUC))) {
-  score <- augur$AUC$auc[i]
-  interpretation <- interpret_augur_score(score)
-  print(sprintf("%s: %.3f - %s", augur$AUC$cell_type[i], score, interpretation))
-}
-```
-
-### Prioritized Cell Types
-
-```r
-# Get top prioritized cell types
-top_cell_types <- get_prioritized_cell_types(augur, min_score = 0.7, top_n = 5)
-```
-
-### Export Results
-
-```r
-export_augur_results(
-  augur,
-  output_dir = "augur_results",
-  prefix = "sample1",
-  export_summary = TRUE,
-  export_importances = TRUE,
-  export_detailed = FALSE
+augur <- run_augur(
+  seurat_obj,
+  label_col = "condition",
+  cell_type_col = "cell_type",
+  classifier = "rf",
+  n_subsamples = 50,
+  subsample_size = 20,
+  folds = 3,
+  n_threads = 4
 )
+
+print(augur$AUC)
+print(summarize_augur_results(augur))
+plot_augur_lollipop(augur)
+plot_augur_umap(augur, seurat_obj, reduction = "umap", top_n = 5)
+
+top_genes <- get_top_features(augur, top_n = 10)
 ```
 
-## Input Requirements
+## Skill-Provided Functions
 
-### Required Data Format
+### Core analysis
+- `run_augur(...)` — main Augur wrapper.
+- `run_differential_prioritization(...)` — permutation-based comparison.
+- `summarize_augur_results(augur)` — summary statistics.
 
-**Seurat object:**
+### Result extraction
+- `get_prioritized_cell_types(augur, min_score, top_n)` — rank cell types by AUC.
+- `get_top_features(augur, cell_type, top_n)` — top genes by feature importance.
+
+### Visualization
+- `plot_augur_lollipop(augur, ...)` — lollipop plot of AUCs.
+- `plot_augur_umap(augur, sc, reduction, palette, top_n, ...)` — overlay AUC on UMAP.
+- `plot_augur_differential(diff_results, top_n, ...)` — differential prioritization plot.
+
+### Utilities
+- `validate_augur_data(...)` — input validation.
+- `print_validation_results(validation)` — pretty-print validation.
+- `export_augur_results(...)` — export CSVs.
+
+## Official API — Agents Often Miss These
+
+**1. This skill requires Seurat v4**
+
+`run_augur()` checks `SeuratObject` version and errors on v5. To use with v5:
 ```r
-# Required meta.data columns
-head(seurat_obj@meta.data)
-#      condition cell_type
-# 1   control   T_cell
-# 2 treatment   T_cell
-# 3   control   B_cell
+expr_matrix <- Seurat::GetAssayData(seurat_obj, layer = "data")
+meta_df <- seurat_obj@meta.data
+augur <- run_augur(expr_matrix, meta = meta_df, label_col = "condition")
 ```
 
-**Matrix + metadata:**
-```r
-# Expression matrix: genes x cells
-expr_matrix[1:5, 1:3]
-#        Cell1 Cell2 Cell3
-# Gene1   0.0   1.2   0.5
-# Gene2   2.1   0.0   1.8
+**2. `augur_mode = "permute"` generates a null distribution**
 
-# Metadata data frame
-meta <- data.frame(
-  condition = c("control", "treatment", "control"),
-  cell_type = c("T_cell", "T_cell", "B_cell"),
-  row.names = c("Cell1", "Cell2", "Cell3")
+Permutation mode shuffles labels and is used for differential prioritization. Augur internally uses 500 subsamples in permute mode.
+
+**3. Differential prioritization requires four Augur runs**
+
+You need observed Augur results for both conditions **and** permuted Augur results for both conditions:
+```r
+diff <- run_differential_prioritization(augur1, augur2, perm1, perm2)
+```
+
+**4. Feature importance is only available with `classifier = "rf"`**
+
+Logistic regression (`"lr"`) does not return feature importance. `get_top_features()` will error if you use `"lr"`.
+
+**5. `subsample_size` cells are required per cell type per condition**
+
+Cell types with fewer cells are skipped. Either filter cell types or reduce `subsample_size`.
+
+## Common Pitfalls
+
+1. **Seurat v5 incompatibility** — use Seurat v4 or extract matrix + metadata.
+2. **Only one unique label** — `run_augur()` needs at least two conditions.
+3. **Cell types skipped due to low cell count** — default `subsample_size = 20` requires 20 cells per cell type per condition.
+4. **Feature importance missing with logistic regression** — use `classifier = "rf"` for `get_top_features()`.
+5. **Strong batch effects** — correct batch effects before Augur.
+6. **Forgetting permuted runs for differential prioritization** — you need four Augur objects.
+
+## Scenarios
+
+### Scenario 1: Basic Cell-Type Prioritization
+
+```r
+source("scripts/r/augur_analysis.R")
+
+augur <- run_augur(
+  seurat_obj,
+  label_col = "condition",
+  cell_type_col = "cell_type",
+  classifier = "rf",
+  n_subsamples = 50,
+  n_threads = 4
 )
+
+head(augur$AUC)
+plot_augur_lollipop(augur)
 ```
 
-### Data Validation
+### Scenario 2: Compare Two Batches
 
-```r
-# Check label distribution
-table(seurat_obj$cell_type, seurat_obj$condition)
-
-# Check for NA values
-sum(is.na(seurat_obj$condition))
-sum(is.na(seurat_obj$cell_type))
-```
-
-## Output Specifications
-
-### Core Outputs
-
-| Output | Type | Description |
-|--------|------|-------------|
-| `AUC` | Data frame | Mean AUC per cell type |
-| `feature_importance` | Data frame | Gene importance per cell type |
-| `results` | Data frame | Detailed CV results per fold/subsample |
-
-### AUC Columns
-
-| Column | Description |
-|--------|-------------|
-| `cell_type` | Cell type name |
-| `auc` | Mean AUC across subsamples |
-
-### Feature Importance Columns
-
-| Column | Description |
-|--------|-------------|
-| `cell_type` | Cell type name |
-| `subsample_idx` | Subsample index |
-| `fold` | CV fold |
-| `gene` | Gene symbol |
-| `importance` | Importance score |
-
-## Key Parameters
-
-### Augur Initialization
-
-| Parameter | Default | Description | When to Adjust |
-|-----------|---------|-------------|----------------|
-| `classifier` | `"rf"` | ML classifier | Use `"lr"` for faster runtime |
-| `n_subsamples` | 50 | Random subsamples | Increase for stability |
-| `subsample_size` | 20 | Cells per subsample | Increase if many cells available |
-| `folds` | 3 | CV folds | Increase to 5 for robustness |
-| `var_quantile` | 0.5 | HVG quantile | Lower for more genes |
-| `feature_perc` | 0.5 | Gene proportion | Adjust based on gene count |
-
-### Classifier Options
-
-| Classifier | Best For | Notes |
-|------------|----------|-------|
-| `"rf"` | General use | Default, robust, supports feature importance |
-| `"lr"` | Linear separability | Faster, L1 regularized via glmnet |
-
-### RF Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `trees` | 100 | Number of trees |
-| `mtry` | 2 | Features sampled at each split |
-| `importance` | `"accuracy"` | `"accuracy"` or `"gini"` |
-
-## Expected Runtime
-
-| Dataset Size | N Subsamples | Runtime |
-|--------------|--------------|---------|
-| 1k cells, 3 cell types | 50 | 2-4 min |
-| 5k cells, 5 cell types | 50 | 5-10 min |
-| 10k cells, 10 cell types | 50 | 15-30 min |
-| 50k cells, 15 cell types | 50 | 45-90 min |
-
-*Runtime estimates on 4-core CPU with random forest*
-
-## Error Handling
-
-### Insufficient cells per type
-```
-Warning: skipping cell type X: minimum number of cells (N) is less than 20
-```
--> Reduce `subsample_size` or filter cell types
-
-### Only one label
-```
-Error: only one label provided
-```
--> Check `label_col` has multiple unique values
-
-### Missing package
-```
-Error: install "glmnet" R package to run Augur with logistic regression classifier
-```
--> Install required package
-
-### Dimension mismatch
-```
-Error: number of cells in metadata (N) does not match number of cells in expression (M)
-```
--> Ensure metadata rows match expression columns
-
-## Common Analysis Patterns
-
-### Pattern 1: Quick Prioritization
-```r
-augur <- run_augur(seurat_obj, label_col = "condition", cell_type_col = "cell_type")
-top_cell_types <- head(augur$AUC, 3)
-```
-
-### Pattern 2: Compare Conditions
 ```r
 augur1 <- run_augur(subset(seurat_obj, batch == "A"), label_col = "condition")
 augur2 <- run_augur(subset(seurat_obj, batch == "B"), label_col = "condition")
 plot_augur_scatterplot(augur1, augur2, top_n = 5)
 ```
 
-### Pattern 3: Permutation Test
-```r
-augur_obs <- run_augur(seurat_obj, label_col = "condition")
-augur_null <- run_augur(seurat_obj, label_col = "condition", augur_mode = "permute")
-# Compare observed vs null AUCs
-```
+### Scenario 3: Differential Prioritization
 
-### Pattern 4: Differential Prioritization
 ```r
-# Two conditions with common control
-augur_treat <- run_augur(seurat_treat, label_col = "condition")
-augur_ctrl <- run_augur(seurat_ctrl, label_col = "condition")
-perm_treat <- run_augur(seurat_treat, label_col = "condition", augur_mode = "permute")
-perm_ctrl <- run_augur(seurat_ctrl, label_col = "condition", augur_mode = "permute")
+augur1 <- run_augur(batch1, label_col = "condition")
+augur2 <- run_augur(batch2, label_col = "condition")
+perm1 <- run_augur(batch1, label_col = "condition", augur_mode = "permute")
+perm2 <- run_augur(batch2, label_col = "condition", augur_mode = "permute")
 
-diff <- run_differential_prioritization(
-  augur_treat, augur_ctrl, perm_treat, perm_ctrl
-)
+diff <- run_differential_prioritization(augur1, augur2, perm1, perm2)
+sig <- diff[diff$padj < 0.05, ]
 plot_augur_differential(diff, top_n = 5)
 ```
 
-## Best Practices
+## Parameters
 
-1. **Check baseline**: AUCs near 0.5 = no detectable effect
-2. **Use appropriate subsample_size**: Balance statistical power and runtime
-3. **Validate with permutation test**: Assess statistical significance
-4. **Inspect feature importance**: Validate known marker genes are important
-5. **Consider cell type abundance**: Rare cell types may have high variance
-6. **Account for batch effects**: Correct batch effects before running Augur
+### `run_augur()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input` | Seurat/matrix/df | required | Expression data (genes x cells) |
+| `meta` | data.frame | NULL | Metadata (required for matrix/df) |
+| `label_col` | char | "label" | Perturbation label column |
+| `cell_type_col` | char | "cell_type" | Cell type column |
+| `classifier` | char | "rf" | "rf" or "lr" |
+| `n_subsamples` | int | 50 | Random subsamples per cell type |
+| `subsample_size` | int | 20 | Cells per subsample per condition |
+| `folds` | int | 3 | CV folds |
+| `min_cells` | int | subsample_size | Minimum cells per cell type per condition |
+| `var_quantile` | numeric | 0.5 | HVG selection quantile |
+| `feature_perc` | numeric | 0.5 | Proportion of genes as features |
+| `n_threads` | int | 4 | Parallel threads |
+| `augur_mode` | char | "default" | "default", "velocity", or "permute" |
+| `rf_params` | list | list(...) | RF parameters: trees, mtry, min_n, importance |
+| `lr_params` | list | list(...) | LR parameters: mixture, penalty |
+
+### `run_differential_prioritization()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `augur1`, `augur2` | Augur | required | Observed Augur results |
+| `permuted1`, `permuted2` | Augur | required | Permuted Augur results |
+| `n_subsamples` | int | 50 | Subsamples to pool per permutation |
+| `n_permutations` | int | 1000 | Number of permutations |
+
+## Output Interpretation
+
+| AUC | Interpretation |
+|-----|----------------|
+| 0.5 | No effect (random) |
+| 0.5–0.7 | Weak effect |
+| 0.7–0.9 | Moderate effect |
+| 0.9–1.0 | Strong effect |
+
+`run_augur()` returns a list of class `Augur` with `AUC` (or `CCC` in regression mode), `feature_importance`, `results`, and `parameters`.
+
+`run_differential_prioritization()` returns a data frame with `cell_type`, `auc.x`, `auc.y`, `delta_auc`, `b`, `m`, `z`, `pval`, `padj`.
+
+## Best Practices & Runtime Notes
+
+- Genes must be rows; metadata must contain `label_col` and `cell_type_col` with no NAs.
+- Each cell type × condition needs ≥ `subsample_size` cells; filter or reduce `subsample_size` for rare groups.
+- Use `n_subsamples >= 50` and `folds = 3` for stable AUC estimates.
+- Increase `n_subsamples` if AUCs are noisy; decrease if runtime is limiting.
+- Decrease `subsample_size` for rare cell types; increase `var_quantile` to remove low-variance noise genes.
+- Use `classifier = "rf"` for feature importance; `"lr"` is faster but provides no importance.
+- Correct batch effects before comparing AUCs across batches.
+- Approximate runtime: ~1–5 min per 1,000 cells with default RF on a few threads.
+
+## API Reference
+
+| Function | Location | Description |
+|----------|----------|-------------|
+| `run_augur()` | [augur_analysis.R:76](scripts/r/augur_analysis.R#L76) | Main Augur runner |
+| `run_differential_prioritization()` | [augur_analysis.R:199](scripts/r/augur_analysis.R#L199) | Differential prioritization |
+| `summarize_augur_results()` | [augur_analysis.R:241](scripts/r/augur_analysis.R#L241) | Summary statistics |
+| `get_prioritized_cell_types()` | [augur_analysis.R:305](scripts/r/augur_analysis.R#L305) | Rank cell types |
+| `get_top_features()` | [augur_analysis.R:331](scripts/r/augur_analysis.R#L331) | Top feature genes |
+| `plot_augur_lollipop()` | [augur_analysis.R:371](scripts/r/augur_analysis.R#L371) | Lollipop plot |
+| `plot_augur_scatterplot()` | [augur_analysis.R:391](scripts/r/augur_analysis.R#L391) | Scatterplot comparison |
+| `plot_augur_umap()` | [augur_analysis.R:415](scripts/r/augur_analysis.R#L415) | UMAP overlay |
+| `plot_augur_differential()` | [augur_analysis.R:446](scripts/r/augur_analysis.R#L446) | Differential plot |
+| `export_augur_results()` | [augur_analysis.R:467](scripts/r/augur_analysis.R#L467) | Export CSVs |
+| `validate_augur_data()` | [augur_analysis.R:522](scripts/r/augur_analysis.R#L522) | Input validation |
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `Seurat v5 detected...` | SeuratObject >= 5.0.0 | Use Seurat v4 or extract matrix + metadata |
+| `only one label provided` | `label_col` has one unique value | Check metadata column |
+| `skipping cell type X...` | Insufficient cells per condition | Reduce `subsample_size` or filter cell types |
+| `No feature importance found` | Used `classifier = "lr"` | Use `"rf"` for feature importance |
+| `install "glmnet" ...` | glmnet missing | `install.packages("glmnet")` |
+| Metadata/expression mismatch | Row/column order mismatch | Ensure metadata rows match expression columns |
 
 ## Related Skills
 
-- [bio-single-cell-perturbation-mixscape](../bio-single-cell-perturbation-mixscape/SKILL.md) - Perturbation signature detection (Python)
-- [bio-single-cell-perturbation-scgen](../bio-single-cell-perturbation-scgen/SKILL.md) - Perturbation modeling with VAE (Python)
-- [bio-single-cell-perturbation-pertpy](../bio-single-cell-perturbation-pertpy/SKILL.md) - General perturbation analysis (Python)
+- [bio-single-cell-perturbation-mixscape](../bio-single-cell-perturbation-mixscape/SKILL.md) — Perturbation signature detection (Python)
+- [bio-single-cell-perturbation-scgen](../bio-single-cell-perturbation-scgen/SKILL.md) — Perturbation modeling with VAE (Python)
+- [bio-single-cell-perturbation-pertpy](../bio-single-cell-perturbation-pertpy/SKILL.md) — General perturbation analysis (Python)
 
 ## References
 
 1. Skinnider et al. (2019). Cell type prioritization in single-cell data. *Nature Communications*, 10, 5292. https://doi.org/10.1038/s41467-019-12235-0
-2. Skinnider et al. (2021). Spatial charting of single-cell transcriptomes in tissues. *Nature Biotechnology*, 39, 674-678. https://doi.org/10.1038/s41587-020-0605-1
-3. Augur R Package: https://github.com/neurorestore/Augur
+2. Augur R Package: https://github.com/neurorestore/Augur

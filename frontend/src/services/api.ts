@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
@@ -210,23 +210,6 @@ export interface LlmConfigUpdate {
   api_key?: string
   temperature: number
   max_tokens: number
-}
-
-export interface LlmConfigOut {
-  provider: string | null
-  model: string | null
-  fallback_models: string[]
-  base_url: string | null
-  api_key: string | null
-  temperature: number
-  max_tokens: number
-}
-
-export interface TestConnectionOut {
-  ok: boolean
-  provider: string | null
-  model: string | null
-  error?: string
 }
 
 export const settingsApi = {
