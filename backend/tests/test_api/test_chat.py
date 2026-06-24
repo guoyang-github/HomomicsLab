@@ -107,3 +107,23 @@ def test_regenerate_message():
         assistant_messages = [m for m in data["messages"] if m.get("sender") == "agent"]
         original_assistant = [m for m in original["messages"] if m.get("sender") == "agent"]
         assert len(assistant_messages) == len(original_assistant)
+
+
+def test_list_sessions():
+    with TestClient(app) as client:
+        session_id = "sess_list_api"
+        response = client.post("/api/chat/send", json={
+            "project_id": "proj_1",
+            "session_id": session_id,
+            "message": "列出我的会话",
+        })
+        assert response.status_code == 200
+
+        response = client.get("/api/chat/sessions?project_id=proj_1")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert any(s["id"] == session_id for s in data)
+        session = next(s for s in data if s["id"] == session_id)
+        assert session["project_id"] == "proj_1"
+        assert "name" in session

@@ -42,6 +42,34 @@ class MemoryManager:
         state = await self.session_store.get(session_id)
         return state.project_id if state else None
 
+    async def list_sessions(
+        self, project_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List persisted sessions, optionally filtered by project."""
+        states = await self.session_store.list(project_id=project_id)
+        sessions: List[Dict[str, Any]] = []
+        for state in states:
+            sessions.append(
+                {
+                    "id": state.session_id,
+                    "project_id": state.project_id,
+                    "name": self._session_name(state),
+                    "updated_at": state.updated_at.isoformat(),
+                    "created_at": state.updated_at.isoformat(),
+                }
+            )
+        return sessions
+
+    @staticmethod
+    def _session_name(state: SessionState) -> str:
+        """Derive a display name from the first user message."""
+        for message in state.working_memory.messages:
+            if message.sender == "user":
+                text = str(message.content).strip()
+                if text:
+                    return text[:40] or "New Session"
+        return "New Session"
+
     async def enrich_context(
         self,
         project_id: str,

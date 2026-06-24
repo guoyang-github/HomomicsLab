@@ -9,6 +9,7 @@ import { useTranslation } from '@/i18n'
 export function SessionList() {
   const { t } = useTranslation()
   const sessions = useChatStore((state) => state.sessions)
+  const sessionsLoading = useChatStore((state) => state.sessionsLoading)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
   const setSessionId = useChatStore((state) => state.setSessionId)
   const createSession = useChatStore((state) => state.createSession)
@@ -16,6 +17,7 @@ export function SessionList() {
   const deleteSession = useChatStore((state) => state.deleteSession)
   const clearMessages = useChatStore((state) => state.clearMessages)
   const setProjectId = useChatStore((state) => state.setProjectId)
+  const fetchSessions = useChatStore((state) => state.fetchSessions)
 
   const projects = useProjectStore((state) => state.projects)
   const currentProjectId = useProjectStore((state) => state.currentProjectId)
@@ -37,18 +39,12 @@ export function SessionList() {
     fetchProjects()
   }, [fetchProjects])
 
-  // One-time migration: rename old hardcoded Chinese session names to English.
   useEffect(() => {
-    sessions.forEach((s) => {
-      if (s.name === '默认会话') {
-        renameSession(s.id, t('sessionList.defaultSession'))
-      } else if (s.name.startsWith('会话 ')) {
-        renameSession(s.id, s.name.replace(/^会话 /, 'Session '))
-      }
-    })
-  }, [sessions, renameSession, t])
+    fetchSessions(currentProjectId)
+  }, [currentProjectId, fetchSessions])
 
   useEffect(() => {
+    if (sessionsLoading) return
     const projectSessions = sessions.filter((s) => s.projectId === currentProjectId)
     if (projectSessions.length === 0) {
       createSession(t('sessionList.defaultSession'), currentProjectId)
@@ -58,7 +54,16 @@ export function SessionList() {
       setSessionId(projectSessions[0].id)
       clearMessages()
     }
-  }, [currentProjectId, sessions, currentSessionId, createSession, setSessionId, clearMessages, t])
+  }, [
+    currentProjectId,
+    sessions,
+    currentSessionId,
+    createSession,
+    setSessionId,
+    clearMessages,
+    t,
+    sessionsLoading,
+  ])
 
   const projectSessions = sessions.filter((s) => s.projectId === currentProjectId)
 
@@ -141,7 +146,12 @@ export function SessionList() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {projectSessions.length === 0 ? (
+        {sessionsLoading ? (
+          <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {t('common.loading')}
+          </div>
+        ) : projectSessions.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             {t('sessionList.noSessions')}
           </div>

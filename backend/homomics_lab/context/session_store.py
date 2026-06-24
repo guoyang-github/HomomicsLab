@@ -8,7 +8,7 @@ PostgreSQL, etc.) using the same async engine as the rest of the application.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 import aiosqlite
 
@@ -34,6 +34,9 @@ class SessionStore(ABC):
 
     @abstractmethod
     async def delete(self, session_id: str) -> None: ...
+
+    @abstractmethod
+    async def list(self, project_id: Optional[str] = None) -> List[SessionState]: ...
 
     @abstractmethod
     async def cleanup_expired(self, ttl_days: int) -> int: ...
@@ -102,6 +105,35 @@ class SQLiteSessionStore(SessionStore):
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
             await conn.commit()
+
+    async def list(self, project_id: Optional[str] = None) -> List[SessionState]:
+        async with aiosqlite.connect(self.db_path) as conn:
+            if project_id:
+                cursor = await conn.execute(
+                    "SELECT session_id, project_id, working_memory, task_tree, updated_at "
+                    "FROM sessions WHERE project_id = ? ORDER BY updated_at DESC",
+                    (project_id,),
+                )
+            else:
+                cursor = await conn.execute(
+                    "SELECT session_id, project_id, working_memory, task_tree, updated_at "
+                    "FROM sessions ORDER BY updated_at DESC"
+                )
+            rows = await cursor.fetchall()
+
+        states: List[SessionState] = []
+        for row in rows:
+            session_id, project_id, wm_json, tree_json, updated_at = row
+            states.append(
+                SessionState(
+                    session_id=session_id,
+                    project_id=project_id,
+                    working_memory=WorkingMemory.from_json(wm_json),
+                    task_tree=TaskTree.model_validate_json(tree_json) if tree_json else None,
+                    updated_at=datetime.fromisoformat(updated_at),
+                )
+            )
+        return states
 
     async def cleanup_expired(self, ttl_days: int) -> int:
         cutoff = datetime.now(timezone.utc).isoformat()
@@ -198,6 +230,41 @@ class SQLAlchemySessionStore(SessionStore):
                 text("DELETE FROM sessions WHERE session_id = :session_id"),
                 {"session_id": session_id},
             )
+
+    async def list(self, project_id: Optional[str] = None) -> List[SessionState]:
+        from sqlalchemy import text
+
+        async with self.engine.connect() as conn:
+            if project_id:
+                result = await conn.execute(
+                    text(
+                        "SELECT session_id, project_id, working_memory, task_tree, updated_at "
+                        "FROM sessions WHERE project_id = :project_id ORDER BY updated_at DESC"
+                    ),
+                    {"project_id": project_id},
+                )
+            else:
+                result = await conn.execute(
+                    text(
+                        "SELECT session_id, project_id, working_memory, task_tree, updated_at "
+                        "FROM sessions ORDER BY updated_at DESC"
+                    )
+                )
+            rows = result.fetchall()
+
+        states: List[SessionState] = []
+        for row in rows:
+            session_id, project_id, wm_json, tree_json, updated_at = row
+            states.append(
+                SessionState(
+                    session_id=session_id,
+                    project_id=project_id,
+                    working_memory=WorkingMemory.from_json(wm_json),
+                    task_tree=TaskTree.model_validate_json(tree_json) if tree_json else None,
+                    updated_at=datetime.fromisoformat(updated_at),
+                )
+            )
+        return states
 
     async def cleanup_expired(self, ttl_days: int) -> int:
         from sqlalchemy import text

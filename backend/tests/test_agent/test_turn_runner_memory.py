@@ -27,8 +27,10 @@ class _FakeSessionStore(SessionStore):
     async def cleanup_expired(self, ttl_days: int) -> int:
         return 0
 
-    async def list_sessions(self, project_id: str | None = None, limit: int = 100, offset: int = 0):
-        return list(self._data.values())
+    async def list(self, project_id: str | None = None):
+        if project_id is None:
+            return list(self._data.values())
+        return [s for s in self._data.values() if s.project_id == project_id]
 
 
 @pytest.fixture

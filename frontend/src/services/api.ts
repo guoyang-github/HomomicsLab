@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { SendMessageRequest, SendMessageResponse, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
+import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api'
@@ -18,6 +19,9 @@ export const chatApi = {
 
   getMessages: (sessionId: string) =>
     api.get<ChatMessage[]>(`/chat/messages?session_id=${sessionId}`),
+
+  listSessions: (projectId?: string) =>
+    api.get<ChatSession[]>('/chat/sessions', { params: projectId ? { project_id: projectId } : undefined }),
 
   respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown>; remember?: boolean }) =>
     api.post('/chat/hitl/respond', data),

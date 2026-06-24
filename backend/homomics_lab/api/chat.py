@@ -157,6 +157,13 @@ async def get_messages(session_id: str, http_request: Request) -> List[dict]:
     return [m.model_dump() for m in working_memory.get_recent_messages()]
 
 
+@router.get("/sessions")
+async def list_sessions(http_request: Request, project_id: Optional[str] = None) -> List[dict]:
+    """List persisted chat sessions, optionally filtered by project."""
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    return await memory_manager.list_sessions(project_id=project_id)
+
+
 @router.post("/regenerate", response_model=SendMessageResponse)
 async def regenerate_message(
     request: SendMessageRequest,
