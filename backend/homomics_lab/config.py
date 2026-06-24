@@ -278,6 +278,10 @@ class Settings(BaseSettings):
     # Literature / RAP settings
     literature_retrieval_enabled: bool = False  # requires network; disabled by default
 
+    # HITL thresholds
+    hitl_confidence_threshold: float = 0.7
+    hitl_risk_threshold: float = 0.6
+
     # CodeAct safety settings
     codeact_hitl_level: str = "high"  # "low" | "medium" | "high" | "critical" | "never"
 

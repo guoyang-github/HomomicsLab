@@ -131,3 +131,9 @@ def test_cors_origins_accepts_list():
 def test_cors_origins_empty_string_becomes_none():
     settings = Settings(cors_origins="")
     assert settings.cors_origins is None
+
+
+def test_hitl_threshold_defaults():
+    settings = Settings()
+    assert settings.hitl_confidence_threshold == 0.7
+    assert settings.hitl_risk_threshold == 0.6

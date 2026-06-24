@@ -31,10 +31,23 @@ class HITLDetector:
         if task.estimated_duration_minutes > cost_threshold:
             return self._create_cost_checkpoint(task, project_id=project_id)
 
-        # Check confidence threshold (mock for MVP)
+        # Check confidence threshold
         confidence = context.get("confidence", 1.0)
-        if confidence < self.DEFAULT_CONFIDENCE_THRESHOLD:
-            return self._create_confidence_checkpoint(task, confidence, project_id=project_id)
+        confidence_threshold = context.get(
+            "confidence_threshold", self.DEFAULT_CONFIDENCE_THRESHOLD
+        )
+        if confidence < confidence_threshold:
+            return self._create_confidence_checkpoint(
+                task, confidence, confidence_threshold, project_id=project_id
+            )
+
+        # Check risk threshold
+        risk_score = context.get("risk_score", 0.0)
+        risk_threshold = context.get("risk_threshold", 0.6)
+        if risk_score > risk_threshold:
+            return self._create_risk_checkpoint(
+                task, risk_score, risk_threshold, project_id=project_id
+            )
 
         return None
 
@@ -65,6 +78,7 @@ class HITLDetector:
         self,
         task: TaskNode,
         confidence: float,
+        confidence_threshold: float,
         project_id: Optional[str] = None,
     ) -> HITLCheckpoint:
         options: List[Option] = [
@@ -75,11 +89,48 @@ class HITLDetector:
             id=f"hitl_conf_{task.id}",
             trigger_reason=HITLTrigger.LOW_CONFIDENCE,
             context_summary=(
-                f"Low confidence ({confidence:.2f}) for task '{task.name}'. "
-                "Please review parameters."
+                f"Low confidence ({confidence:.2f} < {confidence_threshold:.2f}) "
+                f"for task '{task.name}'. Please review parameters."
             ),
             options=options,
-            metadata={"scope_type": "task", "scope_id": task.id, "task_name": task.name},
+            metadata={
+                "scope_type": "task",
+                "scope_id": task.id,
+                "task_name": task.name,
+                "confidence": confidence,
+                "confidence_threshold": confidence_threshold,
+            },
+        )
+        self._apply_preference_defaults(project_id, checkpoint)
+        return checkpoint
+
+    def _create_risk_checkpoint(
+        self,
+        task: TaskNode,
+        risk_score: float,
+        risk_threshold: float,
+        project_id: Optional[str] = None,
+    ) -> HITLCheckpoint:
+        options: List[Option] = [
+            Option(id="proceed", label="Proceed", description="Run the task"),
+            Option(id="cancel", label="Cancel", description="Skip this task"),
+            Option(id="modify", label="Modify parameters"),
+        ]
+        checkpoint = HITLCheckpoint(
+            id=f"hitl_risk_{task.id}",
+            trigger_reason=HITLTrigger.HIGH_RISK,
+            context_summary=(
+                f"High risk score ({risk_score:.2f} > {risk_threshold:.2f}) "
+                f"for task '{task.name}'. Please confirm before proceeding."
+            ),
+            options=options,
+            metadata={
+                "scope_type": "task",
+                "scope_id": task.id,
+                "task_name": task.name,
+                "risk_score": risk_score,
+                "risk_threshold": risk_threshold,
+            },
         )
         self._apply_preference_defaults(project_id, checkpoint)
         return checkpoint

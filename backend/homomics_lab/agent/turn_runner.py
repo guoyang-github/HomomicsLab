@@ -13,6 +13,7 @@ This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 
 import json
 import asyncio
+import re
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -31,6 +32,7 @@ from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.config import settings
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.context_engine.models import ContextBundle
@@ -687,9 +689,13 @@ class TurnRunner:
             )
 
         if scope == "single_step" or intent.complexity == "single_step":
-            return await self._handle_single_step(tree, working_memory, project_id)
+            return await self._handle_single_step(
+                tree, working_memory, project_id, intent=intent, user_message=user_message
+            )
 
-        return await self._handle_workflow(tree, working_memory, project_id)
+        return await self._handle_workflow(
+            tree, working_memory, project_id, intent=intent, user_message=user_message
+        )
 
     @staticmethod
     def _is_domain_template_analysis(intent: UserIntent) -> bool:
@@ -801,11 +807,140 @@ class TurnRunner:
             "percent": 0,
         }
 
+    async def _evaluate_risk(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> float:
+        """Evaluate plan/data-destruction risk for the current turn.
+
+        Uses the configured LLM client when available, otherwise falls back to
+        a simple keyword heuristic.
+        """
+        low_risk_keywords = {"analysis", "plot", "qc", "visualize", "统计", "画图", "质控"}
+        high_risk_keywords = {"delete", "drop", "overwrite", "remove", "清空", "删除", "覆盖", "替换"}
+
+        if self._llm_client is None:
+            return self._heuristic_risk_score(
+                user_message, intent, low_risk_keywords, high_risk_keywords
+            )
+
+        try:
+            prompt = self._build_risk_prompt(intent, user_message, working_memory, project_id)
+            response = await self._llm_client.chat_completion(prompt)
+            return self._parse_risk_score(response)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "LLM risk evaluation failed; falling back to heuristic", exc_info=True
+            )
+            return self._heuristic_risk_score(
+                user_message, intent, low_risk_keywords, high_risk_keywords
+            )
+
+    @staticmethod
+    def _build_risk_prompt(
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        return (
+            "Evaluate the risk that executing this user request will lead to "
+            "data loss, destruction, or unintended modification of project state.\n\n"
+            f"User message: {user_message}\n"
+            f"Intent: {intent.analysis_type}\n"
+            f"Intent confidence: {intent.confidence:.2f}\n"
+            f"Project ID: {project_id or 'unknown'}\n\n"
+            "Respond with a JSON object: {\"risk_score\": 0.0} where the score is "
+            "a float between 0.0 (no risk) and 1.0 (very high risk)."
+        )
+
+    @staticmethod
+    def _parse_risk_score(response: Any) -> float:
+        """Parse a risk score from an LLM response."""
+        text = ""
+        if isinstance(response, str):
+            text = response
+        elif isinstance(response, dict):
+            if "risk_score" in response:
+                return float(response["risk_score"])
+            text = str(response.get("content", response))
+        else:
+            text = str(response)
+
+        # Try to extract JSON from the text.
+        try:
+            match = re.search(r"\{[^}]*\"risk_score\"[^}]*\}", text)
+            if match:
+                data = json.loads(match.group(0))
+                return float(data["risk_score"])
+        except Exception:
+            pass
+
+        # Fall back to a plain float in the response.
+        try:
+            return float(text.strip())
+        except Exception:
+            pass
+
+        return 0.0
+
+    @staticmethod
+    def _heuristic_risk_score(
+        user_message: str,
+        intent: UserIntent,
+        low_risk_keywords: set,
+        high_risk_keywords: set,
+    ) -> float:
+        message_lower = user_message.lower()
+        score = 0.0
+        if any(kw in message_lower for kw in high_risk_keywords):
+            score += 0.7
+        if any(kw in message_lower for kw in low_risk_keywords):
+            score -= 0.3
+        if intent.analysis_type in ("file_conversion", "qa", "information_request"):
+            score -= 0.2
+        return max(0.0, min(1.0, score))
+
+    async def _build_orchestrator_context(
+        self,
+        project_id: str,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
+        working_memory: Optional[WorkingMemory] = None,
+    ) -> Dict[str, Any]:
+        """Build the context dict passed to the orchestrator and HITL detector."""
+        context: Dict[str, Any] = {"project_id": project_id}
+        if getattr(self, "_trace_id", None):
+            context["trace_id"] = self._trace_id
+
+        confidence = getattr(intent, "confidence", 1.0) if intent is not None else 1.0
+        context["confidence"] = confidence
+        context["confidence_threshold"] = settings.hitl_confidence_threshold
+
+        risk_threshold = settings.hitl_risk_threshold
+        context["risk_threshold"] = risk_threshold
+
+        if intent is not None and user_message is not None and working_memory is not None:
+            context["risk_score"] = await self._evaluate_risk(
+                intent, user_message, working_memory, project_id
+            )
+        else:
+            context["risk_score"] = 0.0
+
+        return context
+
     async def _handle_single_step(
         self,
         tree: TaskTree,
         working_memory: WorkingMemory,
         project_id: str,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
     ) -> TurnResult:
         """Handle single-step tasks (e.g., file conversion)."""
         # Handle non-executable fallback suggestions directly.
@@ -813,9 +948,9 @@ class TurnRunner:
             return self._build_fallback_result(tree, working_memory)
 
         orchestrator = self._get_orchestrator()
-        context = {"project_id": project_id}
-        if getattr(self, "_trace_id", None):
-            context["trace_id"] = self._trace_id
+        context = await self._build_orchestrator_context(
+            project_id, intent=intent, user_message=user_message, working_memory=working_memory
+        )
         results = await orchestrator.run_tree(tree, context=context)
 
         # Check for HITL
@@ -856,6 +991,8 @@ class TurnRunner:
         tree: TaskTree,
         working_memory: WorkingMemory,
         project_id: str,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
     ) -> TurnResult:
         """Handle complex multi-step workflows."""
         # Handle non-executable fallback suggestions directly.
@@ -863,9 +1000,9 @@ class TurnRunner:
             return self._build_fallback_result(tree, working_memory)
 
         orchestrator = self._get_orchestrator()
-        context = {"project_id": project_id}
-        if getattr(self, "_trace_id", None):
-            context["trace_id"] = self._trace_id
+        context = await self._build_orchestrator_context(
+            project_id, intent=intent, user_message=user_message, working_memory=working_memory
+        )
         results = await orchestrator.run_tree(tree, context=context)
 
         # Check for HITL

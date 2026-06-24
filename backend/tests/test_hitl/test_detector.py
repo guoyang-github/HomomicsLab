@@ -42,6 +42,30 @@ def test_detects_high_cost(detector):
     assert checkpoint.trigger_reason == HITLTrigger.HIGH_COST
 
 
+def test_detects_low_confidence(detector):
+    task = TaskNode(id="t1", name="load", description="load data")
+    checkpoint = detector.check(
+        task,
+        context={"confidence": 0.5, "confidence_threshold": 0.7},
+    )
+    assert checkpoint is not None
+    assert checkpoint.trigger_reason == HITLTrigger.LOW_CONFIDENCE
+    assert checkpoint.metadata["confidence"] == 0.5
+    assert checkpoint.metadata["confidence_threshold"] == 0.7
+
+
+def test_detects_high_risk(detector):
+    task = TaskNode(id="t1", name="delete", description="delete dataset")
+    checkpoint = detector.check(
+        task,
+        context={"risk_score": 0.8, "risk_threshold": 0.6},
+    )
+    assert checkpoint is not None
+    assert checkpoint.trigger_reason == HITLTrigger.HIGH_RISK
+    assert checkpoint.metadata["risk_score"] == 0.8
+    assert checkpoint.metadata["risk_threshold"] == 0.6
+
+
 def test_no_checkpoint_for_simple_task(detector):
     task = TaskNode(id="t1", name="load", description="load data")
     checkpoint = detector.check(task, context={})
