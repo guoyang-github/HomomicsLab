@@ -11,6 +11,7 @@ import { chatApi, fileApi } from '@/services/api'
 import { Button } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import type { ChatMessage, PlanRequestContent } from '@/types/chat'
+import type { SendMessageResponse } from '@/types/api'
 import type { TaskProgress } from '@/types/tasks'
 
 function generateSessionName(message: string): string {
@@ -59,8 +60,73 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     textareaRef.current?.focus()
   }, [draftInput, setDraftInput])
 
+  const processSendResponse = (response: { data: SendMessageResponse }) => {
+    const tasks = response.data.task_tree?.tasks || []
+    setTaskTree(tasks)
+    setProgress(_extractProgress(tasks))
+    const lastMsg = response.data.messages[response.data.messages.length - 1]
+
+    let agentMessage: ChatMessage
+    if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
+      const planContent: PlanRequestContent = {
+        plan_id: response.data.plan_id || response.data.plan.plan_id,
+        response_text: response.data.response,
+        plan: response.data.plan,
+      }
+      loadPlan(planContent)
+      agentMessage = {
+        id: `msg_${Date.now()}_agent`,
+        type: 'plan_request',
+        content: planContent as unknown as Record<string, unknown>,
+        sender: 'agent',
+        timestamp: new Date().toISOString(),
+      }
+    } else if (lastMsg?.type === 'execution_plan') {
+      agentMessage = {
+        id: `msg_${Date.now()}_agent`,
+        type: 'execution_plan',
+        content: lastMsg.content,
+        sender: 'agent',
+        timestamp: new Date().toISOString(),
+      }
+    } else if (response.data.status === 'completed' && tasks.length === 0) {
+      agentMessage = {
+        id: `msg_${Date.now()}_agent`,
+        type: 'text',
+        content: response.data.response,
+        sender: 'agent',
+        timestamp: new Date().toISOString(),
+      }
+    } else {
+      const progress = _extractProgress(tasks)
+      agentMessage = {
+        id: `msg_${Date.now()}_agent`,
+        type: 'todo_list',
+        content: {
+          text: response.data.response,
+          tasks: tasks,
+          progress,
+          job_id: response.data.job_id || undefined,
+        },
+        sender: 'agent',
+        timestamp: new Date().toISOString(),
+      }
+    }
+    addMessage(agentMessage)
+
+    // Start monitoring any queued job.
+    if (response.data.job_id) {
+      resetExecution()
+      setJobId(response.data.job_id)
+      setTaskTree(tasks)
+      const progress = _extractProgress(tasks)
+      setProgress(progress)
+    }
+  }
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    const trimmed = input.trim()
+    if (!trimmed || isLoading) return
 
     let sessionId = currentSessionId
     if (!sessionId) {
@@ -72,7 +138,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
       const isGenericName =
         currentSession.name === 'Default Session' || currentSession.name.startsWith('Session ')
       if (isGenericName) {
-        useChatStore.getState().renameSession(currentSession.id, generateSessionName(input))
+        useChatStore.getState().renameSession(currentSession.id, generateSessionName(trimmed))
       }
     }
 
@@ -81,7 +147,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       type: 'text',
-      content: input,
+      content: trimmed,
       sender: 'user',
       timestamp: new Date().toISOString(),
     }
@@ -91,75 +157,30 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     setIsLoading(true)
     setIsTyping(true)
 
+    // Natural-language shortcuts.
+    const isRegenerateCmd = /^(重新输出|regenerate|retry|再试一次|重新生成)$/i.test(trimmed)
+    const isHelpShortcut = trimmed === '?'
+
     try {
+      if (isRegenerateCmd) {
+        const response = await chatApi.regenerate({
+          project_id: currentProjectId,
+          session_id: sessionId,
+          message: '',
+          plan_mode: planMode,
+        })
+        processSendResponse(response)
+        return
+      }
+
+      const apiMessage = isHelpShortcut ? 'what can you do?' : trimmed
       const response = await chatApi.sendMessage({
         project_id: currentProjectId,
         session_id: sessionId,
-        message: input,
+        message: apiMessage,
         plan_mode: planMode,
       })
-
-      const tasks = response.data.task_tree?.tasks || []
-      setTaskTree(tasks)
-      setProgress(_extractProgress(tasks))
-      const lastMsg = response.data.messages[response.data.messages.length - 1]
-
-      let agentMessage: ChatMessage
-      if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
-        const planContent: PlanRequestContent = {
-          plan_id: response.data.plan_id || response.data.plan.plan_id,
-          response_text: response.data.response,
-          plan: response.data.plan,
-        }
-        loadPlan(planContent)
-        agentMessage = {
-          id: `msg_${Date.now()}_agent`,
-          type: 'plan_request',
-          content: planContent as unknown as Record<string, unknown>,
-          sender: 'agent',
-          timestamp: new Date().toISOString(),
-        }
-      } else if (lastMsg?.type === 'execution_plan') {
-        agentMessage = {
-          id: `msg_${Date.now()}_agent`,
-          type: 'execution_plan',
-          content: lastMsg.content,
-          sender: 'agent',
-          timestamp: new Date().toISOString(),
-        }
-      } else if (response.data.status === 'completed' && tasks.length === 0) {
-        agentMessage = {
-          id: `msg_${Date.now()}_agent`,
-          type: 'text',
-          content: response.data.response,
-          sender: 'agent',
-          timestamp: new Date().toISOString(),
-        }
-      } else {
-        const progress = _extractProgress(tasks)
-        agentMessage = {
-          id: `msg_${Date.now()}_agent`,
-          type: 'todo_list',
-          content: {
-            text: response.data.response,
-            tasks: tasks,
-            progress,
-            job_id: response.data.job_id || undefined,
-          },
-          sender: 'agent',
-          timestamp: new Date().toISOString(),
-        }
-      }
-      addMessage(agentMessage)
-
-      // Start monitoring any queued job.
-      if (response.data.job_id) {
-        resetExecution()
-        setJobId(response.data.job_id)
-        setTaskTree(tasks)
-        const progress = _extractProgress(tasks)
-        setProgress(progress)
-      }
+      processSendResponse(response)
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error('Chat send failed:', error)
