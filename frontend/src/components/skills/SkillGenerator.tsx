@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Wand2, Sparkles, FileCode2, Check } from 'lucide-react'
+import { Wand2, Sparkles, FileCode2, Check, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import {
   Button,
@@ -18,6 +18,14 @@ interface GeneratedFile {
   content: string
 }
 
+interface SkillInput {
+  id: string
+  name: string
+  description: string
+  required: boolean
+  default: string
+}
+
 export function SkillGenerator() {
   const { t } = useTranslation()
   const [name, setName] = useState('')
@@ -28,6 +36,12 @@ export function SkillGenerator() {
   const [supportedTools, setSupportedTools] = useState('')
   const [keywords, setKeywords] = useState('')
   const [dependencies, setDependencies] = useState('')
+  const [inputs, setInputs] = useState<SkillInput[]>([
+    { id: '1', name: 'input_file', description: 'Input data file', required: true, default: '' },
+  ])
+  const [outputs, setOutputs] = useState<{ id: string; name: string }[]>([
+    { id: '1', name: 'output_file' },
+  ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([])
@@ -73,8 +87,13 @@ export function SkillGenerator() {
           supported_tools: supportedTools.split(',').map((s) => s.trim()).filter(Boolean),
           keywords: keywords.split(',').map((s) => s.trim()).filter(Boolean),
           dependencies: dependencies.split(',').map((s) => s.trim()).filter(Boolean),
-          inputs: [{ name: 'input_file', description: 'Input data file' }],
-          outputs: ['output_file'],
+          inputs: inputs.map((inp) => ({
+            name: inp.name,
+            description: inp.description,
+            required: inp.required,
+            default: inp.default || undefined,
+          })),
+          outputs: outputs.map((out) => out.name),
         }),
       })
 
@@ -94,6 +113,33 @@ export function SkillGenerator() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const addInput = () => {
+    setInputs((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: '', description: '', required: false, default: '' },
+    ])
+  }
+
+  const updateInput = (id: string, field: keyof SkillInput, value: string | boolean) => {
+    setInputs((prev) => prev.map((inp) => (inp.id === id ? { ...inp, [field]: value } : inp)))
+  }
+
+  const removeInput = (id: string) => {
+    setInputs((prev) => prev.filter((inp) => inp.id !== id))
+  }
+
+  const addOutput = () => {
+    setOutputs((prev) => [...prev, { id: crypto.randomUUID(), name: '' }])
+  }
+
+  const updateOutput = (id: string, value: string) => {
+    setOutputs((prev) => prev.map((out) => (out.id === id ? { ...out, name: value } : out)))
+  }
+
+  const removeOutput = (id: string) => {
+    setOutputs((prev) => prev.filter((out) => out.id !== id))
   }
 
   return (
@@ -175,6 +221,90 @@ export function SkillGenerator() {
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('skills.generator.dependencies')}</label>
               <Input value={dependencies} onChange={(e) => setDependencies(e.target.value)} placeholder="scanpy, anndata, matplotlib" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">{t('skills.generator.inputs')}</label>
+                <Button type="button" variant="ghost" size="sm" onClick={addInput}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  {t('skills.generator.addInput')}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {inputs.map((inp) => (
+                  <div key={inp.id} className="rounded-lg border border-border bg-card p-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={inp.name}
+                        onChange={(e) => updateInput(inp.id, 'name', e.target.value)}
+                        placeholder={t('skills.generator.inputName')}
+                      />
+                      <Input
+                        value={inp.description}
+                        onChange={(e) => updateInput(inp.id, 'description', e.target.value)}
+                        placeholder={t('skills.generator.inputDescription')}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        value={inp.default}
+                        onChange={(e) => updateInput(inp.id, 'default', e.target.value)}
+                        placeholder="Default value (optional)"
+                        className="flex-1"
+                      />
+                      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                        <Input
+                          type="checkbox"
+                          checked={inp.required}
+                          onChange={(e) => updateInput(inp.id, 'required', e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        {t('skills.generator.inputRequired')}
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeInput(inp.id)}
+                        title={t('skills.generator.removeInput')}
+                      >
+                        <Trash2 className="h-4 w-4 text-error" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">{t('skills.generator.outputs')}</label>
+                <Button type="button" variant="ghost" size="sm" onClick={addOutput}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  {t('skills.generator.addOutput')}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {outputs.map((out) => (
+                  <div key={out.id} className="flex items-center gap-2">
+                    <Input
+                      value={out.name}
+                      onChange={(e) => updateOutput(out.id, e.target.value)}
+                      placeholder={t('skills.generator.outputName')}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeOutput(out.id)}
+                      title={t('skills.generator.removeOutput')}
+                    >
+                      <Trash2 className="h-4 w-4 text-error" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {error && <p className="text-sm text-error">{error}</p>}
