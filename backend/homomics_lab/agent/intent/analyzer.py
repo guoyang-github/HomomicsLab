@@ -297,6 +297,33 @@ class CascadeIntentAnalyzer:
                 "uniprot_search",
                 "geo_search",
             ):
+                # Some users mention a database name to ask where the previous
+                # answer came from, not to run a search. If the query is missing
+                # or meaningless, answer directly instead of calling the tool.
+                tool_inputs = self._extract_mcp_inputs(top_keyword.analysis_type, message)
+                if self._is_meta_source_question(message) or self._is_meaningless_query(
+                    tool_inputs.get("query", "")
+                ):
+                    guard_match = IntentMatch(
+                        analysis_type="qa",
+                        confidence=0.9,
+                        source="keyword_guardrail",
+                        reason="tool keyword present but message asks about source or lacks a usable query",
+                        weight=top_keyword.weight,
+                        structured=StructuredIntent(
+                            intent_type="qa",
+                            interaction_mode="answer",
+                            target="answer_question",
+                            scope="single_step",
+                            confidence=0.9,
+                            reason="tool keyword present but message asks about source or lacks a usable query",
+                        ),
+                    )
+                    intent = self._to_user_intent(
+                        guard_match, message, alternatives=keyword_matches
+                    )
+                    self._enrich_with_cbkb(intent, cbkb)
+                    return intent
                 intent = self._to_user_intent(
                     top_keyword, message, alternatives=keyword_matches[1:]
                 )
@@ -789,8 +816,8 @@ class CascadeIntentAnalyzer:
         # For search tools, try to capture the query phrase.
         query = ""
         patterns = [
-            r"(?:搜索|查找|查|search|find|query)\s*[:=]?\s*[\"']?([^\"'\n，。]+)",
-            r"(?:关于|for|about)\s*[:=]?\s*[\"']?([^\"'\n，。]+)",
+            r"(?:搜索|查找|查|search|find|query)\s*[:=]?\s*[\"']?([^\"'\n，。]{2,})",
+            r"(?:关于|for|about)\s*[:=]?\s*[\"']?([^\"'\n，。]{2,})",
         ]
         for pattern in patterns:
             m = re.search(pattern, lower)
@@ -817,6 +844,41 @@ class CascadeIntentAnalyzer:
         if analysis_type == "uniprot_search":
             return {"query": query, "limit": limit}
         return {"query": query}
+
+    @staticmethod
+    def _is_meta_source_question(message: str) -> bool:
+        """Return True when the user is asking about the source of an answer.
+
+        Examples:
+            - "你这个信息是从 pubmed 查的？"
+            - "Is this from PubMed?"
+            - "数据来源于 GEO 吗？"
+        """
+        lower = message.lower()
+        patterns = [
+            r"是\s*从\s*\S+\s*查的",
+            r"是\s*在\s*\S+\s*查的",
+            r"从\s*\S+\s*(?:查|来|找|搜索)",
+            r"(?:来源|来自|based\s+on|from)\s*(?:pubmed|uniprot|geo|文献|数据库)",
+            r"(?:pubmed|uniprot|geo|文献|数据库)\s*(?:来源|来自|from)",
+            r"你[这那].*?(?:从|在).*?(?:查|来|找)",
+        ]
+        return any(re.search(p, lower) for p in patterns)
+
+    @staticmethod
+    def _is_meaningless_query(query: str) -> bool:
+        """Return True if the extracted search query has no real content."""
+        if not isinstance(query, str):
+            return True
+        cleaned = re.sub(r"[^\w\s]", "", query.strip())
+        cleaned = re.sub(r"\s+", "", cleaned)
+        if len(cleaned) < 2:
+            return True
+        particles = {
+            "的", "了", "吗", "呢", "吧", "啊", "嗯", "哦",
+            "是", "在", "从", "查", "找", "搜索", "的查",
+        }
+        return cleaned in particles
 
     def _to_user_intent(
         self,

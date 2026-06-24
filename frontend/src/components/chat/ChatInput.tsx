@@ -66,11 +66,17 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     setProgress(_extractProgress(tasks))
     const lastMsg = response.data.messages[response.data.messages.length - 1]
 
+    // Prefer the backend's top-level response, but fall back to the last stored
+    // message content if the response field is empty/whitespace.
+    const responseText =
+      response.data.response?.trim() ||
+      (typeof lastMsg?.content === 'string' ? lastMsg.content : '')
+
     let agentMessage: ChatMessage
     if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
       const planContent: PlanRequestContent = {
         plan_id: response.data.plan_id || response.data.plan.plan_id,
-        response_text: response.data.response,
+        response_text: responseText,
         plan: response.data.plan,
       }
       loadPlan(planContent)
@@ -93,7 +99,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
       agentMessage = {
         id: `msg_${Date.now()}_agent`,
         type: 'text',
-        content: response.data.response,
+        content: responseText,
         sender: 'agent',
         timestamp: new Date().toISOString(),
       }
@@ -103,7 +109,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         id: `msg_${Date.now()}_agent`,
         type: 'todo_list',
         content: {
-          text: response.data.response,
+          text: responseText,
           tasks: tasks,
           progress,
           job_id: response.data.job_id || undefined,

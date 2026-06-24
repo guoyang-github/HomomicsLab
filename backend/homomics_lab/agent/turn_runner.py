@@ -571,6 +571,12 @@ class TurnRunner:
                 intent, user_message, working_memory, project_id
             )
 
+        # Never store or return a completely empty assistant text bubble.
+        if not response_text or not str(response_text).strip():
+            response_text = (
+                "我暂时无法生成回答，请稍后再试，或换一种方式描述您的问题。"
+            )
+
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
             type=MessageType.TEXT,

@@ -94,6 +94,15 @@ export function MessageBubble({ message, onRegenerate }: Props) {
   const isUser = message.sender === 'user'
   const [copied, setCopied] = useState(false)
 
+  // Avoid rendering empty/whitespace-only text bubbles (e.g. stale LLM output).
+  if (
+    message.type === 'text' &&
+    typeof message.content === 'string' &&
+    !message.content.trim()
+  ) {
+    return null
+  }
+
   const handleCopy = async () => {
     const text = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2)
     await navigator.clipboard.writeText(text)

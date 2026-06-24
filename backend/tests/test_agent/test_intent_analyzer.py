@@ -138,3 +138,31 @@ async def test_structured_intent_fields_for_single_step(analyzer_with_single_cel
     assert intent.interaction_mode == "execute"
     assert intent.scope == "single_step"
     assert intent.target == "convert_file"
+
+
+@pytest.mark.asyncio
+async def test_pubmed_meta_source_question_routes_to_qa(analyzer):
+    """A question about whether information came from PubMed should not run pubmed_search."""
+    intent = await analyzer.analyze("你这个信息是从 pubmed 查的？")
+    assert intent.analysis_type == "qa"
+    assert intent.interaction_mode == "answer"
+    assert intent.metadata.get("tool_name") is None
+
+
+@pytest.mark.asyncio
+async def test_pubmed_meaningless_query_routes_to_qa(analyzer):
+    """If no usable query can be extracted, do not invoke the PubMed tool."""
+    intent = await analyzer.analyze("pubmed 查")
+    assert intent.analysis_type == "qa"
+    assert intent.interaction_mode == "answer"
+    assert intent.metadata.get("tool_name") is None
+
+
+@pytest.mark.asyncio
+async def test_pubmed_real_search_still_routes_to_tool(analyzer):
+    """A normal PubMed search request should still route to the tool."""
+    intent = await analyzer.analyze("pubmed 搜索 single-cell RNA-seq")
+    assert intent.analysis_type == "pubmed_search"
+    assert intent.interaction_mode == "execute"
+    assert intent.metadata.get("tool_name") == "pubmed_search"
+    assert "single-cell" in intent.metadata.get("tool_inputs", {}).get("query", "")
