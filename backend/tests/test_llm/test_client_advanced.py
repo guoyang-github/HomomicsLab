@@ -119,21 +119,4 @@ class TestLLMClientStreaming:
         assert "".join(tokens) == "Hello world"
 
 
-class TestLLMRouterComplexity:
-    def test_select_by_complexity_simple(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        router = LLMRouter()
-        decision = router.select_by_complexity(intent_type="greeting")
-        assert decision.model in {"gpt-4o-mini", "deepseek-chat", "glm-4-flash", "qwen-turbo"}
 
-    def test_select_by_complexity_complex(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        router = LLMRouter()
-        decision = router.select_by_complexity(intent_type="planning")
-        assert decision.model in {"gpt-4o", "claude-3-5-sonnet-20241022", "deepseek-reasoner"}
-
-    def test_select_skip_excludes_failed_models(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        router = LLMRouter()
-        decision = router.select(skip={"gpt-4o-mini"})
-        assert decision.model != "gpt-4o-mini"

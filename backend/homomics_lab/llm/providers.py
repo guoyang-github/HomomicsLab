@@ -7,11 +7,22 @@ drive them with the ``openai`` package by swapping ``base_url`` and ``api_key``.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from homomics_lab.config import settings
 from homomics_lab.secrets import get_secrets_manager
+
+
+@dataclass
+class ModelCapability:
+    """Capability metadata for a model used in capability-based routing."""
+
+    context_window: int = 0
+    cost_rank: int = 99  # 1=cheapest; lower is cheaper
+    supports_reasoning: bool = False
+    supports_tool_calling: bool = False
+    strengths: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -27,6 +38,7 @@ class ProviderConfig:
     secret_namespace: str = "llm"
     explicit_api_key: Optional[str] = None
     explicit_base_url: Optional[str] = None
+    model_capabilities: Dict[str, ModelCapability] = field(default_factory=dict)
 
     @property
     def resolved_base_url(self) -> str:
@@ -67,6 +79,21 @@ class ProviderRegistry:
                 api_key_env="OPENAI_API_KEY",
                 secret_key="OPENAI_API_KEY",
                 default_models=["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+                model_capabilities={
+                    "gpt-4o": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=3,
+                        supports_reasoning=False,
+                        supports_tool_calling=True,
+                        strengths=["analysis", "coding", "reasoning"],
+                    ),
+                    "gpt-4o-mini": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=1,
+                        supports_tool_calling=True,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         self.register(
@@ -77,6 +104,13 @@ class ProviderRegistry:
                 api_key_env="ANTHROPIC_API_KEY",
                 secret_key="ANTHROPIC_API_KEY",
                 default_models=["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+                model_capabilities={
+                    "claude-3-5-sonnet-20241022": ModelCapability(
+                        context_window=200_000,
+                        cost_rank=3,
+                        strengths=["analysis", "coding", "long_context"],
+                    ),
+                },
             )
         )
         # Domestic / China-friendly providers (OpenAI-compatible)
@@ -88,6 +122,17 @@ class ProviderRegistry:
                 api_key_env="DEEPSEEK_API_KEY",
                 secret_key="DEEPSEEK_API_KEY",
                 default_models=["deepseek-chat", "deepseek-coder", "deepseek-reasoner"],
+                model_capabilities={
+                    "deepseek-reasoner": ModelCapability(
+                        cost_rank=2,
+                        supports_reasoning=True,
+                        strengths=["reasoning", "coding"],
+                    ),
+                    "deepseek-chat": ModelCapability(
+                        cost_rank=1,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         self.register(
@@ -98,6 +143,18 @@ class ProviderRegistry:
                 api_key_env="DASHSCOPE_API_KEY",
                 secret_key="DASHSCOPE_API_KEY",
                 default_models=["qwen-turbo", "qwen-plus", "qwen-max"],
+                model_capabilities={
+                    "qwen-max": ModelCapability(
+                        context_window=32_000,
+                        cost_rank=3,
+                        strengths=["analysis", "coding"],
+                    ),
+                    "qwen-turbo": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=1,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         self.register(
@@ -108,6 +165,17 @@ class ProviderRegistry:
                 api_key_env="ZHIPU_API_KEY",
                 secret_key="ZHIPU_API_KEY",
                 default_models=["glm-4", "glm-4-flash", "glm-4-air"],
+                model_capabilities={
+                    "glm-4": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=2,
+                        strengths=["analysis"],
+                    ),
+                    "glm-4-flash": ModelCapability(
+                        cost_rank=1,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         self.register(
@@ -118,6 +186,17 @@ class ProviderRegistry:
                 api_key_env="MOONSHOT_API_KEY",
                 secret_key="MOONSHOT_API_KEY",
                 default_models=["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+                model_capabilities={
+                    "moonshot-v1-128k": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=2,
+                        strengths=["long_context", "analysis"],
+                    ),
+                    "moonshot-v1-8k": ModelCapability(
+                        cost_rank=1,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         self.register(
@@ -128,6 +207,21 @@ class ProviderRegistry:
                 api_key_env="AZURE_OPENAI_KEY",
                 secret_key="AZURE_OPENAI_KEY",
                 default_models=["gpt-4o", "gpt-4o-mini"],
+                model_capabilities={
+                    "gpt-4o": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=3,
+                        supports_reasoning=False,
+                        supports_tool_calling=True,
+                        strengths=["analysis", "coding", "reasoning"],
+                    ),
+                    "gpt-4o-mini": ModelCapability(
+                        context_window=128_000,
+                        cost_rank=1,
+                        supports_tool_calling=True,
+                        strengths=["classification", "cheap"],
+                    ),
+                },
             )
         )
         # Local / self-hosted
@@ -153,6 +247,17 @@ class ProviderRegistry:
 
     def list_configured(self) -> List[ProviderConfig]:
         return [p for p in self._providers.values() if p.is_configured()]
+
+    def list_models_with_capabilities(
+        self,
+    ) -> Iterator[Tuple[str, str, ModelCapability]]:
+        """Yield (provider_name, model, capability) tuples for configured providers."""
+        for provider in self.list_configured():
+            for model in provider.default_models:
+                capability = provider.model_capabilities.get(
+                    model, ModelCapability(strengths=[])
+                )
+                yield (provider.name, model, capability)
 
     def infer_provider(
         self,

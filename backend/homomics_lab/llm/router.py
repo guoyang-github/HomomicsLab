@@ -198,6 +198,43 @@ class LLMRouter:
             "DASHSCOPE_API_KEY, ZHIPU_API_KEY, MOONSHOT_API_KEY, or OLLAMA_API_KEY."
         )
 
+    def _build_capability_candidates(
+        self,
+        intent_type: str,
+        input_token_count: int,
+    ) -> List[str]:
+        """Build a model candidate list using provider capability metadata."""
+        simple_intents = {"greeting", "clarification", "chitchat", "faq", "status"}
+        complex_intents = {"planning", "interpretation", "code_generation", "analysis", "debug"}
+
+        models = list(self.registry.list_models_with_capabilities())
+
+        if input_token_count > 120_000:
+            candidates = [
+                model
+                for _, model, cap in models
+                if cap.context_window >= 120_000 or "long_context" in cap.strengths
+            ]
+        elif intent_type in simple_intents:
+            candidates = [
+                model
+                for _, model, cap in models
+                if cap.cost_rank == 1 or "classification" in cap.strengths
+            ]
+        elif intent_type in complex_intents:
+            candidates = [
+                model
+                for _, model, cap in models
+                if any(strength in cap.strengths for strength in ("reasoning", "coding", "analysis"))
+            ]
+        else:
+            return []
+
+        # Ensure stable, deterministic ordering: cost rank ascending, then model name.
+        candidate_caps = {model: cap for _, model, cap in models}
+        candidates = sorted(set(candidates), key=lambda m: (candidate_caps[m].cost_rank, m))
+        return candidates
+
     def select_by_complexity(
         self,
         intent_type: str = "general",
@@ -211,21 +248,19 @@ class LLMRouter:
         prefer models with large context windows.
         """
         # Local/self-hosted providers only have the user's pulled models; the
-        # hard-coded cloud complexity candidates would all 404.  Fall back to the
+        # capability-based cloud candidates would all 404.  Fall back to the
         # normal selection, which is constrained to the local model.
         if self._is_local_provider(self.runtime_config):
             return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
-        simple_intents = {"greeting", "clarification", "chitchat", "faq", "status"}
-        complex_intents = {"planning", "interpretation", "code_generation", "analysis", "debug"}
+        # If complexity routing is disabled, fall back to the standard selection.
+        if not getattr(settings, "llm_complexity_routing_enabled", True):
+            return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
-        if input_token_count > 120_000:
-            candidates = ["claude-3-5-sonnet-20241022", "moonshot-v1-128k", "gpt-4o"]
-        elif intent_type in simple_intents:
-            candidates = ["gpt-4o-mini", "deepseek-chat", "glm-4-flash", "qwen-turbo"]
-        elif intent_type in complex_intents:
-            candidates = ["gpt-4o", "claude-3-5-sonnet-20241022", "deepseek-reasoner"]
-        else:
+        candidates = self._build_capability_candidates(intent_type, input_token_count)
+
+        # For unknown or general intents, fall back to primary + fallback chain.
+        if not candidates:
             candidates = [self.primary_model] + self.fallback_models
 
         seen = set()
@@ -248,7 +283,7 @@ class LLMRouter:
                 estimated_input_cost_usd=estimated,
                 reason=f"complexity:{intent_type}",
             )
-        # Fall back to normal selection if complexity candidates fail budget/provider.
+        # Fall back to normal selection if capability candidates fail budget/provider.
         return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
     def list_available_models(self) -> List[Dict[str, str]]:

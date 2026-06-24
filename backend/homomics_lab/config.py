@@ -204,7 +204,7 @@ class Settings(BaseSettings):
     llm_response_cache_dir: Path = Field(default_factory=lambda: Path("./data/llm_cache"))
     llm_response_cache_ttl_seconds: float = 3600.0
     llm_response_cache_max_entries: int = 1000
-    llm_complexity_routing_enabled: bool = False
+    llm_complexity_routing_enabled: bool = True
 
     @field_validator("llm_response_cache_backend")
     @classmethod
