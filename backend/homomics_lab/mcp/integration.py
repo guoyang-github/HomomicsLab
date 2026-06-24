@@ -22,7 +22,11 @@ async def register_mcp_tools(tool_registry: ToolRegistry) -> Optional[BioMCPClie
         return None
 
     try:
-        client = BioMCPClient(mode=settings.mcp_mode)
+        client = BioMCPClient(
+            mode=settings.mcp_mode,
+            server_script=settings.mcp_server_script,
+            server_url=settings.mcp_server_url,
+        )
         await client.connect()
     except Exception as exc:
         logger.warning(

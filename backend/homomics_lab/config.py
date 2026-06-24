@@ -304,6 +304,15 @@ class Settings(BaseSettings):
     mcp_enabled: bool = True
     mcp_mode: str = "embedded"  # "embedded" | "stdio" | "sse"
     mcp_server_script: Optional[str] = None
+    mcp_server_url: Optional[str] = None
+
+    @field_validator("mcp_mode")
+    @classmethod
+    def _validate_mcp_mode(cls, v: str) -> str:
+        allowed = {"embedded", "stdio", "sse"}
+        if v not in allowed:
+            raise ValueError(f"mcp_mode must be one of {allowed}, got {v}")
+        return v
 
     # Session / memory settings
     session_store_url: str = "sqlite+aiosqlite:///./data/sessions.db"
