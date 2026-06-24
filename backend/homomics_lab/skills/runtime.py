@@ -106,7 +106,7 @@ class SkillRuntimeExecutor:
         self,
         plan,
         inputs: Dict[str, Any],
-        timeout_seconds: float = 3600.0,
+        timeout_seconds: float = settings.default_job_timeout_seconds,
     ) -> Dict[str, Any]:
         """Run a full PlanResult as a Nextflow workflow project.
 
@@ -323,6 +323,13 @@ class SkillRuntimeExecutor:
 
         # Validate inputs (schema-based defaults)
         validated = skill.validate_input(inputs)
+
+        # Allow a per-task timeout override from raw inputs without requiring
+        # every skill schema to declare it.
+        for override_key in ("timeout_seconds", "_timeout_seconds"):
+            if override_key in inputs and "_timeout_seconds" not in validated:
+                validated["_timeout_seconds"] = inputs[override_key]
+                break
 
         start_time = time.time()
         fingerprint = skill.metadata.get("sha256") or skill.metadata.get("version") or ""
@@ -728,7 +735,8 @@ class SkillRuntimeExecutor:
         # Dependency preparation is now handled by the scheduler's EnvironmentManager,
         # which creates isolated venvs/project libraries and installs dependencies when
         # settings.auto_install_dependencies is enabled.
-        timeout = self._parse_timeout(skill.runtime.resources.time)
+        task_override = inputs.get("timeout_seconds") or inputs.get("_timeout_seconds")
+        timeout = self._parse_timeout(task_override or skill.runtime.resources.time)
 
         entrypoint_path = self._resolve_entrypoint(skill, scripts_dir)
         if entrypoint_path is not None:
@@ -797,16 +805,24 @@ class SkillRuntimeExecutor:
         return "\n".join(code_parts)
 
     def _parse_timeout(self, time_str: str) -> float:
-        """Parse time string like '30m' or '1h' into seconds."""
-        time_str = str(time_str).strip()
-        if time_str.endswith("m"):
-            seconds = float(time_str[:-1]) * 60
-        elif time_str.endswith("h"):
-            seconds = float(time_str[:-1]) * 3600
-        elif time_str.endswith("s"):
-            seconds = float(time_str[:-1])
-        else:
-            seconds = float(time_str)
+        """Parse time string like '30m' or '1h' into seconds.
 
-        # Cap at 1 hour for MVP
-        return min(seconds, 3600.0)
+        - Empty/None values fall back to ``settings.default_job_timeout_seconds``.
+        - Results are clamped to ``settings.max_skill_timeout_seconds``.
+        - Always returns at least 1 second.
+        """
+        if time_str is None or str(time_str).strip() == "":
+            seconds = settings.default_job_timeout_seconds
+        else:
+            time_str = str(time_str).strip()
+            if time_str.endswith("m"):
+                seconds = float(time_str[:-1]) * 60
+            elif time_str.endswith("h"):
+                seconds = float(time_str[:-1]) * 3600
+            elif time_str.endswith("s"):
+                seconds = float(time_str[:-1])
+            else:
+                seconds = float(time_str)
+
+        seconds = min(seconds, settings.max_skill_timeout_seconds)
+        return max(seconds, 1.0)

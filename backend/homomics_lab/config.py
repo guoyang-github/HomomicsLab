@@ -268,6 +268,17 @@ class Settings(BaseSettings):
 
     # Job / worker settings
     default_job_timeout_seconds: float = 3600.0
+    max_skill_timeout_seconds: float = 86400.0
+
+    @model_validator(mode="after")
+    def _validate_timeout_bounds(self):
+        if self.default_job_timeout_seconds > self.max_skill_timeout_seconds:
+            raise ValueError(
+                "default_job_timeout_seconds must be <= max_skill_timeout_seconds"
+            )
+        if self.max_skill_timeout_seconds < 1:
+            raise ValueError("max_skill_timeout_seconds must be at least 1")
+        return self
 
     # Result / cache settings
     result_inline_size_limit_bytes: int = 10 * 1024 * 1024

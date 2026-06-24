@@ -175,3 +175,27 @@ def test_literature_settings_env_override(monkeypatch):
     assert settings.ncbi_api_key == "secret-key"
     assert settings.literature_cache_ttl_seconds == 120.0
     assert settings.literature_max_results == 25
+
+
+def test_timeout_settings_defaults():
+    settings = Settings()
+    assert settings.default_job_timeout_seconds == 3600.0
+    assert settings.max_skill_timeout_seconds == 86400.0
+
+
+def test_timeout_settings_env_override(monkeypatch):
+    monkeypatch.setenv("HOMOMICS_DEFAULT_JOB_TIMEOUT_SECONDS", "7200")
+    monkeypatch.setenv("HOMOMICS_MAX_SKILL_TIMEOUT_SECONDS", "43200")
+    settings = Settings()
+    assert settings.default_job_timeout_seconds == 7200.0
+    assert settings.max_skill_timeout_seconds == 43200.0
+
+
+def test_default_job_timeout_cannot_exceed_max():
+    with pytest.raises(ValueError):
+        Settings(default_job_timeout_seconds=90000.0, max_skill_timeout_seconds=3600.0)
+
+
+def test_max_skill_timeout_must_be_positive():
+    with pytest.raises(ValueError):
+        Settings(max_skill_timeout_seconds=0.5)
