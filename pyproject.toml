@@ -47,6 +47,8 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "python-jose>=3.5.0",
     "aiohttp>=3.14.1",
+    "markdown>=3.10.2",
+    "bleach>=6.4.0",
 ]
 
 [project.optional-dependencies]

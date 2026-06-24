@@ -460,60 +460,40 @@ class ReportTemplateEngine:
         except Exception as e:
             raise RuntimeError(f"PDF generation failed: {e}")
 
-    @staticmethod
-    def _markdown_to_html(text: str) -> str:
-        """Simple Markdown to HTML conversion."""
-        lines = text.split("\n")
-        result: List[str] = []
-        in_list = False
-        list_type = ""
+    _ALLOWED_HTML_TAGS = [
+        "p", "br", "hr",
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "ul", "ol", "li",
+        "strong", "em", "code", "pre", "blockquote",
+        "a", "img",
+        "table", "thead", "tbody", "tr", "th", "td",
+    ]
 
-        for line in lines:
-            stripped = line.strip()
+    _ALLOWED_HTML_ATTRS = {
+        "a": ["href", "title"],
+        "img": ["src", "alt", "title"],
+        "code": ["class"],
+        "pre": ["class"],
+    }
 
-            if stripped.startswith("# "):
-                if in_list:
-                    result.append(f"</{list_type}>")
-                    in_list = False
-                result.append(f"<h1>{stripped[2:]}</h1>")
-            elif stripped.startswith("## "):
-                if in_list:
-                    result.append(f"</{list_type}>")
-                    in_list = False
-                result.append(f"<h2>{stripped[3:]}</h2>")
-            elif stripped.startswith("### "):
-                if in_list:
-                    result.append(f"</{list_type}>")
-                    in_list = False
-                result.append(f"<h3>{stripped[4:]}</h3>")
-            elif stripped.startswith("- "):
-                if not in_list or list_type != "ul":
-                    if in_list:
-                        result.append(f"</{list_type}>")
-                    result.append("<ul>")
-                    in_list = True
-                    list_type = "ul"
-                result.append(f"<li>{stripped[2:]}</li>")
-            elif stripped.startswith(("1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. ", "8. ", "9. ")):
-                if not in_list or list_type != "ol":
-                    if in_list:
-                        result.append(f"</{list_type}>")
-                    result.append("<ol>")
-                    in_list = True
-                    list_type = "ol"
-                result.append(f"<li>{stripped[3:]}</li>")
-            elif stripped == "":
-                if in_list:
-                    result.append(f"</{list_type}>")
-                    in_list = False
-                result.append("<br>")
-            else:
-                if in_list:
-                    result.append(f"</{list_type}>")
-                    in_list = False
-                result.append(f"<p>{stripped}</p>")
+    @classmethod
+    def _markdown_to_html(cls, text: str) -> str:
+        """Convert Markdown to sanitized HTML.
 
-        if in_list:
-            result.append(f"</{list_type}>")
+        Uses the ``markdown`` library for parsing and ``bleach`` to strip
+        dangerous tags/attributes so that LLM-generated report content can be
+        rendered safely.
+        """
+        import bleach
+        import markdown
 
-        return "\n".join(result)
+        raw_html = markdown.markdown(
+            text,
+            extensions=["tables", "fenced_code"],
+        )
+        return bleach.clean(
+            raw_html,
+            tags=cls._ALLOWED_HTML_TAGS,
+            attributes=cls._ALLOWED_HTML_ATTRS,
+            strip=True,
+        )

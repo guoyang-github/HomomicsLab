@@ -569,6 +569,18 @@ wheels = [
 ]
 
 [[package]]
+name = "bleach"
+version = "6.4.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
+dependencies = [
+    { name = "webencodings" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/48/3c/e12ac860709702bd5ebeb9b56a4fe334f1001246ee1b8f2b7ee28912df7d/bleach-6.4.0.tar.gz", hash = "sha256:4202482733d85cedd04e59fcb2f89f4e4c7c385a78d3c3c23c30446843a37452", size = 204857, upload-time = "2026-06-05T13:01:13.734Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/58/9d/40b6267367182187139a4000b82a3b287d84d745bccd808e75d916920e9d/bleach-6.4.0-py3-none-any.whl", hash = "sha256:4b6b6a54fff2e69a3dde9d21cc6301220bee3c3cb792187d11403fd795031081", size = 165109, upload-time = "2026-06-05T13:01:12.504Z" },
+]
+
+[[package]]
 name = "boto3"
 version = "1.43.30"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
@@ -1989,11 +2001,13 @@ dependencies = [
     { name = "anndata", version = "0.12.16", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.11'" },
     { name = "apscheduler" },
     { name = "asyncpg" },
+    { name = "bleach" },
     { name = "boto3" },
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "gunicorn" },
     { name = "leidenalg" },
+    { name = "markdown" },
     { name = "mcp" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
@@ -2057,6 +2071,7 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.11.2" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "black", marker = "extra == 'dev'" },
+    { name = "bleach", specifier = ">=6.4.0" },
     { name = "boto3", specifier = ">=1.34.0" },
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "fakeredis", marker = "extra == 'test'", specifier = ">=2.36.1" },
@@ -2064,6 +2079,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=21.0.0" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.26.0" },
     { name = "leidenalg", specifier = ">=0.9.0" },
+    { name = "markdown", specifier = ">=3.10.2" },
     { name = "mcp", specifier = ">=1.27.2" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "nf-core", marker = "extra == 'nfcore'", specifier = ">=2.11.0" },
