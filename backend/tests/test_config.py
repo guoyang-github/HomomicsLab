@@ -152,3 +152,26 @@ def test_debate_judge_backend_accepts_llm():
 def test_debate_judge_backend_rejects_unknown():
     with pytest.raises(ValueError):
         Settings(debate_judge_backend="human")
+
+
+def test_literature_settings_defaults():
+    settings = Settings()
+    assert settings.literature_retrieval_enabled is False
+    assert settings.ncbi_email is None
+    assert settings.ncbi_api_key is None
+    assert settings.literature_cache_ttl_seconds == 3600.0
+    assert settings.literature_max_results == 10
+
+
+def test_literature_settings_env_override(monkeypatch):
+    monkeypatch.setenv("HOMOMICS_LITERATURE_RETRIEVAL_ENABLED", "true")
+    monkeypatch.setenv("HOMOMICS_NCBI_EMAIL", "test@example.com")
+    monkeypatch.setenv("HOMOMICS_NCBI_API_KEY", "secret-key")
+    monkeypatch.setenv("HOMOMICS_LITERATURE_CACHE_TTL_SECONDS", "120.0")
+    monkeypatch.setenv("HOMOMICS_LITERATURE_MAX_RESULTS", "25")
+    settings = Settings()
+    assert settings.literature_retrieval_enabled is True
+    assert settings.ncbi_email == "test@example.com"
+    assert settings.ncbi_api_key == "secret-key"
+    assert settings.literature_cache_ttl_seconds == 120.0
+    assert settings.literature_max_results == 25

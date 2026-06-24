@@ -134,7 +134,7 @@ class SkillRetriever:
         self.data_sources = data_sources or []
         self.literature_retriever = literature_retriever
 
-    def retrieve(
+    async def retrieve(
         self,
         query: str,
         intent_type: str,
@@ -162,7 +162,7 @@ class SkillRetriever:
 
         literature: List[Dict[str, Any]] = []
         if include_literature and self.literature_retriever is not None:
-            literature = self.literature_retriever.retrieve(query)
+            literature = await self.literature_retriever.retrieve(query)
 
         sops: List[Dict[str, Any]] = []
         if include_sops:

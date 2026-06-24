@@ -45,15 +45,17 @@ def skill_registry():
 
 
 class TestSkillRetriever:
-    def test_retrieve_without_dag(self, skill_registry):
+    @pytest.mark.asyncio
+    async def test_retrieve_without_dag(self, skill_registry):
         retriever = SkillRetriever(skill_registry=skill_registry)
-        context = retriever.retrieve("quality control single cell", "single_cell_analysis")
+        context = await retriever.retrieve("quality control single cell", "single_cell_analysis")
 
         assert isinstance(context, RetrievalContext)
         assert context.intent_type == "single_cell_analysis"
         assert any(s.skill.id == "scanpy_qc" for s in context.skills)
 
-    def test_retrieve_with_dag(self, skill_registry, tmp_path):
+    @pytest.mark.asyncio
+    async def test_retrieve_with_dag(self, skill_registry, tmp_path):
         dag = SkillDAG(registry=skill_registry, db_path=tmp_path / "dag.db")
         dag.propose_edge("scanpy_qc", "scanpy_normalize", EdgeType.FOLLOWED_BY)
         edge = dag.edges["scanpy_qc_followed_by_scanpy_normalize"]
@@ -61,15 +63,16 @@ class TestSkillRetriever:
         edge.confidence = 0.9
 
         retriever = SkillRetriever(skill_registry=skill_registry, skill_dag=dag)
-        context = retriever.retrieve("quality control", "single_cell_analysis")
+        context = await retriever.retrieve("quality control", "single_cell_analysis")
 
         qc_retrieved = next((s for s in context.skills if s.skill.id == "scanpy_qc"), None)
         assert qc_retrieved is not None
         assert "scanpy_normalize" in qc_retrieved.followed_by
 
-    def test_retrieve_prompt_context(self, skill_registry):
+    @pytest.mark.asyncio
+    async def test_retrieve_prompt_context(self, skill_registry):
         retriever = SkillRetriever(skill_registry=skill_registry)
-        context = retriever.retrieve("quality control", "single_cell_analysis")
+        context = await retriever.retrieve("quality control", "single_cell_analysis")
         prompt_context = context.to_prompt_context(max_skills=2)
 
         assert prompt_context["query"] == "quality control"

@@ -175,7 +175,7 @@ class PlanEngine:
         phases = strategy.generate_skeleton(data_state)
 
         retrieval_query = self._build_retrieval_query(intent, phases)
-        retrieval_context = self.skill_retriever.retrieve(
+        retrieval_context = await self.skill_retriever.retrieve(
             query=retrieval_query,
             intent_type=intent.analysis_type,
             data_sources=strategy.data_sources,

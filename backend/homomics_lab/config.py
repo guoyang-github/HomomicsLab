@@ -277,6 +277,10 @@ class Settings(BaseSettings):
 
     # Literature / RAP settings
     literature_retrieval_enabled: bool = False  # requires network; disabled by default
+    ncbi_email: Optional[str] = None
+    ncbi_api_key: Optional[str] = None
+    literature_cache_ttl_seconds: float = 3600.0
+    literature_max_results: int = 10
 
     # HITL thresholds
     hitl_confidence_threshold: float = 0.7
