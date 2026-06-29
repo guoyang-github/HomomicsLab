@@ -7,6 +7,7 @@ export type MessageType =
   | 'debate_request'
   | 'tool_call'
   | 'result_preview'
+  | 'follow_up'
   | 'parameter_form'
   | 'file_reference'
   | 'plot'
@@ -84,6 +85,10 @@ export interface PlanModification {
   required?: boolean
   skill_id?: string
   dependencies?: string[]
+}
+
+export interface FollowUpContent {
+  suggestions: string[]
 }
 
 export interface PlanRequestContent {

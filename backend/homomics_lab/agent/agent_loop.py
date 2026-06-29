@@ -10,10 +10,11 @@ isolation.
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.tools.registry import ToolRegistry
@@ -78,6 +79,7 @@ class AgentLoop:
         max_rounds: int = 3,
         budget: Optional[TurnBudget] = None,
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         system_prompt: Optional[str] = None,
     ):
         self.llm_client = llm_client
@@ -88,6 +90,7 @@ class AgentLoop:
         self.max_rounds = max(max_rounds, 1)
         self.budget = budget or TurnBudget()
         self.progress_callback = progress_callback
+        self.event_callback = event_callback
         self.system_prompt = system_prompt or (
             "You are HomomicsLab, an AI assistant for bioinformatics and computational biology. "
             "You have access to tools such as PubMed/GEO/UniProt search. "
@@ -101,6 +104,14 @@ class AgentLoop:
                 self.progress_callback(event, payload)
             except Exception:
                 logger.debug("Progress callback failed", exc_info=True)
+
+    async def _emit(self, event: str, payload: Dict[str, Any]) -> None:
+        """Emit an async event (e.g. to a WebSocket/SSE consumer)."""
+        if self.event_callback is not None:
+            try:
+                await self.event_callback({"event": event, **payload})
+            except Exception:
+                logger.debug("Event callback failed", exc_info=True)
 
     async def run(
         self,
@@ -150,6 +161,7 @@ class AgentLoop:
                     tool_calls_count=tool_calls_count,
                 )
 
+            await self._emit("agent.thinking", {"round": round_idx + 1})
             self._report("thinking", {"round": round_idx + 1})
             try:
                 message, usage = await self.llm_client.chat_completion_message(
@@ -206,6 +218,10 @@ class AgentLoop:
                 except json.JSONDecodeError:
                     inputs = {}
 
+                await self._emit(
+                    "tool_call.start",
+                    {"tool_name": tool_name, "inputs": inputs, "round": round_idx + 1},
+                )
                 self._report(
                     "tool_call",
                     {"tool_name": tool_name, "inputs": inputs, "round": round_idx + 1},
@@ -214,6 +230,15 @@ class AgentLoop:
                 record = await self._execute_tool(tool_call.id, tool_name, inputs)
                 tool_records.append(record)
                 tool_calls_count += 1
+                await self._emit(
+                    "tool_call.complete",
+                    {
+                        "tool_name": tool_name,
+                        "success": record.success,
+                        "output_summary": record.output_summary,
+                        "inputs": inputs,
+                    },
+                )
                 messages.append(self._tool_result_message(tool_call.id, record.output_summary))
 
         # If we exit the loop without a final answer, ask the model one last time

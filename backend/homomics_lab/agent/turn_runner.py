@@ -19,7 +19,7 @@ import re
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +294,7 @@ class TurnRunner:
         debate_response: Optional[Dict[str, Any]] = None,
         plan_mode: bool = False,
         trace_id: Optional[str] = None,
+        event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ) -> TurnResult:
         """Execute one full turn: from user message to agent response.
 
@@ -311,6 +312,7 @@ class TurnRunner:
         self._project_id = project_id
         self._trace_id = trace_id
         self._turn_request_id = f"turn_{session_id}_{int(time.time() * 1000)}"
+        self._event_callback = event_callback
 
         # 1. Record user message
         user_msg = ChatMessage(
@@ -703,6 +705,7 @@ class TurnRunner:
             request_id=getattr(self, "_turn_request_id", None),
             max_rounds=3,
             budget=TurnBudget(max_llm_calls=5, max_tool_calls=10),
+            event_callback=getattr(self, "_event_callback", None),
         )
         result = await loop.run(
             user_message=user_message,
@@ -743,11 +746,59 @@ class TurnRunner:
             )
             working_memory.add_message(preview_msg)
 
+        # Suggest follow-up questions for direct text/tool answers.
+        suggestions = await self._generate_followup_suggestions(
+            user_message=user_message,
+            response_text=response_text,
+        )
+        if suggestions:
+            follow_up_msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.FOLLOW_UP,
+                content={"suggestions": suggestions},
+                sender="agent",
+            )
+            working_memory.add_message(follow_up_msg)
+
         return TurnResult(
             mode=ExecutionMode.DIRECT_RESPONSE,
             response_text=response_text,
             agent_message=agent_msg,
         )
+
+    async def _generate_followup_suggestions(
+        self,
+        user_message: str,
+        response_text: str,
+        max_suggestions: int = 3,
+    ) -> List[str]:
+        """Generate concise follow-up question suggestions using the LLM."""
+        if self._llm_client is None or not getattr(self._llm_client, "is_configured", lambda: False)():
+            return []
+
+        prompt = (
+            f"User question: {user_message}\n"
+            f"Agent answer: {response_text}\n\n"
+            f"Generate up to {max_suggestions} concise follow-up questions the user might ask next. "
+            "Respond with a JSON array of strings only, no markdown."
+        )
+        try:
+            raw = await self._llm_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that suggests follow-up questions."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+            parsed = json.loads(raw)
+            suggestions = parsed.get("suggestions", parsed) if isinstance(parsed, dict) else parsed
+            if isinstance(suggestions, list):
+                return [str(s) for s in suggestions[:max_suggestions]]
+        except Exception:
+            logger.debug("Follow-up suggestion generation failed", exc_info=True)
+        return []
 
     def _working_memory_to_history(
         self, working_memory: WorkingMemory

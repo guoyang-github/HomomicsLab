@@ -458,11 +458,15 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
             working_memory, _ = await memory_manager.load_session(session_id, project_id)
 
+            async def _event_callback(payload: Dict[str, Any]) -> None:
+                await websocket.send_json({"type": "agent_event", "payload": payload})
+
             result = await runner.run_turn(
                 session_id=session_id,
                 user_message=user_message,
                 working_memory=working_memory,
                 project_id=project_id,
+                event_callback=_event_callback,
             )
 
             # Push back the main agent message
@@ -483,6 +487,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         pass
 
 
+class FeedbackRequest(BaseModel):
+    message_id: str
+    rating: str  # "positive" | "negative"
+    comment: Optional[str] = None
+
+
 class SLARequest(BaseModel):
     message: str
 
@@ -498,6 +508,24 @@ class SLAResponse(BaseModel):
     risks: List[str]
     explanation: str
     nfcore_pipeline: Optional[str] = None
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    request: FeedbackRequest,
+    http_request: Request,
+):
+    """Record user feedback (thumbs up/down) on a chat message."""
+    from homomics_lab.metrics import record_message_feedback
+
+    session_id = getattr(http_request.state, "session_id", None)
+    record_message_feedback(
+        message_id=request.message_id,
+        rating=request.rating,
+        session_id=session_id,
+        comment=request.comment,
+    )
+    return {"status": "ok"}
 
 
 @router.post("/sla", response_model=SLAResponse)

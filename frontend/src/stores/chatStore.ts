@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { chatApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
+import { useTaskStore } from '@/stores/taskStore'
+import { usePlanStore } from '@/stores/planStore'
+import { useExecutionStore } from '@/stores/executionStore'
+import { toastError } from '@/stores/toastStore'
+import type { TaskProgress } from '@/types/tasks'
+import type { PlanRequestContent } from '@/types/chat'
 
 export interface ChatSession {
   id: string
@@ -33,6 +39,7 @@ interface ChatState {
   renameSession: (id: string, name: string) => void
   deleteSession: (id: string) => void
   getCurrentSession: () => ChatSession | undefined
+  sendMessage: (text: string) => Promise<void>
 }
 
 function normalizeSession(raw: Record<string, unknown>): ChatSession {
@@ -143,6 +150,102 @@ export const useChatStore = create<ChatState>()(
       getCurrentSession: () => {
         const state = get()
         return state.sessions.find((s) => s.id === state.currentSessionId)
+      },
+
+      sendMessage: async (text: string) => {
+        const trimmed = text.trim()
+        if (!trimmed) return
+        const state = get()
+        let sessionId = state.currentSessionId
+        if (!sessionId) {
+          sessionId = get().createSession()
+        }
+        const currentSession = get().getCurrentSession()
+        if (currentSession) {
+          const isGenericName =
+            currentSession.name === 'Default Session' || currentSession.name.startsWith('Session ')
+          if (isGenericName) {
+            get().renameSession(currentSession.id, trimmed.slice(0, 40))
+          }
+        }
+
+        usePlanStore.getState().discardDraft()
+
+        const userMessage: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          type: 'text',
+          content: trimmed,
+          sender: 'user',
+          timestamp: new Date().toISOString(),
+        }
+        get().addMessage(userMessage)
+        get().setIsTyping(true)
+
+        const _extractProgress = (tasks: { status: string }[]): TaskProgress => {
+          const total = tasks.length
+          const counts = {
+            pending: 0,
+            running: 0,
+            completed: 0,
+            failed: 0,
+            awaiting_human: 0,
+          }
+          tasks.forEach((task) => {
+            if (task.status in counts) {
+              counts[task.status as keyof typeof counts]++
+            }
+          })
+          return {
+            total,
+            ...counts,
+            percent: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
+          }
+        }
+
+        try {
+          const response = await chatApi.sendMessage({
+            project_id: state.currentProjectId,
+            session_id: sessionId,
+            message: trimmed,
+          })
+
+          const tasks = response.data.task_tree.tasks || []
+          useTaskStore.getState().setTaskTree(tasks)
+          useTaskStore.getState().setProgress(_extractProgress(tasks))
+
+          if (response.data.status === 'awaiting_plan_approval' && response.data.plan) {
+            const planContent: PlanRequestContent = {
+              plan_id: response.data.plan_id || response.data.plan.plan_id,
+              response_text: response.data.response,
+              plan: response.data.plan,
+            }
+            usePlanStore.getState().loadPlan(planContent)
+          } else {
+            usePlanStore.getState().discardDraft()
+          }
+
+          get().setMessages(response.data.messages)
+
+          if (response.data.job_id) {
+            useExecutionStore.getState().reset()
+            useExecutionStore.getState().setJobId(response.data.job_id)
+            useTaskStore.getState().setTaskTree(tasks)
+            useTaskStore.getState().setProgress(_extractProgress(tasks))
+          }
+        } catch (error: any) {
+          const detail = error?.response?.data?.detail || error?.message
+          const errorMessage: ChatMessage = {
+            id: `msg_${Date.now()}_error`,
+            type: 'error',
+            content: detail || 'Send failed',
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+          }
+          get().addMessage(errorMessage)
+          toastError(detail || 'Send failed')
+        } finally {
+          get().setIsTyping(false)
+        }
       },
     }),
     {

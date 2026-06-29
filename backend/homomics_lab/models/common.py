@@ -30,6 +30,7 @@ class MessageType(str, Enum):
     DEBATE_REQUEST = "debate_request"
     TOOL_CALL = "tool_call"
     RESULT_PREVIEW = "result_preview"
+    FOLLOW_UP = "follow_up"
     PARAMETER_FORM = "parameter_form"
     FILE_REFERENCE = "file_reference"
     PLOT = "plot"

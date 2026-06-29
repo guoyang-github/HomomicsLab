@@ -9,7 +9,10 @@ Exposes a /metrics endpoint for scraping by Prometheus. Tracks:
 
 from __future__ import annotations
 
+import sqlite3
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Optional
 
 from fastapi import Request, Response
@@ -333,3 +336,52 @@ def record_intent_low_confidence(intent: str) -> None:
     if not _PROMETHEUS_AVAILABLE or INTENT_LOW_CONFIDENCE_TOTAL is None:
         return
     INTENT_LOW_CONFIDENCE_TOTAL.labels(intent=intent).inc()
+
+
+_FEEDBACK_DB_PATH = Path("./homomics_lab_metrics.db")
+
+
+def _init_feedback_table() -> None:
+    _FEEDBACK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(_FEEDBACK_DB_PATH)) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS message_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id TEXT NOT NULL,
+                session_id TEXT,
+                rating TEXT NOT NULL,
+                comment TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_message_feedback_id ON message_feedback(message_id)"
+        )
+        conn.commit()
+
+
+def record_message_feedback(
+    message_id: str,
+    rating: str,
+    session_id: Optional[str] = None,
+    comment: Optional[str] = None,
+) -> None:
+    """Record a user's thumbs-up/down feedback on a chat message."""
+    _init_feedback_table()
+    with sqlite3.connect(str(_FEEDBACK_DB_PATH)) as conn:
+        conn.execute(
+            """
+            INSERT INTO message_feedback (message_id, session_id, rating, comment, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                message_id,
+                session_id or "",
+                rating,
+                comment or "",
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()

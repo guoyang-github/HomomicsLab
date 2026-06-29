@@ -31,6 +31,9 @@ export const chatApi = {
 
   regenerate: (data: SendMessageRequest) =>
     api.post<SendMessageResponse>('/chat/regenerate', data),
+
+  submitFeedback: (data: { message_id: string; rating: 'positive' | 'negative'; comment?: string }) =>
+    api.post('/chat/feedback', data),
 }
 
 export const planApi = {

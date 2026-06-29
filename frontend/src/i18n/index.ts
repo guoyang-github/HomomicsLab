@@ -26,6 +26,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'common.confirm': 'Confirm',
     'common.copy': 'Copy',
     'common.copied': 'Copied',
+    'common.hide': 'Hide',
+    'common.details': 'Details',
+    'common.inputs': 'Inputs',
+    'common.output': 'Output',
+    'common.saved': 'Saved',
 
     // Navigation
     'nav.chat': 'Chat',
@@ -124,6 +129,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.estimatedDuration': 'Estimated duration',
     'plan.estimatedCost': 'Estimated cost',
     'plan.estimatedTokens': 'Estimated tokens',
+    'followUp.title': 'You may also ask',
 
     // Plan history
     'planHistory.title': 'Plan Version History',
@@ -614,6 +620,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'message.regenerate': '重新生成',
     'message.useful': '有用',
     'message.notUseful': '无用',
+    'common.hide': '隐藏',
+    'common.details': '详情',
+    'common.inputs': '输入',
+    'common.output': '输出',
+    'common.saved': '已保存',
 
     // Plan
     'plan.approved': '计划已批准，开始执行',
@@ -634,6 +645,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.estimatedDuration': '预计耗时',
     'plan.estimatedCost': '预计成本',
     'plan.estimatedTokens': '预计 Token',
+    'followUp.title': '你可能还想问',
 
     // Plan history
     'planHistory.title': '计划版本历史',

@@ -8,7 +8,11 @@ import { HITLRequest } from './HITLRequest'
 import { PlanApproval } from './PlanApproval'
 import { DebateRequest } from './DebateRequest'
 import { PlotChart } from '../shared/PlotChart'
+import { ResultPreview, type ResultPreviewContent } from './ResultPreview'
+import { FollowUpSuggestions } from './FollowUpSuggestions'
 import { useTranslation } from '@/i18n'
+import { chatApi } from '@/services/api'
+import { toastSuccess } from '@/stores/toastStore'
 import type {
   ChatMessage,
   TodoListContent,
@@ -18,6 +22,7 @@ import type {
   PlotDataContent,
   PlanRequestContent,
   DebateRequestContent,
+  FollowUpContent,
 } from '@/types/chat'
 
 function isTodoListContent(content: unknown): content is TodoListContent {
@@ -84,6 +89,24 @@ function isPlotDataContent(content: unknown): content is PlotDataContent {
   )
 }
 
+function isResultPreviewContent(content: unknown): content is ResultPreviewContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'tool_calls' in content &&
+    Array.isArray((content as Record<string, unknown>).tool_calls)
+  )
+}
+
+function isFollowUpContent(content: unknown): content is FollowUpContent {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'suggestions' in content &&
+    Array.isArray((content as Record<string, unknown>).suggestions)
+  )
+}
+
 interface Props {
   message: ChatMessage
   onRegenerate?: () => void
@@ -93,6 +116,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
   const { t } = useTranslation()
   const isUser = message.sender === 'user'
   const [copied, setCopied] = useState(false)
+  const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
 
   // Avoid rendering empty/whitespace-only text bubbles (e.g. stale LLM output).
   if (
@@ -108,6 +132,16 @@ export function MessageBubble({ message, onRegenerate }: Props) {
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleFeedback = async (rating: 'positive' | 'negative') => {
+    setFeedback(rating)
+    try {
+      await chatApi.submitFeedback({ message_id: message.id, rating })
+      toastSuccess(t('common.saved'))
+    } catch {
+      // Best-effort; keep local state even if network fails.
+    }
   }
 
   const renderContent = () => {
@@ -194,6 +228,17 @@ export function MessageBubble({ message, onRegenerate }: Props) {
           )
         }
         return null
+      case 'result_preview':
+      case 'tool_call':
+        if (isResultPreviewContent(message.content)) {
+          return <ResultPreview content={message.content} />
+        }
+        return null
+      case 'follow_up':
+        if (isFollowUpContent(message.content)) {
+          return <FollowUpSuggestions suggestions={message.content.suggestions} />
+        }
+        return null
       case 'error':
         return (
           <div className="rounded-lg border border-error/20 bg-error/10 p-3 text-sm text-error">
@@ -246,10 +291,24 @@ export function MessageBubble({ message, onRegenerate }: Props) {
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               )}
-              <button className="rounded p-1 hover:bg-muted" title={t('message.useful')}>
+              <button
+                onClick={() => handleFeedback('positive')}
+                className={clsx(
+                  'rounded p-1 hover:bg-muted',
+                  feedback === 'positive' && 'text-success'
+                )}
+                title={t('message.useful')}
+              >
                 <ThumbsUp className="h-3.5 w-3.5" />
               </button>
-              <button className="rounded p-1 hover:bg-muted" title={t('message.notUseful')}>
+              <button
+                onClick={() => handleFeedback('negative')}
+                className={clsx(
+                  'rounded p-1 hover:bg-muted',
+                  feedback === 'negative' && 'text-error'
+                )}
+                title={t('message.notUseful')}
+              >
                 <ThumbsDown className="h-3.5 w-3.5" />
               </button>
             </div>
