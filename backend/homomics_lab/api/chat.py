@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from homomics_lab.hitl.nlu import HITLNLUParser
 from homomics_lab.hitl.preference_resolver import HITLPreferenceResolver
 from homomics_lab.jobs import JobService, JobStatus
 from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan import PlanPresenter, PlanStore
 from homomics_lab.api.chat_references import resolve_chat_references
 
@@ -86,6 +88,18 @@ async def send_message(
         request.message, request.project_id, skill_executor
     )
 
+    trace_id = str(uuid.uuid4())
+    trace_store = getattr(http_request.app.state, "trace_store", None) or TraceStore()
+    try:
+        await trace_store.start_trace(
+            trace_id=trace_id,
+            session_id=request.session_id,
+            project_id=request.project_id,
+            root_name="chat_turn",
+        )
+    except Exception:
+        pass
+
     # Use TurnRunner for consistent handling of all intents, including LLM fallback.
     runner = TurnRunner(
         tool_registry=getattr(http_request.app.state, "tool_registry", None),
@@ -94,6 +108,7 @@ async def send_message(
         context_engine=getattr(http_request.app.state, "context_engine", None),
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
+        trace_store=trace_store,
     )
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -104,6 +119,7 @@ async def send_message(
         enqueue_skills=True,
         plan_store=plan_store,
         plan_mode=request.plan_mode,
+        trace_id=trace_id,
     )
 
     # Extract plot attachments produced during execution

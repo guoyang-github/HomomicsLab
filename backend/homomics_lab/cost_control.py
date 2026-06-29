@@ -33,7 +33,9 @@ class CostController:
     """Track and enforce LLM + compute spending budgets."""
 
     def __init__(self, db_path: Optional[Path] = None):
-        self.db_path = db_path or Path("./homomics_lab_costs.db")
+        if db_path is None:
+            db_path = settings.data_dir / "homomics_lab_costs.db"
+        self.db_path = db_path
         self._init_db()
 
     def _init_db(self) -> None:
@@ -129,7 +131,7 @@ class CostController:
 
     def get_monthly_compute_cost(self) -> float:
         """Return total compute cost for the current calendar month from skill metrics."""
-        metrics_db = Path("./homomics_lab_metrics.db")
+        metrics_db = settings.data_dir / "homomics_lab_metrics.db"
         if not metrics_db.exists():
             return 0.0
         now = datetime.now(timezone.utc)
@@ -163,12 +165,18 @@ class CostController:
             remaining_monthly_budget_usd=remaining,
         )
 
-    def check_request_budget(self, estimated_cost_usd: float) -> None:
+    def check_request_budget(
+        self, estimated_cost_usd: float, cap: Optional[float] = None
+    ) -> None:
         """Raise BudgetExceeded if a single LLM request exceeds the per-request cap.
 
-        Also checks monthly budget if configured.
+        Also checks monthly budget if configured. The optional ``cap`` argument
+        allows callers (e.g. ``LLMRouter``) to enforce a stricter per-request
+        limit than the global setting.
         """
-        max_request = settings.max_llm_cost_per_request_usd
+        global_cap = settings.max_llm_cost_per_request_usd
+        caps = [c for c in (cap, global_cap) if c is not None]
+        max_request = min(caps) if caps else None
         if max_request is not None and estimated_cost_usd > max_request:
             raise BudgetExceeded(
                 f"Estimated request cost ${estimated_cost_usd:.4f} exceeds "

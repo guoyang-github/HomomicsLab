@@ -1,8 +1,10 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from homomics_lab.api.audit import audit_middleware
 from homomics_lab.api.rate_limit import update_limiter_config
@@ -12,6 +14,7 @@ from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
 from homomics_lab.logging_config import (
     configure_logging,
+    get_correlation_id,
     new_correlation_id,
     set_correlation_id,
 )
@@ -89,6 +92,23 @@ app = FastAPI(
 )
 
 instrument_fastapi(app)
+
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Return a structured error with correlation_id for any unhandled exception."""
+    cid = get_correlation_id() or new_correlation_id()
+    logger.exception("Unhandled exception correlation_id=%s", cid)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "correlation_id": cid,
+        },
+        headers={"X-Correlation-ID": cid},
+    )
 
 
 @app.middleware("http")

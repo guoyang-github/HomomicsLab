@@ -13,10 +13,15 @@ This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 
 import json
 import asyncio
+import logging
+import random
 import re
+import time
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homomics_lab.agent.debate import LightweightDebate
@@ -155,9 +160,11 @@ class TurnRunner:
         context_engine: Optional[ContextEngine] = None,
         project_state_manager: Optional[ProjectStateManager] = None,
         llm_client: Optional[LLMClient] = None,
+        trace_store=None,
     ):
         self._cbkb = cbkb
         self._llm_client = llm_client
+        self._trace_store = trace_store
         self._orchestrator = orchestrator
         self._registry = registry
         self._progress_callback = progress_callback
@@ -285,6 +292,7 @@ class TurnRunner:
         plan_store: Optional[PlanStore] = None,
         debate_response: Optional[Dict[str, Any]] = None,
         plan_mode: bool = False,
+        trace_id: Optional[str] = None,
     ) -> TurnResult:
         """Execute one full turn: from user message to agent response.
 
@@ -297,6 +305,12 @@ class TurnRunner:
             plan_mode: If True, always present an execution plan for approval before
                 running non-domain tasks.
         """
+        # Track turn context for cost attribution and tracing.
+        self._session_id = session_id
+        self._project_id = project_id
+        self._trace_id = trace_id
+        self._turn_request_id = f"turn_{session_id}_{int(time.time() * 1000)}"
+
         # 1. Record user message
         user_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -317,6 +331,7 @@ class TurnRunner:
             plan_store=plan_store,
             debate_response=debate_response,
             plan_mode=plan_mode,
+            trace_id=trace_id,
         )
 
     async def regenerate_response(
@@ -379,6 +394,7 @@ class TurnRunner:
         plan_store: Optional[PlanStore] = None,
         debate_response: Optional[Dict[str, Any]] = None,
         plan_mode: bool = False,
+        trace_id: Optional[str] = None,
     ) -> TurnResult:
         """Run the turn pipeline once and persist state."""
         turn_result: Optional[TurnResult] = None
@@ -397,22 +413,36 @@ class TurnRunner:
             )
         except TurnError as exc:
             if exc.retryable:
-                try:
-                    await asyncio.sleep(0.5)
-                    turn_result = await self._run_turn_once(
-                        session_id=session_id,
-                        user_message=user_message,
-                        working_memory=working_memory,
-                        project_id=project_id,
-                        task_tree=task_tree,
-                        job_service=job_service,
-                        enqueue_skills=enqueue_skills,
-                        plan_store=plan_store,
-                        debate_response=debate_response,
-                        plan_mode=plan_mode,
+                max_retries = 2
+                for attempt in range(max_retries):
+                    backoff = (2 ** attempt) * 0.5 + random.uniform(0, 0.25)
+                    logger.warning(
+                        "Retryable turn error, retrying in %.2fs: %s",
+                        backoff,
+                        exc,
                     )
-                except TurnError as exc2:
-                    turn_result = self._build_error_result(exc2, working_memory)
+                    await asyncio.sleep(backoff)
+                    try:
+                        turn_result = await self._run_turn_once(
+                            session_id=session_id,
+                            user_message=user_message,
+                            working_memory=working_memory,
+                            project_id=project_id,
+                            task_tree=task_tree,
+                            job_service=job_service,
+                            enqueue_skills=enqueue_skills,
+                            plan_store=plan_store,
+                            debate_response=debate_response,
+                            plan_mode=plan_mode,
+                        )
+                        break
+                    except TurnError as exc2:
+                        exc = exc2
+                        if not exc2.retryable or attempt == max_retries - 1:
+                            turn_result = self._build_error_result(exc2, working_memory)
+                            break
+                else:
+                    turn_result = self._build_error_result(exc, working_memory)
             else:
                 turn_result = self._build_error_result(exc, working_memory)
         except Exception as exc:
@@ -455,9 +485,35 @@ class TurnRunner:
                     "Failed to update project state", exc_info=True
                 )
 
-        return turn_result or self._build_error_result(
+        turn_result = turn_result or self._build_error_result(
             ExecutionError("Turn produced no result"), working_memory
         )
+
+        # Record a lightweight summary node in the execution trace.
+        if self._trace_store is not None and trace_id is not None:
+            try:
+                await self._trace_store.add_node(
+                    trace_id=trace_id,
+                    node_type="turn",
+                    name="chat_turn",
+                    metadata={
+                        "mode": str(turn_result.mode.value if hasattr(turn_result.mode, "value") else turn_result.mode),
+                        "response_length": len(turn_result.response_text or ""),
+                        "has_error": turn_result.error is not None,
+                        "job_id": turn_result.job_id,
+                        "plan_id": turn_result.plan_id,
+                    },
+                )
+                await self._trace_store.update_node(
+                    trace_id=trace_id,
+                    node_id="root",
+                    status="completed" if not turn_result.error else "failed",
+                    outputs={"response_preview": (turn_result.response_text or "")[:200]},
+                )
+            except Exception:
+                logger.warning("Failed to record turn trace node", exc_info=True)
+
+        return turn_result
 
     async def _run_turn_once(
         self,
@@ -1016,7 +1072,12 @@ class TurnRunner:
 
         try:
             prompt = self._build_risk_prompt(intent, user_message, working_memory, project_id)
-            response = await self._llm_client.chat_completion(prompt)
+            response = await self._llm_client.chat_completion(
+                prompt,
+                session_id=getattr(self, "_session_id", None),
+                project_id=getattr(self, "_project_id", None),
+                request_id=f"{getattr(self, '_turn_request_id', 'risk')}_risk",
+            )
             return self._parse_risk_score(response)
         except Exception:
             import logging
@@ -1536,6 +1597,9 @@ class TurnRunner:
                 messages=prompt_messages,
                 temperature=0.2,
                 max_tokens=1500,
+                session_id=getattr(self, "_session_id", None),
+                project_id=getattr(self, "_project_id", None),
+                request_id=f"{getattr(self, '_turn_request_id', 'code')}_code",
             )
         except Exception:
             return (
@@ -1635,6 +1699,9 @@ class TurnRunner:
                 messages=messages,
                 temperature=0.3,
                 max_tokens=2000,
+                session_id=getattr(self, "_session_id", None),
+                project_id=getattr(self, "_project_id", None),
+                request_id=f"{getattr(self, '_turn_request_id', 'direct')}_direct",
             )
         except Exception:
             logger.warning("LLM direct response failed for type %s; using fallback", response_type, exc_info=True)

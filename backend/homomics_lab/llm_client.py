@@ -6,8 +6,10 @@ DeepSeek, Qwen (DashScope), Zhipu GLM, Moonshot (Kimi), and Ollama/local.
 
 import asyncio
 import logging
+import random
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional
+import uuid
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +142,11 @@ class LLMClient:
         model: Optional[str] = None,
         prefer_cheap: bool = False,
         intent_type: Optional[str] = None,
-    ) -> str:
+        return_usage: bool = False,
+        session_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Union[str, Tuple[str, Dict[str, Any]]]:
         """Send a chat completion request with automatic provider routing.
 
         Args:
@@ -151,6 +157,10 @@ class LLMClient:
             model: Explicit model override.
             prefer_cheap: If True, pick the cheapest configured model.
             intent_type: Optional intent classification for complexity-based routing.
+            return_usage: If True, return a tuple (content, usage_metadata).
+            session_id: Optional session identifier for cost attribution.
+            project_id: Optional project identifier for cost attribution.
+            request_id: Optional request identifier for cost attribution.
         """
         requested_model = model or self._legacy_model
         route = self._select_route(
@@ -167,44 +177,66 @@ class LLMClient:
             )
             if cached is not None:
                 self._record_cache_hit(route.model)
+                if return_usage:
+                    return cached, {"cache_hit": True, "model": route.model}
                 return cached
 
         tried_models = {route.model}
         last_error: Optional[Exception] = None
         while True:
-            try:
-                content = await self._chat_completion_once(
-                    route=route,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    response_format=response_format,
-                )
-                if self._cache is not None:
-                    await self._cache.put(
-                        route.model,
-                        messages,
-                        temperature,
-                        max_tokens,
-                        response_format,
-                        content,
-                    )
-                return content
-            except Exception as exc:
-                # Only retry on API/timeout/network-type errors.
-                if not self._is_retryable_error(exc):
-                    raise
-                last_error = exc
+            # Retry the same provider with exponential backoff before falling back.
+            same_provider_attempts = 2
+            for attempt in range(same_provider_attempts):
                 try:
-                    route = self._router.select(
-                        model=requested_model,
-                        prefer_cheap=prefer_cheap,
-                        skip=tried_models,
+                    content, usage = await self._chat_completion_once(
+                        route=route,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        response_format=response_format,
+                        session_id=session_id,
+                        project_id=project_id,
+                        request_id=request_id,
                     )
-                    tried_models.add(route.model)
-                except RuntimeError:
-                    break
-                self._record_fallback(str(exc), list(tried_models)[-2], route.model)
+                    if self._cache is not None:
+                        await self._cache.put(
+                            route.model,
+                            messages,
+                            temperature,
+                            max_tokens,
+                            response_format,
+                            content,
+                        )
+                    if return_usage:
+                        return content, usage
+                    return content
+                except Exception as exc:
+                    if not self._is_retryable_error(exc):
+                        raise
+                    last_error = exc
+                    if attempt < same_provider_attempts - 1:
+                        backoff = (2 ** attempt) * 0.5 + random.uniform(0, 0.25)
+                        logger.warning(
+                            "Retryable LLM error on %s, retrying in %.2fs: %s",
+                            route.model,
+                            backoff,
+                            exc,
+                        )
+                        await asyncio.sleep(backoff)
+                    else:
+                        break
+
+            # Fall back to the next provider/model.
+            try:
+                route = self._router.select(
+                    model=requested_model,
+                    prefer_cheap=prefer_cheap,
+                    skip=tried_models,
+                )
+                tried_models.add(route.model)
+            except RuntimeError:
+                break
+            self._record_fallback(str(last_error), list(tried_models)[-2], route.model)
 
         if last_error is not None:
             raise last_error
@@ -217,8 +249,15 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
         response_format: Optional[Dict[str, str]],
-    ) -> str:
-        """Execute a single chat completion call and record usage."""
+        session_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Execute a single chat completion call and record usage.
+
+        Returns the response content together with a usage metadata dict so
+        callers can aggregate per-turn costs.
+        """
         client = self._get_client(route.provider)
 
         kwargs: Dict[str, Any] = {
@@ -239,7 +278,7 @@ class LLMClient:
         try:
             response = await client.chat.completions.create(**kwargs)
             choice = response.choices[0]
-            content = choice.message.content.strip()
+            content = (choice.message.content or "").strip()
             finish_reason = getattr(choice, "finish_reason", None)
             if finish_reason == "length":
                 logger.warning(
@@ -258,8 +297,16 @@ class LLMClient:
                 total_tokens = getattr(usage, "total_tokens", 0) or 0
 
             latency_ms = (time.time() - start) * 1000
+            cost_usd = estimate_cost_usd(route.model, prompt_tokens, completion_tokens)
             self._record_usage(
-                route.model, prompt_tokens, completion_tokens, total_tokens
+                route.model,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+                cost_usd=cost_usd,
+                session_id=session_id,
+                project_id=project_id,
+                request_id=request_id,
             )
             self._record_request_metrics(route.model, route.provider.name, latency_ms, exc=None)
             self._finish_llm_span(
@@ -270,7 +317,16 @@ class LLMClient:
                 total_tokens=total_tokens,
                 latency_ms=latency_ms,
             )
-            return content
+            usage_meta = {
+                "model": route.model,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "cost_usd": cost_usd,
+                "latency_ms": latency_ms,
+                "finish_reason": finish_reason,
+            }
+            return content, usage_meta
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000
             self._record_request_metrics(route.model, route.provider.name, latency_ms, exc=exc)
@@ -370,7 +426,7 @@ class LLMClient:
             if exc is not None:
                 record_llm_error(model, provider, type(exc).__name__)
         except Exception:
-            pass
+            logger.debug("Failed to record LLM request metrics", exc_info=True)
 
     @staticmethod
     def _is_retryable_error(exc: Exception) -> bool:
@@ -399,7 +455,7 @@ class LLMClient:
 
             record_llm_cache_hit(model)
         except Exception:
-            pass
+            logger.debug("Failed to record LLM cache hit metrics", exc_info=True)
 
     def _record_fallback(self, reason: str, from_model: str, to_model: str) -> None:
         """Record fallback metrics."""
@@ -408,12 +464,13 @@ class LLMClient:
 
             record_llm_fallback(reason, from_model, to_model)
         except Exception:
-            pass
+            logger.debug("Failed to record LLM fallback metrics", exc_info=True)
 
     def _start_llm_span(self, model: str, provider: str, kwargs: Dict[str, Any]) -> Any:
         """Start an OpenTelemetry span for an LLM call if tracing is available."""
         try:
             from homomics_lab.tracing import get_tracer
+            from homomics_lab.logging_config import get_correlation_id
 
             tracer = get_tracer()
             if tracer is None:
@@ -423,8 +480,12 @@ class LLMClient:
             span.set_attribute("llm.provider", provider)
             span.set_attribute("llm.request.temperature", kwargs.get("temperature", 0.3))
             span.set_attribute("llm.request.max_tokens", kwargs.get("max_tokens", 0))
+            cid = get_correlation_id()
+            if cid:
+                span.set_attribute("correlation_id", cid)
             return span
         except Exception:
+            logger.debug("Failed to start LLM span", exc_info=True)
             return None
 
     def _finish_llm_span(
@@ -459,11 +520,21 @@ class LLMClient:
                 )
             span.end()
         except Exception:
-            pass
+            logger.debug("Failed to finish LLM span", exc_info=True)
 
-    def _record_usage(self, model: str, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+    def _record_usage(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+        cost_usd: Optional[float] = None,
+        session_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> None:
         """Record token usage and update cost estimate."""
-        cost = estimate_cost_usd(model, prompt_tokens, completion_tokens)
+        cost = cost_usd if cost_usd is not None else estimate_cost_usd(model, prompt_tokens, completion_tokens)
         self.total_prompt_tokens += prompt_tokens
         self.total_completion_tokens += completion_tokens
         self.total_tokens += total_tokens
@@ -478,17 +549,20 @@ class LLMClient:
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
                 cost_usd=cost,
+                request_id=request_id or str(uuid.uuid4()),
+                session_id=session_id,
+                project_id=project_id,
             )
             get_cost_controller().check_request_budget(cost)
         except Exception:
-            pass
+            logger.debug("Failed to record LLM cost", exc_info=True)
 
         try:
             from homomics_lab.metrics import record_llm_usage
 
             record_llm_usage(model, prompt_tokens, completion_tokens, cost)
         except Exception:
-            pass
+            logger.debug("Failed to record LLM usage metrics", exc_info=True)
 
     def get_usage_summary(self) -> Dict[str, Any]:
         """Return aggregated usage and cost estimate."""

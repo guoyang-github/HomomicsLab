@@ -36,3 +36,34 @@ def test_snapshot(controller):
     snapshot = controller.get_snapshot()
     assert snapshot.total_cost_usd == pytest.approx(0.003, rel=1e-3)
     assert snapshot.remaining_monthly_budget_usd == pytest.approx(9.997, rel=1e-3)
+
+
+def test_check_request_budget_accepts_optional_cap(controller):
+    """Router may pass a stricter per-request cap than the global setting."""
+    # Global cap is $2; optional cap of $1 should be enforced.
+    with pytest.raises(BudgetExceeded):
+        controller.check_request_budget(1.5, cap=1.0)
+    # Optional cap higher than global should still respect global.
+    with pytest.raises(BudgetExceeded):
+        controller.check_request_budget(2.5, cap=5.0)
+
+
+def test_record_llm_cost_with_context(controller):
+    """Cost records should preserve request/session/project context."""
+    import sqlite3
+
+    controller.record_llm_cost(
+        "gpt-4o-mini",
+        100,
+        50,
+        150,
+        0.001,
+        request_id="req_1",
+        session_id="sess_1",
+        project_id="proj_1",
+    )
+    with sqlite3.connect(str(controller.db_path)) as conn:
+        row = conn.execute(
+            "SELECT request_id, session_id, project_id FROM llm_costs"
+        ).fetchone()
+    assert row == ("req_1", "sess_1", "proj_1")
