@@ -53,6 +53,19 @@ class HITLResponseResponse(BaseModel):
     status: str = "completed"
 
 
+class ToolApprovalResponseRequest(BaseModel):
+    session_id: str
+    call_id: str
+    approved: bool
+
+
+class ToolApprovalResponseResponse(BaseModel):
+    message: str
+    response: str
+    messages: List[dict]
+    status: str
+
+
 class DebateResponseRequest(BaseModel):
     session_id: str
     debate_id: str
@@ -333,6 +346,46 @@ async def respond_to_hitl(
         message="Task resumed successfully",
         job_id=resume_job.job_id,
         status="queued",
+    )
+
+
+@router.post("/tool-approval/respond", response_model=ToolApprovalResponseResponse)
+async def respond_to_tool_approval(
+    request: ToolApprovalResponseRequest,
+    http_request: Request,
+):
+    """Approve or decline a high-risk tool call requested by the agent loop."""
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    llm_client = getattr(http_request.app.state, "llm_client", None)
+    tool_registry = getattr(http_request.app.state, "tool_registry", None)
+
+    working_memory, _ = await memory_manager.load_session(request.session_id, "")
+    project_id = await memory_manager.get_project_id(request.session_id)
+    if project_id is None:
+        project_id = "default"
+
+    runner = TurnRunner(
+        memory_manager=memory_manager,
+        cbkb=getattr(http_request.app.state, "cbkb", None),
+        context_engine=getattr(http_request.app.state, "context_engine", None),
+        project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
+        llm_client=llm_client,
+        tool_registry=tool_registry,
+    )
+    result = await runner.respond_to_tool_approval(
+        call_id=request.call_id,
+        approved=request.approved,
+        working_memory=working_memory,
+        project_id=project_id,
+    )
+
+    await memory_manager.save_session(request.session_id, project_id, working_memory)
+
+    return ToolApprovalResponseResponse(
+        message="Tool approval processed",
+        response=result.response_text,
+        messages=[m.model_dump() for m in working_memory.get_recent_messages()],
+        status="completed",
     )
 
 

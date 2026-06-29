@@ -1,7 +1,8 @@
 import pytest
 
 from homomics_lab.agent.agent_loop import AgentLoop, TurnBudget
-from homomics_lab.tools.models import ToolDefinition, ToolResult
+from homomics_lab.tools.approval_store import PersistentApprovalStore
+from homomics_lab.tools.models import ToolDefinition
 from homomics_lab.tools.registry import ToolRegistry
 
 
@@ -94,18 +95,24 @@ async def test_agent_loop_no_tool_call_when_not_needed(registry):
 
 
 @pytest.mark.asyncio
-async def test_agent_loop_respects_high_risk_gate(registry):
+async def test_agent_loop_respects_high_risk_gate(registry, tmp_path):
     llm = _FakeLLM([
         _FakeMessage(tool_calls=[_FakeToolCall("tc1", "shell_exec", '{"command": "rm -rf /"}')]),
-        _FakeMessage(content="I cannot run that command."),
     ])
-    loop = AgentLoop(llm_client=llm, tool_registry=registry, max_rounds=2)
+    store = PersistentApprovalStore(db_path=tmp_path / "approvals.db")
+    loop = AgentLoop(
+        llm_client=llm,
+        tool_registry=registry,
+        max_rounds=2,
+        approval_store=store,
+    )
     result = await loop.run(user_message="delete everything", history=[])
 
-    assert len(result.tool_calls) == 1
-    assert result.tool_calls[0].tool_name == "shell_exec"
-    assert result.tool_calls[0].success is False
-    assert "高风险" in result.tool_calls[0].output_summary
+    assert result.awaiting_approval is True
+    assert result.stopped_reason == "awaiting_tool_approval"
+    assert result.approval_request is not None
+    assert result.approval_request["tool_name"] == "shell_exec"
+    assert result.approval_request["risk_level"] == "high"
 
 
 @pytest.mark.asyncio

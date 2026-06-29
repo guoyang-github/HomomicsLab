@@ -81,13 +81,16 @@ class PersistentApprovalStore:
         tool_name: str,
         arguments: Dict,
         risk_level: str,
+        metadata: Optional[Dict] = None,
+        call_id: Optional[str] = None,
     ) -> ToolApprovalRequest:
-        call_id = str(uuid.uuid4())
+        call_id = call_id or str(uuid.uuid4())
         request = ToolApprovalRequest(
             call_id=call_id,
             tool_name=tool_name,
             arguments=arguments,
             risk_level=risk_level,
+            metadata=metadata or {},
         )
         if self._available:
             try:

@@ -21,10 +21,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
-logger = logging.getLogger(__name__)
-
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
-from homomics_lab.agent.agent_loop import AgentLoop, TurnBudget
+from homomics_lab.agent.agent_loop import AgentLoop, ToolCallRecord, TurnBudget
 from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.agent.errors import (
     ExecutionError,
@@ -51,13 +49,15 @@ from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.constants import JobMode
 from homomics_lab.llm_client import LLMClient
-from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.models.common import ChatMessage, HITLCheckpoint, HITLTrigger, MessageType, Option
 from homomics_lab.plan.models import Plan, PlanStatus
 from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.presenter import PlanPresenter
 from homomics_lab.plan.store import PlanStore, _new_plan_id
 from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.tasks.task_tree import TaskTree
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionMode(str, Enum):
@@ -162,10 +162,12 @@ class TurnRunner:
         project_state_manager: Optional[ProjectStateManager] = None,
         llm_client: Optional[LLMClient] = None,
         trace_store=None,
+        approval_store=None,
     ):
         self._cbkb = cbkb
         self._llm_client = llm_client
         self._trace_store = trace_store
+        self._approval_store = approval_store
         self._orchestrator = orchestrator
         self._registry = registry
         self._progress_callback = progress_callback
@@ -713,6 +715,11 @@ class TurnRunner:
             allowed_tools=allowed_tools,
         )
 
+        if result.awaiting_approval and result.approval_request:
+            return await self._create_tool_approval_hitl(
+                result, working_memory, user_message
+            )
+
         response_text = result.response_text
         if not response_text or not str(response_text).strip():
             response_text = "工具调用已完成，但没有生成可读的回复。"
@@ -799,6 +806,207 @@ class TurnRunner:
         except Exception:
             logger.debug("Follow-up suggestion generation failed", exc_info=True)
         return []
+
+    async def _create_tool_approval_hitl(
+        self,
+        loop_result: Any,
+        working_memory: WorkingMemory,
+        user_message: str,
+    ) -> "TurnResult":
+        """Create a HITL request when the agent loop pauses for tool approval."""
+        req = loop_result.approval_request
+        call_id = req["call_id"]
+        tool_name = req["tool_name"]
+        arguments = req["arguments"]
+
+        checkpoint = HITLCheckpoint(
+            id=f"tool_approval_{call_id}",
+            trigger_reason=HITLTrigger.HIGH_RISK,
+            context_summary=(
+                f"Agent wants to run high-risk tool `{tool_name}` "
+                f"with arguments {arguments}. Please approve or decline."
+            ),
+            options=[
+                Option(id="approve", label="授权执行", description="允许执行该高风险工具"),
+                Option(id="decline", label="拒绝", description="跳过该工具调用"),
+            ],
+            metadata={
+                "tool_approval_call_id": call_id,
+                "tool_name": tool_name,
+                "arguments": arguments,
+            },
+        )
+
+        hitl_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.HITL_REQUEST,
+            content={
+                "checkpoint": checkpoint.model_dump(),
+                "task_id": call_id,
+            },
+            sender="agent",
+        )
+        working_memory.add_message(hitl_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.AWAITING_HITL,
+            response_text=loop_result.response_text,
+            agent_message=hitl_msg,
+            hitl_task_id=call_id,
+            hitl_checkpoint=checkpoint.model_dump(),
+        )
+
+    async def respond_to_tool_approval(
+        self,
+        call_id: str,
+        approved: bool,
+        working_memory: WorkingMemory,
+        project_id: str,
+    ) -> "TurnResult":
+        """Resume an agent loop after a high-risk tool approval decision."""
+        from homomics_lab.tools.approval_store import PersistentApprovalStore
+        from homomics_lab.agent.agent_loop import AgentLoop
+
+        store = self._approval_store or PersistentApprovalStore()
+        request = store.get(call_id)
+        if request is None:
+            text = f"找不到工具授权请求 `{call_id}`，请重新发起查询。"
+            msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.TEXT,
+                content=text,
+                sender="agent",
+            )
+            working_memory.add_message(msg)
+            return TurnResult(
+                mode=ExecutionMode.DIRECT_RESPONSE,
+                response_text=text,
+                agent_message=msg,
+            )
+
+        if not approved:
+            text = f"已拒绝执行高风险工具 `{request.tool_name}`。"
+            msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.TEXT,
+                content=text,
+                sender="agent",
+            )
+            working_memory.add_message(msg)
+            request.approved = False
+            store.reject(call_id, resolver="user", reason="declined")
+            return TurnResult(
+                mode=ExecutionMode.DIRECT_RESPONSE,
+                response_text=text,
+                agent_message=msg,
+            )
+
+        # Mark approved and execute the tool directly.
+        request.approved = True
+        store.approve(call_id, resolver="user", reason="approved")
+
+        metadata = request.metadata or {}
+        messages = list(metadata.get("messages", []))
+        tool_records = [
+            ToolCallRecord(**r) for r in metadata.get("tool_records", [])
+        ]
+        pending = metadata.get("pending_tool_call", {})
+        tool_name = pending.get("name", request.tool_name)
+        tool_inputs = pending.get("inputs", request.arguments)
+        tool_call_id = pending.get("id", call_id)
+
+        if self._tool_registry is None:
+            text = "Tool registry unavailable, cannot resume tool execution."
+            msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.TEXT,
+                content=text,
+                sender="agent",
+            )
+            working_memory.add_message(msg)
+            return TurnResult(
+                mode=ExecutionMode.DIRECT_RESPONSE,
+                response_text=text,
+                agent_message=msg,
+            )
+
+        try:
+            tool_result = await self._tool_registry.invoke_async(tool_name, tool_inputs)
+            summary = AgentLoop(
+                llm_client=self._llm_client,
+                tool_registry=self._tool_registry,
+            )._summarize_tool_output(tool_name, tool_result.output)
+        except Exception as exc:
+            summary = f"调用工具 `{tool_name}` 失败：{exc}"
+            tool_result = None
+
+        record = ToolCallRecord(
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            inputs=tool_inputs,
+            success=tool_result is not None and getattr(tool_result, "success", False),
+            output_summary=summary,
+        )
+        tool_records.append(record)
+
+        messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": summary,
+        })
+
+        # Ask the LLM to summarize the result for the user.
+        final_text = summary
+        if self._llm_client is not None and getattr(self._llm_client, "is_configured", lambda: False)():
+            try:
+                final_msg, _ = await self._llm_client.chat_completion_message(
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=2000,
+                    session_id=self._session_id,
+                    project_id=self._project_id,
+                    request_id=f"{self._turn_request_id or 'agent'}_approval_resume",
+                )
+                final_text = (getattr(final_msg, "content", None) or "").strip() or summary
+            except Exception as exc:
+                logger.warning("Tool approval final summarization failed: %s", exc)
+                final_text = summary
+
+        if not final_text or not str(final_text).strip():
+            final_text = "工具调用已完成。"
+
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TEXT,
+            content=final_text,
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+        preview_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.RESULT_PREVIEW,
+            content={
+                "tool_calls": [
+                    {
+                        "tool_name": tc.tool_name,
+                        "inputs": tc.inputs,
+                        "success": tc.success,
+                        "output_summary": tc.output_summary,
+                    }
+                    for tc in tool_records
+                ],
+                "response_text": final_text,
+            },
+            sender="agent",
+        )
+        working_memory.add_message(preview_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.DIRECT_RESPONSE,
+            response_text=final_text,
+            agent_message=agent_msg,
+        )
 
     def _working_memory_to_history(
         self, working_memory: WorkingMemory

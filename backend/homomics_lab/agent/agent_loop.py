@@ -10,13 +10,13 @@ isolation.
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
-from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.tools.approval import ToolApprovalRequired
+from homomics_lab.tools.approval_store import PersistentApprovalStore
 from homomics_lab.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,9 @@ class AgentLoopResult:
     cost_usd: float = 0.0
     llm_calls: int = 0
     tool_calls_count: int = 0
+    awaiting_approval: bool = False
+    approval_request: Optional[Dict[str, Any]] = None
+    messages: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -81,6 +84,7 @@ class AgentLoop:
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         system_prompt: Optional[str] = None,
+        approval_store: Optional[PersistentApprovalStore] = None,
     ):
         self.llm_client = llm_client
         self.tool_registry = tool_registry
@@ -91,6 +95,7 @@ class AgentLoop:
         self.budget = budget or TurnBudget()
         self.progress_callback = progress_callback
         self.event_callback = event_callback
+        self.approval_store = approval_store or PersistentApprovalStore()
         self.system_prompt = system_prompt or (
             "You are HomomicsLab, an AI assistant for bioinformatics and computational biology. "
             "You have access to tools such as PubMed/GEO/UniProt search. "
@@ -227,7 +232,61 @@ class AgentLoop:
                     {"tool_name": tool_name, "inputs": inputs, "round": round_idx + 1},
                 )
 
-                record = await self._execute_tool(tool_call.id, tool_name, inputs)
+                try:
+                    record = await self._execute_tool(tool_call.id, tool_name, inputs)
+                except ToolApprovalRequired as exc:
+                    # Pause the loop and persist enough state to resume after approval.
+                    self.approval_store.create_request(
+                        tool_name=exc.tool_name,
+                        arguments=exc.arguments,
+                        risk_level=exc.risk_level,
+                        call_id=exc.call_id,
+                        metadata={
+                                "messages": messages,
+                                "tool_records": [
+                                    {
+                                        "tool_call_id": r.tool_call_id,
+                                        "tool_name": r.tool_name,
+                                        "inputs": r.inputs,
+                                        "success": r.success,
+                                        "output_summary": r.output_summary,
+                                    }
+                                    for r in tool_records
+                                ],
+                                "llm_calls": llm_calls,
+                                "tool_calls_count": tool_calls_count,
+                                "total_cost": total_cost,
+                                "pending_tool_call": {
+                                    "id": tool_call.id,
+                                    "name": tool_name,
+                                    "inputs": inputs,
+                                },
+                                "round": round_idx,
+                                "max_rounds": self.max_rounds,
+                                "session_id": self.session_id,
+                                "project_id": self.project_id,
+                                "request_id": self.request_id,
+                            },
+                        )
+                    return AgentLoopResult(
+                        response_text=(
+                            f"工具 `{exc.tool_name}` 是高风险操作，需要您授权后才能继续。"
+                        ),
+                        tool_calls=tool_records,
+                        stopped_reason="awaiting_tool_approval",
+                        cost_usd=total_cost,
+                        llm_calls=llm_calls,
+                        tool_calls_count=tool_calls_count,
+                        awaiting_approval=True,
+                        approval_request={
+                            "call_id": exc.call_id,
+                            "tool_name": exc.tool_name,
+                            "arguments": exc.arguments,
+                            "risk_level": exc.risk_level,
+                        },
+                        messages=messages,
+                    )
+
                 tool_records.append(record)
                 tool_calls_count += 1
                 await self._emit(
@@ -294,15 +353,13 @@ class AgentLoop:
 
         # High-risk tools require explicit approval before execution.
         if tool.risk_level == "high":
-            return ToolCallRecord(
-                tool_call_id=tool_call_id,
+            import uuid as _uuid
+
+            raise ToolApprovalRequired(
+                call_id=_uuid.uuid4().hex,
                 tool_name=tool_name,
-                inputs=inputs,
-                success=False,
-                output_summary=(
-                    f"工具 `{tool_name}` 属于高风险操作（风险等级：high），"
-                    "已暂停执行。请在确认后再授权运行。"
-                ),
+                arguments=inputs,
+                risk_level="high",
             )
 
         try:
