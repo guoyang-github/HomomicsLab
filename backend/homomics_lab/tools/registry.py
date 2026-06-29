@@ -110,6 +110,46 @@ class ToolRegistry:
         tool_names = role_tools.get(role, ["file_read"])
         return [self._tools[name] for name in tool_names if name in self._tools]
 
+    def to_openai_tools(self, allowed_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Export registered tools as OpenAI function-calling schema.
+
+        If ``allowed_names`` is provided, only those tools are included.
+        """
+        tools = []
+        for tool in self._tools.values():
+            if allowed_names is not None and tool.name not in allowed_names:
+                continue
+            schema = dict(tool.input_schema) if isinstance(tool.input_schema, dict) else {"type": "object"}
+            if schema.get("type") != "object":
+                schema["type"] = "object"
+            if "properties" not in schema:
+                schema["properties"] = {}
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": schema,
+                },
+            })
+        return tools
+
+    def to_anthropic_tools(self, allowed_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Export registered tools as Anthropic tool-use schema.
+
+        If ``allowed_names`` is provided, only those tools are included.
+        """
+        tools = []
+        for tool in self._tools.values():
+            if allowed_names is not None and tool.name not in allowed_names:
+                continue
+            tools.append({
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.input_schema,
+            })
+        return tools
+
     # ─────────────────────────────────────────
     # Execution
     # ─────────────────────────────────────────

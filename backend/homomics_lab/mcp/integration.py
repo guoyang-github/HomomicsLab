@@ -46,11 +46,13 @@ async def register_mcp_tools(tool_registry: ToolRegistry) -> Optional[BioMCPClie
     for tool_desc in tools:
         name = tool_desc["name"]
         schema = tool_desc.get("parameters") or tool_desc.get("inputSchema", {"type": "object"})
+        risk_level = _infer_risk_level(name)
         tool = ToolDefinition(
             name=name,
             description=tool_desc.get("description", ""),
             input_schema=schema,
             source="mcp",
+            risk_level=risk_level,
             metadata={
                 "mcp_mode": settings.mcp_mode,
                 "mcp_server": "homomics-bio",
@@ -58,9 +60,21 @@ async def register_mcp_tools(tool_registry: ToolRegistry) -> Optional[BioMCPClie
             handler=_make_tool_handler(client, name),
         )
         tool_registry.register(tool)
-        logger.info("Registered MCP tool: %s", name)
+        logger.info("Registered MCP tool: %s (risk=%s)", name, risk_level)
 
     return client
+
+
+def _infer_risk_level(tool_name: str) -> str:
+    """Infer a risk level for an MCP tool based on its name."""
+    name_lower = tool_name.lower()
+    high_risk = {"delete", "drop", "remove", "write", "exec", "shell", "run", "overwrite"}
+    medium_risk = {"fetch", "download", "submit", "update", "modify", "create"}
+    if any(k in name_lower for k in high_risk):
+        return "high"
+    if any(k in name_lower for k in medium_risk):
+        return "medium"
+    return "low"
 
 
 def _make_tool_handler(client: BioMCPClient, tool_name: str):

@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 logger = logging.getLogger(__name__)
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.agent.agent_loop import AgentLoop, TurnBudget
 from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.agent.errors import (
     ExecutionError,
@@ -683,6 +684,91 @@ class TurnRunner:
             agent_message=agent_msg,
         )
 
+    async def _handle_agent_loop(
+        self,
+        user_message: str,
+        working_memory: WorkingMemory,
+        allowed_tools: Optional[List[str]] = None,
+    ) -> TurnResult:
+        """Run the LLM-driven tool-calling loop for MCP tool intents."""
+        if self._llm_client is None or self._tool_registry is None:
+            raise RuntimeError("AgentLoop requires both llm_client and tool_registry")
+
+        history = self._working_memory_to_history(working_memory)
+        loop = AgentLoop(
+            llm_client=self._llm_client,
+            tool_registry=self._tool_registry,
+            session_id=getattr(self, "_session_id", None),
+            project_id=getattr(self, "_project_id", None),
+            request_id=getattr(self, "_turn_request_id", None),
+            max_rounds=3,
+            budget=TurnBudget(max_llm_calls=5, max_tool_calls=10),
+        )
+        result = await loop.run(
+            user_message=user_message,
+            history=history,
+            allowed_tools=allowed_tools,
+        )
+
+        response_text = result.response_text
+        if not response_text or not str(response_text).strip():
+            response_text = "工具调用已完成，但没有生成可读的回复。"
+
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TEXT,
+            content=response_text,
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+        # Preserve a structured preview if any tool calls were made.
+        if result.tool_calls:
+            preview_msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.RESULT_PREVIEW,
+                content={
+                    "tool_calls": [
+                        {
+                            "tool_name": tc.tool_name,
+                            "inputs": tc.inputs,
+                            "success": tc.success,
+                            "output_summary": tc.output_summary,
+                        }
+                        for tc in result.tool_calls
+                    ],
+                    "response_text": response_text,
+                },
+                sender="agent",
+            )
+            working_memory.add_message(preview_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.DIRECT_RESPONSE,
+            response_text=response_text,
+            agent_message=agent_msg,
+        )
+
+    def _working_memory_to_history(
+        self, working_memory: WorkingMemory
+    ) -> List[Dict[str, Any]]:
+        """Convert recent working-memory messages to OpenAI-compatible history."""
+        history: List[Dict[str, Any]] = []
+        for msg in working_memory.get_recent_messages()[-10:]:
+            if msg.sender == "user":
+                role = "user"
+            elif msg.sender == "agent":
+                role = "assistant"
+            else:
+                continue
+            content = msg.content
+            if isinstance(content, dict):
+                content = content.get("response_text") or content.get("text") or str(content)
+            if not isinstance(content, str):
+                content = str(content)
+            history.append({"role": role, "content": content})
+        return history
+
     @staticmethod
     def _summarize_mcp_result(
         tool_name: str,
@@ -888,14 +974,24 @@ class TurnRunner:
                 intent, user_message, working_memory, project_id
             )
 
-        # MCP tool fast path.
+        # MCP tool agent loop.
         mcp_tool_name = intent.metadata.get("tool_name")
         if mcp_tool_name and self._tool_registry is not None:
-            return await self._handle_mcp_tool(
-                mcp_tool_name,
-                intent.metadata.get("tool_inputs", {}),
-                working_memory,
-            )
+            try:
+                return await self._handle_agent_loop(
+                    user_message=user_message,
+                    working_memory=working_memory,
+                    allowed_tools=[t.name for t in self._tool_registry.list_by_source("mcp")],
+                )
+            except Exception as exc:
+                logger.warning(
+                    "AgentLoop failed, falling back to direct MCP tool: %s", exc, exc_info=True
+                )
+                return await self._handle_mcp_tool(
+                    mcp_tool_name,
+                    intent.metadata.get("tool_inputs", {}),
+                    working_memory,
+                )
 
         # Everything else is some form of execution.
         plan_result, tree = await self.task_decomposer.decompose_with_plan(

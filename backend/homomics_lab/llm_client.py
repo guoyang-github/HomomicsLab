@@ -135,7 +135,7 @@ class LLMClient:
 
     async def chat_completion(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         temperature: float = 0.3,
         max_tokens: int = 2000,
         response_format: Optional[Dict[str, str]] = None,
@@ -162,6 +162,42 @@ class LLMClient:
             project_id: Optional project identifier for cost attribution.
             request_id: Optional request identifier for cost attribution.
         """
+        message, usage = await self.chat_completion_message(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            model=model,
+            prefer_cheap=prefer_cheap,
+            intent_type=intent_type,
+            session_id=session_id,
+            project_id=project_id,
+            request_id=request_id,
+        )
+        content = (getattr(message, "content", None) or "").strip()
+        if return_usage:
+            return content, usage
+        return content
+
+    async def chat_completion_message(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.3,
+        max_tokens: int = 2000,
+        response_format: Optional[Dict[str, str]] = None,
+        model: Optional[str] = None,
+        prefer_cheap: bool = False,
+        intent_type: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        session_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Tuple[Any, Dict[str, Any]]:
+        """Send a chat completion and return the raw assistant message object.
+
+        This is the low-level entry point used by the agent loop so it can
+        inspect ``message.tool_calls``.
+        """
         requested_model = model or self._legacy_model
         route = self._select_route(
             requested_model=requested_model,
@@ -170,16 +206,21 @@ class LLMClient:
             messages=messages,
         )
 
-        # Check cache first
-        if self._cache is not None:
+        # Check cache first (only for simple non-tool requests).
+        if self._cache is not None and not tools:
             cached = await self._cache.get(
                 route.model, messages, temperature, max_tokens, response_format
             )
             if cached is not None:
                 self._record_cache_hit(route.model)
-                if return_usage:
-                    return cached, {"cache_hit": True, "model": route.model}
-                return cached
+                # Reconstruct a minimal message object for callers.
+                try:
+                    from openai.types.chat import ChatCompletionMessage
+
+                    msg = ChatCompletionMessage(role="assistant", content=cached)
+                except Exception:
+                    msg = {"role": "assistant", "content": cached}
+                return msg, {"cache_hit": True, "model": route.model}
 
         tried_models = {route.model}
         last_error: Optional[Exception] = None
@@ -188,7 +229,7 @@ class LLMClient:
             same_provider_attempts = 2
             for attempt in range(same_provider_attempts):
                 try:
-                    content, usage = await self._chat_completion_once(
+                    message, usage = await self._chat_completion_once(
                         route=route,
                         messages=messages,
                         temperature=temperature,
@@ -197,8 +238,11 @@ class LLMClient:
                         session_id=session_id,
                         project_id=project_id,
                         request_id=request_id,
+                        tools=tools,
                     )
-                    if self._cache is not None:
+                    # Only cache simple text responses.
+                    content = (getattr(message, "content", None) or "").strip()
+                    if self._cache is not None and not tools and not getattr(message, "tool_calls", None):
                         await self._cache.put(
                             route.model,
                             messages,
@@ -207,9 +251,7 @@ class LLMClient:
                             response_format,
                             content,
                         )
-                    if return_usage:
-                        return content, usage
-                    return content
+                    return message, usage
                 except Exception as exc:
                     if not self._is_retryable_error(exc):
                         raise
@@ -245,18 +287,19 @@ class LLMClient:
     async def _chat_completion_once(
         self,
         route: Any,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         temperature: float,
         max_tokens: int,
         response_format: Optional[Dict[str, str]],
         session_id: Optional[str] = None,
         project_id: Optional[str] = None,
         request_id: Optional[str] = None,
-    ) -> Tuple[str, Dict[str, Any]]:
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Tuple[Any, Dict[str, Any]]:
         """Execute a single chat completion call and record usage.
 
-        Returns the response content together with a usage metadata dict so
-        callers can aggregate per-turn costs.
+        Returns the raw assistant message object together with a usage metadata
+        dict so callers can aggregate per-turn costs and inspect ``tool_calls``.
         """
         client = self._get_client(route.provider)
 
@@ -272,13 +315,15 @@ class LLMClient:
             kwargs["temperature"] = temperature
         if response_format:
             kwargs["response_format"] = response_format
+        if tools:
+            kwargs["tools"] = tools
 
         start = time.time()
         span = self._start_llm_span(route.model, route.provider.name, kwargs)
         try:
             response = await client.chat.completions.create(**kwargs)
             choice = response.choices[0]
-            content = (choice.message.content or "").strip()
+            message = choice.message
             finish_reason = getattr(choice, "finish_reason", None)
             if finish_reason == "length":
                 logger.warning(
@@ -326,7 +371,7 @@ class LLMClient:
                 "latency_ms": latency_ms,
                 "finish_reason": finish_reason,
             }
-            return content, usage_meta
+            return message, usage_meta
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000
             self._record_request_metrics(route.model, route.provider.name, latency_ms, exc=exc)

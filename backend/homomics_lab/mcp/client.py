@@ -122,37 +122,53 @@ class BioMCPClient:
             List of tool descriptors with name, description, and parameters.
         """
         if self.mode == "embedded":
-            # Keep the backward-compatible hard-coded descriptor list.
+            # Return proper JSON Schema descriptors for function calling.
             return [
                 {
                     "name": "pubmed_search",
                     "description": "Search PubMed for scientific articles",
                     "parameters": {
-                        "query": {"type": "string", "description": "Search terms"},
-                        "retmax": {"type": "integer", "description": "Max results", "default": 10},
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search terms"},
+                            "retmax": {"type": "integer", "description": "Max results", "default": 10},
+                        },
+                        "required": ["query"],
                     },
                 },
                 {
                     "name": "pubmed_fetch",
                     "description": "Fetch article abstract by PubMed ID",
                     "parameters": {
-                        "pmid": {"type": "string", "description": "PubMed ID"},
+                        "type": "object",
+                        "properties": {
+                            "pmid": {"type": "string", "description": "PubMed ID"},
+                        },
+                        "required": ["pmid"],
                     },
                 },
                 {
                     "name": "uniprot_search",
                     "description": "Search UniProt for protein information",
                     "parameters": {
-                        "query": {"type": "string", "description": "Protein name or gene"},
-                        "limit": {"type": "integer", "description": "Max results", "default": 10},
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Protein name or gene"},
+                            "limit": {"type": "integer", "description": "Max results", "default": 10},
+                        },
+                        "required": ["query"],
                     },
                 },
                 {
                     "name": "geo_search",
                     "description": "Search GEO for gene expression datasets",
                     "parameters": {
-                        "query": {"type": "string", "description": "Search terms"},
-                        "retmax": {"type": "integer", "description": "Max results", "default": 10},
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search terms"},
+                            "retmax": {"type": "integer", "description": "Max results", "default": 10},
+                        },
+                        "required": ["query"],
                     },
                 },
             ]

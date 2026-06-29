@@ -89,13 +89,13 @@ class Orchestrator:
             if not ready_tasks:
                 break
 
+            # HITL checks are cheap and sequential; they may remove tasks from
+            # the ready set before execution.
+            executable_tasks: List[Any] = []
             for task in ready_tasks:
                 if task.status in (TaskStatus.COMPLETED, TaskStatus.ABORTED):
                     continue
 
-                self._publish_task_update(tree, task, "RUNNING")
-
-                # Check HITL
                 checkpoint = self.hitl_detector.check(task, context)
                 if checkpoint:
                     self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
@@ -104,106 +104,25 @@ class Orchestrator:
                     self._publish_task_update(tree, task, "AWAITING_HUMAN")
                     continue
 
-                try:
-                    result = await self._execute_task(task, context, results)
-                except Exception as exc:
-                    self._publish_task_update(tree, task, "FAILED", error_message=str(exc))
-                    raise
+                executable_tasks.append(task)
+                self._publish_task_update(tree, task, "RUNNING")
 
-                # A skill may request HITL by returning a ``hitl`` payload.
-                # Treat this the same as a pre-execution checkpoint.
-                if isinstance(result, dict) and result.get("status") == "awaiting_human" and "hitl" in result:
-                    from homomics_lab.models.common import HITLCheckpoint
-
-                    checkpoint = HITLCheckpoint(**result["hitl"])
-                    task.hitl_checkpoints.insert(0, checkpoint)
-                    self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
-                    results[task.id] = {"hitl": checkpoint.model_dump()}
-                    hitl_triggered = True
-                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
-                    continue
-
-                # SWR: escalate worker failures that survived retries.
-                if self.supervisor is not None:
-                    worker_result = results.get(task.id, result)
-                    if isinstance(worker_result, dict) and worker_result.get("status") == "failure":
-                        failure_count = getattr(task, "attempt_count", 1)
-                        decision = self.supervisor.handle_worker_failure(task, failure_count)
-                        if decision["action"] == "replan" and task.replan_attempt_count < task.max_replan_attempts:
-                            await self._replan_for_worker_failure(tree, task, worker_result, context)
-                            self.state_machine.transition(task, TaskStatus.COMPLETED)
-                            continue
-                        # Escalate to HITL (or replan exhausted).
-                        checkpoint = self._create_worker_failure_checkpoint(task, worker_result)
-                        task.hitl_checkpoints.insert(0, checkpoint)
-                        self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
-                        results[task.id] = {"hitl": checkpoint.model_dump()}
-                        hitl_triggered = True
-                        self._publish_task_update(tree, task, "AWAITING_HUMAN")
-                        continue
-
-                # Snapshot before gate evaluation if needed.
-                if self._should_snapshot(task):
+            # Execute independent ready tasks in parallel.
+            if executable_tasks:
+                async def run_one(task):
                     try:
-                        task.pre_snapshot_id = self.workspace_manager.snapshot(
-                            f"pre_{task.id}"
-                        )
-                    except Exception:
-                        # Snapshots are best-effort; do not break execution.
-                        pass
+                        result = await self._execute_task(task, context, results)
+                    except Exception as exc:
+                        self._publish_task_update(tree, task, "FAILED", error_message=str(exc))
+                        raise
+                    await self._process_task_result(task, result, tree, context, results)
+                    return task.id
 
-                gate_result = await self._evaluate_gate(task, result)
-                if not gate_result.passed:
-                    task.gate_result = self._gate_result_to_dict(gate_result)
-                    if self._should_auto_replan(task, gate_result):
-                        await self._replan_after_gate(tree, task, gate_result, context)
-                        # Mark the failed task as completed so that remediation
-                        # phases downstream can execute.
-                        self.state_machine.transition(task, TaskStatus.COMPLETED)
-                        continue
+                await asyncio.gather(*[run_one(t) for t in executable_tasks])
 
-                    # Escalate to HITL.
-                    checkpoint = self._create_phase_gate_checkpoint(task, gate_result)
-                    task.hitl_checkpoints.insert(0, checkpoint)
-                    self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
-                    results[task.id] = {"hitl": checkpoint.model_dump()}
-                    hitl_triggered = True
-                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
-                    continue
-
-                # SWR: reviewer checks gate-passed results.
-                if self.reviewer is not None:
-                    review_decision = await self.reviewer.review(
-                        task,
-                        results.get(task.id, result),
-                        self._gate_result_to_dict(gate_result),
-                    )
-                    if not review_decision.get("approved", True):
-                        action = review_decision.get("action", "hitl")
-                        if action == "replan" and task.replan_attempt_count < task.max_replan_attempts:
-                            await self._replan_for_reviewer_rejection(
-                                tree, task, review_decision, context
-                            )
-                            self.state_machine.transition(task, TaskStatus.COMPLETED)
-                            continue
-
-                        checkpoint = self._create_reviewer_reject_checkpoint(
-                            task, review_decision
-                        )
-                        task.hitl_checkpoints.insert(0, checkpoint)
-                        self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
-                        results[task.id] = {"hitl": checkpoint.model_dump()}
-                        hitl_triggered = True
-                        self._publish_task_update(tree, task, "AWAITING_HUMAN")
-                        continue
-
-                # Gate passed — interpret the result and adaptively replan if
-                # the interpretation recommends it (e.g. missing downstream step).
-                await self._maybe_adaptive_replan(tree, task, result, context)
-
-                # Gate passed.
-                self.state_machine.transition(task, TaskStatus.COMPLETED)
-                self._publish_task_update(tree, task, "COMPLETED")
+            # Check whether any task escalated to HITL during post-processing.
+            if any(t.status == TaskStatus.AWAITING_HUMAN for t in executable_tasks):
+                hitl_triggered = True
 
         if hitl_triggered:
             self._publish_task_update(tree, status="AWAITING_HUMAN")
@@ -280,6 +199,105 @@ class Orchestrator:
             )
         except Exception:
             pass
+
+    async def _process_task_result(
+        self,
+        task: Any,
+        result: Any,
+        tree: TaskTree,
+        context: Dict[str, Any],
+        results: Dict[str, Any],
+    ) -> None:
+        """Post-process a single task result: HITL, gates, review, replan."""
+        # A skill may request HITL by returning a ``hitl`` payload.
+        if isinstance(result, dict) and result.get("status") == "awaiting_human" and "hitl" in result:
+            from homomics_lab.models.common import HITLCheckpoint
+
+            checkpoint = HITLCheckpoint(**result["hitl"])
+            task.hitl_checkpoints.insert(0, checkpoint)
+            self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+            results[task.id] = {"hitl": checkpoint.model_dump()}
+            self._publish_task_update(tree, task, "AWAITING_HUMAN")
+            return
+
+        # SWR: escalate worker failures that survived retries.
+        if self.supervisor is not None:
+            worker_result = results.get(task.id, result)
+            if isinstance(worker_result, dict) and worker_result.get("status") == "failure":
+                failure_count = getattr(task, "attempt_count", 1)
+                decision = self.supervisor.handle_worker_failure(task, failure_count)
+                if decision["action"] == "replan" and task.replan_attempt_count < task.max_replan_attempts:
+                    await self._replan_for_worker_failure(tree, task, worker_result, context)
+                    self.state_machine.transition(task, TaskStatus.COMPLETED)
+                    return
+                # Escalate to HITL (or replan exhausted).
+                checkpoint = self._create_worker_failure_checkpoint(task, worker_result)
+                task.hitl_checkpoints.insert(0, checkpoint)
+                self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+                results[task.id] = {"hitl": checkpoint.model_dump()}
+                self._publish_task_update(tree, task, "AWAITING_HUMAN")
+                return
+
+        # Snapshot before gate evaluation if needed.
+        if self._should_snapshot(task):
+            try:
+                task.pre_snapshot_id = self.workspace_manager.snapshot(
+                    f"pre_{task.id}"
+                )
+            except Exception:
+                # Snapshots are best-effort; do not break execution.
+                pass
+
+        gate_result = await self._evaluate_gate(task, result)
+        if not gate_result.passed:
+            task.gate_result = self._gate_result_to_dict(gate_result)
+            if self._should_auto_replan(task, gate_result):
+                await self._replan_after_gate(tree, task, gate_result, context)
+                # Mark the failed task as completed so that remediation
+                # phases downstream can execute.
+                self.state_machine.transition(task, TaskStatus.COMPLETED)
+                return
+
+            # Escalate to HITL.
+            checkpoint = self._create_phase_gate_checkpoint(task, gate_result)
+            task.hitl_checkpoints.insert(0, checkpoint)
+            self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+            results[task.id] = {"hitl": checkpoint.model_dump()}
+            self._publish_task_update(tree, task, "AWAITING_HUMAN")
+            return
+
+        # SWR: reviewer checks gate-passed results.
+        if self.reviewer is not None:
+            review_decision = await self.reviewer.review(
+                task,
+                results.get(task.id, result),
+                self._gate_result_to_dict(gate_result),
+            )
+            if not review_decision.get("approved", True):
+                action = review_decision.get("action", "hitl")
+                if action == "replan" and task.replan_attempt_count < task.max_replan_attempts:
+                    await self._replan_for_reviewer_rejection(
+                        tree, task, review_decision, context
+                    )
+                    self.state_machine.transition(task, TaskStatus.COMPLETED)
+                    return
+
+                checkpoint = self._create_reviewer_reject_checkpoint(
+                    task, review_decision
+                )
+                task.hitl_checkpoints.insert(0, checkpoint)
+                self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+                results[task.id] = {"hitl": checkpoint.model_dump()}
+                self._publish_task_update(tree, task, "AWAITING_HUMAN")
+                return
+
+        # Gate passed — interpret the result and adaptively replan if
+        # the interpretation recommends it (e.g. missing downstream step).
+        await self._maybe_adaptive_replan(tree, task, result, context)
+
+        # Gate passed.
+        self.state_machine.transition(task, TaskStatus.COMPLETED)
+        self._publish_task_update(tree, task, "COMPLETED")
 
     async def resume_task(
         self,
