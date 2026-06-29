@@ -1073,6 +1073,12 @@ class TurnRunner:
                 )
             else:
                 response_text = "我为您规划了以下执行步骤，请确认后再执行。"
+                estimates = {}
+                if plan is not None:
+                    estimates = {
+                        "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
+                        "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
+                    }
                 agent_msg = ChatMessage(
                     id=f"msg_{len(working_memory.messages)}",
                     type=MessageType.EXECUTION_PLAN,
@@ -1081,6 +1087,7 @@ class TurnRunner:
                         "response_text": response_text,
                         "tasks": [t.model_dump() for t in tree.tasks],
                         "progress": self._build_initial_progress(tree),
+                        "estimates": estimates,
                     },
                     sender="agent",
                 )

@@ -9,11 +9,32 @@ layer can add extra safeguards (e.g., HITL confirmation) before running it.
 import json
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, ValidationError
+
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry
+
+
+class FallbackPlanStep(BaseModel):
+    """A single step in the LLM fallback plan output."""
+
+    skill_id: str
+    phase: str = "analysis"
+    reason: str = ""
+    parameters: Dict[str, Any] = {}
+    estimated_duration_seconds: Optional[float] = None
+    estimated_cost_usd: Optional[float] = None
+
+
+class FallbackPlanOutput(BaseModel):
+    """Structured JSON output expected from the fallback planner LLM."""
+
+    steps: List[FallbackPlanStep]
+    summary: str = ""
 
 
 class LLMFallbackPlanner:
@@ -31,11 +52,13 @@ class LLMFallbackPlanner:
         llm_client: Optional[LLMClient] = None,
         top_k: int = 10,
         allow_code_fallback: bool = True,
+        tracker: Optional[Any] = None,
     ):
         self.skill_registry = skill_registry
         self.llm_client = llm_client
         self.top_k = top_k
         self.allow_code_fallback = allow_code_fallback
+        self.tracker = tracker or default_tracker()
 
     async def generate_plan(
         self,
@@ -81,7 +104,10 @@ class LLMFallbackPlanner:
                 selected_skill=skill,
                 parameters=item.get("parameters", {}),
                 readonly=is_code_act_skill,
+                estimated_duration_seconds=item.get("estimated_duration_seconds"),
+                estimated_cost_usd=item.get("estimated_cost_usd"),
             )
+            estimate_phase(phase, self.tracker)
             phases.append(phase)
 
         if not phases:
@@ -184,6 +210,7 @@ Rules:
 4. If no bioinformatics skill matches the request, but the request is a general coding or data-processing task (e.g., filtering CSVs, renaming files), you MAY select "core_code_act" and include a "generated_code" parameter with the code snippet.
 5. If no skill matches the request at all, return an empty `steps` array.
 6. Prefer fewer steps when possible; avoid redundant analysis.
+7. Optionally provide per-step execution estimates (`estimated_duration_seconds` and `estimated_cost_usd`) when you can infer them.
 
 Respond with a single JSON object in this exact format (no markdown fences):
 {
@@ -192,7 +219,9 @@ Respond with a single JSON object in this exact format (no markdown fences):
       "skill_id": "registered_skill_id",
       "phase": "qc|normalization|analysis|visualization|utility|...",
       "reason": "why this skill is needed",
-      "parameters": {"param_name": "value", "generated_code": "optional code snippet"}
+      "parameters": {"param_name": "value", "generated_code": "optional code snippet"},
+      "estimated_duration_seconds": 120,
+      "estimated_cost_usd": 0.01
     }
   ],
   "summary": "one-sentence description of the overall plan"
@@ -217,10 +246,11 @@ Generate the JSON plan now."""
                 temperature=0.2,
                 response_format={"type": "json_object"},
             )
-            parsed = json.loads(raw)
-            steps = parsed.get("steps", [])
-            if isinstance(steps, list):
-                return steps
+            parsed = FallbackPlanOutput.model_validate_json(raw)
+            return [step.model_dump() for step in parsed.steps]
+        except (json.JSONDecodeError, ValidationError):
+            # Swallow parse/validation errors and fall back to empty selection.
+            pass
         except Exception:
             # Swallow LLM errors and fall back to empty selection.
             pass

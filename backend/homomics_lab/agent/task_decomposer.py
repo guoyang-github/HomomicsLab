@@ -185,6 +185,10 @@ class TaskDecomposer:
                 parameters=phase.parameters,
                 hitl_checkpoints=hitl_checkpoints,
                 success_criteria=success_criteria,
+                estimated_duration_minutes=int((phase.estimated_duration_seconds or 600) / 60.0),
+                estimated_cost_usd=phase.estimated_cost_usd,
+                estimated_input_tokens=phase.estimated_input_tokens,
+                estimated_output_tokens=phase.estimated_output_tokens,
             )
             tasks.append(task)
 

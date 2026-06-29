@@ -196,6 +196,14 @@ class Phase:
     success_criteria: List[SuccessCriterion] = field(default_factory=list)
     snapshot_policy: str = "auto"  # "auto" | "always" | "never"
 
+    # Execution estimates (best-effort; populated by the plan engine).
+    estimated_cost_usd: Optional[float] = None
+    estimated_duration_seconds: Optional[float] = None
+    estimated_input_tokens: Optional[int] = None
+    estimated_output_tokens: Optional[int] = None
+    estimated_cpu_cores: int = 2
+    estimated_memory_gb: Optional[float] = None
+
     def __post_init__(self):
         if not self.description:
             self.description = f"{self.phase_type} analysis step"
@@ -246,6 +254,18 @@ class PlanResult:
             if p.selected_skill is not None
         ]
 
+    @property
+    def total_estimated_cost_usd(self) -> Optional[float]:
+        """Sum per-phase cost estimates when all phases have one."""
+        costs = [p.estimated_cost_usd for p in self.phases if p.estimated_cost_usd is not None]
+        return sum(costs) if costs else None
+
+    @property
+    def total_estimated_duration_seconds(self) -> Optional[float]:
+        """Sum per-phase duration estimates when all phases have one."""
+        durations = [p.estimated_duration_seconds for p in self.phases if p.estimated_duration_seconds is not None]
+        return sum(durations) if durations else None
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize plan result to a plain dict."""
         return {
@@ -259,6 +279,8 @@ class PlanResult:
             "suggestion_text": self.suggestion_text,
             "phase_transitions": self.phase_transitions,
             "risks": self.risks,
+            "total_estimated_cost_usd": self.total_estimated_cost_usd,
+            "total_estimated_duration_seconds": self.total_estimated_duration_seconds,
         }
 
     @classmethod

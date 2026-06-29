@@ -121,6 +121,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.openedInEditor': 'Plan editor opened in canvas. Drag to adjust structure and parameters.',
     'plan.progress': 'Progress',
     'plan.versionLabel': 'Version {{version}}',
+    'plan.estimatedDuration': 'Estimated duration',
+    'plan.estimatedCost': 'Estimated cost',
+    'plan.estimatedTokens': 'Estimated tokens',
 
     // Plan history
     'planHistory.title': 'Plan Version History',
@@ -628,6 +631,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.openedInEditor': '已在画布中打开计划编辑器，您可以拖拽调整结构与参数。',
     'plan.progress': '进度',
     'plan.versionLabel': '版本 {{version}}',
+    'plan.estimatedDuration': '预计耗时',
+    'plan.estimatedCost': '预计成本',
+    'plan.estimatedTokens': '预计 Token',
 
     // Plan history
     'planHistory.title': '计划版本历史',

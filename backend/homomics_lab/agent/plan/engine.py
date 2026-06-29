@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from homomics_lab.agent.information_gathering import InformationGatheringEngine
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
+from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
@@ -52,6 +53,7 @@ class PlanEngine:
         data_sources: Optional[List[Dict[str, Any]]] = None,
         literature_retriever: Optional[LiteratureRetriever] = None,
         enable_information_gathering: bool = False,
+        tracker: Optional[Any] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
@@ -71,7 +73,10 @@ class PlanEngine:
             skill_registry=skill_registry,
             skill_dag=skill_dag,
         )
-        self.llm_fallback = llm_fallback or LLMFallbackPlanner(skill_registry)
+        self.tracker = tracker or default_tracker()
+        self.llm_fallback = llm_fallback or LLMFallbackPlanner(
+            skill_registry, tracker=self.tracker
+        )
         self.cbkb = cbkb
 
     async def plan(
@@ -187,6 +192,7 @@ class PlanEngine:
             phase.selected_skill = self._select_skill_for_phase(
                 phase, data_state, retrieval_context
             )
+            estimate_phase(phase, self.tracker)
             injected = self._apply_learned_defaults(phase)
             learned_defaults.extend(injected)
 

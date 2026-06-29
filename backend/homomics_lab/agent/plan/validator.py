@@ -108,6 +108,20 @@ class PlanValidator:
                     skill_id=skill_id,
                 )
 
+            # 4. Execution estimates sanity check
+            if phase.estimated_cost_usd is not None and phase.estimated_cost_usd < 0:
+                report.add_warning(
+                    f"Phase '{phase.phase_type}' has negative estimated cost",
+                    phase=phase.phase_type,
+                    skill_id=skill_id,
+                )
+            if phase.estimated_duration_seconds is not None and phase.estimated_duration_seconds <= 0:
+                report.add_warning(
+                    f"Phase '{phase.phase_type}' has invalid estimated duration",
+                    phase=phase.phase_type,
+                    skill_id=skill_id,
+                )
+
             # Accumulate outputs for downstream phases
             for output_name in phase.selected_skill.output_schema.properties.keys():
                 available_outputs[output_name] = f"<output from {skill_id}>"

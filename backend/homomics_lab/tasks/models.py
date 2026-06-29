@@ -21,6 +21,9 @@ class TaskNode(BaseModel):
     skills_required: List[str] = Field(default_factory=list)
     hitl_checkpoints: List[HITLCheckpoint] = Field(default_factory=list)
     estimated_duration_minutes: int = 10
+    estimated_cost_usd: Optional[float] = None
+    estimated_input_tokens: Optional[int] = None
+    estimated_output_tokens: Optional[int] = None
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     parameters: Dict[str, Any] = Field(default_factory=dict)
     success_criteria: List[Dict[str, Any]] = Field(default_factory=list)

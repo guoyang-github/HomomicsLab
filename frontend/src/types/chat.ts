@@ -23,11 +23,17 @@ export interface TodoListContent {
   job_id?: string
 }
 
+export interface PlanEstimates {
+  total_estimated_cost_usd?: number
+  total_estimated_duration_seconds?: number
+}
+
 export interface ExecutionPlanContent {
   plan_id: string
   response_text: string
   tasks: TaskNode[]
   progress?: TaskProgress
+  estimates?: PlanEstimates
 }
 
 export interface HITLContent {

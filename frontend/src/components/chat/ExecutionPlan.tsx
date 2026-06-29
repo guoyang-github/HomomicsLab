@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, X, Pencil, Layers } from 'lucide-react'
+import { Check, X, Pencil, Layers, Clock, DollarSign } from 'lucide-react'
 import { clsx } from 'clsx'
 import { planApi } from '@/services/api'
 import { usePlanStore } from '@/stores/planStore'
@@ -17,7 +17,7 @@ interface Props {
 
 export function ExecutionPlan({ content }: Props) {
   const { t } = useTranslation()
-  const { plan_id, response_text, tasks, progress } = content
+  const { plan_id, response_text, tasks, progress, estimates } = content
   const { addMessage } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { setJobId, reset: resetExecution } = useExecutionStore()
@@ -126,6 +126,20 @@ export function ExecutionPlan({ content }: Props) {
 
   const editableTasks = tasks.filter((task) => task.parameters && Object.keys(task.parameters).length > 0)
 
+  const formatDuration = (seconds?: number) => {
+    if (seconds === undefined || seconds === null) return null
+    if (seconds < 60) return `${Math.round(seconds)}s`
+    const mins = Math.floor(seconds / 60)
+    const rem = Math.round(seconds % 60)
+    return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`
+  }
+
+  const formatCost = (cost?: number) => {
+    if (cost === undefined || cost === null) return null
+    if (cost < 0.001) return `< $0.001`
+    return `$${cost.toFixed(2)}`
+  }
+
   const openInEditor = () => {
     const planContent: PlanRequestContent = {
       plan_id,
@@ -161,6 +175,22 @@ export function ExecutionPlan({ content }: Props) {
           <Badge variant="info" size="md">{t('plan.pendingApproval')}</Badge>
         </div>
         <CardDescription className="mt-2 text-foreground/80">{response_text}</CardDescription>
+        {(estimates?.total_estimated_duration_seconds !== undefined || estimates?.total_estimated_cost_usd !== undefined) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {estimates?.total_estimated_duration_seconds !== undefined && (
+              <Badge variant="outline" size="sm" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {t('plan.estimatedDuration')}: {formatDuration(estimates.total_estimated_duration_seconds)}
+              </Badge>
+            )}
+            {estimates?.total_estimated_cost_usd !== undefined && (
+              <Badge variant="outline" size="sm" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3" />
+                {t('plan.estimatedCost')}: {formatCost(estimates.total_estimated_cost_usd)}
+              </Badge>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -174,6 +204,18 @@ export function ExecutionPlan({ content }: Props) {
                 {task.skills_required.length > 0 && (
                   <Badge variant="outline" size="sm">
                     {task.skills_required[0]}
+                  </Badge>
+                )}
+                {task.estimated_duration_minutes !== undefined && task.estimated_duration_minutes > 0 && (
+                  <Badge variant="secondary" size="sm" className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDuration(task.estimated_duration_minutes * 60)}
+                  </Badge>
+                )}
+                {task.estimated_cost_usd !== undefined && (
+                  <Badge variant="secondary" size="sm" className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    {formatCost(task.estimated_cost_usd)}
                   </Badge>
                 )}
               </div>

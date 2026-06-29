@@ -46,6 +46,10 @@ class PlanPresenter:
                     "parameters": phase.parameters,
                     "parameter_recommendations": phase.parameter_recommendations,
                     "parameter_sources": phase.parameter_sources,
+                    "estimated_cost_usd": phase.estimated_cost_usd,
+                    "estimated_duration_seconds": phase.estimated_duration_seconds,
+                    "estimated_input_tokens": phase.estimated_input_tokens,
+                    "estimated_output_tokens": phase.estimated_output_tokens,
                 }
             )
 
@@ -80,6 +84,8 @@ class PlanPresenter:
             "suggestion_text": plan.plan_result.suggestion_text,
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
             "version": plan.version,
+            "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
+            "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
         }
 
     @classmethod
