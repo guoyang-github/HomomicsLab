@@ -12,6 +12,7 @@ from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context
 from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
+from homomics_lab.settings_store import apply_runtime_settings
 from homomics_lab.logging_config import (
     configure_logging,
     get_correlation_id,
@@ -30,6 +31,9 @@ setup_tracing(service_name=settings.otel_service_name)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Load any runtime setting overrides before bootstrapping dependent services.
+    apply_runtime_settings(settings)
+
     ctx = await bootstrap_worker_context(enable_hot_reload=settings.skill_hot_reload_enabled)
 
     # Expose initialized registries for API endpoints

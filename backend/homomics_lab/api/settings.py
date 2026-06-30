@@ -15,12 +15,18 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from homomics_lab.api.auth import require_auth
+from homomics_lab.config import settings
 from homomics_lab.llm.runtime_config import (
     LLMRuntimeConfig,
     load_llm_runtime_config,
     save_llm_runtime_config,
 )
 from homomics_lab.llm.router import LLMRouter
+from homomics_lab.settings_store import (
+    apply_runtime_settings,
+    load_runtime_settings,
+    save_runtime_settings,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_auth)])
@@ -218,3 +224,108 @@ async def test_llm_connection(
             model=config.model,
             error=f"{type(exc).__name__}: {exc}",
         )
+
+
+# ---------------------------------------------------------------------------
+# System/runtime settings (non-LLM)
+# ---------------------------------------------------------------------------
+
+class SystemSettingsOut(BaseModel):
+    """Current effective system settings exposed to the frontend."""
+
+    skill_sandbox_backend: str
+    enable_semantic_memory: bool
+    semantic_search_model: Optional[str]
+    session_ttl_days: int
+    default_job_timeout_seconds: float
+    max_skill_timeout_seconds: float
+    result_inline_size_limit_bytes: int
+    max_llm_cost_per_request_usd: Optional[float]
+    monthly_budget_usd: Optional[float]
+    skill_hot_reload_enabled: bool
+
+
+class SystemSettingsUpdate(BaseModel):
+    """Subset of settings that can be updated at runtime."""
+
+    skill_sandbox_backend: Optional[str] = None
+    enable_semantic_memory: Optional[bool] = None
+    semantic_search_model: Optional[str] = None
+    session_ttl_days: Optional[int] = None
+    default_job_timeout_seconds: Optional[float] = None
+    max_skill_timeout_seconds: Optional[float] = None
+    result_inline_size_limit_bytes: Optional[int] = None
+    max_llm_cost_per_request_usd: Optional[float] = None
+    monthly_budget_usd: Optional[float] = None
+    skill_hot_reload_enabled: Optional[bool] = None
+
+
+@router.get("/system", response_model=SystemSettingsOut)
+async def get_system_settings() -> SystemSettingsOut:
+    """Return the currently effective non-LLM runtime settings."""
+    # Merge static settings with any persisted runtime overrides so the UI
+    # always sees the truth.
+    overrides = load_runtime_settings()
+    return SystemSettingsOut(
+        skill_sandbox_backend=overrides.get(
+            "skill_sandbox_backend", settings.skill_sandbox_backend
+        ),
+        enable_semantic_memory=overrides.get(
+            "enable_semantic_memory", settings.enable_semantic_memory
+        ),
+        semantic_search_model=overrides.get(
+            "semantic_search_model", settings.semantic_search_model
+        ),
+        session_ttl_days=overrides.get(
+            "session_ttl_days", settings.session_ttl_days
+        ),
+        default_job_timeout_seconds=overrides.get(
+            "default_job_timeout_seconds", settings.default_job_timeout_seconds
+        ),
+        max_skill_timeout_seconds=overrides.get(
+            "max_skill_timeout_seconds", settings.max_skill_timeout_seconds
+        ),
+        result_inline_size_limit_bytes=overrides.get(
+            "result_inline_size_limit_bytes", settings.result_inline_size_limit_bytes
+        ),
+        max_llm_cost_per_request_usd=overrides.get(
+            "max_llm_cost_per_request_usd", settings.max_llm_cost_per_request_usd
+        ),
+        monthly_budget_usd=overrides.get(
+            "monthly_budget_usd", settings.monthly_budget_usd
+        ),
+        skill_hot_reload_enabled=overrides.get(
+            "skill_hot_reload_enabled", settings.skill_hot_reload_enabled
+        ),
+    )
+
+
+@router.put("/system", response_model=SystemSettingsOut)
+async def update_system_settings(
+    request: Request,
+    body: SystemSettingsUpdate,
+) -> SystemSettingsOut:
+    """Persist non-LLM runtime setting overrides.
+
+    Values are written to disk and applied to the in-process ``settings``
+    object immediately.
+    """
+    updates = body.model_dump(exclude_none=True)
+    if not updates:
+        return await get_system_settings()
+
+    try:
+        save_runtime_settings(updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Apply to the running process immediately.
+    apply_runtime_settings(settings)
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    logger.info(
+        "System settings updated via UI",
+        extra={"updates": updates, "user_id": user_id},
+    )
+
+    return await get_system_settings()

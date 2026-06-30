@@ -19,6 +19,7 @@ Example:
 """
 
 import json
+import logging
 import sqlite3
 import uuid
 from abc import ABC, abstractmethod
@@ -30,6 +31,8 @@ import sqlite_vec
 
 from homomics_lab.config import Settings
 from homomics_lab.context.embedding_cache import get_shared_embedding_model
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryType(str, Enum):
@@ -878,7 +881,7 @@ class PostgresSemanticMemory(BaseSemanticMemory):
                     """)
                 except Exception:
                     try:
-                        await conn.execute(f"""
+                        await conn.execute("""
                             CREATE INDEX IF NOT EXISTS idx_memories_embedding_ivfflat
                             ON memories USING ivfflat (embedding vector_cosine_ops)
                             WITH (lists = 100)
@@ -1311,12 +1314,32 @@ class PostgresSemanticMemory(BaseSemanticMemory):
 SemanticMemory = SQLiteSemanticMemory
 
 
+def _embedding_model_available(model_name: str) -> bool:
+    """Probe whether the configured embedding model can be loaded."""
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        SentenceTransformer(model_name)
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Embedding model '%s' is not available; semantic memory will be disabled: %s",
+            model_name,
+            exc,
+        )
+        return False
+
+
 def create_semantic_memory(settings: Settings) -> Optional[BaseSemanticMemory]:
     """Factory that creates the configured semantic memory backend.
 
-    Returns None when semantic memory is disabled or no embedding model is set.
+    Returns None when semantic memory is disabled, no embedding model is set,
+    or the embedding model cannot be loaded.
     """
     if not settings.enable_semantic_memory or not settings.semantic_search_model:
+        return None
+
+    if not _embedding_model_available(settings.semantic_search_model):
         return None
 
     if settings.semantic_memory_backend == "postgres":

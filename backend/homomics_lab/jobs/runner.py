@@ -230,7 +230,7 @@ class BackgroundJobRunner:
                 # Finalize reproducibility bundle regardless of outcome.
                 try:
                     cbkb = self._get_cbkb()
-                    repro_engine.finalize(cbkb=cbkb)
+                    repro_engine.finalize(cbkb=cbkb, job_id=job_id)
                     logger.info("Reproducibility bundle finalized for job %s", job_id)
                 except Exception:
                     logger.exception("Failed to finalize reproducibility bundle for job %s", job_id)

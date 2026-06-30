@@ -119,20 +119,30 @@ class ReproducibilityEngine:
             )
         )
 
-    def finalize(self, cbkb=None) -> ReproducibilityBundle:
+    def finalize(
+        self,
+        cbkb=None,
+        job_id: Optional[str] = None,
+    ) -> ReproducibilityBundle:
         """Finalize the bundle and save it to the workspace.
 
         Args:
             cbkb: Optional CBKB instance to auto-index the bundle into the
                 Computational Biology Knowledge Base.
+            job_id: Optional job identifier used to scope the bundle filename.
         """
         if self._bundle is None:
             raise RuntimeError("Analysis not started. Call start_analysis() first.")
 
         bundle = self._bundle
 
-        # Save to workspace
-        bundle_path = self.workspace.get_path(".metadata/reproducibility_bundle.json")
+        # Save to workspace. When a job_id is provided, use a job-scoped filename
+        # so multiple jobs in the same project do not overwrite each other.
+        if job_id:
+            filename = f".metadata/reproducibility_bundle_{job_id}.json"
+        else:
+            filename = ".metadata/reproducibility_bundle.json"
+        bundle_path = self.workspace.get_path(filename)
         bundle.save(bundle_path)
 
         # Auto-index into CBKB if available

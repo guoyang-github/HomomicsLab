@@ -1,11 +1,9 @@
 """Tests for the runtime LLM settings API."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 from homomics_lab.config import settings
 from homomics_lab.llm.providers import reset_provider_registry
-from homomics_lab.main import app
 from homomics_lab.secrets import reset_secrets_manager
 
 
@@ -18,19 +16,17 @@ def reset_singletons():
     reset_provider_registry()
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    # SecretsManager stores secrets under settings.data_dir by default.
+@pytest.fixture(autouse=True)
+def _isolate_settings(monkeypatch, tmp_path):
+    # SecretsManager and the runtime settings store both use settings.data_dir at
+    # call time. Point each test at its own temp directory so writes from one
+    # test do not leak to another when sharing the module-scoped TestClient.
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "secrets_master_key", "settings-test-master-key")
-    monkeypatch.setattr(settings, "auth_enabled", True)
-    monkeypatch.setattr(settings, "api_key", "test-api-key")
     # Make sure env-level defaults do not leak into these tests.
     monkeypatch.setattr(settings, "llm_provider", None)
     monkeypatch.setattr(settings, "llm_model", None)
     monkeypatch.setattr(settings, "llm_fallback_models", None)
-    with TestClient(app) as c:
-        yield c
 
 
 class TestLlmSettingsApi:
@@ -137,3 +133,57 @@ class TestLlmSettingsApi:
         assert data["provider"] == "openai"
         assert data["model"] == "gpt-4o-mini"
         assert "error" in data
+
+
+class TestSystemSettingsApi:
+    def test_get_system_settings_fallback(self, client):
+        response = client.get("/api/settings/system", headers={"X-API-Key": "test-api-key"})
+        assert response.status_code == 200
+        data = response.json()
+        assert "skill_sandbox_backend" in data
+        assert "enable_semantic_memory" in data
+        assert "session_ttl_days" in data
+
+    def test_update_system_settings_persists(self, client, tmp_path):
+        response = client.put(
+            "/api/settings/system",
+            json={
+                "skill_sandbox_backend": "container",
+                "enable_semantic_memory": False,
+                "session_ttl_days": 30,
+                "max_llm_cost_per_request_usd": 0.5,
+            },
+            headers={"X-API-Key": "test-api-key"},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["skill_sandbox_backend"] == "container"
+        assert data["enable_semantic_memory"] is False
+        assert data["session_ttl_days"] == 30
+        assert data["max_llm_cost_per_request_usd"] == 0.5
+
+        # Verify persistence by reading back
+        response = client.get("/api/settings/system", headers={"X-API-Key": "test-api-key"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["skill_sandbox_backend"] == "container"
+
+    def test_update_system_settings_rejects_invalid_backend(self, client):
+        response = client.put(
+            "/api/settings/system",
+            json={"skill_sandbox_backend": "invalid"},
+            headers={"X-API-Key": "test-api-key"},
+        )
+        assert response.status_code == 422
+
+    def test_update_system_settings_applies_in_memory(self, client, monkeypatch):
+        from homomics_lab.config import settings as cfg
+
+        monkeypatch.setattr(cfg, "skill_sandbox_backend", "local")
+        response = client.put(
+            "/api/settings/system",
+            json={"skill_sandbox_backend": "bubblewrap"},
+            headers={"X-API-Key": "test-api-key"},
+        )
+        assert response.status_code == 200
+        assert cfg.skill_sandbox_backend == "bubblewrap"

@@ -1,8 +1,5 @@
 import time
 
-from fastapi.testclient import TestClient
-from homomics_lab.main import app
-
 
 def _poll_job(client, job_id, timeout=30.0):
     deadline = time.time() + timeout
@@ -15,24 +12,23 @@ def _poll_job(client, job_id, timeout=30.0):
     return response.json()
 
 
-def test_chat_persists_session_state():
-    with TestClient(app) as client:
-        r1 = client.post("/api/chat/send", json={
-            "project_id": "proj_1",
-            "session_id": "sess_persist_api",
-            "message": "帮我分析单细胞数据",
-        })
-        assert r1.status_code == 200
-        data1 = r1.json()
-        job_id = data1["job_id"]
-        _poll_job(client, job_id)
+def test_chat_persists_session_state(client):
+    r1 = client.post("/api/chat/send", json={
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "message": "帮我分析单细胞数据",
+    })
+    assert r1.status_code == 200
+    data1 = r1.json()
+    job_id = data1["job_id"]
+    _poll_job(client, job_id)
 
-        r2 = client.post("/api/chat/send", json={
-            "project_id": "proj_1",
-            "session_id": "sess_persist_api",
-            "message": "继续",
-        })
-        assert r2.status_code == 200
+    r2 = client.post("/api/chat/send", json={
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "message": "继续",
+    })
+    assert r2.status_code == 200
 
-        messages = client.get("/api/chat/messages?session_id=sess_persist_api").json()
-        assert len(messages) >= 4
+    messages = client.get("/api/chat/messages?session_id=sess_persist_api").json()
+    assert len(messages) >= 4
