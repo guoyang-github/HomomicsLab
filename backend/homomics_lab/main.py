@@ -47,11 +47,13 @@ async def lifespan(app: FastAPI):
     app.state.skill_reloader = ctx["skill_reloader"]
     app.state.mcp_client = ctx["mcp_client"]
     app.state.memory_manager = ctx["memory_manager"]
+    app.state.capability_index = ctx["capability_index"]
     app.state.context_engine = ctx["context_engine"]
     app.state.project_state_manager = ctx["project_state_manager"]
     app.state.llm_client = ctx["llm_client"]
     app.state.provenance_recorder = ctx["provenance_recorder"]
     app.state.llm_cache = ctx["llm_cache"]
+    app.state.knowledge_index = ctx["knowledge_index"]
 
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
     cbkb = ctx["cbkb"]
@@ -87,6 +89,10 @@ async def lifespan(app: FastAPI):
         await app.state.domain_reloader.stop()
     if app.state.skill_reloader is not None:
         await app.state.skill_reloader.stop()
+    if app.state.capability_index is not None:
+        await app.state.capability_index.close()
+    if app.state.knowledge_index is not None:
+        await app.state.knowledge_index.close()
 
 
 app = FastAPI(

@@ -25,6 +25,7 @@ from homomics_lab.agent.retrieval import SkillRetriever
 from homomics_lab.agent.plan.validator import PlanValidator
 from homomics_lab.config import settings
 from homomics_lab.knowledge.cbkb import CBKB
+from homomics_lab.skills.capability_index import CapabilityIndex
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import SkillDAG
 from homomics_lab.tools.registry import ToolRegistry
@@ -54,9 +55,11 @@ class PlanEngine:
         literature_retriever: Optional[LiteratureRetriever] = None,
         enable_information_gathering: bool = False,
         tracker: Optional[Any] = None,
+        capability_index: Optional[CapabilityIndex] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
+        self.capability_index = capability_index
         self.enable_information_gathering = enable_information_gathering
         if literature_retriever is None and settings.literature_retrieval_enabled:
             literature_retriever = LiteratureRetriever()
@@ -66,6 +69,7 @@ class PlanEngine:
             tool_registry=tool_registry,
             data_sources=data_sources,
             literature_retriever=literature_retriever,
+            capability_index=capability_index,
         )
         self.plan_validator = PlanValidator(skill_registry=skill_registry)
         self.strategy_library = StrategyLibrary(skill_registry=skill_registry)
@@ -84,6 +88,7 @@ class PlanEngine:
         intent: UserIntent,
         data_state: Optional[DataState] = None,
         top_k: int = 1,
+        project_id: Optional[str] = None,
     ) -> PlanResult:
         """Generate an analysis plan from user intent and data state.
 
@@ -138,7 +143,7 @@ class PlanEngine:
         candidate_plans: List[PlanResult] = []
         for strategy in candidates:
             plan_result = await self._build_plan_for_strategy(
-                intent, data_state, strategy
+                intent, data_state, strategy, project_id=project_id
             )
             candidate_plans.append(plan_result)
 
@@ -172,6 +177,7 @@ class PlanEngine:
         intent: UserIntent,
         data_state: DataState,
         strategy: AnalysisStrategy,
+        project_id: Optional[str] = None,
     ) -> PlanResult:
         """Build a PlanResult for a single selected strategy."""
         if strategy.name == "generic":
@@ -185,6 +191,7 @@ class PlanEngine:
             intent_type=intent.analysis_type,
             data_sources=strategy.data_sources,
             include_literature=self.skill_retriever.literature_retriever is not None,
+            project_id=project_id,
         )
 
         learned_defaults: List[Dict[str, Any]] = []

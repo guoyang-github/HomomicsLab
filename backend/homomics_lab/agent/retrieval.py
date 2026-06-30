@@ -7,18 +7,24 @@ feeds into PlanEngine and CodeAct:
   3. CBKB Lab SOPs for the target domain
   4. CBKB anomaly archive for known failure modes
   5. CBKB parameter lore for proven parameter choices
+  6. CapabilityIndex unified dense + graph search
 """
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.knowledge.cbkb import CBKB
+from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import SkillDAG
+from homomics_lab.tools.models import ToolDefinition
 from homomics_lab.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -126,6 +132,7 @@ class SkillRetriever:
         tool_registry: Optional[ToolRegistry] = None,
         data_sources: Optional[List[Dict[str, Any]]] = None,
         literature_retriever: Optional[LiteratureRetriever] = None,
+        capability_index: Optional[CapabilityIndex] = None,
     ):
         self.registry = skill_registry
         self.skill_dag = skill_dag
@@ -133,6 +140,7 @@ class SkillRetriever:
         self.tool_registry = tool_registry
         self.data_sources = data_sources or []
         self.literature_retriever = literature_retriever
+        self.capability_index = capability_index
 
     async def retrieve(
         self,
@@ -146,19 +154,22 @@ class SkillRetriever:
         include_data_sources: bool = True,
         include_literature: bool = False,
         data_sources: Optional[List[Dict[str, Any]]] = None,
+        project_id: Optional[str] = None,
     ) -> RetrievalContext:
         """Retrieve skills, tools, data sources, literature, SOPs, and anomaly context."""
         skills = self._retrieve_skills(query, top_k=top_k, include_graph=include_graph)
-        skill_ids = [s.skill.id for s in skills]
+        skill_ids = {s.skill.id for s in skills}
 
         tools: List[RetrievedTool] = []
         if include_tools and self.tool_registry is not None:
             tools = self._retrieve_tools(query)
+        tool_names = {t.name for t in tools}
 
         effective_data_sources = data_sources if data_sources is not None else self.data_sources
         retrieved_data_sources: List[RetrievedDataSource] = []
         if include_data_sources:
             retrieved_data_sources = self._retrieve_data_sources(query, effective_data_sources)
+        data_source_ids = {d.id for d in retrieved_data_sources}
 
         literature: List[Dict[str, Any]] = []
         if include_literature and self.literature_retriever is not None:
@@ -167,6 +178,7 @@ class SkillRetriever:
         sops: List[Dict[str, Any]] = []
         if include_sops:
             sops = self._retrieve_sops(intent_type)
+        sop_ids = {s.get("id") for s in sops}
 
         anomalies: List[Dict[str, Any]] = []
         if include_anomalies:
@@ -174,7 +186,31 @@ class SkillRetriever:
 
         lore: List[Dict[str, Any]] = []
         if skill_ids:
-            lore = self._retrieve_parameter_lore(skill_ids)
+            lore = self._retrieve_parameter_lore(list(skill_ids))
+
+        # Augment with the unified capability index (best-effort, additive).
+        cap_results = await self._retrieve_capabilities(
+            query=query,
+            intent_type=intent_type,
+            project_id=project_id,
+            top_k=top_k,
+        )
+        for rs in cap_results.get("skills", []):
+            if rs.skill.id not in skill_ids:
+                skills.append(rs)
+                skill_ids.add(rs.skill.id)
+        for t in cap_results.get("tools", []):
+            if t.name not in tool_names:
+                tools.append(t)
+                tool_names.add(t.name)
+        for s in cap_results.get("sops", []):
+            if s.get("id") not in sop_ids:
+                sops.append(s)
+                sop_ids.add(s.get("id"))
+        for d in cap_results.get("data_sources", []):
+            if d.id not in data_source_ids:
+                retrieved_data_sources.append(d)
+                data_source_ids.add(d.id)
 
         return RetrievalContext(
             query=query,
@@ -221,6 +257,102 @@ class SkillRetriever:
             if len(results) >= top_k:
                 break
         return results
+
+    async def _retrieve_capabilities(
+        self,
+        query: str,
+        intent_type: str,
+        project_id: Optional[str],
+        top_k: int,
+    ) -> Dict[str, List[Any]]:
+        """Search the unified CapabilityIndex and map candidates to retrieval structs."""
+        if self.capability_index is None:
+            return {}
+
+        try:
+            candidates = await self.capability_index.search(
+                query=query,
+                top_k=top_k,
+                item_types=[
+                    CapabilityType.SKILL,
+                    CapabilityType.TOOL,
+                    CapabilityType.SOP,
+                    CapabilityType.DATA_SOURCE,
+                ],
+                project_id=project_id,
+            )
+        except Exception:
+            logger.warning("CapabilityIndex retrieval failed for query %r", query, exc_info=True)
+            return {}
+
+        skills: List[RetrievedSkill] = []
+        tools: List[RetrievedTool] = []
+        sops: List[Dict[str, Any]] = []
+        data_sources: List[RetrievedDataSource] = []
+
+        for candidate in candidates:
+            payload = candidate.payload or {}
+            if candidate.type == CapabilityType.SKILL:
+                skill = next(
+                    (s for s in self.registry.list_all() if s.id == candidate.id),
+                    None,
+                )
+                if skill is None:
+                    skill = SkillDefinition(
+                        id=candidate.id,
+                        name=candidate.name,
+                        version=payload.get("version", "1.0.0"),
+                        category=candidate.category or payload.get("category", "general"),
+                        description=candidate.description,
+                        metadata=payload.get("metadata", {}),
+                    )
+                skills.append(RetrievedSkill(skill=skill, semantic_score=candidate.score))
+
+            elif candidate.type == CapabilityType.TOOL:
+                tool_def: Optional[ToolDefinition] = None
+                if self.tool_registry is not None:
+                    tool_def = self.tool_registry.get(candidate.id)
+                if tool_def is None:
+                    tool_def = ToolDefinition(
+                        name=candidate.id,
+                        description=candidate.description,
+                        input_schema=payload.get("input_schema", {"type": "object"}),
+                        source=payload.get("source", "capability_index"),
+                        risk_level=payload.get("risk_level", "low"),
+                        metadata=payload.get("metadata", {}),
+                    )
+                tools.append(RetrievedTool(
+                    name=tool_def.name,
+                    description=tool_def.description,
+                    input_schema=tool_def.input_schema,
+                    risk_level=tool_def.risk_level,
+                    source=tool_def.source,
+                ))
+
+            elif candidate.type == CapabilityType.SOP:
+                sops.append({
+                    "id": candidate.id,
+                    "name": candidate.name,
+                    "category": candidate.category,
+                    "template": payload.get("template"),
+                    "version": payload.get("version"),
+                    "locked": payload.get("locked"),
+                })
+
+            elif candidate.type == CapabilityType.DATA_SOURCE:
+                data_sources.append(RetrievedDataSource(
+                    id=candidate.id,
+                    path=payload.get("path", ""),
+                    format=payload.get("format", ""),
+                    description=candidate.description,
+                ))
+
+        return {
+            "skills": skills,
+            "tools": tools,
+            "sops": sops,
+            "data_sources": data_sources,
+        }
 
     def _retrieve_sops(self, intent_type: str) -> List[Dict[str, Any]]:
         """Retrieve SOPs whose category matches the intent type."""

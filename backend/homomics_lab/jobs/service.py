@@ -94,6 +94,31 @@ class JobService:
         await self._update_active_jobs()
         return job
 
+    async def create_cognify_job(
+        self,
+        session_id: str,
+        project_id: str,
+        source_type: str,
+        source: str,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Job:
+        job = Job(
+            session_id=session_id,
+            project_id=project_id,
+            status=JobStatus.QUEUED,
+            mode=JobMode.COGNIFY,
+            result={
+                "source_type": source_type,
+                "source": source,
+                "options": options or {},
+            },
+        )
+        await self._repository.create(job)
+        await self._queue.enqueue(job.job_id)
+        await self._publish_state(job.job_id, JobStatus.QUEUED, "Cognify job queued")
+        await self._update_active_jobs()
+        return job
+
     async def create_checkpoint_resume_job(
         self,
         session_id: str,

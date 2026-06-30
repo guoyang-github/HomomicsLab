@@ -80,8 +80,10 @@ class CascadeIntentAnalyzer:
         self.clarification_threshold = clarification_threshold
         self.high_confidence_threshold = high_confidence_threshold
 
-        # LLM-first: give the LLM classifier the highest weight.
-        self.keyword_classifier = keyword_classifier or KeywordIntentClassifier(weight=0.15)
+        # Keyword matches are treated as strong direct signals by default; the
+        # weight is used only when fusing multiple sources or when a test passes
+        # an intentionally low weight to simulate weak keyword evidence.
+        self.keyword_classifier = keyword_classifier or KeywordIntentClassifier(weight=1.0)
         self.embedding_classifier = embedding_classifier or EmbeddingIntentClassifier(weight=0.25)
         self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.60)
         self.debate = debate
@@ -313,7 +315,7 @@ class CascadeIntentAnalyzer:
         )
 
         # Layer 4: fusion with keyword guardrail override.
-        fused = self._fuse_matches(keyword_matches, embedding_matches, llm_matches)
+        fused = self._fuse_matches(keyword_matches, embedding_matches, llm_matches, message)
 
         # Layer 5: clarification only when the ensemble signals genuine ambiguity.
         if fused.needs_clarification:
@@ -345,7 +347,7 @@ class CascadeIntentAnalyzer:
                     confidence=0.9,
                     source="keyword_guardrail",
                     reason="fused tool intent lacks usable query or asks about source",
-                    weight=0.15,
+                    weight=1.0,
                     structured=StructuredIntent(
                         intent_type="qa",
                         interaction_mode="answer",
@@ -536,6 +538,7 @@ class CascadeIntentAnalyzer:
         keyword: List[IntentMatch],
         embedding: List[IntentMatch],
         llm: List[IntentMatch],
+        message: str,
     ) -> IntentClassificationResult:
         """Fuse scores from all classifiers into a single result.
 
@@ -627,6 +630,30 @@ class CascadeIntentAnalyzer:
                     if alt.analysis_type not in {s.analysis_type for s in sub_intents}:
                         sub_intents.append(alt)
 
+        # Explicit sequential markers ("先...再...") indicate a multi-step workflow.
+        # Surface all strong, specific step intents as sub-intents.
+        sequential_markers = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
+        text = message.lower()
+        has_sequential_markers = any(m in text for m in sequential_markers)
+        if has_sequential_markers:
+            min_step_score = 0.05
+            direct_response_types = {"qa", "information_request", "general_help", "greeting", "clarification"}
+            step_signals = [
+                m for m in keyword + embedding + llm
+                if (m.confidence * m.weight) >= min_step_score
+                and m.analysis_type not in broad_types
+                and m.analysis_type not in direct_response_types
+            ]
+            distinct_steps = {m.analysis_type for m in step_signals}
+            if len(distinct_steps) >= 2:
+                sub_intents = []
+                seen_steps: set = set()
+                for m in sorted(step_signals, key=lambda x: x.confidence * x.weight, reverse=True):
+                    if m.analysis_type in seen_steps:
+                        continue
+                    seen_steps.add(m.analysis_type)
+                    sub_intents.append(m)
+
         # --- Clarification logic ---
         needs_clarification = False
         clarification_question = None
@@ -638,10 +665,19 @@ class CascadeIntentAnalyzer:
                 llm_primary.structured.entities.get("clarification_question")
                 or "我不太确定您的需求，请再具体描述一下。"
             )
-        elif primary.confidence < self.clarification_threshold and alternatives:
+        elif not has_sequential_markers and alternatives:
+            # Use classifier-weighted scores to decide whether the ensemble is
+            # genuinely ambiguous. Sequential markers are treated as workflow
+            # intent, not as ambiguity.
+            primary_weighted = primary.confidence * primary.weight
             top_alt = alternatives[0]
-            gap = primary.confidence - top_alt.confidence
-            if top_alt.confidence > 0.2 and gap < 0.15:
+            top_alt_weighted = top_alt.confidence * top_alt.weight
+            gap = primary_weighted - top_alt_weighted
+            if (
+                primary_weighted < self.clarification_threshold
+                and top_alt_weighted > 0
+                and gap < 0.3 * primary_weighted
+            ):
                 needs_clarification = True
                 option_lines = [f"- {primary.analysis_type}？"]
                 for alt in alternatives[:2]:

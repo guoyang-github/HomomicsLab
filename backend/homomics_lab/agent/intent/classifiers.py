@@ -84,7 +84,7 @@ class KeywordIntentClassifier(IntentClassifier):
         r"你会什么",
     ]
 
-    def __init__(self, weight: float = 0.2):
+    def __init__(self, weight: float = 1.0):
         super().__init__(weight=weight)
 
     async def classify(

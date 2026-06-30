@@ -24,4 +24,5 @@ class JobMode(str, Enum):
     AWAITING_HITL = "awaiting_hitl"
     RESUME_HITL = "resume_hitl"
     CHECKPOINT_RESUME = "checkpoint_resume"
+    COGNIFY = "cognify"
     ERROR = "error"

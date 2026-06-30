@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
@@ -136,6 +136,7 @@ class BackgroundJobRunner:
             # Start reproducibility tracking for this job.
             repro_engine = self._create_repro_engine(job)
 
+            cognify_handled = False
             try:
                 timeout = settings.default_job_timeout_seconds
                 if job.mode == JobMode.CHECKPOINT_RESUME:
@@ -159,50 +160,60 @@ class BackgroundJobRunner:
                         parameters=job.resume_parameters or {},
                         working_memory=job.working_memory,
                         task_tree=job.task_tree,
-                    )
-                else:
-                    coro = runner.execute_tree(
-                        tree=job.task_tree,
-                        working_memory=job.working_memory,
                         project_id=job.project_id,
-                        trace_id=job_id,
                     )
-                result = await asyncio.wait_for(coro, timeout=timeout)
-
-                # Persist mutated state
-                job.task_tree = result.task_tree
-                job.working_memory = job.working_memory  # TurnRunner mutates in place
-                job.result = self._result_to_dict(result)
-                job.status = self._mode_to_status(result.mode)
-                job.error_message = result.error
-                job.updated_at = datetime.now(timezone.utc)
-
-                # Update plan status before persisting the job so that callers
-                # observing a completed job also see a completed plan.
-                if job.plan_id:
-                    plan_status = PlanStatus.COMPLETED if job.status == JobStatus.COMPLETED else PlanStatus.FAILED
-                    if job.status == JobStatus.AWAITING_HUMAN:
-                        plan_status = PlanStatus.EXECUTING
-                    await self._update_plan_status(job.plan_id, plan_status)
-
-                await self._repository.update(job)
-                await self._ingest_to_cbkb(job)
-
-                if job.status == JobStatus.AWAITING_HUMAN:
-                    self._publish_state(
-                        job_id,
-                        JobStatus.AWAITING_HUMAN,
-                        "Waiting for human input",
-                        hitl_checkpoint=result.hitl_checkpoint,
-                    )
-                    await trace_store.finish_trace(job_id, "running")
-                else:
-                    self._publish_state(job_id, job.status, "Job finished")
+                elif job.mode == JobMode.COGNIFY:
+                    cognify_result = await self._execute_cognify_job(job)
+                    job.result = cognify_result
+                    job.status = JobStatus.COMPLETED if not cognify_result.get("error") else JobStatus.FAILED
+                    job.error_message = cognify_result.get("error")
+                    job.updated_at = datetime.now(timezone.utc)
+                    await self._repository.update(job)
+                    self._publish_state(job_id, job.status, "Cognify finished")
                     await trace_store.finish_trace(
                         job_id,
                         "completed" if job.status == JobStatus.COMPLETED else "failed",
                         job.error_message,
                     )
+                    cognify_handled = True
+
+                if not cognify_handled:
+                    result = await asyncio.wait_for(coro, timeout=timeout)
+
+                    # Persist mutated state
+                    job.task_tree = result.task_tree
+                    job.working_memory = job.working_memory  # TurnRunner mutates in place
+                    job.result = self._result_to_dict(result)
+                    job.status = self._mode_to_status(result.mode)
+                    job.error_message = result.error
+                    job.updated_at = datetime.now(timezone.utc)
+
+                    # Update plan status before persisting the job so that callers
+                    # observing a completed job also see a completed plan.
+                    if job.plan_id:
+                        plan_status = PlanStatus.COMPLETED if job.status == JobStatus.COMPLETED else PlanStatus.FAILED
+                        if job.status == JobStatus.AWAITING_HUMAN:
+                            plan_status = PlanStatus.EXECUTING
+                        await self._update_plan_status(job.plan_id, plan_status)
+
+                    await self._repository.update(job)
+                    await self._ingest_to_cbkb(job)
+
+                    if job.status == JobStatus.AWAITING_HUMAN:
+                        self._publish_state(
+                            job_id,
+                            JobStatus.AWAITING_HUMAN,
+                            "Waiting for human input",
+                            hitl_checkpoint=result.hitl_checkpoint,
+                        )
+                        await trace_store.finish_trace(job_id, "running")
+                    else:
+                        self._publish_state(job_id, job.status, "Job finished")
+                        await trace_store.finish_trace(
+                            job_id,
+                            "completed" if job.status == JobStatus.COMPLETED else "failed",
+                            job.error_message,
+                        )
 
             except asyncio.TimeoutError:
                 logger.error("Job %s timed out after %ss", job_id, settings.default_job_timeout_seconds)
@@ -369,6 +380,44 @@ class BackgroundJobRunner:
 
         if isinstance(self._queue, RedisQueueBackend):
             await self._queue.release_lock(job_id, self._worker_id)
+
+    async def _execute_cognify_job(self, job: Job) -> Dict[str, Any]:
+        """Run a knowledge ingestion (cognify) job in the background."""
+        from homomics_lab.knowledge.ingestion import KnowledgeIndex
+        from homomics_lab.llm_client import LLMClient
+
+        payload = job.result or {}
+        source_type = payload.get("source_type", "text")
+        source = payload.get("source", "")
+
+        try:
+            knowledge_index = KnowledgeIndex(
+                settings=settings,
+                llm_client=LLMClient(),
+            )
+            if source_type == "file":
+                from pathlib import Path
+                path = Path(source)
+                if not path.is_absolute():
+                    path = (settings.data_dir / "raw" / job.project_id / source).resolve()
+                result = await knowledge_index.ingest_file(path, project_id=job.project_id)
+            elif source_type == "url":
+                result = await knowledge_index.ingest_url(source, project_id=job.project_id)
+            else:
+                result = await knowledge_index.ingest_text(source, project_id=job.project_id)
+            await knowledge_index.close()
+            return {
+                "document_id": result.document_id,
+                "chunk_count": len(result.chunk_ids),
+                "entity_count": len(result.entity_names),
+                "relation_count": result.relation_count,
+                "memory_id": result.memory_id,
+                "data_source_id": result.data_source_id,
+                "already_processed": result.already_processed,
+            }
+        except Exception as exc:
+            logger.exception("Cognify job %s failed", job.job_id)
+            return {"error": str(exc)}
 
     async def _ingest_to_cbkb(self, job: Job) -> None:
         """Archive the completed job outcome into CBKB for self-evolution."""

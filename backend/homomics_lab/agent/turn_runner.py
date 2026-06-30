@@ -41,6 +41,8 @@ from homomics_lab.config import settings
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.context_engine.models import ContextBundle
+from homomics_lab.context.feedback_store import FeedbackOutcome
+from homomics_lab.context.memory_backend import MemoryBackend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.prompter import Prompter
@@ -55,6 +57,8 @@ from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.presenter import PlanPresenter
 from homomics_lab.plan.store import PlanStore, _new_plan_id
 from homomics_lab.plots import extract_plot_attachments
+from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
+from homomics_lab.tasks.models import TaskStatus
 from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
@@ -163,6 +167,8 @@ class TurnRunner:
         llm_client: Optional[LLMClient] = None,
         trace_store=None,
         approval_store=None,
+        capability_index: Optional[CapabilityIndex] = None,
+        memory_backend: Optional[MemoryBackend] = None,
     ):
         self._cbkb = cbkb
         self._llm_client = llm_client
@@ -179,6 +185,8 @@ class TurnRunner:
         self._message_bus = message_bus
         self._tool_registry = tool_registry
         self.memory_manager = memory_manager
+        self.memory_backend = memory_backend
+        self.capability_index = capability_index
         self.prompter = prompter or Prompter()
         self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
         self.context_engine = context_engine
@@ -197,7 +205,10 @@ class TurnRunner:
             self._debate = LightweightDebate(judge=judge)
 
         self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=self._debate, cbkb=self._cbkb)
-        self.task_decomposer = task_decomposer or TaskDecomposer(cbkb=self._cbkb)
+        self.task_decomposer = task_decomposer or TaskDecomposer(
+            cbkb=self._cbkb,
+            capability_index=self.capability_index,
+        )
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -547,6 +558,35 @@ class TurnRunner:
                     "Memory enrichment failed; continuing without it", exc_info=True
                 )
         self._extra_context = extra_context or {}
+
+        # 2.5 Enrich context with semantically relevant capabilities (skills/tools/SOPs).
+        if self.capability_index is not None:
+            try:
+                capability_candidates = await self.capability_index.search(
+                    query=user_message,
+                    top_k=5,
+                    item_types=[
+                        CapabilityType.SKILL,
+                        CapabilityType.TOOL,
+                        CapabilityType.SOP,
+                    ],
+                    project_id=project_id,
+                )
+                self._extra_context["capability_candidates"] = [
+                    {
+                        "id": c.id,
+                        "type": c.type.value,
+                        "name": c.name,
+                        "description": c.description,
+                        "category": c.category,
+                        "score": c.score,
+                    }
+                    for c in capability_candidates
+                ]
+            except Exception:
+                logger.warning(
+                    "Capability index enrichment failed; continuing without it", exc_info=True
+                )
 
         context_bundle = None
         if self.context_engine is not None:
@@ -1544,6 +1584,64 @@ class TurnRunner:
 
         return context
 
+    async def _record_execution_feedback(
+        self,
+        tree: TaskTree,
+        results: Dict[str, Any],
+        project_id: str,
+    ) -> None:
+        """Record skill execution feedback into CapabilityIndex and MemoryBackend.
+
+        This is best-effort: failures are logged but never break the turn.
+        """
+        if self.capability_index is None and self.memory_backend is None:
+            return
+
+        for task in tree.tasks:
+            if not task.skills_required:
+                continue
+            skill_id = task.skills_required[0]
+            if not skill_id:
+                continue
+
+            outcome = FeedbackOutcome.SUCCESS if task.status == TaskStatus.COMPLETED else FeedbackOutcome.FAILURE
+
+            if self.capability_index is not None:
+                try:
+                    await self.capability_index.add_feedback(
+                        capability_id=skill_id,
+                        capability_type=CapabilityType.SKILL,
+                        outcome=outcome,
+                        project_id=project_id,
+                        context={
+                            "task_id": task.id,
+                            "phase": task.phase,
+                            "result_keys": list(results.get(task.id, {}).keys()) if isinstance(results.get(task.id), dict) else [],
+                        },
+                    )
+                except Exception:
+                    logger.warning("Failed to record capability feedback for %s", skill_id, exc_info=True)
+
+            if self.memory_backend is not None:
+                try:
+                    await self.memory_backend.add(
+                        text=(
+                            f"Executed skill '{skill_id}' for task '{task.name}' "
+                            f"with outcome {outcome.value}."
+                        ),
+                        memory_type="task",
+                        metadata={
+                            "skill_id": skill_id,
+                            "task_id": task.id,
+                            "phase": task.phase,
+                            "outcome": outcome.value,
+                        },
+                        importance=0.7 if outcome == FeedbackOutcome.SUCCESS else 0.9,
+                        project_id=project_id,
+                    )
+                except Exception:
+                    logger.warning("Failed to record task memory for %s", skill_id, exc_info=True)
+
     async def _handle_single_step(
         self,
         tree: TaskTree,
@@ -1567,6 +1665,8 @@ class TurnRunner:
         hitl_info = self._extract_hitl(results)
         if hitl_info:
             return self._build_hitl_result(tree, hitl_info, working_memory)
+
+        await self._record_execution_feedback(tree, results, project_id)
 
         response_text = f"已完成：{tree.tasks[0].description}"
 
@@ -1620,6 +1720,8 @@ class TurnRunner:
         if hitl_info:
             return self._build_hitl_result(tree, hitl_info, working_memory)
 
+        await self._record_execution_feedback(tree, results, project_id)
+
         response_text = f"已为您规划 {len(tree.tasks)} 个分析步骤。"
 
         # Extract any plots produced during the workflow
@@ -1656,6 +1758,7 @@ class TurnRunner:
         parameters: Dict[str, Any],
         working_memory: WorkingMemory,
         task_tree: TaskTree,
+        project_id: str = "default",
     ) -> TurnResult:
         """Resume execution after receiving HITL response."""
         orchestrator = self._get_orchestrator()
@@ -1665,6 +1768,8 @@ class TurnRunner:
             task_id,
             {"choice": choice, "parameters": parameters},
         )
+
+        await self._record_execution_feedback(task_tree, result, project_id)
 
         response_text = f"已恢复任务 {task_id}，继续执行后续步骤。"
 
@@ -1976,6 +2081,7 @@ class TurnRunner:
         intent: UserIntent,
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> Optional[str]:
         """Generate a greeting/QA/information direct response via the configured LLM.
 
@@ -2056,11 +2162,12 @@ class TurnRunner:
                 messages.append({"role": "system", "content": context_text})
             messages.append({"role": "user", "content": user_message})
 
+        type_max_tokens = {"greeting": 800, "qa": 2000, "information_request": 2000}
         try:
             return await self._llm_client.chat_completion(
                 messages=messages,
                 temperature=0.3,
-                max_tokens=2000,
+                max_tokens=max_tokens or type_max_tokens.get(response_type, 2000),
                 session_id=getattr(self, "_session_id", None),
                 project_id=getattr(self, "_project_id", None),
                 request_id=f"{getattr(self, '_turn_request_id', 'direct')}_direct",
@@ -2077,9 +2184,25 @@ class TurnRunner:
     ) -> str:
         """Return a friendly self-introduction for greeting intents.
 
-        Greetings are answered instantly with a static template to avoid blocking the
-        chat on an LLM call; the LLM is still used for substantive questions.
+        Uses the configured LLM when available for a warmer, context-aware greeting;
+        falls back to a static template if no LLM is configured or the call fails.
         """
+        greeting_intent = UserIntent(
+            analysis_type="greeting",
+            domain="general",
+            complexity="direct_response",
+            original_message=user_message,
+        )
+        llm_response = await self._generate_direct_response_via_llm(
+            response_type="greeting",
+            user_message=user_message,
+            intent=greeting_intent,
+            working_memory=working_memory,
+            project_id=project_id,
+        )
+        if llm_response:
+            return llm_response
+
         return (
             "Hello! I'm **HomomicsLab**, your AI assistant specialized in bioinformatics "
             "and computational biology.\n\n"

@@ -100,31 +100,29 @@ run_sctype <- function(seurat_object, known_tissue_type = NULL, assay = "RNA", s
     # Prepare gene sets
     gs_list = gene_sets_prepare(custom_marker_file, tissue_type)
 
-    data_type <- if (scaled) "scale.data" else "counts"  
-    package_type <- data_type %in% names(attributes(seurat_object[[assay]]))
-    
-    # Calculate scType scores
-    if(package_type){
-        
-        print("Using Seurat v4 object")
-        es.max = sctype_score(scRNAseqData = slot(seurat_object[[assay]], data_type),
-                              scaled = TRUE,gs = gs_list$gs_positive, 
-                              gs2 = gs_list$gs_negative)   
-        
-    } else{
-        
-        print("Using Seurat v5 object")
+    data_type <- if (scaled) "scale.data" else "counts"
 
-        if (data_type == "scale.data") {
-            scRNAseqData <- seurat_object[[assay]]$scale.data
-        } else {
-            scRNAseqData <- seurat_object[[assay]]$counts
+    # Reliable Seurat v5 detection
+    seurat_v5 <- inherits(seurat_object[[assay]], "Assay5")
+    if (seurat_v5) {
+        print("Using Seurat v5 object")
+        if (!requireNamespace("SeuratObject", quietly = TRUE)) {
+            stop("Please install SeuratObject: install.packages('SeuratObject')")
         }
-        
-        es.max = sctype_score(scRNAseqData = as.matrix(scRNAseqData),
-                              scaled = TRUE,gs = gs_list$gs_positive, 
-                              gs2 = gs_list$gs_negative)       
+        scRNAseqData <- as.matrix(SeuratObject::LayerData(
+            seurat_object, assay = assay, layer = data_type
+        ))
+    } else {
+        print("Using Seurat v4 object")
+        scRNAseqData <- as.matrix(Seurat::GetAssayData(
+            seurat_object, assay = assay, slot = data_type
+        ))
     }
+
+    # Calculate scType scores
+    es.max = sctype_score(scRNAseqData = scRNAseqData,
+                          scaled = scaled, gs = gs_list$gs_positive,
+                          gs2 = gs_list$gs_negative)
     
     # Extract top cell types for each cluster
     cL_resutls = do.call("rbind", lapply(unique(seurat_object@meta.data$seurat_clusters), function(cl){

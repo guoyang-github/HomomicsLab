@@ -122,6 +122,7 @@ async def send_message(
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
         trace_store=trace_store,
+        capability_index=getattr(http_request.app.state, "capability_index", None),
     )
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -218,6 +219,7 @@ async def regenerate_message(
         context_engine=getattr(http_request.app.state, "context_engine", None),
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
+        capability_index=getattr(http_request.app.state, "capability_index", None),
     )
     result = await runner.regenerate_response(
         session_id=request.session_id,
@@ -371,6 +373,7 @@ async def respond_to_tool_approval(
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=llm_client,
         tool_registry=tool_registry,
+        capability_index=getattr(http_request.app.state, "capability_index", None),
     )
     result = await runner.respond_to_tool_approval(
         call_id=request.call_id,
@@ -423,6 +426,7 @@ async def respond_to_debate(
         context_engine=getattr(http_request.app.state, "context_engine", None),
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
+        capability_index=getattr(http_request.app.state, "capability_index", None),
     )
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(

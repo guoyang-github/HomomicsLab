@@ -1,14 +1,28 @@
-"""Tests for semantic memory grooming (prune/consolidate/touch)."""
+"""Tests for MemoryBackend grooming (prune/consolidate/touch)."""
 
 import pytest
 
+from homomics_lab.config import Settings
 from homomics_lab.context.semantic_memory import SemanticMemory
+from homomics_lab.context.vector_store.factory import reset_vector_store
+from homomics_lab.embeddings.factory import reset_embedding_provider
+from homomics_lab.context.graph.factory import reset_graph_backend
+
+CACHED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 @pytest.fixture
-def memory_with_model(tmp_path):
-    db_path = tmp_path / "groom_memory.db"
-    return SemanticMemory(db_path=str(db_path), model_name="all-MiniLM-L6-v2")
+def memory_with_model(tmp_path, monkeypatch):
+    reset_embedding_provider()
+    reset_vector_store()
+    reset_graph_backend()
+    settings = Settings(
+        data_dir=tmp_path,
+        embedding_model=CACHED_MODEL,
+        vector_store_backend="sqlite-vec",
+        graph_backend="networkx",
+    )
+    return SemanticMemory(db_path=tmp_path / "groom_memory.db", settings=settings)
 
 
 @pytest.mark.asyncio

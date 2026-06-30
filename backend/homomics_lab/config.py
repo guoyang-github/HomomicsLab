@@ -18,8 +18,52 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     skills_dir: Path = Path("./skills")
     external_skills_dirs: List[Path] = Field(default_factory=list)
-    semantic_search_model: Optional[str] = None  # e.g., "all-MiniLM-L6-v2" for dense embeddings
-    semantic_memory_backend: str = "sqlite"  # "sqlite" | "postgres"
+
+    # ------------------------------------------------------------------
+    # Embedding provider configuration
+    # ------------------------------------------------------------------
+    embedding_provider: str = "sentence_transformers"  # sentence_transformers | openai | ollama
+    embedding_model: Optional[str] = None  # e.g., "BAAI/bge-small-en-v1.5"
+    embedding_api_key: Optional[str] = None
+    embedding_base_url: Optional[str] = None
+
+    @field_validator("embedding_provider")
+    @classmethod
+    def _validate_embedding_provider(cls, v: str) -> str:
+        allowed = {"sentence_transformers", "openai", "ollama"}
+        if v not in allowed:
+            raise ValueError(f"embedding_provider must be one of {allowed}, got {v}")
+        return v
+
+    # ------------------------------------------------------------------
+    # Memory backends (vector + graph)
+    # ------------------------------------------------------------------
+    vector_store_backend: str = "qdrant"  # qdrant | pgvector | sqlite-vec
+    vector_store_url: Optional[str] = None  # e.g., "http://localhost:6333" or postgres URL
+    graph_backend: str = "networkx"  # networkx | neo4j
+    graph_store_url: Optional[str] = None  # e.g., "bolt://localhost:7687"
+    memory_reranker_model: Optional[str] = None
+    llm_memory_extraction_enabled: bool = False
+
+    @field_validator("vector_store_backend")
+    @classmethod
+    def _validate_vector_store_backend(cls, v: str) -> str:
+        allowed = {"qdrant", "pgvector", "sqlite-vec"}
+        if v not in allowed:
+            raise ValueError(f"vector_store_backend must be one of {allowed}, got {v}")
+        return v
+
+    @field_validator("graph_backend")
+    @classmethod
+    def _validate_graph_backend(cls, v: str) -> str:
+        allowed = {"networkx", "neo4j"}
+        if v not in allowed:
+            raise ValueError(f"graph_backend must be one of {allowed}, got {v}")
+        return v
+
+    # Deprecated: kept briefly for settings migration; will be removed in a follow-up.
+    semantic_search_model: Optional[str] = None
+    semantic_memory_backend: str = "sqlite"
     semantic_memory_postgres_url: Optional[str] = None
 
     @field_validator("semantic_memory_backend")

@@ -135,12 +135,7 @@ run_sctype_annotation <- function(
         )
         expr_matrix <- as.matrix(SeuratObject::LayerData(seurat_obj, assay = assay, layer = layer_name))
     } else {
-        expr_matrix <- switch(slot,
-            "counts" = as.matrix(seurat_obj[[assay]]@counts),
-            "data" = as.matrix(seurat_obj[[assay]]@data),
-            "scale.data" = as.matrix(seurat_obj[[assay]]@scale.data),
-            stop("Invalid slot specified")
-        )
+        expr_matrix <- as.matrix(Seurat::GetAssayData(seurat_obj, assay = assay, slot = slot))
     }
 
     # Run ScType scoring

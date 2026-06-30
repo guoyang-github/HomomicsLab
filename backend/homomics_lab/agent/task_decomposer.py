@@ -46,10 +46,12 @@ class TaskDecomposer:
         plan_engine: Optional[PlanEngine] = None,
         skill_registry: Optional[SkillRegistry] = None,
         cbkb=None,
+        capability_index=None,
     ):
         self._plan_engine = plan_engine
         self._skill_registry = skill_registry or get_default_registry()
         self._cbkb = cbkb
+        self._capability_index = capability_index
 
     def _get_plan_engine(self) -> PlanEngine:
         """Lazy initialize PlanEngine with the skill registry."""
@@ -57,6 +59,7 @@ class TaskDecomposer:
             self._plan_engine = PlanEngine(
                 skill_registry=self._skill_registry,
                 cbkb=self._cbkb,
+                capability_index=self._capability_index,
             )
         return self._plan_engine
 
@@ -101,7 +104,7 @@ class TaskDecomposer:
 
         # General path: use PlanEngine (domain strategy or LLM fallback).
         plan_engine = self._get_plan_engine()
-        plan = await plan_engine.plan(intent)
+        plan = await plan_engine.plan(intent, project_id=context.get("project_id"))
 
         # If sub-intents are present, filter the generated plan to the requested
         # phases (keeping prerequisites) instead of running the full domain DAG.

@@ -1,82 +1,104 @@
 ---
 name: bio-single-cell-enrichment-irgsea-r
-description: Integrated multi-method gene set enrichment with RRA consensus scoring
+description: Integrated multi-method gene set enrichment for single-cell data with RRA consensus scoring. Combines AUCell, UCell, singscore, ssgsea, and ssGSEA2, and provides Seurat integration, differential enrichment, heatmaps, and EMT scoring.
+version: "2.1"
 tool_type: r
 primary_tool: irGSEA
+supported_tools: [Seurat, ComplexHeatmap, RobustRankAggreg]
 language: r
 dependencies:
-  - irGSEA
-  - Seurat >= 4.3.0, < 5.0.0 (irGSEA not yet compatible with Seurat v5)
+  - irGSEA (GitHub: GitHUBZJY/irGSEA)
+  - Seurat >= 4.3.0, < 5.0.0
   - ComplexHeatmap
+  - ggplot2
+  - ggridges (optional)
 system_requirements:
   - R >= 4.2.0
-keywords: ["single-cell", "enrichment", "irGSEA", "multi-method", "RRA", "consensus", "R", "EMT Scoring"]
+keywords: ["single-cell", "enrichment", "irGSEA", "multi-method", "RRA", "consensus", "EMT", "R"]
 ---
 
-## Version Compatibility
+## Version Compatibility & Installation
 
-- **R**: 4.2.0+
-- **irGSEA**: Latest from GitHub
-- **Seurat**: >= 4.3.0, < 5.0.0 (the underlying `irGSEA` package uses `slot` parameter internally which is incompatible with Seurat v5)
-
-## Installation
+| Package | Required | Notes |
+|---------|----------|-------|
+| R | >= 4.2.0 | |
+| irGSEA | Latest GitHub | `devtools::install_github("GitHUBZJY/irGSEA")` |
+| Seurat | >= 4.3.0, < 5.0.0 | **Required v4.x**; irGSEA uses `slot` internally, incompatible with Seurat v5 layers |
+| ComplexHeatmap | | For heatmap visualization |
+| ggplot2 | | For custom plots |
+| ggridges | optional | For ridge plots |
 
 ```r
+if (!require("devtools", quietly = TRUE))
+    install.packages("devtools")
 devtools::install_github("GitHUBZJY/irGSEA")
+install.packages(c("Seurat", "ComplexHeatmap", "ggplot2", "ggridges"))
 ```
 
-# irGSEA: Integrated Robust GSEA
+> **Agent warning:** This skill requires **Seurat v4** (`SeuratObject < 5.0.0`). Passing a Seurat v5 object raises an explicit error. To use with v5 data, extract the count matrix manually and pass it to `run_irgsea()`.
 
-Multi-method gene set enrichment with RRA (Robust Rank Aggregation) integration for consensus scoring.
+## Skill Overview
+
+irGSEA runs multiple single-cell gene set enrichment methods (AUCell, UCell, singscore, ssgsea, ssGSEA2) and integrates them with Robust Rank Aggregation (RRA) to produce consensus scores. It is suitable when you want method-robust signatures or need to compare scoring approaches.
+
+**When to use:**
+- You want consensus enrichment scores across multiple methods.
+- You need to compare or validate different scoring methods on the same data.
+- You want integrated differential enrichment between two groups.
+- You are performing EMT scoring (M/E ratio) with the provided helper.
+
+**When NOT to use:**
+- You have **Seurat v5** objects and cannot downgrade or extract a matrix — use [bio-single-cell-enrichment-aucell-r](../bio-single-cell-enrichment-aucell-r/SKILL.md), [bio-single-cell-enrichment-ucell-r](../bio-single-cell-enrichment-ucell-r/SKILL.md), or [bio-single-cell-enrichment-decoupler-r](../bio-single-cell-enrichment-decoupler-r/SKILL.md) instead.
+- You need a single fast method — use UCell or AUCell directly.
+- You need over-representation analysis per cluster — use [bio-single-cell-enrichment-clusterprofiler-r](../bio-single-cell-enrichment-clusterprofiler-r/SKILL.md).
+- You need only pathway visualization without consensus — native irGSEA functions may be enough.
 
 ## Quick Selector
 
-| Methods Included | AUCell, UCell, singscore, ssgsea, ssGSEA2 |
-|-----------------|------------------------------------------|
+| Feature | irGSEA |
+|---------|--------|
+| **Methods** | AUCell, UCell, singscore, ssgsea, ssGSEA2 |
 | **Integration** | RRA consensus |
-| **Best for** | When method agreement is important |
-| **Differential** | Built-in differential enrichment |
+| **Best for** | Consensus scoring, method comparison, EMT scoring |
+| **Differential** | Built-in two-group differential enrichment |
+| **Seurat support** | v4 only |
 
-### When to Use irGSEA
+## Core Workflow
 
-- Want consensus across multiple scoring methods
-- Need differential enrichment analysis
-- Unsure which single method to choose
-- Robustness is priority over speed
+### Step 1: Prepare Data
 
----
+**Input:** Expression matrix (genes x cells) or Seurat v4 object.  
+**Requirements:**
+- Gene symbols as row names.
+- Named list of gene sets.
+- Seurat v4 object if using `run_irgsea_seurat()`.
 
-## Quick Start
+```r
+library(Seurat)
+seurat_obj <- readRDS("your_data_v4.rds")
+
+# Or load a matrix
+expr_matrix <- readRDS("expression_matrix.rds")  # genes x cells
+```
+
+### Step 2: Define Gene Sets
+
+```r
+gene_sets <- list(
+  Hypoxia = c("VEGFA", "GLUT1", "CA9", "PGK1", "LDHA"),
+  Glycolysis = c("HK2", "PFKFB3", "GAPDH", "ENO1", "PKM"),
+  T_cells = c("CD3D", "CD3E", "CD4", "CD8A", "CD8B")
+)
+```
+
+### Step 3: Run irGSEA
 
 ```r
 source("scripts/r/run_irgsea.R")
 
-# Run with all methods + RRA
 results <- run_irgsea(
   expr_matrix = expr_matrix,
   gene_sets = gene_sets,
-  methods = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
-  rra_integration = TRUE
-)
-
-# Access RRA consensus scores
-rra_scores <- results$RRA
-```
-
-**Full implementation:** [scripts/r/run_irgsea.R](scripts/r/run_irgsea.R)
-
----
-
-## Detailed Usage
-
-### 1. Run All Methods
-
-```r
-source("scripts/r/run_irgsea.R")
-
-results <- run_irgsea(
-  expr_matrix = expr_matrix, # Expression matrix (genes x cells)
-  gene_sets = marker_genes,
   methods = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
   minGSSize = 10,
   maxGSSize = 500,
@@ -84,32 +106,27 @@ results <- run_irgsea(
   rra_integration = TRUE
 )
 
-# Results contains:
-# - results$AUCell
-# - results$UCell
-# - results$singscore
-# - results$ssgsea
-# - results$ssGSEA2
-# - results$RRA (if rra_integration=TRUE)
+# Access scores
+auc_scores <- results$AUCell
+rra_scores <- results$RRA
 ```
 
-### 2. With Seurat
+### Step 4: Integrate with Seurat
 
 ```r
 seurat_obj <- run_irgsea_seurat(
   seurat_obj,
   gene_sets = gene_sets,
-  slot = "counts"
+  slot = "counts",
+  method = c("AUCell", "UCell")
 )
 
-# Access RRA scores
-FeaturePlot(seurat_obj, features = "irGSEA.RRA.T_cells")
+FeaturePlot(seurat_obj, features = "irGSEA.RRA.Hypoxia")
 ```
 
-### 3. Differential Enrichment
+### Step 5: Differential Enrichment
 
 ```r
-# Compare two conditions
 diff_results <- differential_enrichment(
   irgsea_results = results,
   group_vector = seurat_obj$condition,
@@ -117,419 +134,419 @@ diff_results <- differential_enrichment(
   test = "wilcoxon"
 )
 
-# View significant pathways
 head(diff_results[diff_results$padj < 0.05, ])
 ```
 
-### 4. EMT Scoring (M/E Ratio)
-
-Calculate EMT (Epithelial-Mesenchymal Transition) score using custom gene sets by irGSEA.
+## Complete Pipeline (Copy-Pasteable)
 
 ```r
-# Define EMT gene sets
-emt_gene_sets <- list(
-  # 上皮标志物 (Epithelial markers)
-  Epithelial = c('CDH1', 'EPCAM', 'KRT8', 'KRT18', 'KRT19', 'OCLN', 'CLDN3', 'CLDN4',
-                  'CLDN7', 'TJP1', 'TJP2', 'TJP3', 'CGN', 'MARVELD2', 'CRB3', 'DSP',
-                  'PKP1', 'PKP2', 'PKP3', 'JUP', 'CTNNB1', 'ALCAM', 'CEACAM1', 'CEACAM5',
-                  'CEACAM6', 'MUC1', 'MUC4', 'MUC16', 'CD24', 'HES1', 'PARD3', 'PARD6A',
-                  'PARD6B', 'AMOT', 'AMOTL1', 'AMOTL2', 'INADL', 'MPP5', 'PALS1', 'CRUMBS3',
-                  'LLGL1', 'LLGL2', 'SCRIB', 'DLG1', 'DLG2', 'DLG3', 'DLG4', 'DLG5'),
+library(Seurat)
+library(irGSEA)
 
-  # 间质标志物 (Mesenchymal markers)
-  Mesenchymal = c('CDH2', 'VIM', 'FN1', 'SNAI1', 'SNAI2', 'TWIST1', 'ZEB1', 'ZEB2',
-                  'MMP2', 'MMP3', 'MMP9', 'SERPINE1', 'ACTA2', 'TAGLN', 'TGFB1',
-                  'TGFBR1', 'TGFBR2', 'SMAD2', 'SMAD3', 'COL1A1', 'COL1A2', 'COL3A1',
-                  'COL5A1', 'FAP', 'THY1', 'VCAN', 'TNC', 'POSTN', 'WNT5A', 'WNT5B',
-                  'AXL', 'LOXL2', 'LOXL3', 'ITGA5', 'ITGAV', 'ITGB1', 'CD44', 'EMP3',
-                  'GADD45B', 'ID2', 'ID3', 'RHOC', 'ROCK1', 'RAC1', 'CDC42', 'PAK1',
-                  'LIMK1', 'CFL1', 'DSTN', 'TPM1', 'TPM2', 'MYL9', 'MYH9', 'PRKCA',
-                  'MARCKS', 'PPP1R12A', 'CALD1', 'MYLK', 'FLNA', 'FLNB'),
+# 1. Load Seurat v4 object with annotations
+seurat_obj <- readRDS("your_data_v4.rds")
 
-  # Core EMT transcription factors
-  EMT_TFs = c("SNAI1", "SNAI2", "ZEB1", "ZEB2", "TWIST1", "TWIST2"),
-
-  # EMT相关基因集（来自MSigDB Hallmark EMT）（用于参考）
-  EMT_Hallmark = c('CTNNB1', 'GSK3B', 'MYC', 'SNAI1', 'SNAI2', 'TWIST1', 'ZEB1', 'ZEB2',
-               'VIM', 'CDH2', 'FN1', 'MMP2', 'MMP9', 'SERPINE1', 'SPARC', 'TGFBR1',
-               'TGFBR2', 'TGFB1', 'TGFB2', 'EGF', 'EGFR', 'PDGFRB', 'FGFR1', 'IGF1R',
-               'WNT5A', 'WNT5B', 'AXL', 'LOXL2', 'LOXL3', 'ITGA5', 'ITGAV', 'COL1A1',
-               'COL1A2', 'COL3A1', 'COL5A1', 'FAP', 'THY1', 'VCAN', 'TNC', 'POSTN',
-               'MMP3', 'MMP10', 'MMP13', 'MMP14', 'MMP16', 'LAMB3', 'LAMC2', 'LAMA3',
-               'TIMP1', 'TIMP2', 'ITGA2', 'ITGA3', 'ITGB1', 'CD44', 'EMP3', 'GADD45B',
-               'TGIF1', 'ID2', 'ID3', 'FGF2', 'IGFBP3', 'IGFBP4', 'IGFBP5', 'VEGFA',
-               'VEGFC', 'ANGPTL4', 'RHOC', 'ROCK1', 'RAC1', 'CDC42', 'PAK1', 'LIMK1',
-               'CFL1', 'DSTN', 'ACTA2', 'TAGLN', 'TPM1', 'TPM2', 'MYL9', 'MYH9',
-               'PRKCA', 'MARCKS', 'PPP1R12A', 'CALD1', 'MYLK', 'FLNA', 'FLNB', 'PALLD',
-               'MYO10', 'ENAH', 'ARPC1B', 'ARPC2', 'ARPC3', 'ARPC4', 'ARPC5', 'WAS',
-               'WASL', 'CYFIP1', 'ABI1', 'NCKAP1', 'HSPC300', 'BRK1')
+# 2. Define gene sets
+gene_sets <- list(
+  Hypoxia = c("VEGFA", "EGLN1", "CA9", "PGK1", "LDHA"),
+  Glycolysis = c("HK2", "PFKFB3", "GAPDH", "ENO1", "PKM"),
+  OXPHOS = c("NDUFS1", "SDHA", "UQCRC1", "COX4I1", "ATP5F1A")
 )
 
-# Run irGSEA with custom gene sets (auto-detects custom=TRUE)
-# Add scores to Seurat object
-seurat_obj <- run_irgsea_seurat(
-  seurat_obj,
-  gene_sets = emt_gene_sets,
-  slot = "counts",
+# 3. Source skill wrapper
+source("scripts/r/run_irgsea.R")
+
+# 4. Run irGSEA (returns list of score matrices, including RRA)
+results <- run_irgsea(
+  expr_matrix = seurat_obj,
+  gene_sets = gene_sets,
+  methods = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
   rra_integration = TRUE
 )
-# Scores are automatically extracted to metadata as:
-# - irGSEA.UCell.Mesenchymal
-# - irGSEA.UCell.Epithelial
 
-
-# Run irGSEA with all methods
-irgsea_results <- run_irgsea(
-  expr_matrix = expr_matrix,
-  gene_sets = emt_gene_sets,
-  methods = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
-  rra_integration = TRUE,
-  ncores = 4
-)
-
-# Calculate EMT score as M/E ratio (recommended)
-seurat_obj <- calculate_emt_score(
+# 5. Add scores to Seurat for visualization
+seurat_obj <- run_irgsea_seurat(
   seurat_obj,
-  mesenchymal_col = "irGSEA.UCell.Mesenchymal",
-  epithelial_col = "irGSEA.UCell.Epithelial",
-  method = "ratio",  # "ratio" = M/E, "difference" = M-E
-  new_col_name = "EMT_Score"
+  gene_sets = gene_sets,
+  slot = "counts",
+  method = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
+  rra_integration = TRUE
 )
 
-# Visualize
-FeaturePlot(seurat_obj, features = "EMT_Score")
-VlnPlot(seurat_obj, features = "EMT_Score", group.by = "cell_type")
+# 6. Visualize
+FeaturePlot(seurat_obj, features = "irGSEA.RRA.Hypoxia", reduction = "umap")
+VlnPlot(seurat_obj, features = "irGSEA.UCell.Glycolysis", group.by = "cell_type")
 
-# Compare EMT between conditions (e.g., High vs Low NI)
-diff_emt <- differential_enrichment(
-  irgsea_results = irgsea_results,
-  group_vector = seurat_obj$NI_group,
+# 7. Differential enrichment between two conditions
+diff_results <- differential_enrichment(
+  irgsea_results = results,
+  group_vector = seurat_obj$condition,
   method = "RRA",
   test = "wilcoxon"
 )
+
+# 8. Export
+export_irgsea_results(results, output_dir = "./irgsea_results", prefix = "sample1")
 ```
 
-**EMT Score Interpretation:**
-| Method | Formula | Interpretation |
-|--------|---------|----------------|
-| `ratio` | M / (E + 0.001) | > 1: Mesenchymal-dominant, < 1: Epithelial-dominant |
-| `difference` | M - E | Positive: Mesenchymal, Negative: Epithelial |
+## Skill-Provided Functions
 
-### EMT_TFs说明
-作为独立的基因集，EMT_TFs 提供：
+**Pipeline orchestration**
+- `run_irgsea(expr_matrix, gene_sets, methods, minGSSize, maxGSSize, ncores, rra_integration)` — run multiple scoring methods with optional RRA integration on a matrix.
+- `run_irgsea_seurat(seurat_obj, gene_sets, slot, ...)` — run irGSEA on a Seurat v4 object and extract scores to metadata.
 
-  1. 早期 EMT 检测
-      - 转录因子变化早于结构蛋白（Vimentin, N-cadherin）
-      - 识别"正在启动EMT"的细胞
-  2. 区分 EMT 驱动 vs 结果
-      - Epithelial/Mesenchymal = 细胞状态（结果）
-      - EMT_TFs = 主动调控信号（驱动）
-  3. 异质性分析
+**Extraction & integration**
+- `extract_irgsea_scores(seurat_obj, method, prefix)` — extract scores from an irGSEA assay to metadata columns.
+- `extract_scores_internal(seurat_obj, method)` — internal helper used by `run_irgsea_seurat()`.
 
-三种情况：
-  1. 高 M + 低 E + 高 TFs = 活跃EMT（间质状态）
-  2. 低 M + 高 E + 高 TFs = 早期EMT（上皮但正在转化）
-  3. 高 M + 低 E + 低 TFs = 稳定间质（已完成EMT）
+**Analysis**
+- `differential_enrichment(irgsea_results, group_vector, method, test)` — two-group differential enrichment (wilcoxon or t.test).
+- `calculate_emt_score(seurat_obj, mesenchymal_col, epithelial_col, method, new_col_name)` — compute EMT score as M/E ratio or M-E difference.
 
-实际应用建议
+**Visualization & export**
+- `plot_irgsea_heatmap(irgsea_results, method, group_vector, top_n)` — ComplexHeatmap of top variable gene sets.
+- `export_irgsea_results(irgsea_results, output_dir, prefix)` — export each method's scores to CSV.
 
-  - 与 TGF-β 信号关联：TGF-β 是主要诱导 EMT TFs 的上游通路
-  - 结合使用：EMT_TFs 高但 Mesenchymal 低 → EMT 早期阶段
-  - 不需要用于 EMT_score 计算：比值通常只用 M/E，TFs 单独分析
-  - EMT_TFs 可以帮助识别正在获得侵袭能力的细胞，而不仅仅是已经间质化的细胞。
+## Official API - Agents Often Miss These
 
+**1. This skill requires Seurat v4**
+`run_irgsea_seurat()` checks `SeuratObject` version and errors on v5. To use with v5:
+```r
+expr_matrix <- Seurat::GetAssayData(seurat_obj, layer = "counts")
+results <- run_irgsea(expr_matrix, gene_sets = gene_sets)
+```
 
-### EMT评分对比
-  1. EMT_Hallmark 评分
+**2. `run_irgsea()` returns a named list, not a Seurat object**
+```r
+results <- run_irgsea(expr_matrix, gene_sets)
+results$AUCell   # cells x gene_sets
+results$RRA      # cells x gene_sets (if rra_integration = TRUE)
+```
 
-  混合基因集：包含 E 和 M 基因
-  EMT_Hallmark = c("CDH1", "VIM", "SNAI1", "KRT8", "FN1", ...)
-  - 高分数 = 细胞表达 EMT 相关基因（可能是上皮或间质）
-  - 问题：无法区分 EMT 起始（上皮但响应信号）vs EMT 完成（间质状态）
+**3. `run_irgsea_seurat()` adds metadata columns with prefix `irGSEA.<method>.<geneset>`**
+```r
+# Example column names
+seurat_obj$irGSEA.UCell.Hypoxia
+seurat_obj$irGSEA.RRA.Hypoxia
+```
 
-  2. M/E 比值 (EMT_score)
+**4. RRA integration only runs when `length(methods) > 1`**
+If you request only one method, `results$RRA` will not be created even if `rra_integration = TRUE`.
 
-  EMT_score = Mesenchymal / (Epithelial + 0.01)
-  - 低值 (< 0.5) = 上皮状态为主
-  - 高值 (> 2) = 间质状态为主
-  - 中间值 = 混合/过渡状态
+**5. `run_irgsea_seurat()` with custom gene sets uses `custom = TRUE`**
+The wrapper passes `custom = TRUE` to `irGSEA::irGSEA.score()` when `gene_sets` is provided.
 
+**6. `differential_enrichment()` requires exactly two groups**
+`group_vector` must have exactly two unique values. Use ANOVA or other tests for more groups.
 
+**7. `extract_irgsea_scores()` does not run irGSEA**
+It only extracts already-computed assay scores to metadata. Call `run_irgsea_seurat()` first.
 
-| 研究问题                     | 推荐指标               |
-|------------------------------|------------------------|
-| 细胞是否具有 EMT 特征？      | EMT_Hallmark           |
-| 细胞处于 EMT 的哪个阶段？    | EMT_score（M/E）  |
-| 比较 NI 高 vs 低的 EMT 程度  | EMT_score              |
-| 筛选 EMT 阳性细胞            | 两者结合               |
+## Common Pitfalls
 
+1. **Seurat v5 incompatibility**  
+   The most common failure. Either downgrade to Seurat v4 or extract the matrix and use `run_irgsea()`.
 
+2. **Gene set size filtering removes all sets**  
+   Default `minGSSize = 10` and `maxGSSize = 500`. Small marker sets (< 10 genes) are silently removed.
 
-### 5. Extract Scores from Assays
+3. **Forgetting that RRA needs at least two methods**  
+   Request only AUCell and you will not get `results$RRA`.
 
-Manually extract scores from irGSEA assays to metadata (optional, `run_irgsea_seurat` does this automatically).
+4. **Mismatch between `run_irgsea()` and `run_irgsea_seurat()` outputs**  
+   `run_irgsea()` returns a list of score matrices. `run_irgsea_seurat()` returns a Seurat object with metadata columns.
+
+5. **Differential enrichment needs matching cell order**  
+   `group_vector` length must equal `nrow(scores)`. Ensure no cells were filtered between scoring and testing.
+
+6. **log2FC can be Inf/NaN with near-zero scores**  
+   Some methods produce scores close to zero. Filter or winsorize before interpreting fold changes.
+
+## Scenarios
+
+### Scenario 1: Basic Multi-Method Scoring on a Matrix
 
 ```r
-# After running irGSEA
-seurat_obj <- run_irgsea_seurat(seurat_obj, gene_sets, method = "UCell")
+source("scripts/r/run_irgsea.R")
 
-# Extract with custom prefix
+results <- run_irgsea(
+  expr_matrix = expr_matrix,
+  gene_sets = gene_sets,
+  methods = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2"),
+  ncores = 4,
+  rra_integration = TRUE
+)
+
+# Access consensus
+head(results$RRA)
+```
+
+### Scenario 2: Seurat v4 Integration
+
+```r
+seurat_obj <- run_irgsea_seurat(
+  seurat_obj,
+  gene_sets = gene_sets,
+  slot = "counts",
+  method = c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2")
+)
+
+FeaturePlot(seurat_obj, features = "irGSEA.RRA.T_cells")
+```
+
+### Scenario 3: Extract Specific Method Scores
+
+```r
+# If you ran irGSEA via run_irgsea_seurat() and want a different prefix
 seurat_obj <- extract_irgsea_scores(seurat_obj, method = "UCell", prefix = "UCell")
 
-# Access scores
-head(seurat_obj$UCell.GeneSetName)
-FeaturePlot(seurat_obj, features = "UCell.Mesenchymal")
+# Now access as seurat_obj$UCell.Hypoxia
+FeaturePlot(seurat_obj, features = "UCell.Hypoxia")
 ```
 
+### Scenario 4: Differential Enrichment
 
----
-
-## Visualization
-
-### 1. Heatmap Visualization
-
-Visualize enrichment scores across cells and gene sets.
+Assumes `results` was generated by `run_irgsea()` (see Scenario 1).
 
 ```r
-# Basic heatmap with top variable gene sets
+diff_results <- differential_enrichment(
+  irgsea_results = results,
+  group_vector = seurat_obj$condition,
+  method = "RRA",
+  test = "wilcoxon"
+)
+
+sig <- diff_results[diff_results$padj < 0.05, ]
+print(sig[order(sig$padj), ])
+```
+
+### Scenario 5: Heatmap of Top Variable Gene Sets
+
+```r
 library(ComplexHeatmap)
+
 hm <- plot_irgsea_heatmap(
-  irgsea_results = irgsea_results,
+  irgsea_results = results,
   method = "RRA",
   group_vector = seurat_obj$cell_type,
   top_n = 20
 )
 draw(hm)
+```
 
-# Custom heatmap with annotations
-scores <- irgsea_results$RRA
-ha <- HeatmapAnnotation(
-  CellType = seurat_obj$cell_type,
-  Condition = seurat_obj$condition,
-  col = list(
-    CellType = c("T_cell" = "#1f77b4", "B_cell" = "#ff7f0e", "Myeloid" = "#2ca02c"),
-    Condition = c("Control" = "#d62728", "Treatment" = "#9467bd")
-  )
+### Scenario 6: Export All Scores
+
+```r
+export_irgsea_results(
+  irgsea_results = results,
+  output_dir = "./irgsea_results",
+  prefix = "sample1"
 )
-Heatmap(t(scores[, 1:10]),
-        name = "Enrichment Score",
-        top_annotation = ha,
-        cluster_columns = TRUE,
-        cluster_rows = TRUE,
-        show_column_names = FALSE)
 ```
 
-### 2. Dimensionality Reduction Plots
+Generates one CSV per method: `sample1_AUCell_scores.csv`, `sample1_RRA_scores.csv`, etc.
 
-Display enrichment scores on UMAP/t-SNE.
+### Scenario 7: EMT Scoring (M/E Ratio)
 
-```r
-# Single gene set
-top_geneset <- "T_cells"
-FeaturePlot(seurat_obj, 
-            features = paste0("irGSEA.RRA.", top_geneset),
-            min.cutoff = 0, max.cutoff = 1) +
-  scale_color_viridis_c() +
-  ggtitle(paste("RRA Score:", top_geneset))
-
-# Multiple gene sets
-gene_sets_to_plot <- c("irGSEA.RRA.Epithelial", 
-                       "irGSEA.RRA.Mesenchymal",
-                       "irGSEA.RRA.T_cells")
-FeaturePlot(seurat_obj, features = gene_sets_to_plot, ncol = 2)
-
-# Overlay multiple scores using blend
-FeaturePlot(seurat_obj, 
-            features = c("irGSEA.RRA.Epithelial", "irGSEA.RRA.Mesenchymal"),
-            blend = TRUE, blend.threshold = 0.5)
-```
-
-### 3. Distribution Plots
-
-Compare scores across cell types or conditions.
+For ready-to-use EMT gene sets (Epithelial, Mesenchymal, EMT_TFs, EMT_Hallmark), see [reference/emt_reference.md](reference/emt_reference.md).
 
 ```r
-library(ggplot2)
+# Load the full EMT gene sets from the reference file
+source("reference/emt_reference.R")
 
-# Violin plot by cell type
-VlnPlot(seurat_obj, 
-        features = "irGSEA.RRA.T_cells",
-        group.by = "cell_type",
-        pt.size = 0) +
-  geom_boxplot(width = 0.1, fill = "white", outlier.size = 0)
-
-# Ridge plot for density comparison
-library(ggridges)
-plot_data <- data.frame(
-  Score = seurat_obj$irGSEA.RRA.T_cells,
-  CellType = seurat_obj$cell_type
-)
-ggplot(plot_data, aes(x = Score, y = CellType, fill = CellType)) +
-  geom_density_ridges(alpha = 0.7) +
-  theme_ridges() +
-  labs(title = "T Cell Signature Distribution")
-
-# Boxplot with statistics
-library(ggpubr)
-ggboxplot(plot_data, x = "CellType", y = "Score",
-          add = "jitter", add.params = list(size = 0.3, alpha = 0.5)) +
-  stat_compare_means(method = "anova") +
-  rotate_x_text(45)
-```
-
-### 4. Method Comparison
-
-Compare scores from different enrichment methods.
-
-```r
-# Extract scores for one gene set across methods
-gene_set <- "T_cells"
-method_scores <- data.frame(
-  AUCell = irgsea_results$AUCell[, gene_set],
-  UCell = irgsea_results$UCell[, gene_set],
-  singscore = irgsea_results$singscore[, gene_set],
-  ssgsea = irgsea_results$ssgsea[, gene_set],
-  RRA = irgsea_results$RRA[, gene_set]
+seurat_obj <- run_irgsea_seurat(
+  seurat_obj,
+  gene_sets = emt_gene_sets,
+  slot = "counts",
+  method = c("AUCell", "UCell"),
+  rra_integration = TRUE
 )
 
-# Correlation heatmap
-cor_matrix <- cor(method_scores, use = "complete.obs")
-pheatmap(cor_matrix, 
-         main = "Method Correlation",
-         display_numbers = TRUE,
-         color = colorRampPalette(c("blue", "white", "red"))(100))
+seurat_obj <- calculate_emt_score(
+  seurat_obj,
+  mesenchymal_col = "irGSEA.UCell.Mesenchymal",
+  epithelial_col = "irGSEA.UCell.Epithelial",
+  method = "ratio",
+  new_col_name = "EMT_Score"
+)
 
-# Scatter plot comparing two methods
-ggplot(method_scores, aes(x = AUCell, y = RRA)) +
-  geom_point(alpha = 0.3) +
-  geom_smooth(method = "lm") +
-  stat_cor(method = "pearson") +
-  labs(title = paste(gene_set, "- AUCell vs RRA"))
-
-# All pairwise comparisons (pairs plot)
-library(GGally)
-ggpairs(method_scores, 
-        lower = list(continuous = wrap("smooth", alpha = 0.3)),
-        diag = list(continuous = wrap("barDiag", bins = 30)),
-        title = "Method Comparison")
+FeaturePlot(seurat_obj, features = "EMT_Score")
 ```
 
-### 5. Differential Enrichment Visualization
+**EMT score interpretation:**
 
-Visualize differential enrichment results.
+| Method | Formula | Interpretation |
+|--------|---------|----------------|
+| `ratio` | M / (E + 0.001) | > 1: mesenchymal-dominant; < 1: epithelial-dominant |
+| `difference` | M - E | Positive: mesenchymal; negative: epithelial |
 
-```r
-# Volcano plot
-diff_results$significant <- diff_results$padj < 0.05
-ggplot(diff_results, aes(x = log2FC, y = -log10(padj), color = significant)) +
-  geom_point(size = 3) +
-  geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
-  geom_text_repel(data = subset(diff_results, significant),
-                  aes(label = gene_set), max.overlaps = 15) +
-  scale_color_manual(values = c("grey", "red")) +
-  labs(title = "Differential Enrichment",
-       x = "Log2 Fold Change",
-       y = "-Log10 Adjusted P-value")
+**EMT gene set design:**
 
-# Bar plot of top differential gene sets
-top_diff <- head(diff_results[order(diff_results$padj), ], 15)
-ggplot(top_diff, aes(x = reorder(gene_set, -log10(padj)), 
-                     y = -log10(padj), fill = log2FC > 0)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  scale_fill_manual(values = c("blue", "red"),
-                    labels = c("Down", "Up"),
-                    name = "Direction") +
-  labs(title = "Top Differential Gene Sets",
-       x = "Gene Set",
-       y = "-Log10 Adjusted P-value")
+A complete EMT analysis typically uses three complementary gene sets:
 
-# Lollipop plot
-ggplot(top_diff, aes(x = reorder(gene_set, log2FC), y = log2FC)) +
-  geom_segment(aes(x = gene_set, xend = gene_set, y = 0, yend = log2FC),
-               color = "grey") +
-  geom_point(aes(color = padj < 0.05), size = 4) +
-  scale_color_manual(values = c("grey50", "red")) +
-  coord_flip() +
-  labs(title = "Log2FC of Top Gene Sets")
-```
+| Gene set | Representative markers | Biological meaning |
+|----------|------------------------|--------------------|
+| `Epithelial` | `CDH1`, `EPCAM`, `KRT8/18/19`, `OCLN`, `CLDN3/4/7` | Mature epithelial cell state |
+| `Mesenchymal` | `CDH2`, `VIM`, `FN1`, `SNAI1/2`, `TWIST1`, `ZEB1/2`, `MMP2/9` | Mesenchymal / invasive state |
+| `EMT_TFs` | `SNAI1`, `SNAI2`, `ZEB1`, `ZEB2`, `TWIST1`, `TWIST2` | Active EMT transcriptional drivers |
 
-### 6. Multi-method Consensus Visualization
+**Why include `EMT_TFs` as a separate set:**
 
-Visualize agreement across methods.
+1. **Early EMT detection** - Transcription factor changes often precede structural protein changes (e.g., Vimentin, N-cadherin), helping identify cells that are *starting* EMT.
+2. **Distinguish driver vs. result** - Epithelial/Mesenchymal signatures reflect cell state (outcome), while EMT_TFs reflect active regulatory signaling (driver).
+3. **Capture inter-tumor heterogeneity** - Some cells may score high on EMT_TFs without yet showing full mesenchymal morphology.
 
-```r
-# Upset plot for top cells by each method
-library(UpSetR)
+**Three common EMT states:**
 
-# Get top 10% cells for each method
-top_cells <- lapply(c("AUCell", "UCell", "singscore", "ssgsea", "RRA"), 
-                    function(m) {
-  scores <- irgsea_results[[m]][, "T_cells"]
-  names(sort(scores, decreasing = TRUE))[1:round(0.1 * length(scores))]
-})
-names(top_cells) <- c("AUCell", "UCell", "singscore", "ssgsea", "RRA")
+| Mesenchymal (M) | Epithelial (E) | EMT_TFs | Interpretation |
+|-----------------|----------------|---------|----------------|
+| High | Low | High | Active EMT (mesenchymal transition) |
+| Low | High | High | Early EMT (epithelial but responding to EMT signals) |
+| High | Low | Low | Stable mesenchymal state (EMT completed) |
 
-# Create binary matrix for upset plot
-all_cells <- colnames(seurat_obj)
-binary_matrix <- sapply(top_cells, function(cells) {
-  as.integer(all_cells %in% cells)
-})
-rownames(binary_matrix) <- all_cells
+**Practical recommendations:**
 
-upset(as.data.frame(binary_matrix), 
-      nsets = 5,
-      main.bar.color = "maroon",
-      sets.bar.color = "steelblue",
-      title = "Method Agreement - Top T Cell Signature Cells")
+- **TGF-β association:** TGF-β is a major upstream inducer of EMT_TFs. Co-checking TGF-β signaling can strengthen interpretation.
+- **EMT_TFs high but Mesenchymal low** suggests early EMT; do not rely on M/E ratio alone.
+- **EMT_TFs are usually analyzed separately**, not mixed into the EMT_score calculation. The M/E ratio is the standard EMT_score metric.
+- **EMT_TFs help identify cells gaining invasive potential**, not only those that have already fully mesenchymalized.
 
-# Agreement score per cell
-method_agreement <- rowMeans(binary_matrix)
-seurat_obj$method_agreement <- method_agreement
-FeaturePlot(seurat_obj, features = "method_agreement") +
-  ggtitle("Fraction of Methods Calling Cell Positive")
-```
+**EMT_Hallmark vs. M/E ratio:**
 
----
+| Metric | Gene set composition | What it measures | Best use case |
+|--------|---------------------|------------------|---------------|
+| `EMT_Hallmark` | Mixed E + M genes (e.g., `CDH1`, `VIM`, `SNAI1`, `KRT8`, `FN1`, ...) | Overall EMT-associated gene expression | "Does this cell express EMT-related genes?" |
+| `EMT_score` (M/E ratio) | Separate M and E sets: `M / (E + 0.001)` | Relative balance between mesenchymal and epithelial programs | "What EMT stage is this cell in?" |
+
+
+| Research question | Recommended metric |
+|-------------------|-------------------|
+| Does the cell have EMT characteristics? | `EMT_Hallmark` |
+| Which EMT stage is the cell in? | `EMT_score` (M/E ratio) |
+| Compare EMT degree between conditions (e.g., high vs. low NI) | `EMT_score` |
+| Screen for EMT-positive cells | Combine `EMT_Hallmark` + `EMT_score` + `EMT_TFs` |
 
 ## Parameters
 
+### `run_irgsea()`
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `methods` | vector | All 5 | Methods to run |
-| `rra_integration` | bool | TRUE | RRA consensus integration |
-| `minGSSize` | int | 10 | Min genes per set |
-| `maxGSSize` | int | 500 | Max genes per set |
+| `expr_matrix` | matrix / Seurat | required | Expression matrix (genes x cells) or Seurat v4 object |
+| `gene_sets` | named list | required | Named list of gene sets |
+| `methods` | char vector | `c("AUCell", "UCell", "singscore", "ssgsea", "ssGSEA2")` | Methods to run |
+| `minGSSize` | int | 10 | Minimum genes per set |
+| `maxGSSize` | int | 500 | Maximum genes per set |
+| `ncores` | int | 1 | Parallel cores |
+| `rra_integration` | logical | TRUE | Compute RRA consensus (needs >= 2 methods) |
 
-**Available methods:** `AUCell`, `UCell`, `singscore`, `ssgsea`, `ssGSEA2`
+### `run_irgsea_seurat()`
 
----
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seurat_obj` | Seurat v4 | required | Seurat v4 object |
+| `gene_sets` | named list | NULL | Custom gene sets; if NULL, uses MSigDB built-ins |
+| `slot` | char | "counts" | Assay slot to use |
+| `...` | | | Additional arguments passed to `irGSEA::irGSEA.score()` |
 
-## API Reference
+### `differential_enrichment()`
 
-| Function | Location | Description |
-|----------|----------|-------------|
-| `run_irgsea()` | [run_irgsea.R:41](scripts/r/run_irgsea.R#L41) | Main irGSEA analysis (matrix input) |
-| `run_irgsea_seurat()` | [run_irgsea.R:175](scripts/r/run_irgsea.R#L175) | Seurat wrapper (auto-detects custom gene sets) |
-| `extract_irgsea_scores()` | [run_irgsea.R:361](scripts/r/run_irgsea.R#L361) | Extract scores from assays to metadata |
-| `calculate_emt_score()` | [run_irgsea.R:420](scripts/r/run_irgsea.R#L420) | Calculate EMT score (M/E ratio or M-E) |
-| `differential_enrichment()` | [run_irgsea.R:236](scripts/r/run_irgsea.R#L236) | Differential analysis between groups |
-| `plot_irgsea_heatmap()` | [run_irgsea.R:300](scripts/r/run_irgsea.R#L300) | Heatmap visualization |
-| `export_irgsea_results()` | [run_irgsea.R:343](scripts/r/run_irgsea.R#L343) | Export all results to CSV |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `irgsea_results` | list | required | Output from `run_irgsea()` |
+| `group_vector` | vector | required | Two-group labels per cell |
+| `method` | char | "RRA" | Which score matrix to test |
+| `test` | char | "wilcoxon" | "wilcoxon" or "t.test" |
 
----
+### `calculate_emt_score()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seurat_obj` | Seurat | required | Seurat object with EMT scores in metadata |
+| `mesenchymal_col` | char | required | Column name for mesenchymal score |
+| `epithelial_col` | char | required | Column name for epithelial score |
+| `method` | char | "ratio" | "ratio" (M/E) or "difference" (M-E) |
+| `new_col_name` | char | "EMT_Score" | Output column name |
+
+### `extract_irgsea_scores()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seurat_obj` | Seurat | required | Seurat object with irGSEA assays |
+| `method` | char | "UCell" | Assay/method to extract |
+| `prefix` | char | method name | Prefix for metadata columns |
+
+### `plot_irgsea_heatmap()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `irgsea_results` | list | required | Output from `run_irgsea()` |
+| `method` | char | "RRA" | Method to plot |
+| `group_vector` | vector | NULL | Cell group annotation |
+| `top_n` | int | 20 | Number of top variable gene sets |
+
+### `export_irgsea_results()`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `irgsea_results` | list | required | Output from `run_irgsea()` |
+| `output_dir` | char | required | Output directory |
+| `prefix` | char | "irgsea" | File prefix |
+
+## Output Description
+
+`run_irgsea()` returns a named list where each element is a **cells x gene_sets** score matrix:
+
+| Element | Description |
+|---------|-------------|
+| `results$AUCell` | AUCell scores |
+| `results$UCell` | UCell scores |
+| `results$singscore` | singscore scores |
+| `results$ssgsea` | ssgsea scores |
+| `results$ssGSEA2` | ssGSEA2 scores |
+| `results$RRA` | RRA consensus scores (if `rra_integration = TRUE` and >= 2 methods) |
+
+`run_irgsea_seurat()` returns a Seurat object with new metadata columns:
+
+| Column pattern | Example |
+|----------------|---------|
+| `irGSEA.<method>.<geneset>` | `irGSEA.UCell.Hypoxia` |
+| `irGSEA.RRA.<geneset>` | `irGSEA.RRA.Hypoxia` |
+| `EMT_Score` | After `calculate_emt_score()` |
+
+`differential_enrichment()` returns a data frame:
+
+| Column | Description |
+|--------|-------------|
+| `gene_set` | Gene set name |
+| `group1`, `group2` | Compared groups |
+| `group1_mean`, `group2_mean` | Mean scores |
+| `log2FC` | log2 fold change |
+| `pvalue`, `padj` | Raw and BH-adjusted p-values |
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `Seurat v5 detected...` | SeuratObject >= 5.0.0 | Use Seurat v4 or extract matrix and use `run_irgsea()` |
+| `No valid gene sets after size filtering` | All sets smaller than `minGSSize` or larger than `maxGSSize` | Adjust thresholds or filter gene sets |
+| `results$RRA is NULL` | Only one method requested or `rra_integration = FALSE` | Request >= 2 methods with `rra_integration = TRUE` |
+| `Length of group_vector must match number of cells` | Group labels do not match score matrix | Ensure same cells and no reordering |
+| `Differential enrichment requires exactly 2 groups` | More or fewer than 2 unique labels | Subset to two groups or use another test |
+| `Column 'irGSEA.UCell.X' not found` | Wrong method prefix or score not computed | Check available metadata columns with `colnames(seurat_obj@meta.data)` |
+| Heatmap fails | ComplexHeatmap not installed | `BiocManager::install("ComplexHeatmap")` |
 
 ## Related Skills
 
-- [bio-single-cell-enrichment-gseapy](../bio-single-cell-enrichment-gseapy/SKILL.md) - gseapy
-- [bio-single-cell-enrichment-aucell-r](../bio-single-cell-enrichment-aucell-r/SKILL.md) - AUCell
-- [bio-single-cell-enrichment-ucell-r](../bio-single-cell-enrichment-ucell-r/SKILL.md) - UCell
-
----
+- [bio-single-cell-enrichment-aucell-r](../bio-single-cell-enrichment-aucell-r/SKILL.md) - AUCell single-method scoring (R)
+- [bio-single-cell-enrichment-ucell-r](../bio-single-cell-enrichment-ucell-r/SKILL.md) - UCell fast scoring (R)
+- [bio-single-cell-enrichment-decoupler-r](../bio-single-cell-enrichment-decoupler-r/SKILL.md) - decoupleR multi-method (R)
+- [bio-single-cell-enrichment-gseapy](../bio-single-cell-enrichment-gseapy/SKILL.md) - GSEApy methods (Python)
+- [bio-single-cell-enrichment-clusterprofiler-r](../bio-single-cell-enrichment-clusterprofiler-r/SKILL.md) - Over-representation and GSEA (R)
+- [bio-single-cell-enrichment-progeny-r](../bio-single-cell-enrichment-progeny-r/SKILL.md) - TF activity inference (R)
 
 ## References
 
-1. Zhang et al. (2023). irGSEA: a comprehensive package for single-cell gene set enrichment analysis. Bioinformatics.
-2. Kolde et al. (2012). Robust rank aggregation for gene list integration and meta-analysis. Bioinformatics.
+1. Zhang et al. (2023). irGSEA: a comprehensive package for single-cell gene set enrichment analysis. *Bioinformatics*.
+2. Kolde et al. (2012). Robust rank aggregation for gene list integration and meta-analysis. *Bioinformatics*.
 3. irGSEA documentation: https://github.com/GitHUBZJY/irGSEA

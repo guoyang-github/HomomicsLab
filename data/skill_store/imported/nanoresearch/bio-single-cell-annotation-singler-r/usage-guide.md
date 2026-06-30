@@ -20,6 +20,7 @@ SingleR annotates cells using correlation with curated reference datasets from c
 ## Quick Start
 
 ```r
+library(Seurat)
 library(SingleR)
 library(celldex)
 

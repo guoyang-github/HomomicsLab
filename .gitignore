@@ -26,6 +26,9 @@ frontend/dist/
 *.sqlite
 *.sqlite3
 
+# Runtime-generated memory graph (NetworkX backend default path)
+data/memory_graph.json
+
 # OS / Editors
 .DS_Store
 .idea/

@@ -10,35 +10,40 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List
 
-logger = logging.getLogger(__name__)
-
 from homomics_lab.agent.factory import create_default_agents
+from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.config import settings
 from homomics_lab.context.context_engine.engine import ContextEngine
+from homomics_lab.context.graph.factory import get_graph_backend
 from homomics_lab.context.memory_manager import MemoryManager
+from homomics_lab.context.vector_store.factory import get_vector_store
+from homomics_lab.embeddings.factory import get_embedding_provider
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import create_semantic_memory
 from homomics_lab.context.session_store import create_session_store_from_settings
-from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.database import Base, get_engine
+from homomics_lab.domain.hot_reload import DomainHotReloader, SkillHotReloader
 from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
-from homomics_lab.domain.hot_reload import DomainHotReloader, SkillHotReloader
-from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.knowledge.cbkb import CBKB
-from homomics_lab.skills.builtin import register_builtin_skills
-from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.llm.cache import get_llm_response_cache
-from homomics_lab.llm_client import LLMClient
-from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.llm.runtime_config import is_local_llm_provider, load_llm_runtime_config
+from homomics_lab.llm_client import LLMClient
+from homomics_lab.mcp.integration import register_mcp_skills, register_mcp_tools
+from homomics_lab.provenance.recorder import ProvenanceRecorder
+from homomics_lab.skills.builtin import register_builtin_skills
+from homomics_lab.knowledge.ingestion import KnowledgeIndex
+from homomics_lab.skills.capability_index import CapabilityIndex
+from homomics_lab.skills.loader import SkillLoader
+from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.skill_dag import SkillDAG
 from homomics_lab.skills.skill_store import SkillStore
 from homomics_lab.skills.tracker import SkillPerformanceTracker
 from homomics_lab.stability.schema_validator import SchemaValidator
-from homomics_lab.mcp.integration import register_mcp_skills, register_mcp_tools
 from homomics_lab.tools.builtin import register_all_builtin_tools
 from homomics_lab.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def _discover_external_skill_dirs() -> List[Path]:
@@ -344,10 +349,64 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
 
     semantic_memory = create_semantic_memory(settings)
 
+    # Shared embedding/vector/graph backends so that CapabilityIndex and
+    # KnowledgeIndex do not duplicate or double-close resources.
+    try:
+        shared_embedding_provider = get_embedding_provider(settings)
+    except Exception:
+        shared_embedding_provider = None
+    try:
+        shared_vector_store = get_vector_store(settings)
+    except Exception:
+        shared_vector_store = None
+    try:
+        shared_graph_backend = get_graph_backend(settings)
+    except Exception:
+        shared_graph_backend = None
+
+    # Unified capability index: embed and graph-link all skills, tools and SOPs
+    # so the planner and TurnRunner can retrieve them semantically.
+    capability_index = CapabilityIndex(
+        settings=settings,
+        embedding_provider=shared_embedding_provider,
+        vector_store=shared_vector_store,
+        graph_backend=shared_graph_backend,
+    )
+    try:
+        for skill in skill_executor.registry.list_all():
+            try:
+                await capability_index.index_skill(skill)
+            except Exception:
+                logger.warning("Failed to index skill %s", getattr(skill, "id", "?"), exc_info=True)
+        for tool in tool_registry.list_all():
+            try:
+                await capability_index.index_tool(tool)
+            except Exception:
+                logger.warning("Failed to index tool %s", getattr(tool, "name", "?"), exc_info=True)
+        for sop in cbkb.list_sops():
+            try:
+                await capability_index.index_sop(sop)
+            except Exception:
+                logger.warning("Failed to index SOP %s", getattr(sop, "id", "?"), exc_info=True)
+    except Exception:
+        logger.warning("Capability index population failed; continuing without it", exc_info=True)
+
     memory_manager = MemoryManager(
         session_store=session_store,
         semantic_memory=semantic_memory,
         cbkb=cbkb,
+    )
+
+    # Knowledge ingestion index: parses documents, extracts entities/relations,
+    # and loads them into the graph/vector/memory stores (cognee-style ECL).
+    knowledge_index = KnowledgeIndex(
+        settings=settings,
+        llm_client=llm_client,
+        graph_backend=shared_graph_backend,
+        vector_store=shared_vector_store,
+        memory_backend=semantic_memory,
+        capability_index=capability_index,
+        embedding_provider=shared_embedding_provider,
     )
 
     # Local/self-hosted LLMs are usually CPU-bound and much slower. Disable
@@ -384,9 +443,11 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "mcp_client": mcp_client,
         "llm_client": llm_client,
         "memory_manager": memory_manager,
+        "capability_index": capability_index,
         "cbkb": cbkb,
         "context_engine": context_engine,
         "project_state_manager": project_state_manager,
         "provenance_recorder": provenance_recorder,
         "llm_cache": llm_cache,
+        "knowledge_index": knowledge_index,
     }
