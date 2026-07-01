@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.agent.plan.strategies import StrategyLibrary
+from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
 from homomics_lab.config import settings
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.graph.factory import get_graph_backend
@@ -42,6 +43,7 @@ from homomics_lab.skills.tracker import SkillPerformanceTracker
 from homomics_lab.stability.schema_validator import SchemaValidator
 from homomics_lab.tools.builtin import register_all_builtin_tools
 from homomics_lab.tools.registry import ToolRegistry
+from homomics_lab.workflow.execution_service import WorkflowExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,12 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
     create_default_agents()
 
+    # Analysis templates: seed built-in scenario presets on first boot.
+    analysis_template_store = AnalysisTemplateStore(data_dir=settings.data_dir)
+    imported_count = analysis_template_store.import_builtin_templates()
+    if imported_count:
+        print(f"[bootstrap] imported {imported_count} built-in analysis templates")
+
     # Ensure ORM tables exist. Prefer Alembic migrations; fall back to create_all
     # for SQLite/dev/test environments where Alembic may not have been run yet.
     await _ensure_database_schema()
@@ -172,6 +180,14 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         tool_registry=tool_registry,
         llm_client=llm_client,
         provenance_recorder=provenance_recorder,
+    )
+
+    # Workflow execution service: routes Plans to local orchestrator or Nextflow.
+    workflow_execution_service = WorkflowExecutionService(
+        skill_registry=skill_executor.registry,
+        tool_registry=tool_registry,
+        llm_client=llm_client,
+        cbkb=cbkb,
     )
 
     print("[bootstrap] creating skill store...")
@@ -450,4 +466,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "provenance_recorder": provenance_recorder,
         "llm_cache": llm_cache,
         "knowledge_index": knowledge_index,
+        "analysis_template_store": analysis_template_store,
+        "workflow_execution_service": workflow_execution_service,
     }

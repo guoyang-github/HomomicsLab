@@ -183,8 +183,10 @@ class Settings(BaseSettings):
     skill_hot_reload_enabled: bool = True  # watch sibling skill repos and domain files at startup
     skill_sibling_discovery_enabled: bool = True  # auto-discover ../<domain>-Skills/skills
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
+    domain_strict_validation: bool = False  # if False, missing skills become warnings instead of failing the whole domain
     interactive_mode: bool = False  # require approval for high-risk tool calls
     force_sandbox: bool = True  # if True, shell_exec and CodeAct must run through a sandbox
+    code_act_hitl_risk_level: str = "high"  # "never" | "low" | "medium" | "high" | "critical"
     allow_pickle_serialization: bool = False  # if False, DataStore refuses pickle fallback
 
     # Auth / rate limiting (opt-in for local development)
@@ -313,6 +315,13 @@ class Settings(BaseSettings):
     # Job / worker settings
     default_job_timeout_seconds: float = 3600.0
     max_skill_timeout_seconds: float = 86400.0
+
+    # Workflow execution settings
+    workflow_nextflow_enabled: bool = True
+    workflow_nextflow_min_phases: int = 3
+    workflow_cache_enabled: bool = True
+    workflow_cache_dir: Optional[Path] = None
+    workflow_cache_content_hash_limit: int = 10 * 1024 * 1024  # 10 MB
 
     @model_validator(mode="after")
     def _validate_timeout_bounds(self):

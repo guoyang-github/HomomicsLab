@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { Plus, Trash2, Edit2, Check, X, MessageSquare, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
 import { useProjectStore } from '@/stores/projectStore'
+import { useAnalysisTemplateStore } from '@/stores/analysisTemplateStore'
 import { Button, Select, Modal, Input } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 
@@ -33,11 +34,22 @@ export function SessionList() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
   const [isCreating, setIsCreating] = useState(false)
+
+  const templates = useAnalysisTemplateStore((state) => state.templates)
+  const templatesLoading = useAnalysisTemplateStore((state) => state.loading)
+  const fetchTemplates = useAnalysisTemplateStore((state) => state.fetchTemplates)
 
   useEffect(() => {
     fetchProjects()
   }, [fetchProjects])
+
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      fetchTemplates()
+    }
+  }, [isCreateModalOpen, fetchTemplates])
 
   useEffect(() => {
     fetchSessions(currentProjectId)
@@ -95,11 +107,16 @@ export function SessionList() {
     const name = newProjectName.trim()
     if (!name) return
     setIsCreating(true)
-    const project = await createProject(name, newProjectDescription.trim())
+    const project = await createProject(
+      name,
+      newProjectDescription.trim(),
+      selectedTemplateId || undefined
+    )
     setIsCreating(false)
     if (project) {
       setNewProjectName('')
       setNewProjectDescription('')
+      setSelectedTemplateId('')
       setIsCreateModalOpen(false)
       setProjectId(project.id)
       clearMessages()
@@ -236,6 +253,7 @@ export function SessionList() {
         onClose={() => {
           setIsCreateModalOpen(false)
           clearProjectError()
+          setSelectedTemplateId('')
         }}
         title={t('sessionList.createProject')}
         description={t('sessionList.createProjectDesc')}
@@ -246,6 +264,7 @@ export function SessionList() {
               onClick={() => {
                 setIsCreateModalOpen(false)
                 clearProjectError()
+                setSelectedTemplateId('')
               }}
             >
               {t('common.cancel')}
@@ -268,6 +287,25 @@ export function SessionList() {
             value={newProjectDescription}
             onChange={(e) => setNewProjectDescription(e.target.value)}
           />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t('sessionList.analysisTemplate')}
+            </label>
+            <Select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              disabled={templatesLoading}
+              options={[
+                { value: '', label: t('sessionList.noTemplate') },
+                ...templates.map((t) => ({ value: t.template_id, label: t.name })),
+              ]}
+            />
+            {selectedTemplateId && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {templates.find((t) => t.template_id === selectedTemplateId)?.description}
+              </p>
+            )}
+          </div>
           {projectError && <p className="text-xs text-error">{projectError}</p>}
         </div>
       </Modal>

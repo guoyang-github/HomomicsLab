@@ -91,8 +91,6 @@ class TestSlurmScheduler:
             ),
         )
 
-        submitted = {"job_id": "12345"}
-
         async def fake_sbatch(*args, **kwargs):
             class Proc:
                 returncode = 0
@@ -280,9 +278,10 @@ class TestExecutionMonitoring:
         runner = NextflowRunner(working_dir=tmp_path)
         captured = {}
 
-        async def fake_run_project(nf_file, inputs, timeout_seconds, weblog_url=None):
+        async def fake_run_project(nf_file, inputs, timeout_seconds, weblog_url=None, resume=True):
             captured["nf_file"] = nf_file
             captured["inputs"] = inputs
+            captured["resume"] = resume
             return {"mock": True}
 
         monkeypatch.setattr(runner, "run_project", fake_run_project)
@@ -307,3 +306,20 @@ class TestExecutionMonitoring:
         assert "nf_file" in result
         assert captured["nf_file"] == Path(result["nf_file"])
         assert captured["inputs"] == {"input_file": "data.h5ad"}
+        assert captured.get("resume") is True
+
+
+    @pytest.mark.asyncio
+    async def test_local_scheduler_blocks_critical_code(self, tmp_path):
+        scheduler = LocalScheduler(working_dir=tmp_path)
+        skill = SkillDefinition(
+            id="test", name="Test", version="1.0", category="test",
+            runtime=SkillRuntime(type="python"),
+        )
+
+        result = await scheduler.execute(
+            skill, "import os; os.system('rm -rf /')", {}, timeout_seconds=30
+        )
+        assert result.get("status") == "error"
+        assert "safety_scan" in result
+        assert result["safety_scan"]["risk_level"] == "critical"

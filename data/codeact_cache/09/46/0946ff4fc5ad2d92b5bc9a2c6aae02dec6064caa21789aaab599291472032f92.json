@@ -1,0 +1,6 @@
+{
+  "key": "0946ff4fc5ad2d92b5bc9a2c6aae02dec6064caa21789aaab599291472032f92",
+  "task": "list files",
+  "language": "bash",
+  "code": "echo \"Executing shell task: list files\"\nls -la /tmp\nresult={\"status\": \"ok\"}\n"
+}

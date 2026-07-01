@@ -198,7 +198,83 @@ class CBKB:
                 );
                 CREATE INDEX IF NOT EXISTS idx_sel_from ON skill_evolution_log(from_skill);
                 CREATE INDEX IF NOT EXISTS idx_sel_to ON skill_evolution_log(to_skill);
+
+                CREATE TABLE IF NOT EXISTS plan_outcomes (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT,
+                    strategy_name TEXT NOT NULL,
+                    template_id TEXT,
+                    success INTEGER NOT NULL,
+                    duration_seconds REAL,
+                    error_message TEXT,
+                    artifact_count INTEGER,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_po_strategy ON plan_outcomes(strategy_name);
+                CREATE INDEX IF NOT EXISTS idx_po_template ON plan_outcomes(template_id);
+                CREATE INDEX IF NOT EXISTS idx_po_created ON plan_outcomes(created_at);
             """)
+
+    # ── Plan outcome feedback ───────────────────────
+
+    def record_plan_outcome(
+        self,
+        plan_id: Optional[str],
+        strategy_name: str,
+        success: bool,
+        template_id: Optional[str] = None,
+        duration_seconds: Optional[float] = None,
+        error_message: Optional[str] = None,
+        artifact_count: Optional[int] = None,
+    ) -> None:
+        """Record the result of executing a plan for strategy success-rate tracking."""
+        import uuid
+        from datetime import datetime, timezone
+
+        with sqlite3.connect(str(self.db_path)) as conn:
+            conn.execute(
+                """
+                INSERT INTO plan_outcomes
+                (id, plan_id, strategy_name, template_id, success, duration_seconds,
+                 error_message, artifact_count, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    plan_id,
+                    strategy_name,
+                    template_id,
+                    1 if success else 0,
+                    duration_seconds,
+                    error_message,
+                    artifact_count,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+
+    def get_strategy_success_rate(
+        self,
+        strategy_name: str,
+        template_id: Optional[str] = None,
+        window: int = 100,
+    ) -> float:
+        """Return the recent success rate for a strategy/template, or -1 if no data."""
+        with sqlite3.connect(str(self.db_path)) as conn:
+            sql = """
+                SELECT SUM(success), COUNT(*)
+                FROM (
+                    SELECT success
+                    FROM plan_outcomes
+                    WHERE strategy_name = ?
+                    AND (? IS NULL OR template_id = ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                )
+            """
+            row = conn.execute(sql, (strategy_name, template_id, template_id, window)).fetchone()
+        if row is None or row[1] == 0:
+            return -1.0
+        return row[0] / row[1]
 
     # ── Layer 1: Experiment Graph ───────────────────
 

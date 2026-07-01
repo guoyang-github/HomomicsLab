@@ -1,0 +1,6 @@
+{
+  "key": "cc304c419950a61598dbf45005238c533c13c9b7533f7f17e6f19b1919ce454b",
+  "task": "summarize context",
+  "language": "python",
+  "code": "print(\"Executing generic task: summarize context\")\nprint(\"Context:\", {'x': 1})\nresult = {\"task\": \"summarize context\"}\n"
+}

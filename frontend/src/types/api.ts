@@ -5,8 +5,25 @@ export interface Project {
   id: string
   name: string
   description: string
+  template_id?: string
   created_at: string
   updated_at: string
+}
+
+export interface AnalysisTemplate {
+  template_id: string
+  name: string
+  description: string
+  domain: string
+  applicable_intents: string[]
+  tags: string[]
+  phase_defaults: Record<string, Record<string, unknown>>
+  preferred_skills: Record<string, string>
+  default_parameters: Record<string, unknown>
+  sop_ids: string[]
+  data_sources: Record<string, unknown>[]
+  icon?: string
+  version: string
 }
 
 export interface SendMessageRequest {

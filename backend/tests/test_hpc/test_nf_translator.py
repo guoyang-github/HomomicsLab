@@ -1,5 +1,7 @@
 """Tests for PlanResult -> Nextflow DSL2 translation."""
 
+import json
+
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.hpc.nf_translator import SimpleNFTranslator
 from homomics_lab.skills.models import SkillDefinition, SkillResources, SkillRuntime
@@ -54,3 +56,61 @@ class TestSimpleNFTranslator:
         nf_file = translator.translate(plan, inputs={})
         script = nf_file.read_text()
         assert "process qc" in script
+
+
+    def test_emits_real_python_process_from_skill_entrypoint(self, tmp_path):
+        """A phase with a selected skill that has scripts/run.py gets a real process."""
+        skill_dir = tmp_path / "skills" / "scanpy_qc"
+        scripts_dir = skill_dir / "scripts"
+        scripts_dir.mkdir(parents=True)
+        (scripts_dir / "run.py").write_text(
+            "def main(inputs):\n"
+            "    return {'passed': inputs.get('min_genes', 200)}\n",
+            encoding="utf-8",
+        )
+
+        skill = SkillDefinition(
+            id="scanpy_qc",
+            name="QC",
+            version="1.0",
+            category="single-cell",
+            author="test",
+            description="QC skill",
+            runtime=SkillRuntime(
+                type="python",
+                resources=SkillResources(memory="1GB", cpu=1, time="5m"),
+            ),
+            metadata={"source_dir": str(skill_dir)},
+        )
+
+        plan = PlanResult(
+            phases=[Phase(phase_type="qc", required=True, selected_skill=skill, parameters={"min_genes": 500})],
+            strategy_name="single_cell",
+            data_state=DataState(),
+        )
+
+        translator = SimpleNFTranslator(working_dir=tmp_path)
+        nf_file = translator.translate(plan, inputs={"input_file": "data.h5ad"})
+        script = nf_file.read_text()
+
+        assert "process scanpy_qc" in script
+        assert "memory '1GB'" in script
+        assert "cpus 1" in script
+        assert "container \"python:3.10-slim\"" in script
+        assert "python script.py" in script
+
+        # Staged script and inputs files are referenced in the workflow.
+        assert "Channel.value(file('phase_0_qc/script.py'))" in script
+        assert "Channel.value(file('phase_0_qc/inputs.json'))" in script
+
+        # Verify generated helper files exist.
+        phase_dir = tmp_path / "phase_0_qc"
+        assert (phase_dir / "script.py").exists()
+        assert (phase_dir / "inputs.json").exists()
+        inputs = json.loads((phase_dir / "inputs.json").read_text())
+        assert inputs["min_genes"] == 500
+        assert inputs["input_file"] == "data.h5ad"
+
+        wrapper = (phase_dir / "script.py").read_text()
+        assert "__inputs__ = json.load" in wrapper
+        assert "result = main(__inputs__)" in wrapper

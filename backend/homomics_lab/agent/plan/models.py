@@ -33,6 +33,7 @@ class DataState:
     has_qc: bool = False
     low_quality: bool = False
     n_samples: Optional[int] = None
+    data_type: Optional[str] = None  # e.g. "10x", "smart-seq2", "bulk-rnaseq"
 
     # ── Legacy single-cell fields (for backward compatibility) ──
     # These will be deprecated in favor of domain_state["single_cell"]
@@ -189,6 +190,7 @@ class Phase:
     description: str = ""
     selected_skill: Optional[SkillDefinition] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
+    candidate_skills: List[str] = field(default_factory=list)
     parameter_recommendations: Dict[str, str] = field(default_factory=dict)
     parameter_sources: Dict[str, str] = field(default_factory=dict)
     agent_code: Optional[str] = None  # Agent-generated bridging code

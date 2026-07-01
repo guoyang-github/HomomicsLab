@@ -1,0 +1,57 @@
+{
+  "template_id": "wgs_somatic_variant_v1",
+  "name": "WGS Somatic Variant Calling",
+  "description": "Tumor-normal whole genome somatic variant calling pipeline: alignment, BQSR, mutation calling (SNV/Indel), annotation and filtering.",
+  "domain": "variant_calling",
+  "applicable_intents": [
+    "call somatic variants",
+    "tumor normal variant calling",
+    "WGS mutation analysis",
+    "somatic SNV indel calling"
+  ],
+  "tags": ["WGS", "somatic", "variant calling", "tumor-normal"],
+  "phase_defaults": {
+    "align": {
+      "aligner": "bwa-mem2",
+      "mark_duplicates": true,
+      "sort": true
+    },
+    "recalibrate": {
+      "bqsr": true,
+      "known_sites": ["dbsnp", "mills", "1000G"]
+    },
+    "call_variants": {
+      "caller": "mutect2",
+      "pon": "somatic-hg38",
+      "germline_resource": "af-only-gnomad"
+    },
+    "filter": {
+      "min_depth": 100,
+      "min_vaf": 0.05,
+      "pass_only": true
+    },
+    "annotate": {
+      "annotator": "vep",
+      "cache": "homo_sapiens",
+      "cache_version": 110
+    }
+  },
+  "preferred_skills": {
+    "align": "wgs-align",
+    "recalibrate": "wgs-bqsr",
+    "call_variants": "somatic-variant-call",
+    "filter": "variant-filter",
+    "annotate": "variant-annotate"
+  },
+  "default_parameters": {
+    "organism": "human",
+    "reference": "GRCh38",
+    "sequencing": "WGS",
+    "sample_type": "tumor-normal-pair",
+    "output_formats": ["vcf", "maf", "tsv"]
+  },
+  "sop_ids": [],
+  "data_sources": [],
+  "icon": "dna",
+  "version": "1.0.0"
+}

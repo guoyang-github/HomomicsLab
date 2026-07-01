@@ -12,7 +12,7 @@ process qc {
         path 'result.json'
     script:
     """
-    echo 'Running phase: qc'
+    echo 'Placeholder process for phase: qc'
     python << 'PYEOF'
     import json
     result = {'phase': 'qc', 'status': 'ok'}

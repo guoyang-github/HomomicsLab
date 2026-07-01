@@ -38,6 +38,7 @@ from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.config import settings
+from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.context_engine.models import ContextBundle
@@ -169,6 +170,8 @@ class TurnRunner:
         approval_store=None,
         capability_index: Optional[CapabilityIndex] = None,
         memory_backend: Optional[MemoryBackend] = None,
+        analysis_template_store: Optional[Any] = None,
+        workflow_execution_service: Optional[WorkflowExecutionService] = None,
     ):
         self._cbkb = cbkb
         self._llm_client = llm_client
@@ -191,6 +194,7 @@ class TurnRunner:
         self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
         self.context_engine = context_engine
         self.project_state_manager = project_state_manager
+        self._workflow_execution_service = workflow_execution_service
         self._extra_context: Dict[str, Any] = {}
         self._context_bundle: Optional[ContextBundle] = None
 
@@ -208,6 +212,7 @@ class TurnRunner:
         self.task_decomposer = task_decomposer or TaskDecomposer(
             cbkb=self._cbkb,
             capability_index=self.capability_index,
+            analysis_template_store=analysis_template_store,
         )
 
     def _get_orchestrator(self) -> Orchestrator:
@@ -251,6 +256,19 @@ class TurnRunner:
             )
         return self._orchestrator
 
+    def _get_workflow_execution_service(self) -> Optional[WorkflowExecutionService]:
+        """Lazy init the workflow execution service."""
+        if self._workflow_execution_service is None:
+            cbkb = getattr(self, "_cbkb", None)
+            self._workflow_execution_service = WorkflowExecutionService(
+                skill_registry=getattr(self, "registry", None),
+                tool_registry=self._tool_registry,
+                llm_client=self._llm_client,
+                progress_callback=self._progress_callback,
+                cbkb=cbkb,
+            )
+        return self._workflow_execution_service
+
     async def execute_tree(
         self,
         tree: TaskTree,
@@ -258,20 +276,31 @@ class TurnRunner:
         project_id: str,
         trace_id: Optional[str] = None,
         session_id: str = "",
+        plan_id: Optional[str] = None,
     ) -> TurnResult:
         """Execute a pre-built task tree.
 
         This is used by the background worker after a job has been enqueued.
-        It skips intent analysis and decomposition.
+        It skips intent analysis and decomposition. When ``plan_id`` is provided
+        and the workflow execution service decides a Nextflow backend is
+        appropriate, the whole plan is executed as a Nextflow workflow.
         """
         self._trace_id = trace_id
+
+        plan: Optional[Plan] = None
+        if plan_id is not None:
+            plan = await PlanStore().get(plan_id)
+            if plan is not None:
+                tree = plan.task_tree
 
         if self._is_fallback_suggestion(tree):
             turn_result = self._build_fallback_result(tree, working_memory)
         elif len(tree.tasks) == 1:
             turn_result = await self._handle_single_step(tree, working_memory, project_id)
         else:
-            turn_result = await self._handle_workflow(tree, working_memory, project_id)
+            turn_result = await self._handle_workflow(
+                tree, working_memory, project_id, plan=plan
+            )
 
         # Persist turn to long-term memory (best-effort)
         if self.memory_manager is not None:
@@ -1332,7 +1361,12 @@ class TurnRunner:
             )
 
         return await self._handle_workflow(
-            tree, working_memory, project_id, intent=intent, user_message=user_message
+            tree,
+            working_memory,
+            project_id,
+            intent=intent,
+            user_message=user_message,
+            plan=plan,
         )
 
     @staticmethod
@@ -1696,6 +1730,81 @@ class TurnRunner:
             attachments=plot_messages,
         )
 
+    def _build_workflow_result(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+        backend: str,
+        artifacts: Optional[List[Any]] = None,
+        error: Optional[str] = None,
+    ) -> TurnResult:
+        """Build a TurnResult from a WorkflowResult."""
+        artifacts = artifacts or []
+        if error:
+            response_text = f"工作流执行失败（{backend}）：{error}"
+        else:
+            response_text = f"已完成 {len(tree.tasks)} 个分析步骤（执行后端：{backend}）。"
+
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TODO_LIST,
+            content={
+                "text": response_text,
+                "tasks": [t.model_dump() for t in tree.tasks],
+                "progress": self._tree_progress(tree),
+                "backend": backend,
+                "artifacts": [
+                    {
+                        "path": a.path,
+                        "type": a.artifact_type,
+                        "task_id": a.task_id,
+                    }
+                    for a in artifacts
+                ],
+            },
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.WORKFLOW,
+            response_text=response_text,
+            task_tree=tree,
+            progress=self._tree_progress(tree),
+            agent_message=agent_msg,
+            error=error,
+        )
+
+    @staticmethod
+    def _tree_progress(tree: TaskTree) -> Dict[str, Any]:
+        """Compute a simple progress summary from a TaskTree."""
+        total = len(tree.tasks)
+        if total == 0:
+            return {
+                "total": 0,
+                "pending": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0,
+                "awaiting_human": 0,
+                "percent": 0,
+            }
+
+        counts = {
+            "pending": 0,
+            "running": 0,
+            "completed": 0,
+            "failed": 0,
+            "awaiting_human": 0,
+        }
+        for task in tree.tasks:
+            status = task.status.value if hasattr(task.status, "value") else str(task.status)
+            if status in counts:
+                counts[status] += 1
+        counts["total"] = total
+        counts["percent"] = int((counts["completed"] / total) * 100)
+        return counts
+
     async def _handle_workflow(
         self,
         tree: TaskTree,
@@ -1703,11 +1812,42 @@ class TurnRunner:
         project_id: str,
         intent: Optional[UserIntent] = None,
         user_message: Optional[str] = None,
+        plan: Optional[Plan] = None,
     ) -> TurnResult:
         """Handle complex multi-step workflows."""
         # Handle non-executable fallback suggestions directly.
         if self._is_fallback_suggestion(tree):
             return self._build_fallback_result(tree, working_memory)
+
+        # Multi-step workflows may be offloaded to Nextflow when appropriate.
+        if plan is not None and len(tree.tasks) > 1:
+            service = self._get_workflow_execution_service()
+            if service is not None:
+                try:
+                    context = await self._build_orchestrator_context(
+                        project_id,
+                        intent=intent,
+                        user_message=user_message,
+                        working_memory=working_memory,
+                    )
+                    wf_result = await service.execute(
+                        plan=plan,
+                        project_id=project_id,
+                        context=context,
+                    )
+                    return self._build_workflow_result(
+                        tree=wf_result.task_tree,
+                        working_memory=working_memory,
+                        backend=wf_result.backend,
+                        artifacts=wf_result.artifacts,
+                        error=wf_result.error_message,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "WorkflowExecutionService failed; falling back to local orchestrator: %s",
+                        exc,
+                        exc_info=True,
+                    )
 
         orchestrator = self._get_orchestrator()
         context = await self._build_orchestrator_context(

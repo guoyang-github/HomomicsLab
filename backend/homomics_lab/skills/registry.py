@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.skills.models import SkillDefinition
-from homomics_lab.skills.semantic_search import SkillSemanticSearch
 from homomics_lab.config import settings
 
 
@@ -18,7 +17,11 @@ class SkillRegistry:
             from homomics_lab.skills.semantic_search_v2 import SemanticSearchEngine
 
             return SemanticSearchEngine(model_name=settings.semantic_search_model)
-        return SkillSemanticSearch()
+
+        # Default: hybrid dense + sparse retrieval.
+        from homomics_lab.skills.semantic_search_hybrid import HybridSkillSearch
+
+        return HybridSkillSearch()
 
     def register(self, skill: SkillDefinition) -> None:
         self._skills[skill.id] = skill

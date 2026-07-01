@@ -46,6 +46,7 @@ class SemanticSearchEngine:
             skill.description,
             skill.category.replace("-", " ").replace("_", " "),
         ]
+        parts.extend(skill.metadata.get("tags", []))
         parts.extend(skill.metadata.get("keywords", []))
         parts.extend(skill.metadata.get("supported_tools", []))
         parts.append(skill.metadata.get("primary_tool", ""))

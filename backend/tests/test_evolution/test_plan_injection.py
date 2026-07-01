@@ -4,7 +4,8 @@ import pytest
 
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
-from homomics_lab.agent.plan.models import DataState
+from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.knowledge.cbkb import CBKB, ParameterLoreEntry
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
@@ -42,7 +43,20 @@ def plan_engine_with_cbkb(tmp_path):
                 created_at="2026-01-01T00:00:00+00:00",
             )
         )
-    engine = PlanEngine(skill_registry=reg, cbkb=cbkb)
+    strategy_lib = StrategyLibrary()
+    strategy_lib.register(
+        AnalysisStrategy(
+            name="single_cell_standard",
+            description="Standard single-cell analysis",
+            applicable_intents=["single_cell_analysis"],
+            skeleton=[
+                Phase(phase_type="qc", required=True, description="Quality control filtering single-cell RNA-seq scanpy_qc"),
+                Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy"),
+            ],
+            state_checks=[],
+        )
+    )
+    engine = PlanEngine(skill_registry=reg, cbkb=cbkb, strategy_library=strategy_lib)
     return engine, cbkb
 
 

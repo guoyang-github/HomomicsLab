@@ -46,13 +46,13 @@ def domain_decomposer(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_decompose_single_cell_pipeline(decomposer):
+async def test_decompose_single_cell_pipeline(domain_decomposer):
     intent = UserIntent(
         analysis_type="single_cell_analysis",
         complexity="complex",
     )
 
-    tree = await decomposer.decompose(intent, context={"sample_count": 1})
+    tree = await domain_decomposer.decompose(intent, context={"sample_count": 1})
 
     task_names = [t.name for t in tree.tasks]
     assert "qc" in task_names
@@ -75,13 +75,13 @@ async def test_decompose_file_conversion(decomposer):
 
 
 @pytest.mark.asyncio
-async def test_task_dependencies(decomposer):
+async def test_task_dependencies(domain_decomposer):
     intent = UserIntent(
         analysis_type="single_cell_analysis",
         complexity="complex",
     )
 
-    tree = await decomposer.decompose(intent, context={})
+    tree = await domain_decomposer.decompose(intent, context={})
 
     # Clustering should depend on dim_reduction
     cluster_task = next(t for t in tree.tasks if t.name == "clustering")
@@ -90,7 +90,7 @@ async def test_task_dependencies(decomposer):
 
 
 @pytest.mark.asyncio
-async def test_decompose_sub_intents(decomposer):
+async def test_decompose_sub_intents(domain_decomposer):
     intent = UserIntent(
         analysis_type="single_cell_analysis",
         complexity="complex",
@@ -100,7 +100,7 @@ async def test_decompose_sub_intents(decomposer):
         ],
     )
 
-    tree = await decomposer.decompose(intent, context={})
+    tree = await domain_decomposer.decompose(intent, context={})
     task_names = [t.name for t in tree.tasks]
     assert "qc" in task_names
     assert "clustering" in task_names

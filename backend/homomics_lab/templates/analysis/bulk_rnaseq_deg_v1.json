@@ -1,0 +1,56 @@
+{
+  "template_id": "bulk_rnaseq_deg_v1",
+  "name": "Bulk RNA-seq Differential Expression",
+  "description": "Standard bulk RNA-seq workflow: quantification, normalization, QC, differential expression and functional enrichment.",
+  "domain": "bulk_rnaseq",
+  "applicable_intents": [
+    "run bulk RNA-seq analysis",
+    "find differentially expressed genes",
+    "differential expression",
+    "RNA-seq DE analysis"
+  ],
+  "tags": ["bulk RNA-seq", "differential expression", "DESeq2", "edgeR"],
+  "phase_defaults": {
+    "quantify": {
+      "aligner": "star",
+      "quantifier": "salmon",
+      "feature_level": "gene"
+    },
+    "qc": {
+      "fastqc": true,
+      "multiqc": true,
+      "min_q30": 80
+    },
+    "normalize": {
+      "method": "deseq2_median_of_ratios"
+    },
+    "de": {
+      "method": "deseq2",
+      "padj_threshold": 0.05,
+      "log2fc_threshold": 1.0,
+      "contrast_variable": "condition"
+    },
+    "enrich": {
+      "databases": ["GO", "KEGG", "Reactome"],
+      "top_n_genes": 500
+    }
+  },
+  "preferred_skills": {
+    "quantify": "rnaseq-quantify",
+    "qc": "rnaseq-qc",
+    "normalize": "rnaseq-normalize",
+    "de": "rnaseq-de",
+    "enrich": "pathway-enrichment"
+  },
+  "default_parameters": {
+    "organism": "human",
+    "annotation": "gencode_v44",
+    "strandness": "auto",
+    "paired_end": true,
+    "output_formats": ["count_matrix", "csv", "pdf"]
+  },
+  "sop_ids": [],
+  "data_sources": [],
+  "icon": "bar-chart",
+  "version": "1.0.0"
+}

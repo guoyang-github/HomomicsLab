@@ -2,52 +2,84 @@
 
 import pytest
 
-from homomics_lab.agent.plan.models import DataState
-from homomics_lab.agent.plan.strategies import (
-    SINGLE_CELL_STANDARD,
-    StrategyLibrary,
-)
+from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
+
+
+@pytest.fixture
+def single_cell_strategy():
+    return AnalysisStrategy(
+        name="single_cell_standard",
+        description="Standard single-cell RNA-seq analysis pipeline",
+        applicable_intents=["single_cell_analysis"],
+        skeleton=[
+            Phase(phase_type="qc", required=True),
+            Phase(phase_type="normalization", required=True),
+            Phase(phase_type="dim_reduction", required=True),
+            Phase(phase_type="clustering", required=True),
+        ],
+        state_checks=[],
+    )
+
+
+@pytest.fixture
+def spatial_strategy():
+    return AnalysisStrategy(
+        name="spatial_transcriptomics",
+        description="Spatial transcriptomics analysis pipeline",
+        applicable_intents=["spatial_analysis"],
+        skeleton=[
+            Phase(phase_type="spatial_qc", required=True),
+            Phase(phase_type="spatial_preprocessing", required=True),
+            Phase(phase_type="spatial_clustering", required=True),
+        ],
+        state_checks=[],
+    )
+
+
+@pytest.fixture
+def populated_library(single_cell_strategy, spatial_strategy):
+    lib = StrategyLibrary()
+    lib.register(single_cell_strategy)
+    lib.register(spatial_strategy)
+    return lib
 
 
 class TestStrategyScoring:
-    def test_applicable_intent_base_score(self):
+    def test_applicable_intent_base_score(self, single_cell_strategy):
         data_state = DataState()
-        score = SINGLE_CELL_STANDARD.score("single_cell_analysis", data_state)
+        score = single_cell_strategy.score("single_cell_analysis", data_state)
         assert score >= 1.0
 
-    def test_keyword_boost(self):
+    def test_keyword_boost(self, single_cell_strategy):
         data_state = DataState()
         # The intent tokens overlap with the strategy corpus (cell, analysis, ...).
-        score = SINGLE_CELL_STANDARD.score("single_cell_analysis", data_state)
+        score = single_cell_strategy.score("single_cell_analysis", data_state)
         assert score > 1.0
 
-    def test_data_state_phase_match_boost(self):
+    def test_data_state_phase_match_boost(self, single_cell_strategy):
         data_state = DataState()
         data_state.set("qc", True)
-        score = SINGLE_CELL_STANDARD.score("single_cell_analysis", data_state)
+        score = single_cell_strategy.score("single_cell_analysis", data_state)
         assert score > 1.0
 
-    def test_non_applicable_intent_low_score(self):
+    def test_non_applicable_intent_low_score(self, single_cell_strategy):
         data_state = DataState()
-        score = SINGLE_CELL_STANDARD.score("unknown_type", data_state)
+        score = single_cell_strategy.score("unknown_type", data_state)
         assert score < 1.0
 
 
 class TestStrategyLibrarySelection:
-    def test_legacy_select_returns_single_strategy(self):
-        lib = StrategyLibrary()
-        strategy = lib.select("single_cell_analysis")
-        # Domain strategies may override the hard-coded default; accept either.
+    def test_legacy_select_returns_single_strategy(self, populated_library):
+        strategy = populated_library.select("single_cell_analysis")
         assert "single_cell" in strategy.name
 
-    def test_select_with_data_state_returns_single_strategy(self):
-        lib = StrategyLibrary()
-        strategy = lib.select("spatial_analysis", data_state=DataState())
+    def test_select_with_data_state_returns_single_strategy(self, populated_library):
+        strategy = populated_library.select("spatial_analysis", data_state=DataState())
         assert "spatial" in strategy.name
 
-    def test_select_top_k_returns_ranked_tuples(self):
-        lib = StrategyLibrary()
-        ranked = lib.select_top_k("single_cell_analysis", DataState(), top_k=3)
+    def test_select_top_k_returns_ranked_tuples(self, populated_library):
+        ranked = populated_library.select_top_k("single_cell_analysis", DataState(), top_k=3)
         assert len(ranked) <= 3
         assert all(isinstance(item, tuple) and len(item) == 2 for item in ranked)
         assert "single_cell" in ranked[0][0].name
@@ -60,21 +92,19 @@ class TestStrategyLibrarySelection:
         ranked = lib.select_top_k("unknown_type", DataState(), top_k=3)
         assert ranked[0][0].name == "generic"
 
-    def test_select_with_top_k_one_returns_strategy(self):
-        lib = StrategyLibrary()
-        result = lib.select("single_cell_analysis", data_state=DataState(), top_k=1)
+    def test_select_with_top_k_one_returns_strategy(self, populated_library):
+        result = populated_library.select("single_cell_analysis", data_state=DataState(), top_k=1)
         assert "single_cell" in result.name
 
-    def test_select_with_top_k_greater_than_one_returns_list(self):
-        lib = StrategyLibrary()
-        result = lib.select("single_cell_analysis", data_state=DataState(), top_k=2)
+    def test_select_with_top_k_greater_than_one_returns_list(self, populated_library):
+        result = populated_library.select("single_cell_analysis", data_state=DataState(), top_k=2)
         assert isinstance(result, list)
         assert len(result) == 2
 
 
 class TestPlanEngineBeamSearch:
     @pytest.mark.asyncio
-    async def test_top_k_beam_selects_single_cell(self):
+    async def test_top_k_beam_selects_single_cell(self, populated_library):
         from homomics_lab.agent.intent_analyzer import UserIntent
         from homomics_lab.agent.plan.engine import PlanEngine
         from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
@@ -102,7 +132,7 @@ class TestPlanEngineBeamSearch:
             )
         )
 
-        engine = PlanEngine(skill_registry=reg)
+        engine = PlanEngine(skill_registry=reg, strategy_library=populated_library)
         intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
         plan = await engine.plan(intent, DataState(), top_k=2)
 

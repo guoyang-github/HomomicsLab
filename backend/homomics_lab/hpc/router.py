@@ -1,6 +1,7 @@
 """Execution backend routing logic."""
 
 from homomics_lab.agent.plan.models import DataState, PlanResult
+from homomics_lab.config import settings
 from homomics_lab.hpc.scheduler import NextflowRunner, SlurmScheduler
 
 
@@ -30,7 +31,8 @@ def select_execution_backend(
     # Use cells as a proxy for samples when only cell count is available.
     effective_samples = max(n_samples, n_cells)
 
-    if n_phases > 5 or effective_samples > 100:
+    min_phases = getattr(settings, "workflow_nextflow_min_phases", 5)
+    if n_phases >= min_phases or effective_samples > 100:
         if NextflowRunner.is_available():
             return "nextflow"
         if SlurmScheduler.is_available() and prefer_slurm:

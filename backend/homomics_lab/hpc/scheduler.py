@@ -209,6 +209,30 @@ class LocalScheduler(BaseScheduler):
         sandbox = self._get_sandbox(exec_type)
         sandbox_metadata = sandbox.get_metadata()
 
+        # Static safety scan for Python/R code.
+        from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
+
+        scanner = CodeSafetyScanner()
+        safety_result = scanner.scan(code, language=exec_type)
+        hitl_required = (
+            settings.interactive_mode
+            and requires_hitl(safety_result, min_risk_level=settings.code_act_hitl_risk_level)
+        )
+        if safety_result.risk_level == "critical":
+            return {
+                "status": "error",
+                "error": f"Critical safety findings: {safety_result.findings}",
+                "safety_scan": safety_result.to_dict(),
+                "_sandbox_metadata": sandbox_metadata,
+            }
+        if hitl_required:
+            return {
+                "status": "awaiting_human",
+                "error": "High-risk code requires human approval",
+                "safety_scan": safety_result.to_dict(),
+                "_sandbox_metadata": sandbox_metadata,
+            }
+
         self._report_progress(
             ExecutionState(
                 job_id=job_id,
@@ -819,6 +843,7 @@ Rscript script.R"""
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         job_id = self._new_job_id(f"nf_{skill.id}")
         started_at = datetime.now(timezone.utc)
@@ -832,6 +857,8 @@ Rscript script.R"""
             "nextflow", "run", str(nf_file),
             "-work-dir", str(self.working_dir / "work"),
         ]
+        if resume:
+            cmd.append("-resume")
         if self.config_file:
             cmd.extend(["-c", str(self.config_file)])
 
@@ -864,6 +891,7 @@ Rscript script.R"""
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         weblog_url: Optional[str] = None,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Run a pre-generated Nextflow project/script.
 
@@ -872,6 +900,7 @@ Rscript script.R"""
             inputs: Input parameters passed via -params-file.
             timeout_seconds: Maximum runtime.
             weblog_url: Optional URL to receive Nextflow weblog events.
+            resume: If True, pass ``-resume`` to reuse cached task results.
 
         Returns:
             Execution result dict.
@@ -886,6 +915,8 @@ Rscript script.R"""
             "-work-dir",
             str(self.working_dir / "work"),
         ]
+        if resume:
+            cmd.append("-resume")
         if self.config_file:
             cmd.extend(["-c", str(self.config_file)])
 
@@ -1060,6 +1091,7 @@ Rscript script.R"""
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         weblog_url: Optional[str] = None,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Translate a PlanResult into a Nextflow project and run it.
 
@@ -1068,6 +1100,7 @@ Rscript script.R"""
             inputs: Top-level inputs for the workflow.
             timeout_seconds: Maximum runtime.
             weblog_url: Optional URL for Nextflow weblog events.
+            resume: If True, pass ``-resume`` to reuse cached task results.
 
         Returns:
             Execution result dict including the generated ``main.nf`` path.
@@ -1081,6 +1114,7 @@ Rscript script.R"""
             inputs,
             timeout_seconds=timeout_seconds,
             weblog_url=weblog_url or self.weblog_url,
+            resume=resume,
         )
         result["nf_file"] = str(nf_file)
         return result
@@ -1093,6 +1127,7 @@ Rscript script.R"""
         weblog_url: Optional[str] = None,
         profiles: Optional[List[str]] = None,
         project_id: Optional[str] = None,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Run a full Nextflow pipeline directory (e.g. nf-core pipeline).
 
@@ -1113,6 +1148,8 @@ Rscript script.R"""
             "-work-dir",
             str(self.working_dir / "work"),
         ]
+        if resume:
+            cmd.append("-resume")
         if self.config_file:
             cmd.extend(["-c", str(self.config_file)])
         if profiles:
@@ -1186,6 +1223,7 @@ Rscript script.R"""
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         weblog_url: Optional[str] = None,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Run a curated Nextflow template with user inputs.
 
@@ -1194,6 +1232,7 @@ Rscript script.R"""
             inputs: Top-level inputs for the workflow (becomes params).
             timeout_seconds: Maximum runtime.
             weblog_url: Optional URL for Nextflow weblog events.
+            resume: If True, pass ``-resume`` to reuse cached task results.
 
         Returns:
             Execution result dict.
@@ -1213,6 +1252,7 @@ Rscript script.R"""
             inputs,
             timeout_seconds=timeout_seconds,
             weblog_url=weblog_url or self.weblog_url,
+            resume=resume,
         )
         result["nf_file"] = str(nf_file)
         result["template"] = str(template_path)

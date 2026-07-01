@@ -1,10 +1,13 @@
 """DomainLoader: reads a domain.yaml and registers everything into HomomicsLab."""
 
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
 
+from homomics_lab.config import settings
 from homomics_lab.domain.models import (
     DomainDefinition,
     DomainStateCheck,
@@ -16,10 +19,21 @@ from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 
 
+logger = logging.getLogger(__name__)
+
+
 class DomainLoaderError(Exception):
     """Raised when domain.yaml is invalid or registration fails."""
 
     pass
+
+
+@dataclass
+class DomainValidationIssue:
+    """A single validation issue with an associated severity."""
+
+    severity: str  # "error" or "warning"
+    message: str
 
 
 class DomainValidator:
@@ -29,20 +43,31 @@ class DomainValidator:
         self.skill_registry = skill_registry
         self.strategy_lib = strategy_lib
 
-    def validate(self, domain: DomainDefinition) -> List[str]:
-        """Return a list of validation errors (empty if valid)."""
-        errors = []
+    def validate(self, domain: DomainDefinition) -> List[DomainValidationIssue]:
+        """Return a list of validation issues with severities."""
+        issues: List[DomainValidationIssue] = []
+        phase_ids = {p.id for p in domain.phases}
+        all_skill_ids = {s.id for s in self.skill_registry.list_all()}
 
-        # 1. Check that phases reference valid skills
+        # 1. Check that phases reference valid skills (soft in lenient mode)
         for phase in domain.phases:
             for skill_id in phase.skills:
-                if self.skill_registry.get(skill_id) is None:
-                    errors.append(
-                        f"Phase '{phase.id}' references unknown skill '{skill_id}'"
+                if skill_id not in all_skill_ids:
+                    issues.append(
+                        DomainValidationIssue(
+                            "warning",
+                            f"Phase '{phase.id}' references unknown skill '{skill_id}'",
+                        )
                     )
+            if phase.default_skill is not None and phase.default_skill not in all_skill_ids:
+                issues.append(
+                    DomainValidationIssue(
+                        "warning",
+                        f"Phase '{phase.id}' default_skill '{phase.default_skill}' not found",
+                    )
+                )
 
         # 2. Check that state_check targets exist in phases
-        phase_ids = {p.id for p in domain.phases}
         for check in domain.state_checks:
             # insert actions create a new phase dynamically, so the target does
             # not need to exist in the static skeleton. skip/modify_param still
@@ -52,55 +77,94 @@ class DomainValidator:
                 and check.action != "insert"
                 and check.action != "modify_param"
             ):
-                errors.append(
-                    f"StateCheck targets unknown phase '{check.target}'"
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"StateCheck targets unknown phase '{check.target}'",
+                    )
                 )
             if check.after is not None and check.after not in phase_ids:
-                errors.append(
-                    f"StateCheck references unknown 'after' phase '{check.after}'"
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"StateCheck references unknown 'after' phase '{check.after}'",
+                    )
                 )
 
         # 3. Check that phase transitions reference known phases
-        phase_ids = {p.id for p in domain.phases}
         for transition in domain.phase_transitions:
             if transition.from_phase not in phase_ids:
-                errors.append(f"Phase transition from unknown phase '{transition.from_phase}'")
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"Phase transition from unknown phase '{transition.from_phase}'",
+                    )
+                )
             if transition.to_phase not in phase_ids:
-                errors.append(f"Phase transition to unknown phase '{transition.to_phase}'")
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"Phase transition to unknown phase '{transition.to_phase}'",
+                    )
+                )
 
-        # 4. Check that DAG seeds reference known skills
-        all_skill_ids = {s.id for s in self.skill_registry.list_all()}
+        # 4. Check that DAG seeds reference known skills (soft)
         for seed in domain.dag_seeds:
             if seed.from_skill not in all_skill_ids:
-                errors.append(f"DAG seed references unknown skill '{seed.from_skill}'")
+                issues.append(
+                    DomainValidationIssue(
+                        "warning",
+                        f"DAG seed references unknown skill '{seed.from_skill}'",
+                    )
+                )
             if seed.to_skill not in all_skill_ids:
-                errors.append(f"DAG seed references unknown skill '{seed.to_skill}'")
+                issues.append(
+                    DomainValidationIssue(
+                        "warning",
+                        f"DAG seed references unknown skill '{seed.to_skill}'",
+                    )
+                )
 
-        # 5. Check that orchestrator skills exist and are not also listed as phase skills
-        phase_skill_ids = set()
+        # 5. Check that orchestrator skills exist (soft) and are not also phase skills (hard)
+        phase_skill_ids: set[str] = set()
         for phase in domain.phases:
             phase_skill_ids.update(phase.skills)
         for orch_id in domain.orchestrator_skills:
-            if self.skill_registry.get(orch_id) is None:
-                errors.append(f"Orchestrator skill '{orch_id}' not found in registry")
+            if orch_id not in all_skill_ids:
+                issues.append(
+                    DomainValidationIssue(
+                        "warning",
+                        f"Orchestrator skill '{orch_id}' not found in registry",
+                    )
+                )
             if orch_id in phase_skill_ids:
-                errors.append(
-                    f"Orchestrator skill '{orch_id}' should not also be listed in a phase"
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"Orchestrator skill '{orch_id}' should not also be listed in a phase",
+                    )
                 )
 
         # 6. Check that intent analysis_types are unique
         intent_types = [i.analysis_type for i in domain.intents]
         if len(intent_types) != len(set(intent_types)):
-            errors.append("Duplicate analysis_type in intents")
+            issues.append(
+                DomainValidationIssue("error", "Duplicate analysis_type in intents")
+            )
 
         # 7. Check that condition expressions are syntactically valid
         for check in domain.state_checks:
             try:
                 compile(check.condition, "<string>", "eval")
             except SyntaxError as e:
-                errors.append(f"Invalid condition expression '{check.condition}': {e}")
+                issues.append(
+                    DomainValidationIssue(
+                        "error",
+                        f"Invalid condition expression '{check.condition}': {e}",
+                    )
+                )
 
-        return errors
+        return issues
 
 
 class DomainLoader:
@@ -117,18 +181,22 @@ class DomainLoader:
         strategy_lib: StrategyLibrary,
         skill_dag: Optional[Any] = None,
         cbkb: Optional[CBKB] = None,
+        strict: Optional[bool] = None,
     ):
         self.skill_registry = skill_registry
         self.strategy_lib = strategy_lib
         self.skill_dag = skill_dag
         self.cbkb = cbkb
         self.validator = DomainValidator(skill_registry, strategy_lib)
+        self.strict = (
+            strict if strict is not None else getattr(settings, "domain_strict_validation", False)
+        )
 
     def load(self, domain_yaml_path: Path) -> DomainDefinition:
         """Load a domain.yaml and register all components.
 
         Returns the parsed DomainDefinition.
-        Raises DomainLoaderError on validation failure.
+        Raises DomainLoaderError on hard validation failure.
         """
         # 1. Parse YAML
         domain = self._parse_yaml(domain_yaml_path)
@@ -138,12 +206,23 @@ class DomainLoader:
             skills_path = domain_yaml_path.parent / domain.skills_dir
             self._load_skills(skills_path)
 
-        # 3. Validate
-        errors = self.validator.validate(domain)
-        if errors:
+        # 3. Validate and repair in lenient mode
+        issues = self.validator.validate(domain)
+        domain = self._apply_repair(domain, issues)
+
+        hard_errors = [i for i in issues if i.severity == "error"]
+        if hard_errors or (self.strict and domain.warnings):
+            messages = [i.message for i in (hard_errors or issues)]
             raise DomainLoaderError(
                 f"Domain '{domain.domain}' validation failed:\n"
-                + "\n".join(f"  - {e}" for e in errors)
+                + "\n".join(f"  - {m}" for m in messages)
+            )
+
+        if domain.warnings:
+            logger.warning(
+                "Domain '%s' loaded with warnings:\n%s",
+                domain.domain,
+                "\n".join(f"  - {w}" for w in domain.warnings),
             )
 
         # 4. Register strategy
@@ -169,6 +248,67 @@ class DomainLoader:
                 # Log but continue loading other domains
                 print(f"Warning: Failed to load domain from {domain_yaml}: {e}")
         return domains
+
+    def _apply_repair(
+        self,
+        domain: DomainDefinition,
+        issues: List[DomainValidationIssue],
+    ) -> DomainDefinition:
+        """Remove unknown skill references and record warnings for a lenient load."""
+        if not issues:
+            return domain
+
+        warnings: List[str] = []
+        all_skill_ids = {s.id for s in self.skill_registry.list_all()}
+
+        # Repair phases
+        for phase in domain.phases:
+            missing = [s for s in phase.skills if s not in all_skill_ids]
+            if missing:
+                warnings.extend(
+                    f"Phase '{phase.id}': removed unknown skill '{s}'" for s in missing
+                )
+                phase.skills = [s for s in phase.skills if s in all_skill_ids]
+
+            if phase.default_skill is not None and phase.default_skill not in all_skill_ids:
+                warnings.append(
+                    f"Phase '{phase.id}': removed unknown default_skill '{phase.default_skill}'"
+                )
+                phase.default_skill = None
+
+            if not phase.skills:
+                phase.unresolvable = True
+                warnings.append(
+                    f"Phase '{phase.id}': no resolvable skills; marked unresolvable"
+                )
+
+        # Repair orchestrator skills
+        missing_orch = [s for s in domain.orchestrator_skills if s not in all_skill_ids]
+        if missing_orch:
+            warnings.extend(f"Removed unknown orchestrator skill '{s}'" for s in missing_orch)
+            domain.orchestrator_skills = [
+                s for s in domain.orchestrator_skills if s in all_skill_ids
+            ]
+
+        # Repair DAG seeds
+        bad_seeds = [
+            seed
+            for seed in domain.dag_seeds
+            if seed.from_skill not in all_skill_ids or seed.to_skill not in all_skill_ids
+        ]
+        if bad_seeds:
+            for seed in bad_seeds:
+                warnings.append(
+                    f"Removed DAG seed {seed.from_skill} -> {seed.to_skill} (unknown skill)"
+                )
+            domain.dag_seeds = [
+                seed
+                for seed in domain.dag_seeds
+                if seed.from_skill in all_skill_ids and seed.to_skill in all_skill_ids
+            ]
+
+        domain.warnings = warnings
+        return domain
 
     def _parse_yaml(self, path: Path) -> DomainDefinition:
         """Parse a domain.yaml file into DomainDefinition."""

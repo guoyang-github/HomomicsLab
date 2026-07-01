@@ -21,7 +21,7 @@ class TestDomainValidator:
         errors = validator.validate(domain)
         assert errors == []
 
-    def test_unknown_skill_reference(self):
+    def test_unknown_skill_reference_is_warning(self):
         registry = SkillRegistry()
         lib = StrategyLibrary()
         validator = DomainValidator(registry, lib)
@@ -31,10 +31,11 @@ class TestDomainValidator:
                 {"id": "qc", "skills": ["nonexistent_skill"]},
             ],
         )
-        errors = validator.validate(domain)
-        assert any("nonexistent_skill" in e for e in errors)
+        issues = validator.validate(domain)
+        assert any("nonexistent_skill" in i.message for i in issues)
+        assert all(i.severity == "warning" for i in issues if "nonexistent_skill" in i.message)
 
-    def test_unknown_phase_target(self):
+    def test_unknown_phase_target_is_error(self):
         registry = SkillRegistry()
         lib = StrategyLibrary()
         validator = DomainValidator(registry, lib)
@@ -45,8 +46,9 @@ class TestDomainValidator:
                 {"condition": "x > 1", "action": "skip", "target": "unknown_phase"},
             ],
         )
-        errors = validator.validate(domain)
-        assert any("unknown_phase" in e for e in errors)
+        issues = validator.validate(domain)
+        assert any("unknown_phase" in i.message for i in issues)
+        assert any(i.severity == "error" and "unknown_phase" in i.message for i in issues)
 
 
 class TestDomainLoader:
@@ -184,3 +186,73 @@ class TestDomainLoader:
         assert config["domain"] == "test"
         assert "type_a" in config["analysis_types"]
         assert config["analysis_types"]["type_a"]["keywords"] == ["kw1"]
+
+
+    def test_lenient_load_keeps_domain_when_skill_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            domain_path = Path(tmpdir) / "domain.yaml"
+            domain_data = {
+                "domain": "soft_domain",
+                "description": "Domain with missing skill",
+                "phases": [
+                    {"id": "qc", "skills": ["known_skill", "missing_skill"]},
+                    {"id": "analysis", "skills": ["missing_skill"]},
+                ],
+            }
+            with open(domain_path, "w") as f:
+                yaml.dump(domain_data, f)
+
+            registry = SkillRegistry()
+            lib = StrategyLibrary()
+            loader = DomainLoader(registry, lib, strict=False)
+            domain = loader.load(domain_path)
+
+            assert domain.domain == "soft_domain"
+            assert len(domain.phases) == 2
+            qc_phase = next(p for p in domain.phases if p.id == "qc")
+            analysis_phase = next(p for p in domain.phases if p.id == "analysis")
+
+            # known_skill is not in registry either, so both phases lose skills
+            assert qc_phase.skills == []
+            assert qc_phase.unresolvable is True
+            assert analysis_phase.unresolvable is True
+            assert any("missing_skill" in w for w in domain.warnings)
+
+    def test_strict_load_fails_on_missing_skill(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            domain_path = Path(tmpdir) / "domain.yaml"
+            domain_data = {
+                "domain": "strict_domain",
+                "phases": [
+                    {"id": "qc", "skills": ["missing_skill"]},
+                ],
+            }
+            with open(domain_path, "w") as f:
+                yaml.dump(domain_data, f)
+
+            registry = SkillRegistry()
+            lib = StrategyLibrary()
+            loader = DomainLoader(registry, lib, strict=True)
+
+            with pytest.raises(DomainLoaderError):
+                loader.load(domain_path)
+
+    def test_hard_errors_still_fail_in_lenient_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            domain_path = Path(tmpdir) / "domain.yaml"
+            domain_data = {
+                "domain": "bad_domain",
+                "phases": [{"id": "qc"}],
+                "state_checks": [
+                    {"condition": "x > 1", "action": "skip", "target": "missing_phase"},
+                ],
+            }
+            with open(domain_path, "w") as f:
+                yaml.dump(domain_data, f)
+
+            registry = SkillRegistry()
+            lib = StrategyLibrary()
+            loader = DomainLoader(registry, lib, strict=False)
+
+            with pytest.raises(DomainLoaderError):
+                loader.load(domain_path)

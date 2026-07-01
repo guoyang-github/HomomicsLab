@@ -52,12 +52,14 @@ class LLMFallbackPlanner:
         llm_client: Optional[LLMClient] = None,
         top_k: int = 10,
         allow_code_fallback: bool = True,
+        deterministic_fallback: bool = False,
         tracker: Optional[Any] = None,
     ):
         self.skill_registry = skill_registry
         self.llm_client = llm_client
         self.top_k = top_k
         self.allow_code_fallback = allow_code_fallback
+        self.deterministic_fallback = deterministic_fallback
         self.tracker = tracker or default_tracker()
 
     async def generate_plan(
@@ -88,6 +90,17 @@ class LLMFallbackPlanner:
         )
 
         # 3. Build executable phases from validated skill selections.
+        if (
+            not selected
+            and candidate_skills
+            and self.deterministic_fallback
+            and not self._is_code_or_data_request(intent)
+        ):
+            # No LLM or LLM refused: fall back to a deterministic plan built from
+            # the top retrieved skills. This keeps generic bioinformatics requests
+            # executable while preserving the special code/data suggestion path.
+            selected = self._deterministic_skill_plan(candidate_skills, intent)
+
         phases: List[Phase] = []
         for item in selected:
             skill_id = item.get("skill_id")
@@ -155,6 +168,34 @@ class LLMFallbackPlanner:
         if structured is not None:
             return structured.intent_type == "general_help"
         return False
+
+    def _deterministic_skill_plan(
+        self,
+        candidate_skills: List[SkillDefinition],
+        intent: UserIntent,
+    ) -> List[Dict[str, Any]]:
+        """Build a simple linear plan from retrieved skills when no LLM is available.
+
+        The plan deduplicates by skill category and preserves the retrieval order.
+        """
+        seen_categories: set[str] = set()
+        plan: List[Dict[str, Any]] = []
+        for skill in candidate_skills:
+            category = skill.category or "analysis"
+            if category in seen_categories:
+                continue
+            seen_categories.add(category)
+            plan.append(
+                {
+                    "skill_id": skill.id,
+                    "phase": category,
+                    "reason": f"Run {skill.name} for {intent.analysis_type}",
+                    "parameters": {},
+                }
+            )
+            if len(plan) >= 4:
+                break
+        return plan
 
     def _retrieve_skills(self, intent: UserIntent) -> List[SkillDefinition]:
         """Retrieve candidate skills via semantic search.

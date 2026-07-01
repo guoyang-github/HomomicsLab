@@ -1,10 +1,14 @@
 import dataclasses
+import json
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
+from homomics_lab.agent.plan.template import AnalysisTemplate
+from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
+from homomics_lab.config import settings
 from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
@@ -47,11 +51,13 @@ class TaskDecomposer:
         skill_registry: Optional[SkillRegistry] = None,
         cbkb=None,
         capability_index=None,
+        analysis_template_store: Optional[AnalysisTemplateStore] = None,
     ):
         self._plan_engine = plan_engine
         self._skill_registry = skill_registry or get_default_registry()
         self._cbkb = cbkb
         self._capability_index = capability_index
+        self._analysis_template_store = analysis_template_store
 
     def _get_plan_engine(self) -> PlanEngine:
         """Lazy initialize PlanEngine with the skill registry."""
@@ -62,6 +68,25 @@ class TaskDecomposer:
                 capability_index=self._capability_index,
             )
         return self._plan_engine
+
+    def _load_project_template(self, project_id: Optional[str]) -> Optional[AnalysisTemplate]:
+        """Load the AnalysisTemplate associated with a project, if any."""
+        if not project_id:
+            return None
+        config_path = (
+            settings.data_dir / "workspaces" / project_id / ".metadata" / "project_config.json"
+        )
+        if not config_path.exists():
+            return None
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        template_id = config.get("template_id")
+        if not template_id:
+            return None
+        store = self._analysis_template_store or AnalysisTemplateStore()
+        return store.get_template(template_id)
 
     async def decompose(self, intent: UserIntent, context: Dict[str, Any]) -> TaskTree:
         """Decompose intent into a TaskTree.
@@ -104,7 +129,13 @@ class TaskDecomposer:
 
         # General path: use PlanEngine (domain strategy or LLM fallback).
         plan_engine = self._get_plan_engine()
-        plan = await plan_engine.plan(intent, project_id=context.get("project_id"))
+        project_id = context.get("project_id")
+        template = self._load_project_template(project_id)
+        plan = await plan_engine.plan(
+            intent,
+            project_id=project_id,
+            template=template,
+        )
 
         # If sub-intents are present, filter the generated plan to the requested
         # phases (keeping prerequisites) instead of running the full domain DAG.

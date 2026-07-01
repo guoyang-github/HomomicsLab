@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, Project, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, Project, AnalysisTemplate, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
@@ -69,7 +69,7 @@ export const planApi = {
 }
 
 export const projectApi = {
-  createProject: (data: { name: string; description?: string }) =>
+  createProject: (data: { name: string; description?: string; template_id?: string }) =>
     api.post<Project>('/projects', data),
 
   listProjects: () =>
@@ -81,6 +81,11 @@ export const projectApi = {
       {},
       { responseType: 'blob' }
     ),
+}
+
+export const analysisTemplateApi = {
+  listTemplates: () =>
+    api.get<AnalysisTemplate[]>('/templates'),
 }
 
 export interface FileEntry {

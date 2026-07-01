@@ -108,6 +108,8 @@ class SkillRuntimeExecutor:
         plan,
         inputs: Dict[str, Any],
         timeout_seconds: float = settings.default_job_timeout_seconds,
+        intent_analysis_type: Optional[str] = None,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Run a full PlanResult as a Nextflow workflow project.
 
@@ -115,6 +117,13 @@ class SkillRuntimeExecutor:
         1. Use a curated production template if one matches the plan intent.
         2. Fall back to the LLM-driven Nextflow architect skill.
         3. Fall back to the simple translator (stubs for unsupported domains).
+
+        Args:
+            plan: A PlanResult or any object with a ``phases`` attribute.
+            inputs: Top-level inputs for the workflow.
+            timeout_seconds: Maximum runtime.
+            intent_analysis_type: Optional intent type used to select a curated
+                template. Falls back to ``plan.intent_analysis_type`` if not given.
         """
         from homomics_lab.hpc.scheduler import NextflowRunner
         from homomics_lab.hpc.template_registry import get_template_registry
@@ -127,7 +136,7 @@ class SkillRuntimeExecutor:
             )
 
         # 1. Curated template path (local or nf-core cached pipeline).
-        intent_type = getattr(plan, "intent_analysis_type", None) or ""
+        intent_type = intent_analysis_type or getattr(plan, "intent_analysis_type", None) or ""
         template_path = get_template_registry().resolve_for_intent(intent_type)
         if template_path is not None:
             # nf-core pipelines are full directories with relative imports;
@@ -147,9 +156,13 @@ class SkillRuntimeExecutor:
                     inputs,
                     timeout_seconds=timeout_seconds,
                     profiles=profiles,
+                    resume=resume,
                 )
             return await scheduler.run_template(
-                template_path, inputs, timeout_seconds=timeout_seconds
+                template_path,
+                inputs,
+                timeout_seconds=timeout_seconds,
+                resume=resume,
             )
 
         # 2. LLM architect skill.
@@ -164,13 +177,15 @@ class SkillRuntimeExecutor:
             and self.llm_client.is_configured()
         ):
             result = await self._run_agent_nextflow_plan(
-                architect_skill, plan, inputs, scheduler, timeout_seconds
+                architect_skill, plan, inputs, scheduler, timeout_seconds, resume=resume
             )
             if result.get("success"):
                 return result
 
         # 3. Simple translator fallback.
-        return await scheduler.run_plan(plan, inputs, timeout_seconds=timeout_seconds)
+        return await scheduler.run_plan(
+            plan, inputs, timeout_seconds=timeout_seconds, resume=resume
+        )
 
     async def _run_agent_nextflow_plan(
         self,
@@ -179,6 +194,7 @@ class SkillRuntimeExecutor:
         inputs: Dict[str, Any],
         scheduler,
         timeout_seconds: float,
+        resume: bool = True,
     ) -> Dict[str, Any]:
         """Use a declarative Nextflow architect skill to generate and run a project."""
         project_dir = self.working_dir / "nf_project"
@@ -204,6 +220,7 @@ class SkillRuntimeExecutor:
             nf_file,
             inputs,
             timeout_seconds=timeout_seconds,
+            resume=resume,
         )
         run_result["agent_result"] = agent_result
         run_result["nf_file"] = str(nf_file)

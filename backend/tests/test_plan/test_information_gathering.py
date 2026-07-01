@@ -5,7 +5,8 @@ import pytest
 from homomics_lab.agent.information_gathering import InformationGatheringEngine
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
-from homomics_lab.agent.plan.models import DataState
+from homomics_lab.agent.plan.models import DataState, Phase
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -34,6 +35,24 @@ def registry():
         )
     )
     return reg
+
+
+@pytest.fixture
+def strategy_library():
+    lib = StrategyLibrary()
+    lib.register(
+        AnalysisStrategy(
+            name="single_cell_standard",
+            description="Standard single-cell analysis",
+            applicable_intents=["single_cell_analysis"],
+            skeleton=[
+                Phase(phase_type="qc", required=True, description="Quality control filtering single-cell RNA-seq scanpy_qc"),
+                Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy"),
+            ],
+            state_checks=[],
+        )
+    )
+    return lib
 
 
 class TestInformationGatheringEngine:
@@ -70,17 +89,19 @@ class TestInformationGatheringEngine:
 
 class TestPlanEngineInformationRequest:
     @pytest.mark.asyncio
-    async def test_information_gathering_disabled_by_default(self, registry):
-        engine = PlanEngine(skill_registry=registry)
+    async def test_information_gathering_disabled_by_default(self, registry, strategy_library):
+        engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
         plan = await engine.plan(intent, DataState())
         assert plan.is_information_request is False
         assert len(plan.phases) > 0
 
     @pytest.mark.asyncio
-    async def test_information_request_when_enabled(self, registry):
+    async def test_information_request_when_enabled(self, registry, strategy_library):
         engine = PlanEngine(
-            skill_registry=registry, enable_information_gathering=True
+            skill_registry=registry,
+            enable_information_gathering=True,
+            strategy_library=strategy_library,
         )
         intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
         plan = await engine.plan(intent, DataState())
@@ -90,9 +111,11 @@ class TestPlanEngineInformationRequest:
         assert "probes" in plan.reproducibility_context
 
     @pytest.mark.asyncio
-    async def test_no_information_request_when_data_complete(self, registry):
+    async def test_no_information_request_when_data_complete(self, registry, strategy_library):
         engine = PlanEngine(
-            skill_registry=registry, enable_information_gathering=True
+            skill_registry=registry,
+            enable_information_gathering=True,
+            strategy_library=strategy_library,
         )
         intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
         data_state = DataState()

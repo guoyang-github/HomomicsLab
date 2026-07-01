@@ -82,6 +82,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'sessionList.deleteConfirm': 'Are you sure you want to delete this session?',
     'sessionList.renamePlaceholder': 'Session name',
     'sessionList.loadFailed': 'Failed to load projects',
+    'sessionList.analysisTemplate': 'Quick-start template (optional)',
+    'sessionList.noTemplate': 'No template — use domain defaults',
 
     // Chat
     'chat.planMode': 'Plan mode: show execution plan before running',
@@ -593,6 +595,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'sessionList.deleteConfirm': '确定要删除此会话吗？',
     'sessionList.renamePlaceholder': '会话名称',
     'sessionList.loadFailed': '加载项目失败',
+    'sessionList.analysisTemplate': '快速开始模板（可选）',
+    'sessionList.noTemplate': '不使用模板，按领域默认策略生成计划',
 
     // Chat
     'chat.planMode': 'Plan 模式：执行前先展示执行计划',

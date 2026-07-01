@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
+from homomics_lab.agent.plan.models import Phase
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.retrieval import RetrievalContext, SkillRetriever
 from homomics_lab.agent.turn_runner import TurnRunner, ExecutionMode
 from homomics_lab.context.feedback_store import FeedbackOutcome
@@ -223,8 +225,23 @@ async def test_plan_engine_forwards_project_id_to_retriever():
     idx = MagicMock(spec=CapabilityIndex)
     idx.search = AsyncMock(return_value=[])
 
+    strategy_lib = StrategyLibrary()
+    strategy_lib.register(
+        AnalysisStrategy(
+            name="single_cell_standard",
+            description="Standard single-cell analysis",
+            applicable_intents=["single_cell_analysis"],
+            skeleton=[Phase(phase_type="qc", required=True)],
+            state_checks=[],
+        )
+    )
+
     retriever = SkillRetriever(skill_registry=registry, capability_index=idx)
-    engine = PlanEngine(skill_registry=registry, skill_retriever=retriever)
+    engine = PlanEngine(
+        skill_registry=registry,
+        skill_retriever=retriever,
+        strategy_library=strategy_lib,
+    )
 
     intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
     result = await engine.plan(intent, data_state=DataState(), project_id="proj_42")

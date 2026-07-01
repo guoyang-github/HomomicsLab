@@ -20,7 +20,9 @@ from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
+from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
+from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.retrieval import SkillRetriever
 from homomics_lab.agent.plan.validator import PlanValidator
 from homomics_lab.config import settings
@@ -56,6 +58,7 @@ class PlanEngine:
         enable_information_gathering: bool = False,
         tracker: Optional[Any] = None,
         capability_index: Optional[CapabilityIndex] = None,
+        strategy_library: Optional[StrategyLibrary] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
@@ -72,14 +75,20 @@ class PlanEngine:
             capability_index=capability_index,
         )
         self.plan_validator = PlanValidator(skill_registry=skill_registry)
-        self.strategy_library = StrategyLibrary(skill_registry=skill_registry)
+        self.quality_evaluator = PlanQualityEvaluator(
+            plan_validator=self.plan_validator,
+            cbkb=cbkb,
+        )
+        self.strategy_library = strategy_library or StrategyLibrary(skill_registry=skill_registry)
         self.information_gathering = InformationGatheringEngine(
             skill_registry=skill_registry,
             skill_dag=skill_dag,
         )
         self.tracker = tracker or default_tracker()
         self.llm_fallback = llm_fallback or LLMFallbackPlanner(
-            skill_registry, tracker=self.tracker
+            skill_registry,
+            tracker=self.tracker,
+            deterministic_fallback=True,
         )
         self.cbkb = cbkb
 
@@ -89,6 +98,7 @@ class PlanEngine:
         data_state: Optional[DataState] = None,
         top_k: int = 1,
         project_id: Optional[str] = None,
+        template: Optional[AnalysisTemplate] = None,
     ) -> PlanResult:
         """Generate an analysis plan from user intent and data state.
 
@@ -98,6 +108,8 @@ class PlanEngine:
             top_k: Number of strategy candidates to consider.  When ``top_k > 1``
                 a lightweight beam search ranks candidate plans by gaps and
                 skill coverage.  Defaults to 1 for backward compatibility.
+            template: Optional analysis template that supplies default parameters
+                and preferred skills for the selected scenario.
 
         Returns:
             PlanResult containing the phase sequence, selected skills, and gaps.
@@ -143,14 +155,17 @@ class PlanEngine:
         candidate_plans: List[PlanResult] = []
         for strategy in candidates:
             plan_result = await self._build_plan_for_strategy(
-                intent, data_state, strategy, project_id=project_id
+                intent, data_state, strategy, project_id=project_id, template=template
             )
             candidate_plans.append(plan_result)
 
         plan_result = self._pick_best_plan(candidate_plans)
 
-        # 4. Validate and enrich with SkillDAG risk exposure.
+        # 4. Validate, score quality, and enrich with SkillDAG risk exposure.
         validation_report = self.plan_validator.validate(plan_result)
+        quality_report = self.quality_evaluator.evaluate(
+            plan_result, template_id=getattr(template, "template_id", None)
+        )
         reproducibility_context = dict(plan_result.reproducibility_context)
         reproducibility_context["validation"] = {
             "valid": validation_report.valid,
@@ -163,6 +178,7 @@ class PlanEngine:
                 for w in validation_report.warnings
             ],
         }
+        reproducibility_context["quality"] = quality_report.to_dict()
         plan_result.reproducibility_context = reproducibility_context
 
         if self.skill_dag is not None:
@@ -178,12 +194,18 @@ class PlanEngine:
         data_state: DataState,
         strategy: AnalysisStrategy,
         project_id: Optional[str] = None,
+        template: Optional[AnalysisTemplate] = None,
     ) -> PlanResult:
         """Build a PlanResult for a single selected strategy."""
         if strategy.name == "generic":
             return await self.llm_fallback.generate_plan(intent, data_state)
 
         phases = strategy.generate_skeleton(data_state)
+
+        # Apply scenario template defaults before skill retrieval so that
+        # preferred skills are honoured and parameters are pre-filled.
+        if template is not None:
+            self._apply_template(phases, template, data_state=data_state)
 
         retrieval_query = self._build_retrieval_query(intent, phases)
         retrieval_context = await self.skill_retriever.retrieve(
@@ -196,9 +218,10 @@ class PlanEngine:
 
         learned_defaults: List[Dict[str, Any]] = []
         for phase in phases:
-            phase.selected_skill = self._select_skill_for_phase(
-                phase, data_state, retrieval_context
-            )
+            if phase.selected_skill is None:
+                phase.selected_skill = self._select_skill_for_phase(
+                    phase, data_state, retrieval_context
+                )
             estimate_phase(phase, self.tracker)
             injected = self._apply_learned_defaults(phase)
             learned_defaults.extend(injected)
@@ -212,6 +235,7 @@ class PlanEngine:
             "data_state": data_state.to_context(),
             "retrieval_context": retrieval_context.to_prompt_context(),
             "learned_defaults": learned_defaults,
+            "template": template.to_dict() if template is not None else None,
         }
 
         return PlanResult(
@@ -236,6 +260,95 @@ class PlanEngine:
 
         candidate_plans.sort(key=_plan_score)
         return candidate_plans[0]
+
+    def _apply_template(
+        self,
+        phases: List[Phase],
+        template: AnalysisTemplate,
+        data_state: Optional[DataState] = None,
+    ) -> None:
+        """Merge template defaults, preferred skills, and scenario variants into the skeleton."""
+        from homomics_lab.agent.plan.models import Phase as PlanPhase
+
+        # 1. Remove phases requested by the template.
+        if template.remove_phases:
+            phases[:] = [p for p in phases if p.phase_type not in template.remove_phases]
+
+        # 2. Apply per-phase overrides and preferred skills.
+        for phase in phases:
+            overrides = template.phase_overrides.get(phase.phase_type, {})
+            if overrides.get("required") is not None:
+                phase.required = bool(overrides["required"])
+            if overrides.get("description"):
+                phase.description = str(overrides["description"])
+
+            preferred_skill_id = overrides.get("preferred_skill") or template.preferred_skills.get(phase.phase_type)
+            if preferred_skill_id is not None:
+                skill = self.skill_registry.get(preferred_skill_id)
+                if skill is not None:
+                    phase.selected_skill = skill
+
+            for skill_id in overrides.get("add_skills", []):
+                if skill_id not in phase.candidate_skills:
+                    phase.candidate_skills.append(skill_id)
+            for skill_id in overrides.get("remove_skills", []):
+                phase.candidate_skills = [
+                    s for s in phase.candidate_skills if s != skill_id
+                ]
+
+            # Parameter defaults: global defaults first, then phase-specific.
+            merged: Dict[str, Any] = {}
+            merged.update(template.default_parameters)
+            merged.update(template.phase_defaults.get(phase.phase_type, {}))
+            merged.update(phase.parameters)
+            phase.parameters = merged
+
+        # 3. Insert new phases declared by the template.
+        for insert in template.insert_phases:
+            target = insert.get("after")
+            spec = insert.get("phase", {})
+            if not spec:
+                continue
+            new_phase = PlanPhase(
+                phase_type=spec.get("phase_type", spec.get("id", "extra")),
+                required=spec.get("required", True),
+                description=spec.get("description", ""),
+                parameters=dict(spec.get("parameters", {})),
+            )
+            preferred_skill_id = spec.get("preferred_skill") or template.preferred_skills.get(new_phase.phase_type)
+            if preferred_skill_id is not None:
+                skill = self.skill_registry.get(preferred_skill_id)
+                if skill is not None:
+                    new_phase.selected_skill = skill
+            self._insert_phase_after(phases, target, new_phase)
+
+        # 4. Apply data-type-specific rules.
+        data_type = getattr(data_state, "data_type", None)
+        if data_type and data_type in template.data_type_rules:
+            rule = template.data_type_rules[data_type]
+            rule_template = AnalysisTemplate(
+                template_id=f"{template.template_id}__{data_type}",
+                name="data-type rule",
+                phase_overrides=rule.get("phase_overrides", {}),
+                insert_phases=rule.get("insert_phases", []),
+                remove_phases=rule.get("remove_phases", []),
+                preferred_skills=rule.get("preferred_skills", {}),
+                phase_defaults=rule.get("phase_defaults", {}),
+                default_parameters=rule.get("default_parameters", {}),
+            )
+            self._apply_template(phases, rule_template, data_state=data_state)
+
+    @staticmethod
+    def _insert_phase_after(phases: List[Phase], target: Optional[str], new_phase: Phase) -> None:
+        """Insert a phase after the first occurrence of target, or append if target is None/unknown."""
+        if target is None:
+            phases.append(new_phase)
+            return
+        for i, phase in enumerate(phases):
+            if phase.phase_type == target:
+                phases.insert(i + 1, new_phase)
+                return
+        phases.append(new_phase)
 
     @staticmethod
     def _probe_to_dict(probe: Any) -> Dict[str, Any]:

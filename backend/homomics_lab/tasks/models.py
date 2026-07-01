@@ -40,6 +40,12 @@ class TaskNode(BaseModel):
     completed_at: Optional[datetime] = None
     attempt_count: int = 0
 
+    # Incremental execution / caching metadata
+    input_hash: Optional[str] = None
+    output_hash: Optional[str] = None
+    cache_key: Optional[str] = None
+    cache_hit: bool = False
+
 
 class TaskTreeSnapshot(BaseModel):
     """Serializable snapshot of a task tree for persistence."""

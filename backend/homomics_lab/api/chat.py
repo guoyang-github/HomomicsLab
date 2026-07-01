@@ -123,6 +123,8 @@ async def send_message(
         llm_client=getattr(http_request.app.state, "llm_client", None),
         trace_store=trace_store,
         capability_index=getattr(http_request.app.state, "capability_index", None),
+        analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
+        workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
     )
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -220,6 +222,8 @@ async def regenerate_message(
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
         capability_index=getattr(http_request.app.state, "capability_index", None),
+        analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
+        workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
     )
     result = await runner.regenerate_response(
         session_id=request.session_id,
@@ -374,6 +378,8 @@ async def respond_to_tool_approval(
         llm_client=llm_client,
         tool_registry=tool_registry,
         capability_index=getattr(http_request.app.state, "capability_index", None),
+        analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
+        workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
     )
     result = await runner.respond_to_tool_approval(
         call_id=request.call_id,
@@ -427,6 +433,8 @@ async def respond_to_debate(
         project_state_manager=getattr(http_request.app.state, "project_state_manager", None),
         llm_client=getattr(http_request.app.state, "llm_client", None),
         capability_index=getattr(http_request.app.state, "capability_index", None),
+        analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
+        workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
     )
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(
@@ -483,6 +491,8 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         context_engine=getattr(websocket.app.state, "context_engine", None),
         project_state_manager=getattr(websocket.app.state, "project_state_manager", None),
         llm_client=llm_client,
+        analysis_template_store=getattr(websocket.app.state, "analysis_template_store", None),
+        workflow_execution_service=getattr(websocket.app.state, "workflow_execution_service", None),
     )
 
     try:

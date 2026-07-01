@@ -1,0 +1,6 @@
+{
+  "key": "03535f806446082e6418e2c06976183474c84d95fe784e0737711323614e79c7",
+  "task": "any task",
+  "language": "python",
+  "code": "result = {'llm': True}"
+}

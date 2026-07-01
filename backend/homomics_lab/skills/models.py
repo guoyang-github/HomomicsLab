@@ -111,6 +111,8 @@ class SkillDefinition(BaseModel):
             if isinstance(entrypoint, (str, Path)):
                 if (src / entrypoint).is_file():
                     return True
+            if (src / "scripts" / "run.py").is_file():
+                return True
             if (src / "scripts" / "python" / "run.py").is_file():
                 return True
             if (src / "scripts" / "r" / "run.R").is_file():

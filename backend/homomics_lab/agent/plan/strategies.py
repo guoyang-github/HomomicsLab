@@ -137,25 +137,18 @@ class StrategyLibrary:
     def _register_defaults(self) -> None:
         """Register default strategies.
 
-        Domain declarations take precedence over hard-coded defaults when
-        ``settings.auto_load_domain_strategies`` is enabled. Defaults are
-        registered as fallback for any intents not already covered by a loaded
-        domain.
+        Domain declarations take precedence over the generic fallback when
+        ``settings.auto_load_domain_strategies`` is enabled. The generic
+        strategy is always registered as the ultimate fallback for unknown
+        intents.
         """
         # 1. Load domain strategies first so they take priority (when enabled).
         if settings.auto_load_domain_strategies:
             self._load_domain_strategies()
 
-        # 2. Register hard-coded defaults as fallback for uncovered intents.
-        covered_intents = {
-            intent
-            for strategy in self._strategies.values()
-            for intent in strategy.applicable_intents
-        }
-        defaults = [SINGLE_CELL_STANDARD, SPATIAL_TRANSCRIPTOMICS, QC_ONLY, GENERIC_ANALYSIS]
-        for strategy in defaults:
-            if not any(intent in covered_intents for intent in strategy.applicable_intents):
-                self.register(strategy)
+        # 2. Always register the generic fallback.
+        if "generic" not in self._strategies:
+            self.register(GENERIC_ANALYSIS)
 
     def _load_domain_strategies(self) -> None:
         """Load strategies from domain.yaml declarations.
@@ -235,78 +228,8 @@ class StrategyLibrary:
 
 
 # ─────────────────────────────────────────
-# Default strategies
+# Generic fallback strategy
 # ─────────────────────────────────────────
-
-SINGLE_CELL_STANDARD = AnalysisStrategy(
-    name="single_cell_standard",
-    description="Standard single-cell RNA-seq analysis pipeline",
-    applicable_intents=["single_cell_analysis", "scRNA", "single cell", "scanpy"],
-    skeleton=[
-        Phase(phase_type="qc", required=True, description="Quality control filtering single-cell RNA-seq scanpy"),
-        Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy"),
-        Phase(phase_type="dim_reduction", required=True, description="PCA principal component analysis dimensionality reduction single-cell scanpy"),
-        Phase(phase_type="clustering", required=True, description="Cell clustering Louvain Leiden single-cell scanpy"),
-        Phase(phase_type="annotation", required=True, description="Cell type annotation marker genes single-cell"),
-        Phase(phase_type="differential_expression", required=False, description="Differential expression analysis single-cell DE"),
-        Phase(phase_type="visualization", required=False, description="Generate UMAP heatmap plots single-cell visualization"),
-    ],
-    state_checks=[
-        StateCheck(
-            condition=lambda ds: ds.get("batch_detected", default=False),
-            action="insert",
-            target="batch_correction",
-            after="qc",
-        ),
-        StateCheck(
-            condition=lambda ds: ds.get("low_quality", default=False),
-            action="insert",
-            target="qc_advanced",
-            after="qc",
-        ),
-        StateCheck(
-            condition=lambda ds: ds.get("large_scale", default=False),
-            action="modify_param",
-            target="dim_reduction",
-            value={"n_pcs": 50, "method": "incremental_pca"},
-        ),
-        StateCheck(
-            condition=lambda ds: ds.get("has_qc", default=False),
-            action="skip",
-            target="qc",
-        ),
-    ],
-)
-
-SPATIAL_TRANSCRIPTOMICS = AnalysisStrategy(
-    name="spatial_transcriptomics",
-    description="Spatial transcriptomics analysis pipeline",
-    applicable_intents=["spatial_analysis", "spatial", "visium", "xenium"],
-    skeleton=[
-        Phase(phase_type="spatial_qc", required=True),
-        Phase(phase_type="spatial_preprocessing", required=True),
-        Phase(phase_type="spatial_clustering", required=True),
-        Phase(phase_type="spatial_deconvolution", required=False),
-        Phase(phase_type="visualization", required=False),
-    ],
-    state_checks=[
-        StateCheck(
-            condition=lambda ds: ds.get("n_cells") is not None and ds.get("n_cells") < 1000,
-            action="skip",
-            target="spatial_deconvolution",
-        ),
-    ],
-)
-
-QC_ONLY = AnalysisStrategy(
-    name="qc_only",
-    description="Run quality control only",
-    applicable_intents=["file_conversion", "qc", "quality control"],
-    skeleton=[
-        Phase(phase_type="qc", required=True),
-    ],
-    state_checks=[],
-)
 
 GENERIC_ANALYSIS = AnalysisStrategy(
     name="generic",

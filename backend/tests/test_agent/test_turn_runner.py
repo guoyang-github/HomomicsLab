@@ -3,11 +3,22 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homomics_lab.agent.turn_runner import TurnRunner, ExecutionMode
+from homomics_lab.agent.plan.engine import PlanEngine
+from homomics_lab.agent.plan.models import Phase
+from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
+from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.agent.intent.models import UserIntent
+from homomics_lab.agent.turn_runner import TurnRunner, ExecutionMode
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.models.common import MessageType
+from homomics_lab.plan.models import Plan
 from homomics_lab.secrets import reset_secrets_manager
+from homomics_lab.tasks.models import TaskNode, TaskStatus
+from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.workflow.execution_service import WorkflowExecutionService
+from homomics_lab.workflow.models import WorkflowResult
+from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
+from homomics_lab.skills.registry import SkillRegistry
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +32,36 @@ def isolate_secrets(tmp_path, monkeypatch):
 
 @pytest.fixture
 def runner():
-    return TurnRunner()
+    reg = SkillRegistry()
+    for sid in ("scanpy_qc", "scanpy_normalize", "scanpy_pca", "scanpy_cluster"):
+        reg.register(
+            SkillDefinition(
+                id=sid,
+                name=sid,
+                version="1.0",
+                category="single_cell",
+                description=f"Run {sid} for single-cell analysis",
+                input_schema=SkillInputSchema(),
+            )
+        )
+    strategy_lib = StrategyLibrary()
+    strategy_lib.register(
+        AnalysisStrategy(
+            name="single_cell_standard",
+            description="Standard single-cell RNA-seq analysis pipeline",
+            applicable_intents=["single_cell_analysis"],
+            skeleton=[
+                Phase(phase_type="qc", required=True, description="Quality control filtering single-cell RNA-seq scanpy_qc"),
+                Phase(phase_type="normalization", required=True, description="Count normalization log transformation single-cell scanpy_normalize"),
+                Phase(phase_type="dim_reduction", required=True, description="PCA principal component analysis dimensionality reduction single-cell scanpy_pca"),
+                Phase(phase_type="clustering", required=True, description="Cell clustering Louvain Leiden single-cell scanpy_cluster"),
+            ],
+            state_checks=[],
+        )
+    )
+    plan_engine = PlanEngine(skill_registry=reg, strategy_library=strategy_lib)
+    decomposer = TaskDecomposer(plan_engine=plan_engine, skill_registry=reg)
+    return TurnRunner(task_decomposer=decomposer)
 
 
 @pytest.fixture
@@ -250,3 +290,53 @@ async def test_debate_response_resolves_intent(runner, working_memory):
     assert result.mode == ExecutionMode.DIRECT_RESPONSE
     assert result.agent_message is not None
     assert result.agent_message.type == MessageType.TEXT
+
+
+
+@pytest.mark.asyncio
+async def test_handle_workflow_uses_nextflow_service(working_memory):
+    """When a WorkflowExecutionService is provided, multi-step workflows use it."""
+    from homomics_lab.agent.plan.models import DataState as PlanDataState, PlanResult
+
+    tasks = [
+        TaskNode(id="t1", name="qc", description="QC", phase="qc", status=TaskStatus.PENDING),
+        TaskNode(id="t2", name="cluster", description="Cluster", phase="cluster", status=TaskStatus.PENDING),
+    ]
+    tree = TaskTree(tasks=tasks)
+    plan = Plan(
+        plan_id="plan_nf",
+        session_id="sess_nf",
+        project_id="proj_nf",
+        intent_analysis_type="single_cell_analysis",
+        plan_result=PlanResult(
+            phases=[
+                Phase(phase_type="qc", required=True),
+                Phase(phase_type="cluster", required=True),
+            ],
+            strategy_name="single_cell_standard",
+            data_state=PlanDataState(),
+        ),
+        task_tree=tree,
+    )
+
+    for task in tree.tasks:
+        task.status = TaskStatus.COMPLETED
+    mock_result = WorkflowResult(
+        success=True,
+        backend="nextflow",
+        task_tree=tree,
+    )
+    mock_service = MagicMock(spec=WorkflowExecutionService)
+    mock_service.execute = AsyncMock(return_value=mock_result)
+
+    runner = TurnRunner(workflow_execution_service=mock_service)
+    result = await runner._handle_workflow(
+        tree=tree,
+        working_memory=working_memory,
+        project_id="proj_nf",
+        plan=plan,
+    )
+
+    assert result.mode == ExecutionMode.WORKFLOW
+    assert "nextflow" in result.response_text
+    mock_service.execute.assert_awaited_once()

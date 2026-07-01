@@ -1,0 +1,6 @@
+{
+  "key": "2adb55b23265e8ccaf6172ebfc46434a540b3d2c355871302f7795314881a838",
+  "task": "load pbmc h5ad file",
+  "language": "python",
+  "code": "import scanpy as sc\nadata = sc.read_h5ad(\"data/pbmc3k_raw.h5ad\")\nprint(f\"Loaded {adata.n_obs} cells x {adata.n_vars} genes\")\nresult = {\"cells\": int(adata.n_obs), \"genes\": int(adata.n_vars), \"output_path\": \"data/pbmc3k_raw.h5ad\"}\n"
+}

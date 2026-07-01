@@ -1,0 +1,66 @@
+{
+  "template_id": "10x_scrnaseq_v1",
+  "name": "10x Genomics scRNA-seq (3')",
+  "description": "Standard single-cell RNA-seq analysis for 10x Genomics 3' gene expression data: QC, normalization, clustering, marker identification and basic visualization.",
+  "domain": "scrnaseq",
+  "applicable_intents": [
+    "analyze single cell rna seq",
+    "run scRNA-seq pipeline",
+    "cluster single cells",
+    "find marker genes"
+  ],
+  "tags": ["scRNA-seq", "10x Genomics", "clustering", "markers"],
+  "phase_defaults": {
+    "qc": {
+      "min_genes_per_cell": 200,
+      "min_cells_per_gene": 3,
+      "max_mt_percent": 20,
+      "doublet_removal": true
+    },
+    "normalize": {
+      "method": "log1p",
+      "target_sum": 10000,
+      "highly_variable_genes": 2000
+    },
+    "cluster": {
+      "pca_dims": 30,
+      "neighbors": 15,
+      "resolution": 0.8
+    },
+    "markers": {
+      "method": "wilcoxon",
+      "min_logfoldchange": 0.25,
+      "max_cells_per_group": 1000
+    },
+    "visualize": {
+      "umap": true,
+      "tsne": false,
+      "dotplot_top_n": 10
+    }
+  },
+  "preferred_skills": {
+    "qc": "single-cell-qc",
+    "normalize": "single-cell-normalize",
+    "cluster": "single-cell-cluster",
+    "markers": "single-cell-markers",
+    "visualize": "single-cell-plot"
+  },
+  "default_parameters": {
+    "organism": "human",
+    "reference": "GRCh38",
+    "annotation": "celltype",
+    "batch_correction": false,
+    "output_formats": ["h5ad", "csv", "png"]
+  },
+  "sop_ids": [],
+  "data_sources": [
+    {
+      "name": "10x example dataset",
+      "description": "Default 10x PBMC-like example dataset",
+      "type": "example",
+      "url": "https://www.10xgenomics.com/resources/datasets"
+    }
+  ],
+  "icon": "microscope",
+  "version": "1.0.0"
+}

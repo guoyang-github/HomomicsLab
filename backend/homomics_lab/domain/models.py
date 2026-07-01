@@ -19,6 +19,10 @@ class DomainPhase(BaseModel):
         default=None,
         description="Default skill if none specified",
     )
+    unresolvable: bool = Field(
+        default=False,
+        description="True when none of the referenced skills could be resolved at load time",
+    )
 
 
 class DomainPhaseTransition(BaseModel):
@@ -165,6 +169,12 @@ class DomainDefinition(BaseModel):
     data_state_schema: Dict[str, Any] = Field(
         default_factory=dict,
         description="Schema for domain-specific DataState fields",
+    )
+
+    # Loader warnings (populated when a domain is loaded with missing skills)
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Non-fatal issues encountered while loading the domain",
     )
 
     # Skills directory (relative to domain.yaml)

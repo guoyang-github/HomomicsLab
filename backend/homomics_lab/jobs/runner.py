@@ -176,6 +176,15 @@ class BackgroundJobRunner:
                         job.error_message,
                     )
                     cognify_handled = True
+                else:
+                    coro = runner.execute_tree(
+                        tree=job.task_tree,
+                        working_memory=job.working_memory,
+                        project_id=job.project_id,
+                        trace_id=job_id,
+                        session_id=job.session_id,
+                        plan_id=job.plan_id,
+                    )
 
                 if not cognify_handled:
                     result = await asyncio.wait_for(coro, timeout=timeout)
@@ -307,11 +316,20 @@ class BackgroundJobRunner:
     ):
         # Local import to avoid a circular dependency between jobs.runner
         # and agent.turn_runner at module load time.
+        from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
         from homomics_lab.agent.turn_runner import TurnRunner
         from homomics_lab.knowledge.cbkb import CBKB
+        from homomics_lab.workflow.execution_service import WorkflowExecutionService
 
         cbkb = CBKB(settings.data_dir)
-        return TurnRunner(progress_callback=progress_callback, cbkb=cbkb)
+        analysis_template_store = AnalysisTemplateStore(settings.data_dir)
+        workflow_service = WorkflowExecutionService(progress_callback=progress_callback)
+        return TurnRunner(
+            progress_callback=progress_callback,
+            cbkb=cbkb,
+            analysis_template_store=analysis_template_store,
+            workflow_execution_service=workflow_service,
+        )
 
     @staticmethod
     def _create_repro_engine(job: Job) -> ReproducibilityEngine:

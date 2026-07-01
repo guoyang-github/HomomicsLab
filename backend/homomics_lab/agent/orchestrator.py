@@ -2,9 +2,11 @@ import asyncio
 import dataclasses
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
+from homomics_lab.config import settings
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.message_bus import AgentMessageBus
@@ -16,12 +18,14 @@ from homomics_lab.agent.supervisor import SupervisorAgent
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.models.common import AgentType, HITLCheckpoint, HITLTrigger, Option, TaskStatus
+from homomics_lab.skills.registry import SkillRegistry, get_default_registry as get_default_skill_registry
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.state_machine import TaskStateMachine
 from homomics_lab.tasks.task_tree import TaskTree
 from homomics_lab.hitl.detector import HITLDetector
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.observability.trace_store import TraceStore
+from homomics_lab.workflow.cache import WorkflowCache
 
 
 _UNSET = object()
@@ -42,8 +46,12 @@ class Orchestrator:
         message_bus: Optional[AgentMessageBus] = None,
         interpretation_engine: Optional[InterpretationEngine] = _UNSET,
         cbkb: Optional[CBKB] = None,
+        skill_registry: Optional[SkillRegistry] = None,
+        workflow_cache: Optional[WorkflowCache] = None,
     ):
         self.registry = registry or get_default_registry()
+        self.skill_registry = skill_registry or get_default_skill_registry()
+        self.workflow_cache = workflow_cache
         self.state_machine = TaskStateMachine()
         self.hitl_detector = HITLDetector()
         self._progress_callback = progress_callback
@@ -67,6 +75,157 @@ class Orchestrator:
             from homomics_lab.evolution.ingestion import CBKBIngestionService
 
             self._ingestion_service = CBKBIngestionService(self.cbkb)
+
+    def _resolve_skill_definition(self, task: TaskNode) -> Optional[Any]:
+        """Resolve the SkillDefinition a task will execute, if known."""
+        skill_id = task.skills_required[0] if task.skills_required else None
+        if not skill_id:
+            return None
+        skill = self.skill_registry.get(skill_id)
+        if skill is not None:
+            return skill
+        if self.replanning_engine is not None and self.replanning_engine.skill_dag is not None:
+            return self.replanning_engine.skill_dag.registry.get(skill_id)
+        return None
+
+    def _collect_workspace_inputs(self, task: TaskNode, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Collect file inputs that should participate in the cache key."""
+        workspace_inputs: Dict[str, Any] = {}
+        for key, value in task.parameters.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file():
+                    workspace_inputs[key] = path
+                else:
+                    workspace_inputs[key] = str(value)
+            elif isinstance(value, dict) and "path" in value:
+                path = Path(value["path"])
+                if path.is_file():
+                    workspace_inputs[key] = path
+                else:
+                    workspace_inputs[key] = str(value["path"])
+            else:
+                workspace_inputs[key] = value
+
+        ctx_inputs = context.get("workspace_inputs") if context else None
+        if isinstance(ctx_inputs, dict):
+            for key, value in ctx_inputs.items():
+                if key not in workspace_inputs:
+                    if isinstance(value, (str, Path)):
+                        path = Path(value)
+                        workspace_inputs[key] = path if path.is_file() else str(value)
+                    else:
+                        workspace_inputs[key] = value
+        return workspace_inputs
+
+    def _try_restore_from_cache(
+        self,
+        tree: TaskTree,
+        task: TaskNode,
+        results: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> bool:
+        """Restore a task from the workflow cache if possible.
+
+        Returns True when the task was completed from cache.
+        """
+        if self.workflow_cache is None or not getattr(settings, "workflow_cache_enabled", True):
+            return False
+
+        skill = self._resolve_skill_definition(task)
+        upstream_results = {dep_id: results[dep_id] for dep_id in task.dependencies if dep_id in results}
+        workspace_inputs = self._collect_workspace_inputs(task, context)
+        key = self.workflow_cache.compute_task_key(
+            task,
+            skill=skill,
+            upstream_results=upstream_results,
+            workspace_inputs=workspace_inputs,
+        )
+        entry = self.workflow_cache.get(key)
+        if entry is None or not entry.success:
+            task.input_hash = key
+            task.cache_key = key
+            return False
+
+        task.input_hash = key
+        task.output_hash = self.workflow_cache.compute_hash(entry.result)
+        task.cache_key = key
+        task.cache_hit = True
+        task.result = entry.result
+        results[task.id] = entry.result
+        self.state_machine.transition(task, TaskStatus.RUNNING)
+        self.state_machine.transition(task, TaskStatus.COMPLETED)
+        self._publish_task_update(tree, task, "COMPLETED")
+        return True
+
+    def _collect_artifacts_from_result(self, result: Dict[str, Any]) -> List[Path]:
+        """Collect output file paths from a result dict for caching."""
+        artifacts: List[Path] = []
+        for key in ("output_files", "artifacts", "output_paths"):
+            value = result.get(key)
+            if not isinstance(value, list):
+                continue
+            for item in value:
+                if isinstance(item, (str, Path)):
+                    path = Path(item)
+                    if path.exists():
+                        artifacts.append(path)
+                elif isinstance(item, dict):
+                    path_str = item.get("path") or item.get("file")
+                    if path_str:
+                        path = Path(path_str)
+                        if path.exists():
+                            artifacts.append(path)
+        for key, value in result.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.exists() and path.is_file():
+                    artifacts.append(path)
+        return artifacts
+
+    def _cache_task_result(
+        self,
+        task: TaskNode,
+        results: Dict[str, Any],
+        context: Dict[str, Any],
+    ) -> None:
+        """Store a successful task result in the workflow cache."""
+        if self.workflow_cache is None or not getattr(settings, "workflow_cache_enabled", True):
+            return
+        if task.cache_hit:
+            return
+        result = results.get(task.id)
+        if not isinstance(result, dict):
+            return
+        if result.get("status") == "error" or result.get("error"):
+            return
+        if result.get("status") == "awaiting_human":
+            return
+
+        skill = self._resolve_skill_definition(task)
+        upstream_results = {dep_id: results[dep_id] for dep_id in task.dependencies if dep_id in results}
+        workspace_inputs = self._collect_workspace_inputs(task, context)
+        key = self.workflow_cache.compute_task_key(
+            task,
+            skill=skill,
+            upstream_results=upstream_results,
+            workspace_inputs=workspace_inputs,
+        )
+        task.input_hash = key
+        task.output_hash = self.workflow_cache.compute_hash(result)
+        task.cache_key = key
+        task.cache_hit = False
+        artifacts = self._collect_artifacts_from_result(result)
+        self.workflow_cache.put(
+            key,
+            result,
+            artifacts=artifacts,
+            metadata={
+                "task_name": task.name,
+                "skill_id": skill.id if skill is not None else task.name,
+                "skill_version": skill.version if skill is not None else "unknown",
+            },
+        )
 
     async def run_tree(self, tree: TaskTree, context: Dict[str, Any] = None) -> Dict[str, Any]:
         context = context or {}
@@ -94,6 +253,9 @@ class Orchestrator:
             executable_tasks: List[Any] = []
             for task in ready_tasks:
                 if task.status in (TaskStatus.COMPLETED, TaskStatus.ABORTED):
+                    continue
+
+                if self._try_restore_from_cache(tree, task, results, context):
                     continue
 
                 checkpoint = self.hitl_detector.check(task, context)
@@ -295,7 +457,9 @@ class Orchestrator:
         # the interpretation recommends it (e.g. missing downstream step).
         await self._maybe_adaptive_replan(tree, task, result, context)
 
-        # Gate passed.
+        # Gate passed — cache the successful result for incremental replay.
+        self._cache_task_result(task, results, context)
+
         self.state_machine.transition(task, TaskStatus.COMPLETED)
         self._publish_task_update(tree, task, "COMPLETED")
 
@@ -400,6 +564,7 @@ class Orchestrator:
                     )
                 )
             else:
+                self._cache_task_result(task, results, context)
                 self.state_machine.transition(task, TaskStatus.COMPLETED)
 
         # Continue with remaining tasks

@@ -1,7 +1,8 @@
+import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -31,12 +32,14 @@ router = APIRouter()
 class ProjectCreate(BaseModel):
     name: str
     description: str = ""
+    template_id: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
     id: str
     name: str
     description: str
+    template_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -45,6 +48,19 @@ class ProjectResponse(BaseModel):
 
 def _generate_project_id() -> str:
     return f"proj_{uuid.uuid4().hex[:8]}"
+
+
+def _load_project_template_id(project_id: str) -> Optional[str]:
+    """Read the template_id associated with a project from workspace metadata."""
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    config_path = ws.workspace_dir / ".metadata" / "project_config.json"
+    if not config_path.exists():
+        return None
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        return config.get("template_id")
+    except Exception:
+        return None
 
 
 @router.post("", response_model=ProjectResponse)
@@ -66,10 +82,29 @@ async def create_project(
     db.add(record)
     await db.commit()
     await db.refresh(record)
+
+    # Persist optional template association in workspace metadata so it survives
+    # exports/imports and does not require a database migration.
+    if project.template_id:
+        ws = WorkspaceManager(settings.data_dir, project_id)
+        config_path = ws.workspace_dir / ".metadata" / "project_config.json"
+        config = {}
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text(encoding="utf-8"))
+            except Exception:
+                config = {}
+        config["template_id"] = project.template_id
+        config_path.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
     return ProjectResponse(
         id=record.project_id,
         name=record.name,
         description=record.description,
+        template_id=project.template_id,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -98,6 +133,7 @@ async def list_projects(
             id=r.project_id,
             name=r.name,
             description=r.description,
+            template_id=_load_project_template_id(r.project_id),
             created_at=r.created_at,
             updated_at=r.updated_at,
         )
@@ -126,6 +162,7 @@ async def get_project(
         id=record.project_id,
         name=record.name,
         description=record.description,
+        template_id=_load_project_template_id(project_id),
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

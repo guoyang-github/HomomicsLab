@@ -58,6 +58,7 @@ class SkillSemanticSearch:
                 skill.description,
                 skill.category,
             ]
+            text_parts.extend(skill.metadata.get("tags", []))
             text_parts.extend(skill.metadata.get("keywords", []))
             text_parts.extend(skill.metadata.get("supported_tools", []))
             text_parts.append(skill.metadata.get("primary_tool", ""))

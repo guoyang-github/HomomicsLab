@@ -10,7 +10,7 @@ interface ProjectState {
   error: string | null
 
   fetchProjects: () => Promise<void>
-  createProject: (name: string, description?: string) => Promise<Project | null>
+  createProject: (name: string, description?: string, templateId?: string) => Promise<Project | null>
   setCurrentProject: (id: string) => void
   clearError: () => void
 }
@@ -47,10 +47,10 @@ export const useProjectStore = create<ProjectState>()(
         }
       },
 
-      createProject: async (name, description = '') => {
+      createProject: async (name, description = '', templateId) => {
         set({ loading: true, error: null })
         try {
-          const response = await projectApi.createProject({ name, description })
+          const response = await projectApi.createProject({ name, description, template_id: templateId })
           const project = response.data
           set((state) => ({
             projects: [project, ...state.projects],

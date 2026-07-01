@@ -55,6 +55,13 @@ async def lifespan(app: FastAPI):
     app.state.llm_cache = ctx["llm_cache"]
     app.state.knowledge_index = ctx["knowledge_index"]
 
+    # Analysis templates: scenario presets for plan generation.
+    analysis_template_store = ctx["analysis_template_store"]
+    app.state.analysis_template_store = analysis_template_store
+
+    # Workflow execution service: routes Plans to local orchestrator or Nextflow.
+    app.state.workflow_execution_service = ctx["workflow_execution_service"]
+
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
     cbkb = ctx["cbkb"]
     app.state.cbkb = cbkb
