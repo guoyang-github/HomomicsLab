@@ -14,6 +14,8 @@ Usage:
     report = checker.run_all_checks()
 """
 
+import asyncio
+import inspect
 import shutil
 import sys
 import time
@@ -65,19 +67,49 @@ class HealthChecker:
     def __init__(self, skill_executor=None):
         self.skill_executor = skill_executor
 
-    async def run_all_checks(self) -> HealthReport:
+    async def _run_with_timeout(
+        self, name: str, coro_or_result, timeout: float
+    ) -> CheckResult:
+        """Run a single check, enforcing a timeout for async checks."""
+        if inspect.iscoroutine(coro_or_result):
+            try:
+                return await asyncio.wait_for(coro_or_result, timeout=timeout)
+            except asyncio.TimeoutError:
+                return CheckResult(
+                    name=name,
+                    status="error",
+                    message=f"Health check '{name}' timed out after {timeout}s",
+                    details={"timeout_seconds": timeout},
+                )
+        return coro_or_result
+
+    async def run_all_checks(self, timeout_seconds: float = 5.0) -> HealthReport:
         """Execute all health checks and compile report."""
-        checks = [
-            self._check_python_version(),
-            self._check_core_dependencies(),
-            self._check_optional_dependencies(),
-            await self._check_database(),
-            await self._check_redis(),
-            await self._check_storage(),
-            self._check_skill_system(),
-            self._check_disk_space(),
-            self._check_hpc_schedulers(),
-        ]
+        checks = await asyncio.gather(
+            self._run_with_timeout(
+                "python_version", self._check_python_version(), timeout_seconds
+            ),
+            self._run_with_timeout(
+                "core_dependencies", self._check_core_dependencies(), timeout_seconds
+            ),
+            self._run_with_timeout(
+                "optional_dependencies",
+                self._check_optional_dependencies(),
+                timeout_seconds,
+            ),
+            self._run_with_timeout("database", self._check_database(), timeout_seconds),
+            self._run_with_timeout("redis", self._check_redis(), timeout_seconds),
+            self._run_with_timeout("storage", self._check_storage(), timeout_seconds),
+            self._run_with_timeout(
+                "skill_system", self._check_skill_system(), timeout_seconds
+            ),
+            self._run_with_timeout(
+                "disk_space", self._check_disk_space(), timeout_seconds
+            ),
+            self._run_with_timeout(
+                "hpc_schedulers", self._check_hpc_schedulers(), timeout_seconds
+            ),
+        )
 
         # Determine overall status
         statuses = [c.status for c in checks]
@@ -99,7 +131,9 @@ class HealthChecker:
         version_info = sys.version_info
         version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
 
-        if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
+        if version_info.major < 3 or (
+            version_info.major == 3 and version_info.minor < 10
+        ):
             return CheckResult(
                 name="python_version",
                 status="error",
@@ -195,9 +229,7 @@ class HealthChecker:
 
         registry = self.skill_executor.registry
         skills = registry.list_all()
-        builtin_count = sum(
-            1 for s in skills if s.metadata.get("source") == "builtin"
-        )
+        builtin_count = sum(1 for s in skills if s.metadata.get("source") == "builtin")
         external_count = sum(
             1 for s in skills if s.metadata.get("source") == "external"
         )
@@ -227,8 +259,8 @@ class HealthChecker:
         """Check available disk space."""
         try:
             stat = shutil.disk_usage("/tmp")
-            total_gb = stat.total / (1024 ** 3)
-            free_gb = stat.free / (1024 ** 3)
+            total_gb = stat.total / (1024**3)
+            free_gb = stat.free / (1024**3)
             used_pct = (stat.used / stat.total) * 100
 
             details = {
@@ -305,7 +337,10 @@ class HealthChecker:
                     name="database",
                     status="ok",
                     message="Database connection succeeded",
-                    details={"url": self._mask_url(settings.database_url), "latency_ms": round(latency, 2)},
+                    details={
+                        "url": self._mask_url(settings.database_url),
+                        "latency_ms": round(latency, 2),
+                    },
                 )
             return CheckResult(
                 name="database",
@@ -348,7 +383,10 @@ class HealthChecker:
                     name="redis",
                     status="ok",
                     message="Redis ping succeeded",
-                    details={"url": self._mask_url(settings.redis_url), "latency_ms": round(latency, 2)},
+                    details={
+                        "url": self._mask_url(settings.redis_url),
+                        "latency_ms": round(latency, 2),
+                    },
                 )
             return CheckResult(
                 name="redis",
@@ -381,13 +419,19 @@ class HealthChecker:
                     name="storage",
                     status="ok",
                     message="Object storage backend is reachable",
-                    details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+                    details={
+                        "backend": settings.storage_backend,
+                        "latency_ms": round(latency, 2),
+                    },
                 )
             return CheckResult(
                 name="storage",
                 status="error",
                 message="Object storage backend health check failed",
-                details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+                details={
+                    "backend": settings.storage_backend,
+                    "latency_ms": round(latency, 2),
+                },
             )
         except Exception as exc:
             latency = (time.perf_counter() - start) * 1000
@@ -395,7 +439,10 @@ class HealthChecker:
                 name="storage",
                 status="error",
                 message=f"Storage backend check failed: {exc}",
-                details={"backend": settings.storage_backend, "latency_ms": round(latency, 2)},
+                details={
+                    "backend": settings.storage_backend,
+                    "latency_ms": round(latency, 2),
+                },
             )
 
     @staticmethod

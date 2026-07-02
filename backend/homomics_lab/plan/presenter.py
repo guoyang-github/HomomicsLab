@@ -73,11 +73,30 @@ class PlanPresenter:
             for t in plan.plan_result.phase_transitions
         ]
 
+        trace = plan.plan_result.strategy_trace
+        template_id = None
+        template_name = None
+        strategy_candidates = []
+        quality_score = None
+        rationale_summary = ""
+        if trace is not None:
+            template_id = trace.applied_template_id
+            template_name = trace.applied_template_name
+            strategy_candidates = trace.strategy_candidates
+            quality_score = trace.quality_score
+            rationale_summary = PlanPresenter._build_rationale_summary(plan, trace)
+
         return {
             "plan_id": plan.plan_id,
             "status": plan.status,
             "is_fallback": plan.is_fallback,
             "intent_analysis_type": plan.intent_analysis_type,
+            "strategy_name": plan.plan_result.strategy_name,
+            "template_id": template_id,
+            "template_name": template_name,
+            "rationale_summary": rationale_summary,
+            "strategy_candidates": strategy_candidates,
+            "quality_score": quality_score,
             "phases": phases,
             "transitions": transitions,
             "gaps": gaps,
@@ -87,6 +106,28 @@ class PlanPresenter:
             "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
             "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
         }
+
+    @staticmethod
+    def _build_rationale_summary(plan: Plan, trace) -> str:
+        """Build a short human-readable rationale for why this plan was chosen."""
+        phase_count = len(plan.plan_result.phases)
+        candidate_names = ", ".join(
+            f"{c['name']}({c['score']})" for c in trace.strategy_candidates[:3]
+        )
+        if plan.plan_result.is_fallback:
+            return (
+                f"未找到完全匹配的策略，已使用 fallback 计划（{phase_count} 个步骤）。"
+                f"候选策略：{candidate_names}。"
+            )
+        template_part = ""
+        if trace.applied_template_id:
+            template_name = trace.applied_template_name or trace.applied_template_id
+            template_part = f"并应用了模板 '{template_name}'。"
+        return (
+            f"根据意图 '{trace.intent_analysis_type}' 选择了策略 '{trace.selected_strategy_name}'，"
+            f"包含 {phase_count} 个步骤。{template_part}"
+            f"候选策略：{candidate_names}。"
+        )
 
     @classmethod
     async def to_summary(
@@ -103,7 +144,10 @@ class PlanPresenter:
         """
         phase_count = len(plan.plan_result.phases)
 
-        if llm_client is None or not getattr(llm_client, "is_configured", lambda: False)():
+        if (
+            llm_client is None
+            or not getattr(llm_client, "is_configured", lambda: False)()
+        ):
             return cls._fallback_summary(plan, language, phase_count)
 
         plan_metadata = {

@@ -1,6 +1,7 @@
 """Global pytest configuration for the HomomicsLab backend."""
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -15,9 +16,40 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 # Disable external skill repository discovery and MCP client in tests. Both can
 # trigger network or subprocess calls during bootstrap, causing unrelated test
 # timeouts.
-settings.external_skills_dirs = []
 settings.mcp_enabled = False
 settings.auto_load_domain_strategies = False
+settings.skill_sibling_discovery_enabled = False
+settings.external_skills_dirs = []
+
+# Use the locally cached sentence-transformers model to avoid network fallback
+# attempts for other default models.
+settings.embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+class _FakeEmbeddingProvider:
+    """Deterministic, zero-cost embedding provider for test bootstrapping."""
+
+    def __init__(self, dimension: int = 8):
+        self._dimension = dimension
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def encode(self, texts):
+        return [[0.0] * self._dimension for _ in texts]
+
+    def is_available(self) -> bool:
+        return True
+
+
+# Seed the embedding-provider singleton before bootstrap so heavy models are not
+# loaded during short-lived API/integration tests.  Tests that need real
+# embeddings reset the singleton and configure the provider themselves.
+from homomics_lab.embeddings import factory as _embedding_factory  # noqa: E402
+
+_embedding_factory._provider_instance = _FakeEmbeddingProvider()
+
 
 # Force app bootstrap to disable hot-reload watchers in tests; they can block
 # TestClient lifespan shutdown and are not needed for unit tests.
@@ -43,4 +75,3 @@ def sandbox_backend_local(monkeypatch):
     where Docker is misconfigured, causing unrelated test failures.
     """
     monkeypatch.setattr(settings, "skill_sandbox_backend", "local")
-

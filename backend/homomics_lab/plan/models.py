@@ -31,6 +31,7 @@ class Plan(BaseModel):
     is_fallback: bool = False
     intent_analysis_type: str
     intent_complexity: Optional[str] = None
+    original_intent: Optional[Dict[str, Any]] = None
     plan_result: PlanResult
     task_tree: TaskTree
     working_memory: Optional[WorkingMemory] = None

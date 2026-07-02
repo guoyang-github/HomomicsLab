@@ -9,9 +9,10 @@ from fastapi.responses import JSONResponse
 from homomics_lab.api.audit import audit_middleware
 from homomics_lab.api.rate_limit import update_limiter_config
 from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
-from homomics_lab.bootstrap import bootstrap_worker_context
+from homomics_lab.bootstrap import bootstrap_worker_context, close_worker_context
 from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
+from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.settings_store import apply_runtime_settings
 from homomics_lab.logging_config import (
     configure_logging,
@@ -25,7 +26,7 @@ from homomics_lab.api.router import api_router
 from homomics_lab.tracing import instrument_fastapi, setup_tracing
 
 
-configure_logging(level="INFO" if not settings.debug else "DEBUG", json_format=True)
+configure_logging(level=settings.log_level, json_format=settings.log_json_format)
 setup_tracing(service_name=settings.otel_service_name)
 
 
@@ -34,7 +35,9 @@ async def lifespan(app: FastAPI):
     # Load any runtime setting overrides before bootstrapping dependent services.
     apply_runtime_settings(settings)
 
-    ctx = await bootstrap_worker_context(enable_hot_reload=settings.skill_hot_reload_enabled)
+    ctx = await bootstrap_worker_context(
+        enable_hot_reload=settings.skill_hot_reload_enabled
+    )
 
     # Expose initialized registries for API endpoints
     app.state.tool_registry = ctx["tool_registry"]
@@ -74,6 +77,9 @@ async def lifespan(app: FastAPI):
     # Plan store for persisted, versioned execution plans
     app.state.plan_store = PlanStore()
 
+    # Execution trace store for plan/job-level observability
+    app.state.trace_store = TraceStore()
+
     # Start background job worker only when worker_mode is enabled.
     # Queued jobs persisted before a restart are recovered into the queue.
     app.state.job_service = JobService()
@@ -90,16 +96,9 @@ async def lifespan(app: FastAPI):
     # Shutdown: stop scheduler, background worker, and hot-reload watchers
     await app.state.scheduler.shutdown()
     await app.state.job_service.close()
-    if app.state.mcp_client is not None:
-        await app.state.mcp_client.close()
-    if app.state.domain_reloader is not None:
-        await app.state.domain_reloader.stop()
-    if app.state.skill_reloader is not None:
-        await app.state.skill_reloader.stop()
-    if app.state.capability_index is not None:
-        await app.state.capability_index.close()
-    if app.state.knowledge_index is not None:
-        await app.state.knowledge_index.close()
+    if getattr(app.state, "trace_store", None) is not None:
+        app.state.trace_store = None
+    await close_worker_context(ctx)
 
 
 app = FastAPI(

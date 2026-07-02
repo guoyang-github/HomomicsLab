@@ -1,6 +1,8 @@
 """SQLAlchemy ORM models for persistent entities."""
 
 from datetime import datetime, timezone
+from typing import Optional
+
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -85,6 +87,7 @@ class PlanRecord(Base):
     is_fallback: Mapped[bool] = mapped_column(Boolean, default=False)
     intent_analysis_type: Mapped[str] = mapped_column(String)
     intent_complexity: Mapped[str] = mapped_column(String, nullable=True)
+    original_intent_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     plan_result_json: Mapped[str] = mapped_column(Text)
     task_tree_json: Mapped[str] = mapped_column(Text)
     working_memory_json: Mapped[str] = mapped_column(Text, nullable=True)

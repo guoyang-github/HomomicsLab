@@ -19,6 +19,7 @@ from fastapi import Request, Response
 
 try:
     from prometheus_client import (
+        CollectorRegistry,
         Counter,
         Gauge,
         Histogram,
@@ -26,16 +27,26 @@ try:
         generate_latest,
         CONTENT_TYPE_LATEST,
     )
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
+    CollectorRegistry = None  # type: ignore[misc,assignment]
     _PROMETHEUS_AVAILABLE = False
 
 from homomics_lab import __version__
 
 
 if _PROMETHEUS_AVAILABLE:
+    # Use a dedicated registry so multiple app instances or test runs do not
+    # collide with the global default registry.
+    REGISTRY = CollectorRegistry()
+
     # Application info
-    APP_INFO = Info("homomicslab", "HomomicsLab application information")
+    APP_INFO = Info(
+        "homomicslab",
+        "HomomicsLab application information",
+        registry=REGISTRY,
+    )
     APP_INFO.info({"version": __version__})
 
     # HTTP metrics
@@ -43,17 +54,34 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_http_requests_total",
         "Total HTTP requests",
         ["method", "endpoint", "status_code"],
+        registry=REGISTRY,
     )
     HTTP_REQUEST_DURATION = Histogram(
         "homomicslab_http_request_duration_seconds",
         "HTTP request duration",
         ["method", "endpoint"],
-        buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
+        buckets=[
+            0.005,
+            0.01,
+            0.025,
+            0.05,
+            0.1,
+            0.25,
+            0.5,
+            1.0,
+            2.5,
+            5.0,
+            10.0,
+            30.0,
+            60.0,
+        ],
+        registry=REGISTRY,
     )
     HTTP_REQUESTS_IN_PROGRESS = Gauge(
         "homomicslab_http_requests_in_progress",
         "HTTP requests currently in progress",
         ["method", "endpoint"],
+        registry=REGISTRY,
     )
 
     # LLM metrics
@@ -61,37 +89,44 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_llm_requests_total",
         "Total LLM requests",
         ["model"],
+        registry=REGISTRY,
     )
     LLM_TOKENS_TOTAL = Counter(
         "homomicslab_llm_tokens_total",
         "Total LLM tokens consumed",
         ["model", "token_type"],
+        registry=REGISTRY,
     )
     LLM_COST_USD = Counter(
         "homomicslab_llm_cost_usd_total",
         "Total estimated LLM cost in USD",
         ["model"],
+        registry=REGISTRY,
     )
     LLM_REQUEST_DURATION = Histogram(
         "homomicslab_llm_request_duration_seconds",
         "LLM request duration",
         ["model", "provider"],
         buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
+        registry=REGISTRY,
     )
     LLM_REQUEST_ERRORS_TOTAL = Counter(
         "homomicslab_llm_request_errors_total",
         "Total LLM request errors",
         ["model", "provider", "error_type"],
+        registry=REGISTRY,
     )
     LLM_FALLBACK_TOTAL = Counter(
         "homomicslab_llm_fallback_total",
         "Total LLM fallback events",
         ["reason", "from_model", "to_model"],
+        registry=REGISTRY,
     )
     LLM_CACHE_HITS_TOTAL = Counter(
         "homomicslab_llm_cache_hits_total",
         "Total LLM cache hits",
         ["model"],
+        registry=REGISTRY,
     )
 
     # Intent metrics
@@ -99,16 +134,19 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_intent_decisions_total",
         "Total intent classification decisions",
         ["intent", "confidence_bucket"],
+        registry=REGISTRY,
     )
     INTENT_CLARIFICATION_TOTAL = Counter(
         "homomicslab_intent_clarification_total",
         "Total intent clarification requests",
         ["intent"],
+        registry=REGISTRY,
     )
     INTENT_LOW_CONFIDENCE_TOTAL = Counter(
         "homomicslab_intent_low_confidence_total",
         "Total low-confidence intent decisions",
         ["intent"],
+        registry=REGISTRY,
     )
 
     # Skill/job metrics
@@ -116,10 +154,38 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_skill_executions_total",
         "Total skill executions",
         ["skill_id", "executor_type", "status"],
+        registry=REGISTRY,
     )
     ACTIVE_JOBS = Gauge(
         "homomicslab_active_jobs",
         "Number of jobs currently running or queued",
+        registry=REGISTRY,
+    )
+
+    # Plan metrics
+    PLANS_CREATED_TOTAL = Counter(
+        "homomicslab_plans_created_total",
+        "Total plans created",
+        ["strategy", "is_fallback"],
+        registry=REGISTRY,
+    )
+    PLAN_APPROVALS_TOTAL = Counter(
+        "homomicslab_plan_approvals_total",
+        "Total plan approval decisions",
+        ["decision"],
+        registry=REGISTRY,
+    )
+    PLAN_STRATEGY_SWITCHES_TOTAL = Counter(
+        "homomicslab_plan_strategy_switches_total",
+        "Total plan strategy switches",
+        ["original_strategy", "new_strategy"],
+        registry=REGISTRY,
+    )
+    PLAN_RATIONALE_REQUESTS_TOTAL = Counter(
+        "homomicslab_plan_rationale_requests_total",
+        "Total plan rationale requests",
+        ["strategy"],
+        registry=REGISTRY,
     )
 
     # Context engine metrics
@@ -127,34 +193,41 @@ if _PROMETHEUS_AVAILABLE:
         "homomicslab_context_engine_builds_total",
         "Total ContextEngine builds",
         ["model"],
+        registry=REGISTRY,
     )
     CONTEXT_USAGE_TOKENS = Histogram(
         "homomicslab_context_usage_tokens",
         "Input tokens used in assembled context",
         ["model"],
         buckets=[500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000],
+        registry=REGISTRY,
     )
     CONTEXT_COMPRESSION_RATE = Histogram(
         "homomicslab_context_compression_rate",
         "Ratio of kept parts to total candidate parts",
         buckets=[0.0, 0.25, 0.5, 0.75, 1.0],
+        registry=REGISTRY,
     )
     CONTEXT_DROPPED_PARTS_TOTAL = Counter(
         "homomicslab_context_dropped_parts_total",
         "Total context parts dropped by the ContextEngine",
         ["source"],
+        registry=REGISTRY,
     )
     CONTEXT_SOURCE_TOKENS = Gauge(
         "homomicslab_context_source_tokens",
         "Tokens contributed by each context source before compression",
         ["source", "model"],
+        registry=REGISTRY,
     )
     CONTEXT_DROPPED_BY_DUPLICATE_TOTAL = Counter(
         "homomicslab_context_dropped_by_duplicate_total",
         "Total context parts dropped as duplicates",
         ["source"],
+        registry=REGISTRY,
     )
 else:
+    REGISTRY = None
     APP_INFO = None
     HTTP_REQUESTS_TOTAL = None
     HTTP_REQUEST_DURATION = None
@@ -171,6 +244,10 @@ else:
     INTENT_LOW_CONFIDENCE_TOTAL = None
     SKILL_EXECUTIONS_TOTAL = None
     ACTIVE_JOBS = None
+    PLANS_CREATED_TOTAL = None
+    PLAN_APPROVALS_TOTAL = None
+    PLAN_STRATEGY_SWITCHES_TOTAL = None
+    PLAN_RATIONALE_REQUESTS_TOTAL = None
     CONTEXT_ENGINE_BUILDS_TOTAL = None
     CONTEXT_USAGE_TOKENS = None
     CONTEXT_COMPRESSION_RATE = None
@@ -186,14 +263,17 @@ def metrics_endpoint() -> Response:
             content="# Prometheus client not installed. Run: pip install prometheus-client\n",
             media_type="text/plain",
         )
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 
 def _normalize_path(path: str) -> str:
     """Normalize dynamic path segments for stable metric labels."""
     # Replace UUID-like and hex IDs with placeholders.
     import re
-    path = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<uuid>", path)
+
+    path = re.sub(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<uuid>", path
+    )
     path = re.sub(r"[0-9a-f]{12,}", "<id>", path)
     path = re.sub(r"\d+", "<n>", path)
     return path
@@ -212,7 +292,9 @@ async def prometheus_middleware(request: Request, call_next: Callable) -> Respon
     try:
         response = await call_next(request)
     except Exception:
-        HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=path, status_code="500").inc()
+        HTTP_REQUESTS_TOTAL.labels(
+            method=method, endpoint=path, status_code="500"
+        ).inc()
         raise
     finally:
         HTTP_REQUESTS_IN_PROGRESS.labels(method=method, endpoint=path).dec()
@@ -225,7 +307,9 @@ async def prometheus_middleware(request: Request, call_next: Callable) -> Respon
     return response
 
 
-def record_llm_usage(model: str, prompt_tokens: int, completion_tokens: int, cost_usd: float) -> None:
+def record_llm_usage(
+    model: str, prompt_tokens: int, completion_tokens: int, cost_usd: float
+) -> None:
     """Record LLM usage in Prometheus metrics."""
     if not _PROMETHEUS_AVAILABLE:
         return
@@ -240,7 +324,9 @@ def record_skill_execution(skill_id: str, executor_type: str, success: bool) -> 
     if not _PROMETHEUS_AVAILABLE:
         return
     status = "success" if success else "failure"
-    SKILL_EXECUTIONS_TOTAL.labels(skill_id=skill_id, executor_type=executor_type, status=status).inc()
+    SKILL_EXECUTIONS_TOTAL.labels(
+        skill_id=skill_id, executor_type=executor_type, status=status
+    ).inc()
 
 
 def set_active_jobs(count: int) -> None:
@@ -279,25 +365,33 @@ def record_context_build(
             CONTEXT_DROPPED_BY_DUPLICATE_TOTAL.labels(source=source).inc(count)
 
 
-def record_llm_request_duration(model: str, provider: str, duration_seconds: float) -> None:
+def record_llm_request_duration(
+    model: str, provider: str, duration_seconds: float
+) -> None:
     """Record LLM request duration."""
     if not _PROMETHEUS_AVAILABLE or LLM_REQUEST_DURATION is None:
         return
-    LLM_REQUEST_DURATION.labels(model=model, provider=provider).observe(duration_seconds)
+    LLM_REQUEST_DURATION.labels(model=model, provider=provider).observe(
+        duration_seconds
+    )
 
 
 def record_llm_error(model: str, provider: str, error_type: str) -> None:
     """Record an LLM request error."""
     if not _PROMETHEUS_AVAILABLE or LLM_REQUEST_ERRORS_TOTAL is None:
         return
-    LLM_REQUEST_ERRORS_TOTAL.labels(model=model, provider=provider, error_type=error_type).inc()
+    LLM_REQUEST_ERRORS_TOTAL.labels(
+        model=model, provider=provider, error_type=error_type
+    ).inc()
 
 
 def record_llm_fallback(reason: str, from_model: str, to_model: str) -> None:
     """Record an LLM fallback event."""
     if not _PROMETHEUS_AVAILABLE or LLM_FALLBACK_TOTAL is None:
         return
-    LLM_FALLBACK_TOTAL.labels(reason=reason, from_model=from_model, to_model=to_model).inc()
+    LLM_FALLBACK_TOTAL.labels(
+        reason=reason, from_model=from_model, to_model=to_model
+    ).inc()
 
 
 def record_llm_cache_hit(model: str) -> None:
@@ -321,7 +415,9 @@ def record_intent_decision(intent: str, confidence: float) -> None:
     """Record an intent classification decision."""
     if not _PROMETHEUS_AVAILABLE or INTENT_DECISIONS_TOTAL is None:
         return
-    INTENT_DECISIONS_TOTAL.labels(intent=intent, confidence_bucket=_confidence_bucket(confidence)).inc()
+    INTENT_DECISIONS_TOTAL.labels(
+        intent=intent, confidence_bucket=_confidence_bucket(confidence)
+    ).inc()
 
 
 def record_intent_clarification(intent: str) -> None:
@@ -336,6 +432,39 @@ def record_intent_low_confidence(intent: str) -> None:
     if not _PROMETHEUS_AVAILABLE or INTENT_LOW_CONFIDENCE_TOTAL is None:
         return
     INTENT_LOW_CONFIDENCE_TOTAL.labels(intent=intent).inc()
+
+
+def record_plan_created(strategy: str, is_fallback: bool) -> None:
+    """Record that a new plan was created."""
+    if not _PROMETHEUS_AVAILABLE or PLANS_CREATED_TOTAL is None:
+        return
+    PLANS_CREATED_TOTAL.labels(
+        strategy=str(strategy), is_fallback=str(is_fallback).lower()
+    ).inc()
+
+
+def record_plan_approval(decision: str) -> None:
+    """Record an approval decision (approved/rejected/modified)."""
+    if not _PROMETHEUS_AVAILABLE or PLAN_APPROVALS_TOTAL is None:
+        return
+    PLAN_APPROVALS_TOTAL.labels(decision=decision).inc()
+
+
+def record_plan_strategy_switch(original_strategy: str, new_strategy: str) -> None:
+    """Record a plan strategy switch."""
+    if not _PROMETHEUS_AVAILABLE or PLAN_STRATEGY_SWITCHES_TOTAL is None:
+        return
+    PLAN_STRATEGY_SWITCHES_TOTAL.labels(
+        original_strategy=str(original_strategy),
+        new_strategy=str(new_strategy),
+    ).inc()
+
+
+def record_plan_rationale_request(strategy: str) -> None:
+    """Record a plan rationale request."""
+    if not _PROMETHEUS_AVAILABLE or PLAN_RATIONALE_REQUESTS_TOTAL is None:
+        return
+    PLAN_RATIONALE_REQUESTS_TOTAL.labels(strategy=str(strategy)).inc()
 
 
 _FEEDBACK_DB_PATH = Path("./homomics_lab_metrics.db")

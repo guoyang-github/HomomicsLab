@@ -170,6 +170,33 @@ class PlannedGap:
 
 
 @dataclass
+class StrategyTrace:
+    """Auditable trace of how a plan's strategy and template were chosen."""
+
+    intent_analysis_type: str
+    selected_strategy_name: str
+    intent_confidence: Optional[float] = None
+    intent_reason: Optional[str] = None
+    intent_alternatives: List[Dict[str, Any]] = field(default_factory=list)
+    strategy_candidates: List[Dict[str, Any]] = field(default_factory=list)
+    applied_template_id: Optional[str] = None
+    applied_template_name: Optional[str] = None
+    data_state_snapshot: Dict[str, Any] = field(default_factory=dict)
+    state_checks_triggered: List[Dict[str, Any]] = field(default_factory=list)
+    quality_score: Optional[float] = None
+    is_fallback: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dict."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StrategyTrace":
+        """Deserialize from a plain dict."""
+        return cls(**data)
+
+
+@dataclass
 class SuccessCriterion:
     """A single success criterion for a phase gate."""
 
@@ -246,6 +273,7 @@ class PlanResult:
     suggestion_text: Optional[str] = None
     phase_transitions: List[Dict[str, str]] = field(default_factory=list)
     risks: List[Dict[str, Any]] = field(default_factory=list)
+    strategy_trace: Optional[StrategyTrace] = None
 
     @property
     def skill_sequence(self) -> List[str]:
@@ -270,7 +298,7 @@ class PlanResult:
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize plan result to a plain dict."""
-        return {
+        result = {
             "phases": [p.to_dict() for p in self.phases],
             "strategy_name": self.strategy_name,
             "data_state": self.data_state.to_dict(),
@@ -284,10 +312,14 @@ class PlanResult:
             "total_estimated_cost_usd": self.total_estimated_cost_usd,
             "total_estimated_duration_seconds": self.total_estimated_duration_seconds,
         }
+        if self.strategy_trace is not None:
+            result["strategy_trace"] = self.strategy_trace.to_dict()
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "PlanResult":
         """Deserialize plan result from a plain dict."""
+        trace_data = data.get("strategy_trace")
         return cls(
             phases=[Phase.from_dict(p) for p in data.get("phases", [])],
             strategy_name=data.get("strategy_name", "unknown"),
@@ -299,4 +331,5 @@ class PlanResult:
             suggestion_text=data.get("suggestion_text"),
             phase_transitions=data.get("phase_transitions", []),
             risks=data.get("risks", []),
+            strategy_trace=StrategyTrace.from_dict(trace_data) if trace_data else None,
         )

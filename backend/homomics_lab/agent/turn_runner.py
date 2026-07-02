@@ -38,6 +38,7 @@ from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.config import settings
+from homomics_lab.metrics import record_plan_created
 from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
@@ -52,7 +53,13 @@ from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.constants import JobMode
 from homomics_lab.llm_client import LLMClient
-from homomics_lab.models.common import ChatMessage, HITLCheckpoint, HITLTrigger, MessageType, Option
+from homomics_lab.models.common import (
+    ChatMessage,
+    HITLCheckpoint,
+    HITLTrigger,
+    MessageType,
+    Option,
+)
 from homomics_lab.plan.models import Plan, PlanStatus
 from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.presenter import PlanPresenter
@@ -191,7 +198,9 @@ class TurnRunner:
         self.memory_backend = memory_backend
         self.capability_index = capability_index
         self.prompter = prompter or Prompter()
-        self.compressor = compressor or ContextCompressor(max_items=6, max_chars_per_item=1000)
+        self.compressor = compressor or ContextCompressor(
+            max_items=6, max_chars_per_item=1000
+        )
         self.context_engine = context_engine
         self.project_state_manager = project_state_manager
         self._workflow_execution_service = workflow_execution_service
@@ -205,10 +214,13 @@ class TurnRunner:
             judge = None
             if settings.debate_judge_backend == "llm" and self._llm_client is not None:
                 from homomics_lab.agent.debate import LLMDebateJudge
+
                 judge = LLMDebateJudge(self._llm_client)
             self._debate = LightweightDebate(judge=judge)
 
-        self.intent_analyzer = intent_analyzer or IntentAnalyzer(debate=self._debate, cbkb=self._cbkb)
+        self.intent_analyzer = intent_analyzer or IntentAnalyzer(
+            debate=self._debate, cbkb=self._cbkb
+        )
         self.task_decomposer = task_decomposer or TaskDecomposer(
             cbkb=self._cbkb,
             capability_index=self.capability_index,
@@ -232,9 +244,11 @@ class TurnRunner:
             reviewer = self._reviewer
             if supervisor is None:
                 from homomics_lab.models.common import AgentType
+
                 supervisor = registry.get_agent(AgentType.SUPERVISOR)
             if reviewer is None:
                 from homomics_lab.models.common import AgentType
+
                 reviewer = registry.get_agent(AgentType.REVIEWER)
 
             # Wire the message bus into SWR agents so they can publish events.
@@ -296,7 +310,9 @@ class TurnRunner:
         if self._is_fallback_suggestion(tree):
             turn_result = self._build_fallback_result(tree, working_memory)
         elif len(tree.tasks) == 1:
-            turn_result = await self._handle_single_step(tree, working_memory, project_id)
+            turn_result = await self._handle_single_step(
+                tree, working_memory, project_id
+            )
         else:
             turn_result = await self._handle_workflow(
                 tree, working_memory, project_id, plan=plan
@@ -306,7 +322,9 @@ class TurnRunner:
         if self.memory_manager is not None:
             try:
                 # Derive a user_message placeholder from the tree for memory summary
-                user_message = tree.tasks[0].description if tree.tasks else "background execution"
+                user_message = (
+                    tree.tasks[0].description if tree.tasks else "background execution"
+                )
                 await self.memory_manager.persist_turn(
                     session_id=session_id,
                     project_id=project_id,
@@ -317,6 +335,7 @@ class TurnRunner:
                 )
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Failed to persist background execution to memory", exc_info=True
                 )
@@ -460,7 +479,7 @@ class TurnRunner:
             if exc.retryable:
                 max_retries = 2
                 for attempt in range(max_retries):
-                    backoff = (2 ** attempt) * 0.5 + random.uniform(0, 0.25)
+                    backoff = (2**attempt) * 0.5 + random.uniform(0, 0.25)
                     logger.warning(
                         "Retryable turn error, retrying in %.2fs: %s",
                         backoff,
@@ -493,7 +512,9 @@ class TurnRunner:
         except Exception as exc:
             # Wrap unexpected errors as ExecutionError for structured reporting.
             turn_result = self._build_error_result(
-                ExecutionError(str(exc), context={"exception_type": type(exc).__name__}),
+                ExecutionError(
+                    str(exc), context={"exception_type": type(exc).__name__}
+                ),
                 working_memory,
             )
 
@@ -510,6 +531,7 @@ class TurnRunner:
                 )
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Failed to persist turn to memory", exc_info=True
                 )
@@ -526,6 +548,7 @@ class TurnRunner:
                 self.project_state_manager.save(project_state)
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Failed to update project state", exc_info=True
                 )
@@ -542,7 +565,11 @@ class TurnRunner:
                     node_type="turn",
                     name="chat_turn",
                     metadata={
-                        "mode": str(turn_result.mode.value if hasattr(turn_result.mode, "value") else turn_result.mode),
+                        "mode": str(
+                            turn_result.mode.value
+                            if hasattr(turn_result.mode, "value")
+                            else turn_result.mode
+                        ),
                         "response_length": len(turn_result.response_text or ""),
                         "has_error": turn_result.error is not None,
                         "job_id": turn_result.job_id,
@@ -553,7 +580,9 @@ class TurnRunner:
                     trace_id=trace_id,
                     node_id="root",
                     status="completed" if not turn_result.error else "failed",
-                    outputs={"response_preview": (turn_result.response_text or "")[:200]},
+                    outputs={
+                        "response_preview": (turn_result.response_text or "")[:200]
+                    },
                 )
             except Exception:
                 logger.warning("Failed to record turn trace node", exc_info=True)
@@ -583,6 +612,7 @@ class TurnRunner:
                 )
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Memory enrichment failed; continuing without it", exc_info=True
                 )
@@ -614,7 +644,8 @@ class TurnRunner:
                 ]
             except Exception:
                 logger.warning(
-                    "Capability index enrichment failed; continuing without it", exc_info=True
+                    "Capability index enrichment failed; continuing without it",
+                    exc_info=True,
                 )
 
         context_bundle = None
@@ -629,16 +660,16 @@ class TurnRunner:
                 )
             except Exception:
                 import logging
+
                 logging.getLogger(__name__).warning(
-                    "ContextEngine build failed; falling back to raw working memory", exc_info=True
+                    "ContextEngine build failed; falling back to raw working memory",
+                    exc_info=True,
                 )
         self._context_bundle = context_bundle
 
         # 3. Analyze intent with conversation context
         if debate_response is not None:
-            intent = self._build_debate_resolved_intent(
-                debate_response, user_message
-            )
+            intent = self._build_debate_resolved_intent(debate_response, user_message)
         else:
             try:
                 intent = await self.intent_analyzer.analyze(
@@ -703,9 +734,7 @@ class TurnRunner:
 
         # Never store or return a completely empty assistant text bubble.
         if not response_text or not str(response_text).strip():
-            response_text = (
-                "我暂时无法生成回答，请稍后再试，或换一种方式描述您的问题。"
-            )
+            response_text = "我暂时无法生成回答，请稍后再试，或换一种方式描述您的问题。"
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -849,7 +878,10 @@ class TurnRunner:
         max_suggestions: int = 3,
     ) -> List[str]:
         """Generate concise follow-up question suggestions using the LLM."""
-        if self._llm_client is None or not getattr(self._llm_client, "is_configured", lambda: False)():
+        if (
+            self._llm_client is None
+            or not getattr(self._llm_client, "is_configured", lambda: False)()
+        ):
             return []
 
         prompt = (
@@ -861,7 +893,10 @@ class TurnRunner:
         try:
             raw = await self._llm_client.chat_completion(
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that suggests follow-up questions."},
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that suggests follow-up questions.",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
@@ -869,7 +904,11 @@ class TurnRunner:
                 response_format={"type": "json_object"},
             )
             parsed = json.loads(raw)
-            suggestions = parsed.get("suggestions", parsed) if isinstance(parsed, dict) else parsed
+            suggestions = (
+                parsed.get("suggestions", parsed)
+                if isinstance(parsed, dict)
+                else parsed
+            )
             if isinstance(suggestions, list):
                 return [str(s) for s in suggestions[:max_suggestions]]
         except Exception:
@@ -896,7 +935,9 @@ class TurnRunner:
                 f"with arguments {arguments}. Please approve or decline."
             ),
             options=[
-                Option(id="approve", label="授权执行", description="允许执行该高风险工具"),
+                Option(
+                    id="approve", label="授权执行", description="允许执行该高风险工具"
+                ),
                 Option(id="decline", label="拒绝", description="跳过该工具调用"),
             ],
             metadata={
@@ -976,9 +1017,7 @@ class TurnRunner:
 
         metadata = request.metadata or {}
         messages = list(metadata.get("messages", []))
-        tool_records = [
-            ToolCallRecord(**r) for r in metadata.get("tool_records", [])
-        ]
+        tool_records = [ToolCallRecord(**r) for r in metadata.get("tool_records", [])]
         pending = metadata.get("pending_tool_call", {})
         tool_name = pending.get("name", request.tool_name)
         tool_inputs = pending.get("inputs", request.arguments)
@@ -1018,15 +1057,20 @@ class TurnRunner:
         )
         tool_records.append(record)
 
-        messages.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": summary,
-        })
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": summary,
+            }
+        )
 
         # Ask the LLM to summarize the result for the user.
         final_text = summary
-        if self._llm_client is not None and getattr(self._llm_client, "is_configured", lambda: False)():
+        if (
+            self._llm_client is not None
+            and getattr(self._llm_client, "is_configured", lambda: False)()
+        ):
             try:
                 final_msg, _ = await self._llm_client.chat_completion_message(
                     messages=messages,
@@ -1036,7 +1080,9 @@ class TurnRunner:
                     project_id=self._project_id,
                     request_id=f"{self._turn_request_id or 'agent'}_approval_resume",
                 )
-                final_text = (getattr(final_msg, "content", None) or "").strip() or summary
+                final_text = (
+                    getattr(final_msg, "content", None) or ""
+                ).strip() or summary
             except Exception as exc:
                 logger.warning("Tool approval final summarization failed: %s", exc)
                 final_text = summary
@@ -1091,7 +1137,9 @@ class TurnRunner:
                 continue
             content = msg.content
             if isinstance(content, dict):
-                content = content.get("response_text") or content.get("text") or str(content)
+                content = (
+                    content.get("response_text") or content.get("text") or str(content)
+                )
             if not isinstance(content, str):
                 content = str(content)
             history.append({"role": role, "content": content})
@@ -1166,14 +1214,15 @@ class TurnRunner:
             pmid = article.get("pmid", "") or ""
             doi = article.get("doi", "") or ""
             pmid_link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
-            parts = [p for p in [authors_str, f"*{journal}*" if journal else "", pubdate] if p]
+            parts = [
+                p
+                for p in [authors_str, f"*{journal}*" if journal else "", pubdate]
+                if p
+            ]
             meta = " · ".join(parts)
             pmid_part = f" · PMID: [{pmid}]({pmid_link})" if pmid else ""
             doi_part = f" · DOI: {doi}" if doi else ""
-            lines.append(
-                f"{idx}. **{title}**  \n"
-                f"   {meta}{pmid_part}{doi_part}"
-            )
+            lines.append(f"{idx}. **{title}**  \n   {meta}{pmid_part}{doi_part}")
 
         lines.append(f"\n[在 PubMed 中查看全部结果]({pubmed_url})")
         return "\n".join(lines)
@@ -1291,7 +1340,9 @@ class TurnRunner:
         # Backward compatibility for legacy intents that don't set the new fields.
         if intent.analysis_type == "clarification":
             interaction_mode = "clarify"
-        elif intent.complexity == "direct_response" and not intent.metadata.get("tool_name"):
+        elif intent.complexity == "direct_response" and not intent.metadata.get(
+            "tool_name"
+        ):
             interaction_mode = "answer"
 
         if interaction_mode == "clarify":
@@ -1309,11 +1360,15 @@ class TurnRunner:
                 return await self._handle_agent_loop(
                     user_message=user_message,
                     working_memory=working_memory,
-                    allowed_tools=[t.name for t in self._tool_registry.list_by_source("mcp")],
+                    allowed_tools=[
+                        t.name for t in self._tool_registry.list_by_source("mcp")
+                    ],
                 )
             except Exception as exc:
                 logger.warning(
-                    "AgentLoop failed, falling back to direct MCP tool: %s", exc, exc_info=True
+                    "AgentLoop failed, falling back to direct MCP tool: %s",
+                    exc,
+                    exc_info=True,
                 )
                 return await self._handle_mcp_tool(
                     mcp_tool_name,
@@ -1336,11 +1391,26 @@ class TurnRunner:
                 is_fallback=plan_result.is_fallback,
                 intent_analysis_type=intent.analysis_type,
                 intent_complexity=intent.complexity,
+                original_intent={
+                    "analysis_type": intent.analysis_type,
+                    "complexity": intent.complexity,
+                    "confidence": intent.confidence,
+                    "original_message": intent.original_message,
+                    "domain": intent.domain,
+                    "target": intent.target,
+                    "scope": intent.scope,
+                    "interaction_mode": intent.interaction_mode,
+                    "metadata": dict(intent.metadata),
+                },
                 plan_result=plan_result,
                 task_tree=tree,
                 working_memory=working_memory,
             )
             await plan_store.create(plan)
+            record_plan_created(
+                strategy=plan_result.strategy_name,
+                is_fallback=plan_result.is_fallback,
+            )
 
         if enqueue_skills and job_service is not None:
             return await self._enqueue_execution(
@@ -1357,7 +1427,11 @@ class TurnRunner:
 
         if scope == "single_step" or intent.complexity == "single_step":
             return await self._handle_single_step(
-                tree, working_memory, project_id, intent=intent, user_message=user_message
+                tree,
+                working_memory,
+                project_id,
+                intent=intent,
+                user_message=user_message,
             )
 
         return await self._handle_workflow(
@@ -1498,8 +1572,25 @@ class TurnRunner:
         Uses the configured LLM client when available, otherwise falls back to
         a simple keyword heuristic.
         """
-        low_risk_keywords = {"analysis", "plot", "qc", "visualize", "统计", "画图", "质控"}
-        high_risk_keywords = {"delete", "drop", "overwrite", "remove", "清空", "删除", "覆盖", "替换"}
+        low_risk_keywords = {
+            "analysis",
+            "plot",
+            "qc",
+            "visualize",
+            "统计",
+            "画图",
+            "质控",
+        }
+        high_risk_keywords = {
+            "delete",
+            "drop",
+            "overwrite",
+            "remove",
+            "清空",
+            "删除",
+            "覆盖",
+            "替换",
+        }
 
         if self._llm_client is None:
             return self._heuristic_risk_score(
@@ -1507,7 +1598,9 @@ class TurnRunner:
             )
 
         try:
-            prompt = self._build_risk_prompt(intent, user_message, working_memory, project_id)
+            prompt = self._build_risk_prompt(
+                intent, user_message, working_memory, project_id
+            )
             response = await self._llm_client.chat_completion(
                 prompt,
                 session_id=getattr(self, "_session_id", None),
@@ -1539,7 +1632,7 @@ class TurnRunner:
             f"Intent: {intent.analysis_type}\n"
             f"Intent confidence: {intent.confidence:.2f}\n"
             f"Project ID: {project_id or 'unknown'}\n\n"
-            "Respond with a JSON object: {\"risk_score\": 0.0} where the score is "
+            'Respond with a JSON object: {"risk_score": 0.0} where the score is '
             "a float between 0.0 (no risk) and 1.0 (very high risk)."
         )
 
@@ -1609,7 +1702,11 @@ class TurnRunner:
         risk_threshold = settings.hitl_risk_threshold
         context["risk_threshold"] = risk_threshold
 
-        if intent is not None and user_message is not None and working_memory is not None:
+        if (
+            intent is not None
+            and user_message is not None
+            and working_memory is not None
+        ):
             context["risk_score"] = await self._evaluate_risk(
                 intent, user_message, working_memory, project_id
             )
@@ -1638,7 +1735,11 @@ class TurnRunner:
             if not skill_id:
                 continue
 
-            outcome = FeedbackOutcome.SUCCESS if task.status == TaskStatus.COMPLETED else FeedbackOutcome.FAILURE
+            outcome = (
+                FeedbackOutcome.SUCCESS
+                if task.status == TaskStatus.COMPLETED
+                else FeedbackOutcome.FAILURE
+            )
 
             if self.capability_index is not None:
                 try:
@@ -1650,11 +1751,17 @@ class TurnRunner:
                         context={
                             "task_id": task.id,
                             "phase": task.phase,
-                            "result_keys": list(results.get(task.id, {}).keys()) if isinstance(results.get(task.id), dict) else [],
+                            "result_keys": list(results.get(task.id, {}).keys())
+                            if isinstance(results.get(task.id), dict)
+                            else [],
                         },
                     )
                 except Exception:
-                    logger.warning("Failed to record capability feedback for %s", skill_id, exc_info=True)
+                    logger.warning(
+                        "Failed to record capability feedback for %s",
+                        skill_id,
+                        exc_info=True,
+                    )
 
             if self.memory_backend is not None:
                 try:
@@ -1674,7 +1781,9 @@ class TurnRunner:
                         project_id=project_id,
                     )
                 except Exception:
-                    logger.warning("Failed to record task memory for %s", skill_id, exc_info=True)
+                    logger.warning(
+                        "Failed to record task memory for %s", skill_id, exc_info=True
+                    )
 
     async def _handle_single_step(
         self,
@@ -1691,7 +1800,10 @@ class TurnRunner:
 
         orchestrator = self._get_orchestrator()
         context = await self._build_orchestrator_context(
-            project_id, intent=intent, user_message=user_message, working_memory=working_memory
+            project_id,
+            intent=intent,
+            user_message=user_message,
+            working_memory=working_memory,
         )
         results = await orchestrator.run_tree(tree, context=context)
 
@@ -1743,7 +1855,9 @@ class TurnRunner:
         if error:
             response_text = f"工作流执行失败（{backend}）：{error}"
         else:
-            response_text = f"已完成 {len(tree.tasks)} 个分析步骤（执行后端：{backend}）。"
+            response_text = (
+                f"已完成 {len(tree.tasks)} 个分析步骤（执行后端：{backend}）。"
+            )
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -1798,7 +1912,9 @@ class TurnRunner:
             "awaiting_human": 0,
         }
         for task in tree.tasks:
-            status = task.status.value if hasattr(task.status, "value") else str(task.status)
+            status = (
+                task.status.value if hasattr(task.status, "value") else str(task.status)
+            )
             if status in counts:
                 counts[status] += 1
         counts["total"] = total
@@ -1851,7 +1967,10 @@ class TurnRunner:
 
         orchestrator = self._get_orchestrator()
         context = await self._build_orchestrator_context(
-            project_id, intent=intent, user_message=user_message, working_memory=working_memory
+            project_id,
+            intent=intent,
+            user_message=user_message,
+            working_memory=working_memory,
         )
         results = await orchestrator.run_tree(tree, context=context)
 
@@ -2000,9 +2119,13 @@ class TurnRunner:
                 continue
 
             task = task_lookup.get(task_id)
-            skill_id = result.get("skill") or (task.skills_required[0] if task and task.skills_required else None)
+            skill_id = result.get("skill") or (
+                task.skills_required[0] if task and task.skills_required else None
+            )
 
-            plot_type = skill_output.get("plot_type") or (task.name if task else "visualization")
+            plot_type = skill_output.get("plot_type") or (
+                task.name if task else "visualization"
+            )
             attachments = extract_plot_attachments(
                 skill_output,
                 default_plot_type=plot_type,
@@ -2144,24 +2267,35 @@ class TurnRunner:
         parts: List[str] = []
         snippets = self._extra_context.get("memory_snippets") or []
         if snippets:
-            parts.append("Relevant memory snippets:\n" + "\n".join(f"- {s}" for s in snippets[:3]))
+            parts.append(
+                "Relevant memory snippets:\n"
+                + "\n".join(f"- {s}" for s in snippets[:3])
+            )
         experiments = self._extra_context.get("recent_experiments") or []
         if experiments:
             parts.append(
                 "Recent experiments:\n"
-                + "\n".join(f"- {e.get('bundle_id', '')}: {e.get('summary', '')}" for e in experiments[:3])
+                + "\n".join(
+                    f"- {e.get('bundle_id', '')}: {e.get('summary', '')}"
+                    for e in experiments[:3]
+                )
             )
         sops = self._extra_context.get("recent_sops") or []
         if sops:
             parts.append(
                 "Relevant SOPs:\n"
-                + "\n".join(f"- {s.get('name', '')} ({s.get('category', '')})" for s in sops[:3])
+                + "\n".join(
+                    f"- {s.get('name', '')} ({s.get('category', '')})" for s in sops[:3]
+                )
             )
         anomalies = self._extra_context.get("recent_anomalies") or []
         if anomalies:
             parts.append(
                 "Recent anomalies:\n"
-                + "\n".join(f"- {a.get('phase_type', '')}: {a.get('summary', '')}" for a in anomalies[:3])
+                + "\n".join(
+                    f"- {a.get('phase_type', '')}: {a.get('summary', '')}"
+                    for a in anomalies[:3]
+                )
             )
         return "\n\n".join(parts)
 
@@ -2188,9 +2322,13 @@ class TurnRunner:
             prompt_messages = [m for m in messages if m.get("role") != "user"]
             prompt_messages.append({"role": "user", "content": user_message})
         else:
-            compressed_history = self._compress_working_memory(working_memory, user_message)
+            compressed_history = self._compress_working_memory(
+                working_memory, user_message
+            )
             extra_context = self._format_extra_context()
-            project_context = "\n\n".join(filter(None, [compressed_history, extra_context]))
+            project_context = "\n\n".join(
+                filter(None, [compressed_history, extra_context])
+            )
 
             prompt = self.prompter.build_prompt(
                 user_message=user_message,
@@ -2287,14 +2425,19 @@ class TurnRunner:
                         except Exception:
                             content = str(content)
                     history_lines.append(f"{msg.sender}: {content}")
-                context_parts.append("Recent conversation:\n" + "\n".join(history_lines))
+                context_parts.append(
+                    "Recent conversation:\n" + "\n".join(history_lines)
+                )
 
             if self.project_state_manager is not None and project_id is not None:
                 try:
                     project_state = self.project_state_manager.load(project_id)
                     context_parts.append(project_state.to_prompt_text())
                 except Exception:
-                    logger.debug("Failed to load project state for LLM direct response", exc_info=True)
+                    logger.debug(
+                        "Failed to load project state for LLM direct response",
+                        exc_info=True,
+                    )
 
             context_text = "\n\n".join(context_parts)
             messages = [{"role": "system", "content": system_prompt}]
@@ -2313,7 +2456,11 @@ class TurnRunner:
                 request_id=f"{getattr(self, '_turn_request_id', 'direct')}_direct",
             )
         except Exception:
-            logger.warning("LLM direct response failed for type %s; using fallback", response_type, exc_info=True)
+            logger.warning(
+                "LLM direct response failed for type %s; using fallback",
+                response_type,
+                exc_info=True,
+            )
             return None
 
     async def _generate_greeting_response(

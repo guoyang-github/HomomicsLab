@@ -5,6 +5,7 @@ and the distributed worker need, so both can start with the same agents,
 tools, skills, and domain registry.
 """
 
+import inspect
 import logging
 import shutil
 from pathlib import Path
@@ -28,7 +29,10 @@ from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.llm.cache import get_llm_response_cache
-from homomics_lab.llm.runtime_config import is_local_llm_provider, load_llm_runtime_config
+from homomics_lab.llm.runtime_config import (
+    is_local_llm_provider,
+    load_llm_runtime_config,
+)
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.mcp.integration import register_mcp_skills, register_mcp_tools
 from homomics_lab.provenance.recorder import ProvenanceRecorder
@@ -107,6 +111,7 @@ async def _ensure_database_schema() -> None:
         return
 
     import asyncio
+
     try:
         from alembic import command
         from alembic.config import Config
@@ -150,6 +155,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     if settings.auth_enabled:
         from homomics_lab.database.connection import get_session_factory
         from homomics_lab.api.auth import create_default_admin_if_missing
+
         async with get_session_factory()() as session:
             await create_default_admin_if_missing(session)
 
@@ -221,9 +227,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # imported directories (e.g. old "external" or renamed collections).
     # Preserve locally-bundled skills shipped under data/skill_store/imported/<namespace>/.
     expected_namespaces = {
-        _namespace_for_external_dir(d)
-        for d in external_dirs
-        if d.exists()
+        _namespace_for_external_dir(d) for d in external_dirs if d.exists()
     }
     local_namespaces: set[str] = set()
     if skill_store.imported_dir.exists():
@@ -304,7 +308,9 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 )
                 skill_executor.register_skill(skill)
             except Exception as exc:
-                print(f"Warning: Failed to register local skill from {skill_path}: {exc}")
+                print(
+                    f"Warning: Failed to register local skill from {skill_path}: {exc}"
+                )
 
     # Wrap MCP tools as skills so the planner can orchestrate them
     if mcp_client is not None:
@@ -393,19 +399,27 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             try:
                 await capability_index.index_skill(skill)
             except Exception:
-                logger.warning("Failed to index skill %s", getattr(skill, "id", "?"), exc_info=True)
+                logger.warning(
+                    "Failed to index skill %s", getattr(skill, "id", "?"), exc_info=True
+                )
         for tool in tool_registry.list_all():
             try:
                 await capability_index.index_tool(tool)
             except Exception:
-                logger.warning("Failed to index tool %s", getattr(tool, "name", "?"), exc_info=True)
+                logger.warning(
+                    "Failed to index tool %s", getattr(tool, "name", "?"), exc_info=True
+                )
         for sop in cbkb.list_sops():
             try:
                 await capability_index.index_sop(sop)
             except Exception:
-                logger.warning("Failed to index SOP %s", getattr(sop, "id", "?"), exc_info=True)
+                logger.warning(
+                    "Failed to index SOP %s", getattr(sop, "id", "?"), exc_info=True
+                )
     except Exception:
-        logger.warning("Capability index population failed; continuing without it", exc_info=True)
+        logger.warning(
+            "Capability index population failed; continuing without it", exc_info=True
+        )
 
     memory_manager = MemoryManager(
         session_store=session_store,
@@ -469,3 +483,47 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "analysis_template_store": analysis_template_store,
         "workflow_execution_service": workflow_execution_service,
     }
+
+
+async def _try_close(obj: Any, name: str) -> None:
+    """Call ``close()``/``shutdown()``/``stop()`` on a context object if it exists."""
+    if obj is None:
+        return
+    for method_name in ("close", "shutdown", "stop"):
+        method = getattr(obj, method_name, None)
+        if method is None:
+            continue
+        try:
+            if inspect.iscoroutinefunction(method):
+                await method()
+            elif callable(method):
+                method()
+            return
+        except Exception:
+            logger.warning(
+                "Failed to %s %s during shutdown", method_name, name, exc_info=True
+            )
+
+
+async def close_worker_context(ctx: Dict[str, Any]) -> None:
+    """Release resources held by a bootstrap context.
+
+    Called from both the API lifespan shutdown and the worker shutdown path.
+    """
+    # Close indices and managers first; they may hold open DB/graph/vector handles.
+    for key in (
+        "capability_index",
+        "knowledge_index",
+        "memory_manager",
+        "context_engine",
+        "session_store",
+        "llm_client",
+        "llm_cache",
+        "provenance_recorder",
+        "workflow_execution_service",
+        "skill_store",
+        "mcp_client",
+        "domain_reloader",
+        "skill_reloader",
+    ):
+        await _try_close(ctx.get(key), key)

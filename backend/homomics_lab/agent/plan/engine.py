@@ -19,7 +19,13 @@ from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
-from homomics_lab.agent.plan.models import DataState, Phase, PlannedGap, PlanResult
+from homomics_lab.agent.plan.models import (
+    DataState,
+    Phase,
+    PlannedGap,
+    PlanResult,
+    StrategyTrace,
+)
 from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.plan.template import AnalysisTemplate
@@ -99,6 +105,7 @@ class PlanEngine:
         top_k: int = 1,
         project_id: Optional[str] = None,
         template: Optional[AnalysisTemplate] = None,
+        strategy_name: Optional[str] = None,
     ) -> PlanResult:
         """Generate an analysis plan from user intent and data state.
 
@@ -110,6 +117,8 @@ class PlanEngine:
                 skill coverage.  Defaults to 1 for backward compatibility.
             template: Optional analysis template that supplies default parameters
                 and preferred skills for the selected scenario.
+            strategy_name: Optional explicit strategy to force. When provided,
+                strategy selection is bypassed.
 
         Returns:
             PlanResult containing the phase sequence, selected skills, and gaps.
@@ -141,15 +150,24 @@ class PlanEngine:
                 reproducibility_context={"probes": [self._probe_to_dict(p) for p in probes]},
             )
 
-        # 2. Select strategy based on intent (probabilistic when top_k > 1).
-        if top_k > 1:
-            ranked = self.strategy_library.select_top_k(
-                intent.analysis_type, data_state, top_k=top_k
-            )
-            candidates = [strategy for strategy, _score in ranked]
-        else:
-            strategy = self.strategy_library.select(intent.analysis_type)
+        # 2. Select strategy based on intent (or explicit override).
+        ranked = self.strategy_library.select_top_k(
+            intent.analysis_type, data_state, top_k=max(top_k, 3)
+        )
+        if strategy_name is not None:
+            strategy = self.strategy_library.get(strategy_name)
+            if strategy is None:
+                raise ValueError(f"Unknown strategy: {strategy_name}")
             candidates = [strategy]
+            strategy_candidates = [
+                {"name": strategy.name, "score": 1.0, "description": strategy.description}
+            ]
+        else:
+            candidates = [strategy for strategy, _score in ranked[:max(top_k, 1)]]
+            strategy_candidates = [
+                {"name": strategy.name, "score": round(score, 3), "description": strategy.description}
+                for strategy, score in ranked
+            ]
 
         # 3. Build candidate plans and pick the best one.
         candidate_plans: List[PlanResult] = []
@@ -180,6 +198,25 @@ class PlanEngine:
         }
         reproducibility_context["quality"] = quality_report.to_dict()
         plan_result.reproducibility_context = reproducibility_context
+
+        # 5. Attach an auditable strategy trace.
+        intent_metadata = getattr(intent, "metadata", {}) or {}
+        state_checks_triggered = self._collect_state_checks_triggered(plan_result, data_state)
+        template_info = template.to_dict() if template is not None else None
+        plan_result.strategy_trace = StrategyTrace(
+            intent_analysis_type=intent.analysis_type,
+            intent_confidence=getattr(intent, "confidence", None),
+            intent_reason=intent_metadata.get("reason"),
+            intent_alternatives=intent_metadata.get("alternatives", []),
+            strategy_candidates=strategy_candidates,
+            selected_strategy_name=plan_result.strategy_name,
+            applied_template_id=template_info.get("template_id") if template_info else None,
+            applied_template_name=template_info.get("name") if template_info else None,
+            data_state_snapshot=data_state.to_dict(),
+            state_checks_triggered=state_checks_triggered,
+            quality_score=quality_report.score,
+            is_fallback=plan_result.is_fallback,
+        )
 
         if self.skill_dag is not None:
             plan_result.risks.extend(
@@ -358,6 +395,25 @@ class PlanEngine:
             "missing_key": probe.missing_key,
             "estimated_cost": probe.estimated_cost,
         }
+
+    @staticmethod
+    def _collect_state_checks_triggered(
+        plan_result: PlanResult,
+        data_state: DataState,
+    ) -> List[Dict[str, Any]]:
+        """Record which strategy state checks fired for the chosen plan."""
+        from homomics_lab.agent.plan.strategies import AnalysisStrategy
+
+        triggered: List[Dict[str, Any]] = []
+        # The reproducibility_context already stores the strategy name.
+        strategy_name = plan_result.strategy_name
+        # We cannot reach back into the library from a static helper, so callers
+        # that need richer detail should pass the strategy object. This minimal
+        # version records checks embedded in the reproducibility_context if any.
+        checks = plan_result.reproducibility_context.get("state_checks", [])
+        for check in checks:
+            triggered.append(dict(check))
+        return triggered
 
     def _evaluate_skill_dag_risks(self, plan_result: PlanResult) -> List[Dict[str, Any]]:
         """Evaluate SkillDAG risks for a plan result."""

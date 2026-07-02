@@ -1,21 +1,36 @@
 """Plan approval and inspection endpoints."""
 
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from homomics_lab.api.auth import require_analyst_or_admin, require_auth
+from homomics_lab.agent.intent.models import UserIntent
+from homomics_lab.agent.plan.engine import PlanEngine
+from homomics_lab.agent.plan.models import PlanResult
+from homomics_lab.agent.plan.template import AnalysisTemplate
+from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
+from homomics_lab.api.auth import require_analyst_or_admin
 from homomics_lab.api.rate_limit import rate_limit_dependency
-
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.jobs import JobMode, JobService
+from homomics_lab.metrics import (
+    record_plan_approval,
+    record_plan_rationale_request,
+    record_plan_strategy_switch,
+)
 from homomics_lab.plan import (
+    Plan,
     PlanApprovalRequest,
     PlanPresenter,
     PlanStatus,
     PlanStore,
 )
+from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.tasks.models import TaskNode
+from homomics_lab.tasks.task_tree import TaskTree
+
 router = APIRouter()
 
 
@@ -116,12 +131,11 @@ async def approve_plan(
         new_plan_id = target_plan.plan_id
 
     approved = await plan_store.approve(target_plan.plan_id, approved_by="user")
+    record_plan_approval("approved")
     working_memory = approved.working_memory or WorkingMemory()
 
     mode = (
-        JobMode.SINGLE_STEP
-        if len(approved.task_tree.tasks) == 1
-        else JobMode.WORKFLOW
+        JobMode.SINGLE_STEP if len(approved.task_tree.tasks) == 1 else JobMode.WORKFLOW
     )
     job = await job_service.create_job(
         session_id=approved.session_id,
@@ -163,6 +177,7 @@ async def reject_plan(
         )
 
     rejected = await plan_store.reject(plan_id)
+    record_plan_approval("rejected")
     return PlanApproveResponse(
         plan_id=plan_id,
         status=rejected.status,
@@ -211,11 +226,10 @@ async def modify_plan(
         )
 
     approved = await plan_store.approve(new_plan.plan_id, approved_by="user")
+    record_plan_approval("approved_modified")
     working_memory = approved.working_memory or WorkingMemory()
     mode = (
-        JobMode.SINGLE_STEP
-        if len(approved.task_tree.tasks) == 1
-        else JobMode.WORKFLOW
+        JobMode.SINGLE_STEP if len(approved.task_tree.tasks) == 1 else JobMode.WORKFLOW
     )
     job = await job_service.create_job(
         session_id=approved.session_id,
@@ -375,4 +389,172 @@ async def load_plan_template(
     return PlanApproveResponse(
         plan_id=new_plan.plan_id,
         status=new_plan.status,
+    )
+
+
+class SwitchStrategyRequest(BaseModel):
+    strategy_name: Optional[str] = None
+    template_id: Optional[str] = None
+    preserve_user_modifications: bool = True
+
+
+def _get_plan_engine(http_request: Request) -> PlanEngine:
+    skill_executor = getattr(http_request.app.state, "skill_executor", None)
+    skill_registry = (
+        cast(SkillRegistry, skill_executor.registry)
+        if skill_executor is not None
+        else SkillRegistry()
+    )
+    return PlanEngine(
+        skill_registry=skill_registry,
+        skill_dag=getattr(http_request.app.state, "skill_dag", None),
+        cbkb=getattr(http_request.app.state, "cbkb", None),
+        capability_index=getattr(http_request.app.state, "capability_index", None),
+        strategy_library=getattr(http_request.app.state, "strategy_library", None),
+    )
+
+
+def _get_template_store(http_request: Request) -> AnalysisTemplateStore:
+    return (
+        getattr(http_request.app.state, "analysis_template_store", None)
+        or AnalysisTemplateStore()
+    )
+
+
+def _build_task_tree(plan_result: PlanResult) -> TaskTree:
+    """Convert a PlanResult into a linear TaskTree."""
+    tasks: list[TaskNode] = []
+    prev_id: Optional[str] = None
+    for phase in plan_result.phases:
+        task_id = phase.phase_type
+        dependencies: list[str] = []
+        if prev_id is not None:
+            dependencies.append(prev_id)
+        tasks.append(
+            TaskNode(
+                id=task_id,
+                name=phase.phase_type,
+                description=phase.description,
+                phase=phase.phase_type,
+                skills_required=[phase.selected_skill.id]
+                if phase.selected_skill is not None
+                else [],
+                parameters=dict(phase.parameters),
+                dependencies=dependencies,
+            )
+        )
+        prev_id = task_id
+    return TaskTree(tasks=tasks)
+
+
+def _merge_user_modifications(
+    new_plan_result: PlanResult,
+    old_plan_result: PlanResult,
+) -> None:
+    """Carry forward user-modified phase parameters into a regenerated plan."""
+    old_params = {p.phase_type: dict(p.parameters) for p in old_plan_result.phases}
+    for phase in new_plan_result.phases:
+        if phase.phase_type in old_params:
+            merged = {**phase.parameters, **old_params[phase.phase_type]}
+            phase.parameters = merged
+
+
+@router.get("/{plan_id}/rationale")
+async def get_plan_rationale(plan_id: str, http_request: Request):
+    """Return the auditable strategy trace for a plan."""
+    plan_store = _get_plan_store(http_request)
+    plan = await plan_store.get(plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    trace = plan.plan_result.strategy_trace
+    if trace is None:
+        raise HTTPException(
+            status_code=404, detail="No strategy trace available for this plan"
+        )
+    record_plan_rationale_request(plan.plan_result.strategy_name)
+    return {
+        "plan_id": plan.plan_id,
+        "strategy_name": plan.plan_result.strategy_name,
+        "strategy_trace": trace.to_dict(),
+        "reproducibility_context": plan.plan_result.reproducibility_context,
+    }
+
+
+@router.post("/{plan_id}/switch-strategy", response_model=PlanApproveResponse)
+async def switch_plan_strategy(
+    plan_id: str,
+    request: SwitchStrategyRequest,
+    http_request: Request,
+):
+    """Regenerate a pending plan under a different strategy or template.
+
+    The original plan is kept as the parent; a new plan version is created
+    and returned in ``PENDING_APPROVAL`` state.
+    """
+    plan_store = _get_plan_store(http_request)
+    plan = await plan_store.get(plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if plan.status != PlanStatus.PENDING_APPROVAL:
+        raise HTTPException(
+            status_code=400,
+            detail="Can only switch strategy for plans awaiting approval",
+        )
+
+    intent_data = plan.original_intent or {
+        "analysis_type": plan.intent_analysis_type,
+        "complexity": plan.intent_complexity or "complex",
+    }
+    intent = UserIntent(**intent_data)
+    data_state = plan.plan_result.data_state
+
+    template: Optional[AnalysisTemplate] = None
+    if request.template_id is not None:
+        template_store = _get_template_store(http_request)
+        template = template_store.get_template(request.template_id)
+        if template is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template {request.template_id} not found",
+            )
+
+    plan_engine = _get_plan_engine(http_request)
+    new_plan_result = await plan_engine.plan(
+        intent,
+        data_state=data_state,
+        project_id=plan.project_id,
+        template=template,
+        strategy_name=request.strategy_name,
+    )
+
+    if request.preserve_user_modifications:
+        _merge_user_modifications(new_plan_result, plan.plan_result)
+
+    new_task_tree = _build_task_tree(new_plan_result)
+    new_plan = Plan(
+        plan_id=f"plan_{uuid.uuid4().hex[:12]}",
+        session_id=plan.session_id,
+        project_id=plan.project_id,
+        status=PlanStatus.PENDING_APPROVAL,
+        is_fallback=new_plan_result.is_fallback,
+        intent_analysis_type=intent.analysis_type,
+        intent_complexity=intent.complexity,
+        original_intent=intent_data,
+        plan_result=new_plan_result,
+        task_tree=new_task_tree,
+        working_memory=plan.working_memory,
+        parent_plan_id=plan.plan_id,
+        version=plan.version + 1,
+    )
+    await plan_store.create(new_plan)
+    record_plan_strategy_switch(
+        plan.plan_result.strategy_name,
+        new_plan_result.strategy_name,
+    )
+
+    return PlanApproveResponse(
+        plan_id=new_plan.plan_id,
+        status=new_plan.status,
+        new_plan_id=new_plan.plan_id,
     )

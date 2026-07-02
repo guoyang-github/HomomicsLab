@@ -15,10 +15,11 @@ import logging
 import signal
 from typing import Optional
 
-from homomics_lab.bootstrap import bootstrap_worker_context
+from homomics_lab.bootstrap import bootstrap_worker_context, close_worker_context
 from homomics_lab.config import settings
 from homomics_lab.jobs import JobService
 from homomics_lab.jobs.runner import BackgroundJobRunner
+from homomics_lab.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ class WorkerShutdown:
         await self._event.wait()
 
 
-async def _reload_llm_config_loop(ctx: dict, shutdown: WorkerShutdown, interval: int = 30) -> None:
+async def _reload_llm_config_loop(
+    ctx: dict, shutdown: WorkerShutdown, interval: int = 30
+) -> None:
     """Periodically reload LLM config so workers pick up UI changes."""
     llm_client = ctx.get("llm_client")
     if llm_client is None:
@@ -85,15 +88,17 @@ async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
             await reload_task
         except asyncio.CancelledError:
             pass
+        try:
+            await runner.stop(timeout=10.0)
+        except Exception:
+            logger.exception("Error stopping job runner")
         await job_service.close()
+        await close_worker_context(ctx)
         logger.info("Worker stopped")
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    configure_logging(level=settings.log_level, json_format=settings.log_json_format)
     shutdown = WorkerShutdown()
 
     loop = asyncio.new_event_loop()

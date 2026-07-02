@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Embedding provider configuration
     # ------------------------------------------------------------------
-    embedding_provider: str = "sentence_transformers"  # sentence_transformers | openai | ollama
+    embedding_provider: str = (
+        "sentence_transformers"  # sentence_transformers | openai | ollama
+    )
     embedding_model: Optional[str] = None  # e.g., "BAAI/bge-small-en-v1.5"
     embedding_api_key: Optional[str] = None
     embedding_base_url: Optional[str] = None
@@ -39,7 +41,9 @@ class Settings(BaseSettings):
     # Memory backends (vector + graph)
     # ------------------------------------------------------------------
     vector_store_backend: str = "qdrant"  # qdrant | pgvector | sqlite-vec
-    vector_store_url: Optional[str] = None  # e.g., "http://localhost:6333" or postgres URL
+    vector_store_url: Optional[str] = (
+        None  # e.g., "http://localhost:6333" or postgres URL
+    )
     graph_backend: str = "networkx"  # networkx | neo4j
     graph_store_url: Optional[str] = None  # e.g., "bolt://localhost:7687"
     memory_reranker_model: Optional[str] = None
@@ -71,7 +75,9 @@ class Settings(BaseSettings):
     def _validate_semantic_memory_backend(cls, v: str) -> str:
         allowed = {"sqlite", "postgres"}
         if v not in allowed:
-            raise ValueError(f"semantic_memory_backend must be one of {allowed}, got {v}")
+            raise ValueError(
+                f"semantic_memory_backend must be one of {allowed}, got {v}"
+            )
         return v
 
     @field_validator("database_url")
@@ -179,15 +185,27 @@ class Settings(BaseSettings):
     skill_container_pids_limit: int = 64
     skill_container_readonly_root: bool = True
     skill_container_venv_mount: bool = True
-    auto_install_dependencies: bool = False  # create venvs and install skill deps automatically
-    skill_hot_reload_enabled: bool = True  # watch sibling skill repos and domain files at startup
-    skill_sibling_discovery_enabled: bool = True  # auto-discover ../<domain>-Skills/skills
+    auto_install_dependencies: bool = (
+        False  # create venvs and install skill deps automatically
+    )
+    skill_hot_reload_enabled: bool = (
+        True  # watch sibling skill repos and domain files at startup
+    )
+    skill_sibling_discovery_enabled: bool = (
+        True  # auto-discover ../<domain>-Skills/skills
+    )
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
     domain_strict_validation: bool = False  # if False, missing skills become warnings instead of failing the whole domain
     interactive_mode: bool = False  # require approval for high-risk tool calls
-    force_sandbox: bool = True  # if True, shell_exec and CodeAct must run through a sandbox
-    code_act_hitl_risk_level: str = "high"  # "never" | "low" | "medium" | "high" | "critical"
-    allow_pickle_serialization: bool = False  # if False, DataStore refuses pickle fallback
+    force_sandbox: bool = (
+        True  # if True, shell_exec and CodeAct must run through a sandbox
+    )
+    code_act_hitl_risk_level: str = (
+        "high"  # "never" | "low" | "medium" | "high" | "critical"
+    )
+    allow_pickle_serialization: bool = (
+        False  # if False, DataStore refuses pickle fallback
+    )
 
     # Auth / rate limiting (opt-in for local development)
     auth_enabled: bool = False
@@ -232,14 +250,20 @@ class Settings(BaseSettings):
     # Secrets manager
     secrets_db_path: Optional[Path] = None
     secrets_master_key: Optional[str] = None
-    secrets_plaintext_fallback: bool = False  # dangerous; only for local dev without cryptography
+    secrets_plaintext_fallback: bool = (
+        False  # dangerous; only for local dev without cryptography
+    )
 
     # Cost control
-    monthly_budget_usd: Optional[float] = None  # per-user/tenant budget (enforced when auth enabled)
+    monthly_budget_usd: Optional[float] = (
+        None  # per-user/tenant budget (enforced when auth enabled)
+    )
     max_llm_cost_per_request_usd: Optional[float] = None
 
     # LLM routing
-    llm_provider: Optional[str] = None  # e.g. openai, deepseek, qwen, zhipu, moonshot, ollama
+    llm_provider: Optional[str] = (
+        None  # e.g. openai, deepseek, qwen, zhipu, moonshot, ollama
+    )
     llm_model: Optional[str] = None
     llm_fallback_models: Optional[str] = None  # comma-separated list
 
@@ -247,7 +271,9 @@ class Settings(BaseSettings):
     llm_response_cache_enabled: bool = True
     llm_response_cache_backend: str = "local"  # "local" | "redis"
     llm_response_cache_redis_url: Optional[str] = None
-    llm_response_cache_dir: Path = Field(default_factory=lambda: Path("./data/llm_cache"))
+    llm_response_cache_dir: Path = Field(
+        default_factory=lambda: Path("./data/llm_cache")
+    )
     llm_response_cache_ttl_seconds: float = 3600.0
     llm_response_cache_max_entries: int = 1000
     llm_complexity_routing_enabled: bool = True
@@ -257,7 +283,9 @@ class Settings(BaseSettings):
     def _validate_llm_response_cache_backend(cls, v: str) -> str:
         allowed = {"local", "redis"}
         if v not in allowed:
-            raise ValueError(f"llm_response_cache_backend must be one of {allowed}, got {v}")
+            raise ValueError(
+                f"llm_response_cache_backend must be one of {allowed}, got {v}"
+            )
         return v
 
     @model_validator(mode="after")
@@ -271,6 +299,13 @@ class Settings(BaseSettings):
     otel_exporter: str = "console"  # console | otlp
     otel_otlp_endpoint: Optional[str] = "http://localhost:4317"
     otel_service_name: str = "homomicslab"
+
+    # Logging
+    log_level: str = "INFO"  # DEBUG | INFO | WARNING | ERROR | CRITICAL
+    log_json_format: bool = True  # JSON lines vs. plain text
+
+    # Health checks
+    health_check_timeout_seconds: float = 5.0
 
     # CORS / host security
     cors_origins: Optional[List[str]] = None  # e.g. ["https://app.homomics.lab"]
@@ -337,7 +372,9 @@ class Settings(BaseSettings):
     result_inline_size_limit_bytes: int = 10 * 1024 * 1024
     skill_cache_enabled: bool = True
     skill_cache_dir: Path = Field(default_factory=lambda: Path("./data/skill_cache"))
-    skill_fallback_concatenation: bool = True  # deprecated: concat all .py/.R when no entrypoint
+    skill_fallback_concatenation: bool = (
+        True  # deprecated: concat all .py/.R when no entrypoint
+    )
 
     # Literature / RAP settings
     literature_retrieval_enabled: bool = False  # requires network; disabled by default
@@ -366,7 +403,9 @@ class Settings(BaseSettings):
 
     # CodeAct cache settings
     codeact_cache_enabled: bool = True
-    codeact_cache_dir: Path = Field(default_factory=lambda: Path("./data/codeact_cache"))
+    codeact_cache_dir: Path = Field(
+        default_factory=lambda: Path("./data/codeact_cache")
+    )
 
     # MCP integration settings
     mcp_enabled: bool = True

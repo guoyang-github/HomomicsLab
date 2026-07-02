@@ -244,6 +244,11 @@ class PlanStore:
             is_fallback=plan.is_fallback,
             intent_analysis_type=plan.intent_analysis_type,
             intent_complexity=plan.intent_complexity,
+            original_intent_json=(
+                json.dumps(plan.original_intent, default=str)
+                if plan.original_intent is not None
+                else None
+            ),
             plan_result_json=json.dumps(plan.plan_result.to_dict()),
             task_tree_json=_serialize_task_tree(plan.task_tree),
             working_memory_json=(
@@ -263,6 +268,11 @@ class PlanStore:
         record.is_fallback = plan.is_fallback
         record.intent_analysis_type = plan.intent_analysis_type
         record.intent_complexity = plan.intent_complexity
+        record.original_intent_json = (
+            json.dumps(plan.original_intent, default=str)
+            if plan.original_intent is not None
+            else None
+        )
         record.plan_result_json = json.dumps(plan.plan_result.to_dict())
         record.task_tree_json = _serialize_task_tree(plan.task_tree)
         record.working_memory_json = (
@@ -286,6 +296,9 @@ class PlanStore:
             is_fallback=record.is_fallback,
             intent_analysis_type=record.intent_analysis_type,
             intent_complexity=record.intent_complexity,
+            original_intent=json.loads(record.original_intent_json)
+            if record.original_intent_json
+            else None,
             plan_result=PlanResult.from_dict(json.loads(record.plan_result_json)),
             task_tree=_deserialize_task_tree(record.task_tree_json),
             working_memory=_deserialize_working_memory(record.working_memory_json),
