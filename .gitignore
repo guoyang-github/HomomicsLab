@@ -29,6 +29,14 @@ frontend/dist/
 # Runtime-generated memory graph (NetworkX backend default path)
 data/memory_graph.json
 
+# Runtime skill sources
+# - Canonical project-root skills dir: keep the folder, ignore imported contents
+/skills/*
+!/skills/.gitkeep
+!/skills/README.md
+# - Legacy path used when backend was launched from backend/ (auto-imported)
+backend/skills/
+
 # OS / Editors
 .DS_Store
 .idea/

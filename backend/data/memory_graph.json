@@ -673,6 +673,2306 @@
         "created_at": "2026-07-02T08:43:07.486104+00:00"
       },
       "id": "ee0865f3-3022-4be4-85e6-cfaf9e8e9b37"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-annotation-celltypist",
+        "description": "Automated cell type annotation using CellTypist pre-trained logistic regression models",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-annotation-celltypist"
+    },
+    {
+      "id": "category:single-cell"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-annotation-markers",
+        "description": "Marker-based cell type annotation using manual marker gene scoring in R (Seurat) and Python (Scanpy)",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-annotation-markers"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-annotation-sctype-r",
+        "description": "Marker-based cell type annotation for scRNA-seq using the ScType algorithm in R. Supports 15+ built-in tissue databases, custom marker sets, and automatic tissue detection. Compatible with Seurat v4 and v5.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-annotation-sctype-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-annotation-singler-r",
+        "description": "Reference-based cell type annotation using SingleR and celldex curated reference datasets. Correlation-based scoring with DE gene selection, supports human and mouse references, fine-grained labels, and confidence pruning.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-annotation-singler-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-atac-archr-r",
+        "description": "Single-cell ATAC-seq analysis using ArchR. Fast and scalable analysis of chromatin accessibility data including dimensionality reduction, clustering, peak calling, and motif enrichment.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-atac-archr-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-atac-chromvar-r",
+        "description": "Single-cell ATAC-seq TF motif deviation analysis using chromVAR. Identifies variability in transcription factor binding activity across cells.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-atac-chromvar-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-atac-signac-r",
+        "description": "Single-cell ATAC-seq analysis using Signac. Quality control, normalization, dimensionality reduction, peak calling, and integration with scRNA-seq within the Seurat framework.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-atac-signac-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-batch-integration",
+        "description": "Integrate multiple scRNA-seq samples/batches using Harmony, scVI, Seurat anchors (CCA/RPCA), and fastMNN. Remove technical variation while preserving biological differences. Organized by language (Python/R), Seurat version (V4/V5), and normalization strategy (Standard/SCTransform).",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-batch-integration"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-clustering",
+        "description": "Dimensionality reduction and clustering for single-cell RNA-seq using Seurat (R) and Scanpy (Python). Use for running PCA, computing neighbors, clustering with Leiden/Louvain algorithms, generating UMAP/tSNE embeddings, and visualizing clusters. Use when performing dimensionality reduction and clustering on single-cell data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-clustering"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-cnv-fastcnv-r",
+        "description": "Single-cell CNV analysis using fastCNV (R)",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-cnv-fastcnv-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-cnv-infercnv-r",
+        "description": "Copy number variation inference from single-cell RNA-seq using inferCNV (R). Compares tumor cells to reference normal cells to detect large-scale chromosomal CNVs. Includes Seurat integration and automatic gene order generation via biomaRt.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-cnv-infercnv-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-cnv-infercnvpy",
+        "description": "infercnvpy infers copy number variation (CNV) from single-cell transcriptomics data using Python. Compatible with Scanpy/AnnData workflow, scalable alternative to R-based InferCNV.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-cnv-infercnvpy"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-cnv-scevan-r",
+        "description": "Single-cell CNV inference and tumor/normal classification using SCEVAN. Variational algorithm for detecting copy-number alterations, distinguishing malignant from non-malignant cells, and identifying tumor subclones from scRNA-seq data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-cnv-scevan-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-communication-cellchat-r",
+        "description": "Single-cell cell-cell communication analysis using CellChat (R). Infer ligand-receptor signaling networks, identify active pathways, compare conditions, and export results from annotated scRNA-seq data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-communication-cellchat-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-communication-nichenet-r",
+        "description": "Predict ligand-target relationships and cell-cell communication using NicheNet with automatic database download. Use when investigating how ligands from sender cells regulate target genes in receiver cells.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-communication-nichenet-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-data-io",
+        "description": "Read, write, and create single-cell data objects using Seurat (R) and Scanpy (Python). Supports single-sample and multi-sample loading via SampleSheet CSV, including standard 10X, GEO MTX, GEO H5, and merged-matrix formats. Use for loading, saving, converting, or merging single-cell data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-data-io"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-differential-abundance-diffcyt-r",
+        "description": "diffcyt differential abundance (DA) and differential state (DS) analysis for high-dimensional cytometry and single-cell data. Uses FlowSOM clustering and empirical Bayes moderated tests (edgeR/limma/voom/GLMM).",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-differential-abundance-diffcyt-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-differential-abundance-milor-r",
+        "description": "miloR is an R package for differential abundance analysis on single-cell data using graph-based neighborhoods. Tests for changes in cell population abundance between conditions without requiring discrete clustering.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-differential-abundance-milor-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-differential-abundance-roe-r",
+        "description": "Differential abundance analysis using Ro/e (Ratio of Observed to Expected) for comparing\ncell type proportions across biological conditions. Quantifies enrichment or depletion of\neach cell type in each group relative to the overall distribution. Includes bootstrap\nconfidence intervals, statistical testing (Chi-square, Fisher's exact), and multiple\nvisualization styles (heatmap, lollipop, dot plot, bar chart).\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-differential-abundance-roe-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-differential-abundance-sccoda",
+        "description": "scCODA is a Bayesian model for differential compositional analysis of single-cell data.\nUses a Dirichlet-multinomial model with spike-and-slab prior to identify cell types with\nstatistically credible changes in abundance between conditions, accounting for compositional\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-differential-abundance-sccoda"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-doublet-doubletfinder-r",
+        "description": "DoubletFinder doublet detection for single-cell RNA-seq. Generates artificial\ndoublets, computes pANN (proportion of artificial nearest neighbors), and\nclassifies cells via thresholding. Requires parameter sweep for optimal pK\n(neighborhood size) and supports homotypic doublet adjustment using cluster\nannotations.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-doublet-doubletfinder-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-doublet-scdblfinder-r",
+        "description": "Fast and accurate doublet detection using gradient-boosted classification of\nartificial doublets. Native multi-sample support, cluster-aware generation,\nand Bioconductor integration via SingleCellExperiment.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-doublet-scdblfinder-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-doublet-scrublet",
+        "description": "Scrublet detects doublets in single-cell RNA-seq data by simulating artificial doublets\nfrom random cell pairs and scoring each cell's similarity to these simulated profiles.\nUses a k-nearest-neighbor classifier to calculate a continuous doublet score for each transcriptome.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-doublet-scrublet"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-doublet-solo",
+        "description": "Deep learning-based doublet detection using SOLO from scvi-tools. Trains a semi-supervised classifier on scVI latent space to distinguish singlets from simulated doublets.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-doublet-solo"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-aucell-r",
+        "description": "Per-cell gene set activity scoring using AUCell (AUC-based, robust for sparse scRNA-seq data). Calculate normalized enrichment scores for pathways, signatures, or marker sets and add them to a Seurat object for downstream analysis.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-aucell-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-clusterprofiler-r",
+        "description": "Universal enrichment analysis and visualization for single-cell data using clusterProfiler. Supports ORA, GSEA, and multi-cluster comparison for GO, KEGG, DO, and MSigDB gene sets.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-clusterprofiler-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-decoupler-r",
+        "description": "decoupleR infers pathway and transcription factor activities from gene expression\nusing prior knowledge networks and multiple statistical methods. Supports PROGENy\n(14 pathways), DoRothEA (confidence-ranked TFs), and CollecTRI (expanded TFs).\n10 inference methods including ULM, MLM, AUCell, GSVA, FGSEA.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-decoupler-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-gseapy",
+        "description": "Gene set enrichment analysis using GSEApy — ORA, GSEA, and ssGSEA for single-cell data",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-gseapy"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-irgsea-r",
+        "description": "Integrated multi-method gene set enrichment for single-cell data with RRA consensus scoring. Combines AUCell, UCell, singscore, ssgsea, and ssGSEA2, and provides Seurat integration, differential enrichment, heatmaps, and EMT scoring.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-irgsea-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-progeny-r",
+        "description": "PROGENy estimates signaling pathway activity from gene expression using footprint-based analysis.\nUses pathway-responsive genes derived from perturbation experiments to infer 14 pathway activities\n(MAPK, PI3K, TGFb, TNFa, NFkB, etc.). Supports Human and Mouse. Input requires normalized\ngene expression with HGNC/MGI symbols. Output is pathway activity scores per cell.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-progeny-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-enrichment-ucell-r",
+        "description": "Fast per-cell gene set scoring using UCell (Mann-Whitney U statistic).\nRobust for cross-dataset comparison, small gene sets, and Seurat v4/v5 workflows.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-enrichment-ucell-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-fastq2mtx",
+        "description": "Generate gene expression count matrices from scRNA-seq FASTQ files using Cell Ranger or STARsolo. Supports single-sample and multi-sample processing via SampleSheet. Output is standard 10x MTX/h5 format ready for downstream data-io.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-fastq2mtx"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-markers",
+        "description": "Find marker genes and manually assign cell type labels in single-cell RNA-seq using Seurat (R) and Scanpy (Python). Use for differential expression between clusters, identifying cluster-specific markers, scoring gene sets, and assigning cell type labels. Use when finding marker genes and annotating clusters.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-markers"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-metabolism-compass",
+        "description": "Metabolic flux inference for single-cell transcriptomics using COMPASS.\nPerforms flux-balance-analysis-based reaction penalty scoring, metabolite\nuptake/secretion prediction, differential flux analysis, and subsystem-level\nsummarization with Scanpy/AnnData integration.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-metabolism-compass"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-metabolism-scmetabolism-r",
+        "description": "Single-cell metabolic pathway analysis using scMetabolism (R)",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-metabolism-scmetabolism-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-perturbation-augur-r",
+        "description": "Augur prioritizes cell types by their response to perturbations using machine\nlearning. Trains classifiers to predict perturbation labels and ranks cell\ntypes by classification accuracy (AUC). Supports differential prioritization\nbetween conditions and visualization. R implementation based on\nneurorestore/Augur.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-perturbation-augur-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-perturbation-pertpy",
+        "description": "pertpy is a Python toolkit for perturbation analysis of single-cell data. Use for differential expression, log fold change, and signature scoring in perturbation screens.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-perturbation-pertpy"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-perturbation-scgen",
+        "description": "scGen is a generative deep learning model for predicting single-cell perturbation responses across cell types, studies, and species. Use for perturbation prediction, batch correction, and virtual perturbations.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-perturbation-scgen"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-perturbation-sctenifoldknk-r",
+        "description": "scTenifoldKnk performs in-silico gene knockdown experiments on single-cell gene regulatory networks.\nUses network-based manifold learning to predict gene knockout effects without wet lab experiments.\nConstructs scGRNs from wild-type data, simulates knockout by zeroing target gene edges, and identifies\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-perturbation-sctenifoldknk-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-preprocessing",
+        "description": "Quality control, filtering, and normalization for single-cell RNA-seq using Seurat (R) and Scanpy (Python). Use for calculating QC metrics, filtering cells and genes, normalizing counts, identifying highly variable genes, and scaling data. Use when filtering, normalizing, and selecting features in single-cell data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-preprocessing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-regulatory-pyscenic",
+        "description": "pySCENIC infers gene regulatory networks and cell-type-specific regulons from single-cell RNA-seq data. Three-step pipeline — GRN inference (GRNBoost2/GENIE3), cisTarget motif pruning, AUCell scoring — with automated cisTarget database management.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-regulatory-pyscenic"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-regulatory-scenic-r",
+        "description": "SCENIC infers gene regulatory networks and cell type specific regulons from single-cell RNA-seq data using R. Includes TF validation, correlation-based network alternative, GENIE3 resume capability, and binarization support.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-regulatory-scenic-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-splicing-brie2",
+        "description": "BRIE2 (Bayesian Regression for Isoform Estimate) is a scalable Bayesian method to accurately \nidentify splicing phenotypes in single-cell RNA-seq experiments. It quantifies isoform \nproportions and their uncertainty, supporting both differential alternative splicing (DAS) \nand differential momentum genes (DMG) analysis.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-splicing-brie2"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-tcr-startrac-r",
+        "description": "STARTRAC (Single T-cell Analysis by Rna-seq and Tcr TRACking) for T cell dynamics analysis.\nQuantifies T cell clonotype expansion, migration between tissues, and state transitions.\nProvides three core indices: STARTRAC-expa (clonal expansion), STARTRAC-migr (tissue migration),\nand STARTRAC-tran (phenotypic transition). Supports multi-patient analysis with permutation-based\nsignificance testing.\n",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-tcr-startrac-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-trajectory-monocle3-r",
+        "description": "Single-cell trajectory inference and pseudotime analysis using Monocle3 (v1.4.25+). Reversed graph embedding for ordering cells along developmental trajectories, branch detection, gene dynamics (Moran's I), gene module detection, batch correction (align_cds), and BPCells support for large datasets.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-trajectory-monocle3-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-single-cell-trajectory-scvelo",
+        "description": "RNA velocity analysis using scVelo. Infers cellular dynamics directionality by distinguishing \nunspliced (pre-mRNA) from spliced (mature mRNA) counts. Three estimation modes available:\ndeterministic (steady-state assumption, fastest), stochastic (second-order moments, balanced),\ndynamical (full transcriptional dynamics with EM, most accurate). Core capabilities include\nvelocity vector computation, velocity graph construction, latent time inference, terminal state\nidentification, driver gene rank",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-single-cell-trajectory-scvelo"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-batch-integration",
+        "description": "Integrate multiple spatial transcriptomics slices/samples to remove technical batch effects while preserving biological spatial patterns. Handles image slot management during merge, supports Seurat V5 with Harmony/CCA/RPCA/fastMNN, and provides spatial-specific validation.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-batch-integration"
+    },
+    {
+      "id": "category:spatial-transcriptomics"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-cnv-fastcnv-r",
+        "description": "CNV analysis for spatial transcriptomics and scRNA-seq using fastCNV (R)",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-cnv-fastcnv-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-cnv-numbat-r",
+        "description": "Haplotype-aware CNV calling from spatial transcriptomics using Numbat. Integrates gene expression, allelic ratio, and haplotype information to infer allele-specific CNVs and reconstruct clonal architecture.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-cnv-numbat-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-communication-cellchat-r",
+        "description": "Spatially-aware cell-cell communication analysis using SpatialCellChat (CellChat v3, R)",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-communication-cellchat-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-communication-commot",
+        "description": "Spatial cell-cell communication analysis using optimal transport (COMMOT)",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-communication-commot"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-communication-fastccc",
+        "description": "Fast cell-cell communication analysis using FastCCC for single-cell and spatial transcriptomics",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-communication-fastccc"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-communication-liana",
+        "description": "Cell-cell communication analysis using LIANA+ framework. Supports multi-method inference, spatially-informed analysis, and comprehensive visualization for both single-cell and spatial transcriptomics data.",
+        "category": "single-cell",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-communication-liana"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-data-io",
+        "description": "Load spatial transcriptomics data from Visium, Xenium, MERFISH, and other platforms using Seurat (R) and Scanpy/Squidpy (Python). Supports single-sample and multi-sample loading via SampleSheet CSV, including standard Space Ranger outputs and GEO non-standard formats (h5 + spatial.tar.gz). Use when loading Visium, Xenium, MERFISH, or other spatial data.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-data-io"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-deconvolution-card-r",
+        "description": "CARD (Conditional Autoregressive-based Deconvolution) performs spatially-informed\ncell type deconvolution for spatial transcriptomics. Uses a conditional autoregressive\nmodel to leverage spatial correlation structure while estimating cell type proportions.\nSupports reference-based deconvolution, reference-free mode (CARDfree), high-resolution\nimputation, and single-cell mapping.\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-deconvolution-card-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-deconvolution-cell2location",
+        "description": "Spatial transcriptomics deconvolution using cell2location. Estimates cell type proportions per spot with Bayesian uncertainty quantification (q05/q50/q95) from an annotated scRNA-seq reference.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-deconvolution-cell2location"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-deconvolution-rctd-r",
+        "description": "RCTD (Robust Cell Type Decomposition) for spatial transcriptomics with doublet detection and platform effect normalization",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-deconvolution-rctd-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
+        "description": "SPOTlight performs NMF-based spatial transcriptomics deconvolution with marker gene integration.\nUses Non-negative Matrix Factorization (NMF) combined with Non-negative Least Squares (NNLS)\nregression to estimate cell type proportions in spatial spots. Supports marker gene-guided\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-deconvolution-spotlight-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-deconvolution-tangram",
+        "description": "Deep learning method for mapping single-cell RNA-seq to spatial transcriptomics using PyTorch optimization",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-deconvolution-tangram"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-differential-abundance-roe-r",
+        "description": "Spatial Ro/e (Ratio of Observed to Expected) analysis for quantifying cell type\nco-occurrence patterns and regional enrichment in spatial transcriptomics data.\nTwo complementary analyses: (1) Co-occurrence -- which cell types are spatial neighbors;\n(2) Regional Abundance -- which cell types are enriched in anatomical regions.\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-differential-abundance-roe-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-domains-bayesspace-r",
+        "description": "BayesSpace performs spatial domain identification using Bayesian hierarchical modeling.\nClusters spatial transcriptomics data while accounting for spatial dependencies between\nneighboring spots. Supports resolution enhancement to subspot-level for higher-resolution\nspatial domain identification.\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-domains-bayesspace-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-domains-graphst",
+        "description": "GraphST performs spatial domain identification using graph self-supervised contrastive learning.\nIntegrates spatial location and gene expression to identify tissue regions with similar\nexpression profiles and spatial proximity. Supports spatial clustering, multi-section integration,\nand scRNA-seq transfer onto ST data.\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-domains-graphst"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-domains-spagcn",
+        "description": "Spatial domain identification using SpaGCN with graph convolutional networks and histology integration",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-domains-spagcn"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-domains-stagate",
+        "description": "Spatial domain identification using STAGATE graph attention autoencoder with PyTorch Geometric",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-domains-stagate"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-fastq2spatial",
+        "description": "Generate spatial gene expression count matrices from spatial transcriptomics FASTQ files using Space Ranger or Spacemake. Supports Visium (brightfield and fluorescence), Visium HD, and Slide-seq. Output is standard Space Ranger format with spatial coordinates and tissue images, ready for downstream data-io.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-fastq2spatial"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-integration-spclue",
+        "description": "spCLUE performs spatial domain identification and multi-slice integration using\ncross-view contrastive learning. Constructs multi-view graphs (spatial and expression)\nand employs graph neural networks with instance-level and cluster-level contrastive\nlearning. Supports batch correction for integrating multiple tissue slices.\n",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-integration-spclue"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-layers",
+        "description": "Create and analyze spatial layers around regions of interest for gradient analysis. Divide tissue into concentric zones centered on ROIs (e.g., tumor core, neural structures) to analyze microenvironment gradients such as perineural regions, peritumoral infiltration zones, and perivascular niches.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-layers"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-microenvironment-misty-r",
+        "description": "Multi-view spatial microenvironment analysis using mistyR with network export to Cytoscape",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-microenvironment-misty-r"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-neighbors",
+        "description": "Build spatial neighbor graphs for spatial transcriptomics data. Compute k-nearest neighbors, Delaunay triangulation, and radius-based connectivity for downstream spatial analyses using Squidpy (Python) or custom functions (R). Use when building spatial neighborhood graphs.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-neighbors"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-niches",
+        "description": "Cluster spatial transcriptomics spots into tissue microenvironment niches based on cell type proportions from deconvolution. Identifies biologically meaningful regions like TLS, neural niches, tumor-stroma interfaces using unsupervised clustering with optional spatial constraints. Use when analyzing tissue microenvironments and cellular neighborhoods.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-niches"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-preprocessing",
+        "description": "Quality control, filtering, normalization, and spatial analysis for spatial transcriptomics (10x Visium) using Seurat (R) and Scanpy/Squidpy (Python). Use for loading Visium data, calculating spatial QC metrics, filtering spots, normalizing counts with SCTransform, dimensionality reduction and clustering, spatial visualization, detecting spatially variable features, and merging multiple slices.",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-preprocessing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-spatial-transcriptomics-statistics",
+        "description": "Comprehensive spatial statistics for spatial transcriptomics data analysis",
+        "category": "spatial-transcriptomics",
+        "project_id": null
+      },
+      "id": "skill:bio-spatial-transcriptomics-statistics"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-workflows-scrnaseq-pipeline",
+        "description": "End-to-end single-cell RNA-seq workflow orchestrator. Defines the standard 8-step analysis pipeline from raw counts to annotated cell types, with Propose-Evaluate-Execute-Report mode and agent-orchestrated decision points. Provides complete single-language paths (Full R via Seurat, Full Python via Scanpy) with zero cross-language switching. Use when the user asks for a complete scRNA-seq analysis, \"analyze my single-cell data\", or \"run the full pipeline\".",
+        "category": "workflows",
+        "project_id": null
+      },
+      "id": "skill:bio-workflows-scrnaseq-pipeline"
+    },
+    {
+      "id": "category:workflows"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-workflows-spatial-pipeline",
+        "description": "End-to-end spatial transcriptomics workflow orchestrator for Visium, Xenium, and other platform data. Defines the standard 7-step analysis pipeline from raw spatial data to spatial domains, with Propose-Execute-Report mode and LLM diagnostic cards. Use when the user asks for complete spatial transcriptomics analysis, \"analyze my Visium data\", or \"spatial transcriptomics pipeline\".",
+        "category": "workflows",
+        "project_id": null
+      },
+      "id": "skill:bio-workflows-spatial-pipeline"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-alignment",
+        "description": "序列比对核心流程，包括参考基因组索引、BWA-MEM2比对、排序、重复标记和BAM索引。Use when aligning reads to reference genome.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-alignment"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-alignment-gpu",
+        "description": "GPU加速的序列比对与预处理，基于NVIDIA Parabricks。Use when aligning reads to reference genome with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-alignment-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-bam-qc-recalibration",
+        "description": "BAM文件质控、覆盖度分析和碱基质量分数重校准(BQSR)。Use for BAM quality control and recalibration before variant calling.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-bam-qc-recalibration"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-longread-gpu",
+        "description": "GPU加速的长读序测序分析，基于NVIDIA Parabricks。支持PacBio HiFi和Oxford Nanopore的比对和生殖细胞变异检测。Use for long-read sequencing analysis with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-longread-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-methylation-gpu",
+        "description": "GPU加速的DNA甲基化分析，基于NVIDIA Parabricks fq2bam_meth。Use for methylation-aware alignment with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-methylation-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-pangenome-gpu",
+        "description": "GPU加速的泛基因组分析，基于NVIDIA Parabricks giraffe和pangenome工具。Use for pangenome-aware alignment and variant calling with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-pangenome-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-reads-preprocess",
+        "description": "原始测序数据预处理，包括接头修剪、质量过滤和碱基校正。使用fastp一体化工具完成。Use when cleaning raw FASTQ files.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-reads-preprocess"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-reads-qc",
+        "description": "原始测序数据质量控制，包括FastQC质量评估、MultiQC汇总和FastQ Screen污染筛查。Use when performing QC on raw FASTQ files.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-reads-qc"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-cnv",
+        "description": "拷贝数变异(CNV)检测，包括CNVkit和GATK CNV。检测基因水平的拷贝数增加和缺失。Use for detecting copy number variations from sequencing data.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-cnv"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-filter-norm",
+        "description": "变异过滤、标准化和质量控制。包括VQSR、硬过滤、bcftools过滤和VCF操作。Use for filtering and normalizing VCF files.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-filter-norm"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-germline-gpu",
+        "description": "GPU加速的生殖细胞小变异(SNP/indel)检测，基于NVIDIA Parabricks。Use for germline variant calling with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-germline-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-interpretation",
+        "description": "变异注释、功能预测和临床解读。包括VEP、SnpEff注释和ClinVar/ACMG临床过滤。Use for annotating and interpreting variants.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-interpretation"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-snp-indel",
+        "description": "小变异(SNP/indel)检测，包括GATK HaplotypeCaller、DeepVariant和bcftools。支持单样本和队列联合检测。Use for germline SNP and indel calling.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-snp-indel"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-somatic",
+        "description": "体细胞变异检测，使用Mutect2或Strelka2从肿瘤-正常配对样本中检测somatic SNV和indel。Use for somatic mutation calling from tumor-normal pairs.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-somatic"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-somatic-gpu",
+        "description": "GPU加速的体细胞变异检测，基于NVIDIA Parabricks。支持tumor-normal配对和tumor-only模式。Use for somatic variant calling with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-somatic-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-variant-structural",
+        "description": "结构变异(SV)检测，包括缺失、插入、倒位、重复和易位。Use for detecting large genomic rearrangements.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-variant-structural"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-workflow-wes-germline",
+        "description": "完整的WES生殖细胞变异检测工作流，从FASTQ到注释VCF的全流程。Use for end-to-end WES germline variant calling.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-workflow-wes-germline"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-workflow-wes-germline-gpu",
+        "description": "GPU加速的WES生殖细胞变异检测端到端工作流，基于NVIDIA Parabricks。Use for end-to-end WES germline variant calling with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-workflow-wes-germline-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-workflow-wgs-germline",
+        "description": "完整的WGS生殖细胞变异检测工作流，从FASTQ到注释VCF的全流程。Use for end-to-end WGS germline variant calling.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-workflow-wgs-germline"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-genomics-workflow-wgs-germline-gpu",
+        "description": "GPU加速的WGS生殖细胞变异检测端到端工作流，基于NVIDIA Parabricks。Use for end-to-end WGS germline variant calling with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-genomics-workflow-wgs-germline-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-alignment-gpu",
+        "description": "GPU加速的RNA-seq比对，基于NVIDIA Parabricks rna_fq2bam。Use for RNA-seq alignment to reference genome with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-alignment-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-fusion-gpu",
+        "description": "GPU加速的RNA-seq融合基因检测，基于NVIDIA Parabricks starfusion。Use for gene fusion detection from RNA-seq with GPU acceleration.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-fusion-gpu"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "utils-workflow-management-nextflow",
+        "description": "Transform bioinformatics analysis scripts into production-grade Nextflow DSL2 workflows for SLURM HPC execution. Use when wrapping existing tools/pipelines into portable workflows, designing channel dataflows, or configuring resource-aware cluster submission. Supports Singularity, Conda, and locally installed software.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:utils-workflow-management-nextflow"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "utils-workflow-management-snakemake",
+        "description": "Transform bioinformatics analysis scripts into reproducible Snakemake workflows for SLURM HPC execution. Use when wrapping existing tools/pipelines into rule-based workflows, designing wildcard-driven dataflows, or configuring resource-aware cluster submission. Supports Conda, Singularity, and locally installed software. Compatible with Snakemake 7.x and 8.x.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:utils-workflow-management-snakemake"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "utils-workflow-management-wdl",
+        "description": "Transform bioinformatics analysis scripts into portable WDL workflows for execution with Cromwell or miniwdl. Use when building strongly-typed workflows, running GATK best practices, or targeting cloud platforms (Terra, AnVIL). SLURM execution is supported via Cromwell HPC backend. Supports Docker and Singularity containers.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:utils-workflow-management-wdl"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-communication",
+        "description": "Create scientific presentations, conference posters, and research dissemination materials. Build slide decks (PDF/PowerPoint), design LaTeX research posters, and transform papers into interactive websites and presentation videos. Includes AI-powered visual generation, formatting templates, and publication-ready output workflows.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-communication"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-grant-writing",
+        "description": "Write competitive research proposals for U.S. (NSF, NIH, DOE, DARPA) and Chinese (NSFC, NKRD, Postdoc, Provincial) funding agencies. Agency-specific formatting, review criteria, budget preparation, broader impacts, significance statements, innovation narratives, and compliance with submission requirements.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-grant-writing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-ideation",
+        "description": "Research ideation and strategic problem selection. Combines creative brainstorming for hypothesis generation with systematic project evaluation, risk assessment, and decision-tree frameworks for choosing high-impact scientific problems.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-ideation"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-literature-review",
+        "description": "Comprehensive scientific literature review and research synthesis. Combines systematic review methodology, parallel multi-database literature search (OpenAlex, Semantic Scholar, PubMed, arXiv, bioRxiv), query decomposition, evidence-table extraction, source-anchored synthesis, citation-graph expansion, local library scanning, autonomous deep research, and multi-agent analysis. Produces structured reports with verified citations in multiple academic styles.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-literature-review"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-manuscript",
+        "description": "Complete scientific manuscript preparation. Write and format research papers for international journals (Nature/Cell/Science/IEEE) and Chinese journals (中国科学/科学通报/计算机学报/物理学报) using IMRAD structure, proper citations (APA/AMA/Vancouver/Nature/GB-T-7714), figures/tables, and reporting guidelines (CONSORT/STROBE/PRISMA). Includes citation management tools, statistical reporting standards, journal-specific formatting, Chinese thesis/dissertation formatting, and a two-stage writing process from outlin",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-manuscript"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-orchestrator",
+        "description": "Coordinate multi-skill research workflows across the 8 scientific writing skills. Detect project state, route to appropriate skills, track progress, and manage handoffs between ideation, literature review, research design, manuscript writing, peer review, grant writing, scientific communication, and publishing ethics.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-orchestrator"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-peer-review",
+        "description": "Systematic peer review toolkit. Evaluate methodology, statistics, design, reproducibility, ethics, figure integrity, reporting standards, for manuscript and grant review across disciplines.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-peer-review"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-publishing-ethics",
+        "description": "Ensure publishing compliance and research integrity. Generate venue-specific AI disclosure statements, select appropriate reporting guidelines (CONSORT, STROBE, PRISMA, etc.), and cross-check citations for fabrication or metadata mismatches using free public APIs.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-publishing-ethics"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "scientific-research-design",
+        "description": "Design rigorous scientific studies and generate testable hypotheses. Formulate competing explanations from observations, design experiments, evaluate methodology, assess biases and confounding, and apply evidence quality frameworks (GRADE, Cochrane ROB) for both planning and critiquing research.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:scientific-research-design"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-chemistry-brenda",
+        "description": "Access BRENDA enzyme database via SOAP API. Retrieve kinetic parameters (Km, kcat), reaction equations, organism data, and substrate-specific enzyme information for biochemical research and metabolic pathway analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-chemistry-brenda"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-chemistry-pubchem",
+        "description": "Query PubChem via PUG-REST API/PubChemPy (110M+ compounds). Search by name/CID/SMILES, retrieve properties, similarity/substructure searches, bioactivity, for cheminformatics.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-chemistry-pubchem"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-disease-gwas",
+        "description": "Query NHGRI-EBI GWAS Catalog for SNP-trait associations. Search variants by rs ID, disease/trait, gene, retrieve p-values and summary statistics, for genetic epidemiology and polygenic risk scores.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-disease-gwas"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-disease-opentargets",
+        "description": "Query Open Targets Platform for target-disease associations, drug target discovery, tractability/safety data, genetics/omics evidence, known drugs, for therapeutic target identification.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-disease-opentargets"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-expression-geo",
+        "description": "Access NCBI GEO for gene expression/genomics data. Search/download microarray and RNA-seq datasets (GSE, GSM, GPL), retrieve SOFT/Matrix files, for transcriptomics and expression analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-expression-geo"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-expression-gtex",
+        "description": "Query GTEx (Genotype-Tissue Expression) portal for tissue-specific gene expression, eQTLs (expression quantitative trait loci), and sQTLs. Essential for linking GWAS variants to gene regulation, understanding tissue-specific expression, and interpreting non-coding variant effects.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-expression-gtex"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-pathway-interpro",
+        "description": "Query InterPro for protein family, domain, and functional site annotations. Integrates Pfam, PANTHER, PRINTS, SMART, SUPERFAMILY, and 11 other member databases. Use for protein function prediction, domain architecture analysis, evolutionary classification, and GO term mapping.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-pathway-interpro"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-pathway-jaspar",
+        "description": "Query JASPAR for transcription factor binding site (TFBS) profiles (PWMs/PFMs). Search by TF name, species, or class; scan DNA sequences for TF binding sites; compare matrices; essential for regulatory genomics, motif analysis, and GWAS regulatory variant interpretation.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-pathway-jaspar"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-pathway-reactome",
+        "description": "Query Reactome REST API for pathway analysis, enrichment, gene-pathway mapping, disease pathways, molecular interactions, expression analysis, for systems biology studies.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-pathway-reactome"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-pathway-string",
+        "description": "Query STRING API for protein-protein interactions (59M proteins, 20B interactions). Network analysis, GO/KEGG enrichment, interaction discovery, 5000+ species, for systems biology.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-pathway-string"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-sequence-ena",
+        "description": "Access European Nucleotide Archive via API/FTP. Retrieve DNA/RNA sequences, raw reads (FASTQ), genome assemblies by accession, for genomics and bioinformatics pipelines. Supports multiple formats.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-sequence-ena"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-sequence-ensembl",
+        "description": "Query Ensembl genome database REST API for 250+ species. Gene lookups, sequence retrieval, variant analysis, comparative genomics, orthologs, VEP predictions, for genomic research.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-sequence-ensembl"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-sequence-ncbi-gene",
+        "description": "Query NCBI Gene via E-utilities/Datasets API. Search by symbol/ID, retrieve gene info (RefSeqs, GO, locations, phenotypes), batch lookups, for gene annotation and functional analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-sequence-ncbi-gene"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-sequence-uniprot",
+        "description": "Direct REST API access to UniProt. Protein searches, FASTA retrieval, ID mapping, Swiss-Prot/TrEMBL. For Python workflows with multiple databases, prefer bioservices (unified interface to 40+ services). Use this for direct HTTP/REST work or UniProt-specific control.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-sequence-uniprot"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-structure-alphafold",
+        "description": "Access AlphaFold's 200M+ AI-predicted protein structures. Retrieve structures by UniProt ID, download PDB/mmCIF files, analyze confidence metrics (pLDDT, PAE), for drug discovery and structural biology.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-structure-alphafold"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-database-structure-pdb",
+        "description": "Access RCSB PDB for 3D protein/nucleic acid structures. Search by text/sequence/structure, download coordinates (PDB/mmCIF), retrieve metadata, for structural biology and drug discovery.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-database-structure-pdb"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-cbioportal",
+        "description": "Query cBioPortal for cancer genomics data including somatic mutations, copy number alterations, gene expression, and survival data across hundreds of cancer studies. Essential for cancer target validation, oncogene/tumor suppressor analysis, and patient-level genomic profiling.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-cbioportal"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-clinicaltrials",
+        "description": "Query ClinicalTrials.gov via API v2. Search trials by condition, drug, location, status, or phase. Retrieve trial details by NCT ID, export data, for clinical research and patient matching.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-clinicaltrials"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-clinpgx",
+        "description": "Query ClinPGx for pharmacogenomics data. Access clinical annotations, CPIC/DPWG guidelines, drug labels, pathways, gene-drug interactions, variant frequencies, and connected data for precision medicine and genotype-guided dosing decisions.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-clinpgx"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-clinvar",
+        "description": "Query NCBI ClinVar for variant clinical significance. Search by gene/position, interpret pathogenicity classifications, access via E-utilities API or FTP, annotate VCFs, for genomic medicine.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-clinvar"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-fda",
+        "description": "Query openFDA API for drugs, devices, adverse events, recalls, regulatory submissions (510k, PMA), substance identification (UNII), for FDA regulatory data analysis and safety research.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-fda"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-gnomad",
+        "description": "Query gnomAD (Genome Aggregation Database) for population allele frequencies, variant constraint scores (pLI, LOEUF), and loss-of-function intolerance. Essential for variant pathogenicity interpretation, rare disease genetics, and identifying loss-of-function intolerant genes.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-gnomad"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-variant-clinvar",
+        "description": "Query ClinVar for variant pathogenicity classifications, review status, and disease associations via REST API or local VCF. Use when determining clinical significance of variants for diagnostic or research purposes.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-variant-clinvar"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-variant-dbsnp",
+        "description": "Query dbSNP for rsID lookups, variant annotations, and cross-references to other databases. Use when mapping between rsIDs and genomic coordinates or retrieving basic variant information.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-variant-dbsnp"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-variant-gnomad",
+        "description": "Query gnomAD for population allele frequencies to assess variant rarity. Use when filtering variants by population frequency for rare disease analysis or determining if a variant is common in the general population.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-variant-gnomad"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "clinical-database-variant-pharmgkb",
+        "description": "Query PharmGKB and CPIC for drug-gene interactions, pharmacogenomic annotations, and dosing guidelines. Use when predicting drug response from genetic variants or implementing clinical pharmacogenomics.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:clinical-database-variant-pharmgkb"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "drug-database-chembl",
+        "description": "Query ChEMBL's bioactive molecules and drug discovery data. Search compounds by structure/properties, retrieve bioactivity data (IC50, Ki), find inhibitors, perform SAR studies, for medicinal chemistry.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:drug-database-chembl"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "drug-database-zinc",
+        "description": "Access ZINC (230M+ purchasable compounds). Search by ZINC ID/SMILES, similarity searches, 3D-ready structures for docking, analog discovery, for virtual screening and drug discovery.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:drug-database-zinc"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "lit-database-arxiv",
+        "description": "Efficient database search tool for arXiv preprint server. Use this skill when searching for preprints in physics, mathematics, computer science, quantitative biology, finance, statistics, and electrical engineering by keywords, authors, date ranges, or categories, retrieving paper metadata, downloading PDFs, or conducting literature reviews.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:lit-database-arxiv"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "lit-database-biorxiv",
+        "description": "Efficient database search tool for bioRxiv preprint server. Use this skill when searching for life sciences preprints by keywords, authors, date ranges, or categories, retrieving paper metadata, downloading PDFs, or conducting literature reviews.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:lit-database-biorxiv"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "lit-database-openalex",
+        "description": "Query and analyze scholarly literature using the OpenAlex database. This skill should be used when searching for academic papers, analyzing research trends, finding works by authors or institutions, tracking citations, discovering open access publications, or conducting bibliometric analysis across 240M+ scholarly works. Use for literature searches, research output analysis, citation analysis, and academic database queries.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:lit-database-openalex"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "lit-database-pubmed",
+        "description": "Direct REST API access to PubMed. Advanced Boolean/MeSH queries, E-utilities API, batch processing, citation management. For Python workflows, prefer biopython (Bio.Entrez). Use this for direct HTTP/REST work or custom API implementations.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:lit-database-pubmed"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-alignment",
+        "description": "Splice-aware alignment of bulk mRNA-seq reads using STAR and HISAT2. Covers index generation, basic/two-pass alignment, stranded settings, and BAM sorting. Use when aligning reads to a reference genome.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-alignment"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-batch-correction",
+        "description": "Batch effect correction for bulk mRNA-seq count and normalized expression matrices. Covers ComBat-Seq (counts), ComBat (normalized), limma removeBatchEffect, SVA for unknown batches, and omicverse pyComBat. Use when samples were processed across multiple batches.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-batch-correction"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-count-prep",
+        "description": "Prepare raw count matrices for downstream analysis. Covers ingestion from featureCounts/Salmon/kallisto, gene ID mapping (Ensembl to symbol), metadata alignment, low-count filtering, and AnnData/DESeq2 object creation. Use after quantification and before DE analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-count-prep"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-deconvolution",
+        "description": "Bulk mRNA-seq deconvolution and cell fraction estimation. Covers MuSiC, BSEQ-sc, and omicverse Bulk2Single for reconstructing cell-type proportions or synthetic single-cell profiles. Use when estimating cell-type composition from bulk RNA-seq.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-deconvolution"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-differential-expression",
+        "description": "Differential expression analysis for bulk mRNA-seq. Covers DESeq2, edgeR, limma-voom (R), and PyDESeq2 (Python). Includes model fitting, contrast extraction, LFC shrinkage, result filtering, volcano/MA plots, and heatmaps. Use with prepared count matrices and metadata.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-differential-expression"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-pathway-enrichment",
+        "description": "Functional enrichment and pathway analysis for bulk mRNA-seq differential expression results. Covers GO, KEGG, Reactome over-representation, GSEA, and visualization with clusterProfiler (R) and gseapy (Python). Use after obtaining DE results.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-pathway-enrichment"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-pipeline",
+        "description": "End-to-end bulk mRNA-seq best-practice workflow from FASTQ to pathway enrichment. Orchestrates QC, alignment/quantification, count prep, exploratory QC, differential expression, and functional interpretation. Use as the master skill for complete mRNA-seq projects.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-pipeline"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-ppi",
+        "description": "Protein-protein interaction (PPI) network analysis for bulk mRNA-seq gene lists. Covers STRING database queries, network construction, visualization, and omicverse pyPPI integration. Use for exploring molecular interactions among DE genes.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-ppi"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-qc-bam",
+        "description": "RNA-seq specific quality control including rRNA contamination detection, strandedness verification, gene body coverage, and transcript integrity metrics. Use when validating RNA-seq libraries before differential expression analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-qc-bam"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-qc-exploratory",
+        "description": "Exploratory data analysis and quality control of prepared bulk mRNA-seq count matrices. Covers normalization (VST/rlog/log2CPM), PCA, sample clustering, outlier detection, batch inspection, and library complexity checks. Use before differential expression.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-qc-exploratory"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-qc-preprocessing",
+        "description": "FASTQ-level quality control and preprocessing for bulk mRNA-seq. Covers FastQC, fastp/Trimmomatic adapter trimming, and MultiQC aggregation. Use before alignment or pseudo-alignment.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-qc-preprocessing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-quantification",
+        "description": "Gene and transcript quantification for bulk mRNA-seq. Covers alignment-based counting with featureCounts, STAR GeneCounts, and alignment-free pseudo-alignment with Salmon/kallisto, plus tximport summarization. Use after alignment or directly from FASTQ.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-quantification"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-splicing",
+        "description": "Alternative splicing analysis for bulk mRNA-seq. Covers PSI quantification with SUPPA2 and rMATS-turbo, differential splicing detection, and isoform switching. Use when analyzing splice events and isoform ratios.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-splicing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-timeseries",
+        "description": "Time-series and longitudinal differential expression analysis for bulk mRNA-seq. Covers limma with splines, maSigPro, ImpulseDE2, and DESeq2 LRT for temporal patterns. Use when analyzing time-course expression data.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-timeseries"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-mrna-seq-wgcna",
+        "description": "Weighted gene co-expression network analysis (WGCNA) for bulk mRNA-seq. Covers data preprocessing, soft-threshold selection, module detection, eigengene-trait correlations, and hub gene extraction. Use for discovering co-expression modules and trait associations.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-mrna-seq-wgcna"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-differential-occupancy",
+        "description": "Detect differential ribosome occupancy from Ribo-seq data alone using DESeq2, Xtail, or Babel. Use when comparing translational changes without paired RNA-seq.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-differential-occupancy"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-index-building",
+        "description": "Build reference indexes for Ribo-seq analysis including STAR genome index, bowtie2 transcriptome/rRNA indexes, and GTF preprocessing. Use before running the Ribo-seq pipeline.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-index-building"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-metagene-visualization",
+        "description": "Generate publication-quality metagene plots, frame distributions, heatmaps, and IGV snapshots from Ribo-seq data. Use for QC figures and manuscript reporting.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-metagene-visualization"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-orf-detection",
+        "description": "Detect translated ORFs from Ribo-seq data including uORFs and novel ORFs using RiboCode and RibORF. Use when identifying translated regions beyond annotated coding sequences.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-orf-detection"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-orf-quantification",
+        "description": "Quantify ORF-level translation from Ribo-seq data using ORFik and DESeq2. Use when measuring expression of detected ORFs or comparing ORF translation across conditions.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-orf-quantification"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-qc-reporting",
+        "description": "Generate quality control reports for Ribo-seq data including FastQC, MultiQC, length distribution, and periodicity summaries. Use after preprocessing and periodicity analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-qc-reporting"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-riboseq-preprocessing",
+        "description": "Preprocess ribosome profiling data including adapter trimming, size selection, rRNA removal, and alignment. Use when preparing Ribo-seq reads for downstream analysis of translation.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-riboseq-preprocessing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-ribosome-periodicity",
+        "description": "Validate Ribo-seq data quality by checking 3-nucleotide periodicity and calculating P-site offsets. Use when assessing library quality or determining read offsets for downstream analysis.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-ribosome-periodicity"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-ribosome-stalling",
+        "description": "Detect ribosome pausing and stalling sites from Ribo-seq data at codon resolution. Use when studying translational regulation, identifying pause sites, or analyzing codon-specific translation dynamics.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-ribosome-stalling"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-rna-preprocessing",
+        "description": "Preprocess mRNA-seq data for Ribo-seq translation efficiency analysis including adapter trimming, optional rRNA removal, alignment, and gene-level quantification. Use when paired mRNA-seq data is available for TE calculation.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-rna-preprocessing"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-species-templates",
+        "description": "Provide standardized species-specific parameter templates for Ribo-seq analysis. Use when configuring preprocessing, alignment, P-site offset, and QC parameters for human, mouse, yeast, or plant samples.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-species-templates"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-translation-efficiency",
+        "description": "Calculate translation efficiency (TE) as the ratio of ribosome occupancy to mRNA abundance. Use when comparing translational regulation between conditions or identifying genes with altered translation independent of transcription.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-translation-efficiency"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "bio-ribo-seq-workflow",
+        "description": "End-to-end Ribo-seq analysis workflow from FASTQ to translation efficiency, ORF detection, and ribosome stalling using pure Bash. Use when analyzing ribosome profiling data to study translation.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:bio-ribo-seq-workflow"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "pubmed_search",
+        "description": "Search PubMed for scientific articles",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "skill:mcp_pubmed_search"
+    },
+    {
+      "id": "category:mcp"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "pubmed_fetch",
+        "description": "Fetch article abstract by PubMed ID",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "skill:mcp_pubmed_fetch"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "uniprot_search",
+        "description": "Search UniProt for protein information",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "skill:mcp_uniprot_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "geo_search",
+        "description": "Search GEO for gene expression datasets",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "skill:mcp_geo_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "pubmed_search",
+        "description": "Search PubMed for scientific articles",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "tool:pubmed_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "pubmed_fetch",
+        "description": "Fetch article abstract by PubMed ID",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "tool:pubmed_fetch"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "uniprot_search",
+        "description": "Search UniProt for protein information",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "tool:uniprot_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "geo_search",
+        "description": "Search GEO for gene expression datasets",
+        "category": "mcp",
+        "project_id": null
+      },
+      "id": "tool:geo_search"
     }
   ],
   "edges": [
@@ -729,6 +3029,570 @@
       "properties": {},
       "source": "category:general",
       "target": "skill:batch-skill-b"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-alignment"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-alignment-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-bam-qc-recalibration"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-longread-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-methylation-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-pangenome-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-reads-preprocess"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-reads-qc"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-cnv"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-filter-norm"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-germline-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-interpretation"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-snp-indel"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-somatic"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-somatic-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-variant-structural"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-workflow-wes-germline"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-workflow-wes-germline-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-workflow-wgs-germline"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-genomics-workflow-wgs-germline-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-alignment-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-fusion-gpu"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:utils-workflow-management-nextflow"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:utils-workflow-management-snakemake"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:utils-workflow-management-wdl"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-communication"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-grant-writing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-ideation"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-literature-review"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-manuscript"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-orchestrator"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-peer-review"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-publishing-ethics"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:scientific-research-design"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-chemistry-brenda"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-chemistry-pubchem"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-disease-gwas"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-disease-opentargets"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-expression-geo"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-expression-gtex"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-pathway-interpro"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-pathway-jaspar"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-pathway-reactome"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-pathway-string"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-sequence-ena"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-sequence-ensembl"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-sequence-ncbi-gene"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-sequence-uniprot"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-structure-alphafold"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-database-structure-pdb"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-cbioportal"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-clinicaltrials"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-clinpgx"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-clinvar"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-fda"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-gnomad"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-variant-clinvar"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-variant-dbsnp"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-variant-gnomad"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:clinical-database-variant-pharmgkb"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:drug-database-chembl"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:drug-database-zinc"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:lit-database-arxiv"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:lit-database-biorxiv"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:lit-database-openalex"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:lit-database-pubmed"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-alignment"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-batch-correction"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-count-prep"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-deconvolution"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-differential-expression"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-pathway-enrichment"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-pipeline"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-ppi"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-qc-bam"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-qc-exploratory"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-qc-preprocessing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-quantification"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-splicing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-timeseries"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-mrna-seq-wgcna"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-differential-occupancy"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-index-building"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-metagene-visualization"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-orf-detection"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-orf-quantification"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-qc-reporting"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-riboseq-preprocessing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-ribosome-periodicity"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-ribosome-stalling"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-rna-preprocessing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-species-templates"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-translation-efficiency"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:bio-ribo-seq-workflow"
     },
     {
       "type": "HAS_CAPABILITY",
@@ -1017,6 +3881,498 @@
       "properties": {},
       "source": "sess_2",
       "target": "1418ddf1-94a1-4118-a91b-6080094801d4"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-annotation-celltypist"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-annotation-markers"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-annotation-sctype-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-annotation-singler-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-atac-archr-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-atac-chromvar-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-atac-signac-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-batch-integration"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-clustering"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-cnv-fastcnv-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-cnv-infercnv-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-cnv-infercnvpy"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-cnv-scevan-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-communication-cellchat-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-communication-nichenet-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-data-io"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-differential-abundance-diffcyt-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-differential-abundance-milor-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-differential-abundance-roe-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-differential-abundance-sccoda"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-doublet-doubletfinder-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-doublet-scdblfinder-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-doublet-scrublet"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-doublet-solo"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-aucell-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-clusterprofiler-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-decoupler-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-gseapy"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-irgsea-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-progeny-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-enrichment-ucell-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-fastq2mtx"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-markers"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-metabolism-compass"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-metabolism-scmetabolism-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-perturbation-augur-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-perturbation-pertpy"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-perturbation-scgen"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-perturbation-sctenifoldknk-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-preprocessing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-regulatory-pyscenic"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-regulatory-scenic-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-splicing-brie2"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-tcr-startrac-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-trajectory-monocle3-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-single-cell-trajectory-scvelo"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell",
+      "target": "skill:bio-spatial-transcriptomics-communication-liana"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-batch-integration"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-cnv-fastcnv-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-cnv-numbat-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-communication-cellchat-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-communication-commot"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-communication-fastccc"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-data-io"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-deconvolution-card-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-deconvolution-cell2location"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-deconvolution-rctd-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-deconvolution-spotlight-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-deconvolution-tangram"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-differential-abundance-roe-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-domains-bayesspace-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-domains-graphst"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-domains-spagcn"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-domains-stagate"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-fastq2spatial"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-integration-spclue"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-layers"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-microenvironment-misty-r"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-neighbors"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-niches"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-preprocessing"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "skill:bio-spatial-transcriptomics-statistics"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:workflows",
+      "target": "skill:bio-workflows-scrnaseq-pipeline"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:workflows",
+      "target": "skill:bio-workflows-spatial-pipeline"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "skill:mcp_pubmed_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "skill:mcp_pubmed_fetch"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "skill:mcp_uniprot_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "skill:mcp_geo_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "tool:pubmed_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "tool:pubmed_fetch"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "tool:uniprot_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mcp",
+      "target": "tool:geo_search"
     }
   ]
 }

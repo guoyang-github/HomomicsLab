@@ -5,6 +5,10 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Project root: backend/homomics_lab/config.py -> backend -> HomomicsLab
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HOMOMICS_")
 
@@ -18,9 +22,10 @@ class Settings(BaseSettings):
     database_pool_size: int = 5
     database_max_overflow: int = 10
     data_dir: Path = Path("./data")
-    # User skill drop-in directory. Skills placed here are auto-imported on
-    # startup (namespace "user"). Can be overridden via HOMOMICS_SKILLS_DIR.
-    skills_dir: Path = Path("./skills")
+    # Canonical user skill drop-in directory. Defaults to the project-root
+    # ``skills/`` folder so it is stable regardless of the backend's CWD.
+    # Override via HOMOMICS_SKILLS_DIR.
+    skills_dir: Path = Field(default_factory=lambda: _PROJECT_ROOT / "skills")
     external_skills_dirs: List[Path] = Field(default_factory=list)
 
     # ------------------------------------------------------------------
@@ -209,7 +214,7 @@ class Settings(BaseSettings):
         True  # watch sibling skill repos and domain files at startup
     )
     skill_sibling_discovery_enabled: bool = (
-        True  # auto-discover ../<domain>-Skills/skills
+        False  # auto-discover ../<domain>-Skills/skills
     )
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
     domain_strict_validation: bool = False  # if False, missing skills become warnings instead of failing the whole domain

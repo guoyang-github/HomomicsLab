@@ -63,7 +63,7 @@ class ImportSkillResponse(BaseModel):
 
 
 class ImportDirectoryRequest(BaseModel):
-    source_dir: Optional[str] = "./skills"
+    source_dir: Optional[str] = None
     namespace: Optional[str] = "user"
 
 
@@ -439,9 +439,13 @@ async def import_skill(request: Request, body: ImportSkillRequest):
     dependencies=[Depends(require_admin)],
 )
 async def import_skill_directory(request: Request, body: ImportDirectoryRequest):
-    """Bulk import all skill subdirectories under a directory (e.g. ./skills)."""
+    """Bulk import all skill subdirectories under a directory (defaults to settings.skills_dir)."""
+    from homomics_lab.config import settings
+
     store = _get_store(request)
-    source_dir = Path(body.source_dir or "./skills").expanduser().resolve()
+    source_dir = Path(
+        body.source_dir or str(settings.skills_dir)
+    ).expanduser().resolve()
     if not source_dir.exists():
         raise HTTPException(
             status_code=400, detail=f"Directory not found: {source_dir}"

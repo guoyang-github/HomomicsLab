@@ -616,6 +616,28 @@ HOMOMICS_SKILL_SANDBOX_BACKEND=auto   # auto | local | bubblewrap | container
 
 # Skill Development
 
+### Canonical Skill Directory
+
+The runtime canonical skill directory is the **project-root `skills/` folder** (`HomomicsLab/skills/`). On startup the backend:
+
+1. Registers any skill placed directly under `skills/` as a user drop-in skill.
+2. Copies skills imported from git/zip/external directories into `skills/`.
+
+This path is independent of the backend's working directory because `HOMOMICS_SKILLS_DIR` defaults to the project root. Override it only if you want a non-standard layout:
+
+```env
+HOMOMICS_SKILLS_DIR=/path/to/skills
+```
+
+External skill repositories are **not** auto-discovered. To load skills from outside `skills/`, set `HOMOMICS_EXTERNAL_SKILLS_DIRS` explicitly:
+
+```env
+HOMOMICS_EXTERNAL_SKILLS_DIRS=./external_skills,/path/to/other-skills
+HOMOMICS_SKILL_SIBLING_DISCOVERY_ENABLED=false
+```
+
+`backend/skills/` is not used as the canonical directory; any previous content there was a runtime artifact of launching the backend from `backend/` with the old relative default.
+
 ### Directory Structure
 
 ```
@@ -696,8 +718,7 @@ When the sandbox backend is set to `container`, R skills automatically use the i
 ### Testing Skills
 
 ```bash
-# Run skill tests
-cd backend
+# Run skill tests from the project root
 pytest skills/my_skill/tests/ -v
 
 # Run with coverage
