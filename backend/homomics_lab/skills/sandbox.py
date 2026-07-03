@@ -464,7 +464,8 @@ with open('__skill_result__.json', 'w') as f:
     json.dump(result, f)
 """
 
-        return f"""import json
+        return f"""import builtins
+import json
 import sys
 import types
 
@@ -481,7 +482,7 @@ _BLOCKED = frozenset(['os', 'subprocess', 'socket', 'urllib', 'http', 'ftplib',
                       'telnetlib', 'smtplib', 'poplib', 'imaplib', 'nntplib',
                       'ssl', 'importlib', 'ctypes', 'mmap', 'builtins'])
 
-_original_import = __builtins__.__import__
+_original_import = builtins.__import__
 
 def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
     base = name.split('.')[0]
@@ -489,14 +490,16 @@ def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
         raise ImportError(f"Module '{{name}}' is restricted in skill sandbox")
     return _original_import(name, globals, locals, fromlist, level)
 
-__builtins__.__import__ = _safe_import
+builtins.__import__ = _safe_import
 
-# Also restrict __import__ attribute access
+# Also restrict __import__ attribute access through the builtins dict.
 class _RestrictedBuiltins(dict):
     def __getitem__(self, key):
         if key == '__import__':
             return _safe_import
         return super().__getitem__(key)
+
+__builtins__ = _RestrictedBuiltins(dict(builtins.__dict__))
 
 # Inject inputs
 __inputs__ = json.loads({repr(inputs_json)})

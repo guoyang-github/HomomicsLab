@@ -10,8 +10,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.278415+00:00",
-    "updated_at": "2026-06-29T12:08:36.278440+00:00"
+    "imported_at": "2026-07-02T08:42:51.539082+00:00",
+    "updated_at": "2026-07-02T08:42:51.539102+00:00"
   },
   "builtin:core_hitl": {
     "id": "core_hitl",
@@ -24,8 +24,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.285709+00:00",
-    "updated_at": "2026-06-29T12:08:36.285737+00:00"
+    "imported_at": "2026-07-02T08:42:51.545015+00:00",
+    "updated_at": "2026-07-02T08:42:51.545032+00:00"
   },
   "builtin:core_interpretation": {
     "id": "core_interpretation",
@@ -38,8 +38,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.291865+00:00",
-    "updated_at": "2026-06-29T12:08:36.291877+00:00"
+    "imported_at": "2026-07-02T08:42:51.550947+00:00",
+    "updated_at": "2026-07-02T08:42:51.550963+00:00"
   },
   "builtin:core_planning": {
     "id": "core_planning",
@@ -52,8 +52,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.296942+00:00",
-    "updated_at": "2026-06-29T12:08:36.296949+00:00"
+    "imported_at": "2026-07-02T08:42:51.555431+00:00",
+    "updated_at": "2026-07-02T08:42:51.555442+00:00"
   },
   "builtin:core_reproducibility": {
     "id": "core_reproducibility",
@@ -66,8 +66,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.302919+00:00",
-    "updated_at": "2026-06-29T12:08:36.302931+00:00"
+    "imported_at": "2026-07-02T08:42:51.562525+00:00",
+    "updated_at": "2026-07-02T08:42:51.562546+00:00"
   },
   "builtin:core_skill_router": {
     "id": "core_skill_router",
@@ -80,8 +80,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.307950+00:00",
-    "updated_at": "2026-06-29T12:08:36.307956+00:00"
+    "imported_at": "2026-07-02T08:42:51.569028+00:00",
+    "updated_at": "2026-07-02T08:42:51.569044+00:00"
   },
   "builtin:utils_workflow_management_nextflow": {
     "id": "utils_workflow_management_nextflow",
@@ -94,8 +94,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-29T12:08:36.313688+00:00",
-    "updated_at": "2026-06-29T12:08:36.313703+00:00"
+    "imported_at": "2026-07-02T08:42:51.574592+00:00",
+    "updated_at": "2026-07-02T08:42:51.574607+00:00"
   },
   "builtin:data_loader": {
     "id": "data_loader",
@@ -4980,7 +4980,35 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-22T02:47:41.449871+00:00",
-    "updated_at": "2026-06-22T02:47:41.449887+00:00"
+    "imported_at": "2026-07-02T08:42:51.580193+00:00",
+    "updated_at": "2026-07-02T08:42:51.580208+00:00"
+  },
+  "builtin:batch-skill-a": {
+    "id": "batch-skill-a",
+    "namespace": "builtin",
+    "name": "batch-skill-a",
+    "version": "1.0.0",
+    "category": "general",
+    "source": "imported",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-255/test_import_directory_bulk_imp0/skills/batch-skill-a",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-02T08:42:51.586449+00:00",
+    "updated_at": "2026-07-02T08:42:51.586466+00:00"
+  },
+  "builtin:batch-skill-b": {
+    "id": "batch-skill-b",
+    "namespace": "builtin",
+    "name": "batch-skill-b",
+    "version": "1.0.0",
+    "category": "general",
+    "source": "imported",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-255/test_import_directory_bulk_imp0/skills/batch-skill-b",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-02T08:42:51.592074+00:00",
+    "updated_at": "2026-07-02T08:42:51.592097+00:00"
   }
 }

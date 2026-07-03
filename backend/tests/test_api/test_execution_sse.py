@@ -9,23 +9,19 @@ from homomics_lab.hpc.state import ExecutionState
 
 
 @pytest.fixture
-def client():
+def client(_isolate_pubsub):
     from fastapi import FastAPI
 
     app = FastAPI()
+    app.state.execution_pubsub = _isolate_pubsub
     app.include_router(router, prefix="/api/execution")
     return TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _isolate_pubsub(monkeypatch):
+def _isolate_pubsub():
     """Use a fresh pubsub for every execution API test."""
-    pubsub = ExecutionPubSub()
-    monkeypatch.setattr(
-        "homomics_lab.api.execution.get_default_pubsub",
-        lambda: pubsub,
-    )
-    return pubsub
+    return ExecutionPubSub()
 
 
 class TestExecutionAPI:

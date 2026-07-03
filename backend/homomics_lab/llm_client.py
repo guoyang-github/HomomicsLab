@@ -9,15 +9,16 @@ import logging
 import random
 import time
 import uuid
+from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
-
-logger = logging.getLogger(__name__)
 
 from homomics_lab.llm.cache import BaseLLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
 from homomics_lab.llm.providers import get_provider_registry, reset_provider_registry
 from homomics_lab.llm.router import LLMRouter
 from homomics_lab.llm.runtime_config import load_llm_runtime_config
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -219,7 +220,9 @@ class LLMClient:
 
                     msg = ChatCompletionMessage(role="assistant", content=cached)
                 except Exception:
-                    msg = {"role": "assistant", "content": cached}
+                    # Fallback object that exposes the same attributes as the
+                    # OpenAI message so downstream code can use getattr().
+                    msg = SimpleNamespace(role="assistant", content=cached)
                 return msg, {"cache_hit": True, "model": route.model}
 
         tried_models = {route.model}

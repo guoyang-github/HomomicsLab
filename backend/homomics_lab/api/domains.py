@@ -1,7 +1,7 @@
 """API endpoints for the domain template marketplace."""
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -15,17 +15,10 @@ router = APIRouter()
 def _get_marketplace(request: Request) -> DomainMarketplace:
     marketplace = getattr(request.app.state, "domain_marketplace", None)
     if marketplace is None:
-        from homomics_lab.config import settings
-        from homomics_lab.skills.registry import get_default_registry
-
-        builtin = Path(__file__).parent.parent / "domains"
-        marketplace_dir = settings.data_dir / "marketplace" / "domains"
-        marketplace = DomainMarketplace(
-            builtin_domains_dir=builtin,
-            marketplace_dir=marketplace_dir,
-            skill_registry=get_default_registry(),
+        raise HTTPException(
+            status_code=503,
+            detail="Domain marketplace is not initialized. The application may still be starting up.",
         )
-        request.app.state.domain_marketplace = marketplace
     return marketplace
 
 
@@ -36,10 +29,45 @@ class ImportDomainRequest(BaseModel):
 
 class ImportTemplatesRequest(BaseModel):
     domain_id: str
-    templates: dict
+    templates: Dict[str, Any]
 
 
-@router.get("/")
+class DomainListItem(BaseModel):
+    domain_id: str
+    name: str
+    description: str
+    version: str
+    path: str
+    source: str
+
+
+class DomainReferenceResponse(BaseModel):
+    domain_id: str
+    path: str
+
+
+class DomainPreviewResponse(BaseModel):
+    domain_id: str
+    name: str
+    description: str
+    version: str
+    author: str
+    orchestrator_skills: List[Any]
+    phases: List[Any]
+    phase_transitions: List[Any]
+    intents: List[Any]
+    skills: List[Any]
+    roles: List[Any]
+    sops: List[Any]
+    code_templates: Dict[str, Any]
+
+
+class DomainExportResponse(BaseModel):
+    domain_id: str
+    zip_path: str
+
+
+@router.get("/", response_model=List[DomainListItem])
 async def list_domains(request: Request):
     """List available domain templates."""
     marketplace = _get_marketplace(request)
@@ -57,7 +85,7 @@ async def list_domains(request: Request):
     ]
 
 
-@router.post("/import")
+@router.post("/import", response_model=DomainReferenceResponse)
 async def import_domain(request: Request, body: ImportDomainRequest):
     """Import a domain template from a local path, zip archive, or git URL."""
     marketplace = _get_marketplace(request)
@@ -68,7 +96,7 @@ async def import_domain(request: Request, body: ImportDomainRequest):
     return {"domain_id": target_dir.name, "path": str(target_dir)}
 
 
-@router.post("/import-zip")
+@router.post("/import-zip", response_model=DomainReferenceResponse)
 async def import_domain_zip(
     request: Request,
     file: UploadFile = File(...),
@@ -93,7 +121,7 @@ async def import_domain_zip(
     return {"domain_id": target_dir.name, "path": str(target_dir)}
 
 
-@router.post("/import-templates")
+@router.post("/import-templates", response_model=DomainReferenceResponse)
 async def import_templates(request: Request, body: ImportTemplatesRequest):
     """Import code templates into an existing domain."""
     marketplace = _get_marketplace(request)
@@ -104,7 +132,7 @@ async def import_templates(request: Request, body: ImportTemplatesRequest):
     return {"domain_id": body.domain_id, "path": str(domain_dir)}
 
 
-@router.get("/{domain_id}/preview")
+@router.get("/{domain_id}/preview", response_model=DomainPreviewResponse)
 async def preview_domain(domain_id: str, request: Request):
     """Return detailed preview data for a domain template."""
     marketplace = _get_marketplace(request)
@@ -138,7 +166,7 @@ async def preview_domain(domain_id: str, request: Request):
     }
 
 
-@router.post("/{domain_id}/export")
+@router.post("/{domain_id}/export", response_model=DomainExportResponse)
 async def export_domain(domain_id: str, request: Request):
     """Export a domain template as a zip archive.
 

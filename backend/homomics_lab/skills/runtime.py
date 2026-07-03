@@ -320,11 +320,11 @@ class SkillRuntimeExecutor:
         if skill is None:
             raise ValueError(f"Skill '{skill_id}' disappeared during activation")
 
-        # Trust model: external/community skills must be explicitly trusted.
-        # Programmatic skills without a source are treated as builtin for
-        # backward compatibility with tests and internal components.
+        # Trust model: only builtin skills are trusted by default. All other
+        # sources (external, imported, community, user drop-in, promoted, etc.)
+        # must be explicitly trusted before execution.
         source = skill.metadata.get("source") or "builtin"
-        if source in {"external", "community", "imported"} and not skill.metadata.get("trusted"):
+        if source != "builtin" and not skill.metadata.get("trusted"):
             raise UntrustedSkillError(
                 f"Skill '{skill_id}' from source '{source}' is not trusted. "
                 f"Run 'homomics trust {skill_id}' or POST /skills/{skill_id}/trust first."

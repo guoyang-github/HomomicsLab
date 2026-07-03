@@ -37,3 +37,28 @@ result = {"sum": math.sqrt(16)}
 '''
     result = await sandbox.run_python(code, {})
     assert result["sum"] == 4.0
+
+
+@pytest.mark.asyncio
+async def test_blocks_builtins_import_attribute(sandbox):
+    """Regression: __builtins__['__import__']('os') must also be blocked."""
+    code = '''
+__builtins__["__import__"]("os")
+result = {"status": "should not reach here"}
+'''
+    with pytest.raises(RuntimeError) as exc_info:
+        await sandbox.run_python(code, {})
+    assert "failed" in str(exc_info.value).lower() or "restricted" in str(exc_info.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_blocks_builtin_help_system(sandbox):
+    """Regression: builtins.__import__ must be the patched version."""
+    code = '''
+import builtins
+builtins.__import__("os")
+result = {"status": "should not reach here"}
+'''
+    with pytest.raises(RuntimeError) as exc_info:
+        await sandbox.run_python(code, {})
+    assert "failed" in str(exc_info.value).lower() or "restricted" in str(exc_info.value).lower()

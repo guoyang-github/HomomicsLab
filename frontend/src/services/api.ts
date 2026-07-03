@@ -1,5 +1,7 @@
 import axios from 'axios'
-import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, Project, AnalysisTemplate, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
+
+import { useAuthStore } from '@/stores/authStore'
+import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, SystemSettingsOut, SystemSettingsUpdate, Project, AnalysisTemplate, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
@@ -11,6 +13,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 export const chatApi = {
@@ -226,6 +236,9 @@ export const settingsApi = {
     api.put<LlmConfigOut>('/settings/llm', data),
   testLlmConnection: (data?: LlmConfigUpdate) =>
     api.post<TestConnectionOut>('/settings/llm/test', data),
+  getSystemSettings: () => api.get<SystemSettingsOut>('/settings/system'),
+  updateSystemSettings: (data: SystemSettingsUpdate) =>
+    api.put<SystemSettingsOut>('/settings/system', data),
 }
 
 export default api

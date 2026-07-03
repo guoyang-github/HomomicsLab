@@ -5,8 +5,9 @@ automatically reloading without service restart.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import DomainRegistry
@@ -211,8 +212,12 @@ class SkillHotReloader:
         self,
         skill_registry: SkillRegistry,
         watcher: Optional[FileWatcher] = None,
+        skill_store: Optional[Any] = None,
+        capability_index: Optional[Any] = None,
     ):
         self.registry = skill_registry
+        self.skill_store = skill_store
+        self.capability_index = capability_index
         self.watcher = watcher or FileWatcher()
         self._skill_dirs: Dict[Path, str] = {}  # dir_path -> skill_id
 
@@ -246,10 +251,30 @@ class SkillHotReloader:
 
         try:
             from homomics_lab.skills.loader import SkillLoader
+            from homomics_lab.skills.skill_store import SkillStore
 
             loader = SkillLoader(registry=self.registry)
             skill = loader.load_skill(skill_dir)
             self.registry.register(skill)
+
+            # Keep SkillStore metadata in sync (name/version/category/sha256).
+            if self.skill_store is not None:
+                for key, entry in list(self.skill_store._meta.items()):
+                    if entry.get("id") != skill.id:
+                        continue
+                    entry["name"] = skill.name
+                    entry["version"] = skill.version
+                    entry["category"] = skill.category
+                    source_dir = Path(entry.get("source_dir", skill_dir))
+                    if source_dir.is_dir():
+                        entry["sha256"] = SkillStore._compute_sha256(source_dir)
+                    entry["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self.skill_store._save_meta()
+
+            # Re-index in the capability index so retrieval stays consistent.
+            if self.capability_index is not None:
+                asyncio.create_task(self.capability_index.index_skill(skill))
+
             print(f"[HotReload] Skill '{skill_id}' reloaded successfully")
         except Exception as e:
             print(f"[HotReload] Failed to reload skill '{skill_id}': {e}")

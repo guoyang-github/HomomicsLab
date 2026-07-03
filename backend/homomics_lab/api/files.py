@@ -1,15 +1,49 @@
 import base64
 import mimetypes
 from pathlib import Path
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from homomics_lab.config import settings
+from homomics_lab.projects.permissions import require_project_read, require_project_write
 from homomics_lab.security import validate_project_id, sanitize_filename, safe_path
 from homomics_lab.storage import get_storage_backend, StorageBackend
 from homomics_lab.workspace.manager import WorkspaceManager
 
 router = APIRouter()
+
+
+class FileListEntry(BaseModel):
+    name: str
+    type: str
+    path: str
+    size: Optional[int]
+    modified_at: float
+
+
+class FileListResponse(BaseModel):
+    project_id: str
+    path: str
+    entries: List[FileListEntry]
+
+
+class FileReadResponse(BaseModel):
+    project_id: str
+    path: str
+    mime_type: str
+    size: int
+    encoding: str
+    content: str
+
+
+class FileUploadResponse(BaseModel):
+    filename: str
+    path: str
+    storage_uri: str
+    size: int
+    project_id: str
 
 
 _MAX_READ_BYTES = 5 * 1024 * 1024  # 5 MB preview limit
@@ -19,7 +53,7 @@ def _project_root(project_id: str) -> Path:
     return (settings.data_dir / "raw" / project_id).resolve()
 
 
-@router.get("/list")
+@router.get("/list", dependencies=[Depends(require_project_read)], response_model=FileListResponse)
 async def list_files(project_id: str, path: str = ""):
     """List files and directories under a project workspace path."""
     try:
@@ -60,7 +94,7 @@ async def list_files(project_id: str, path: str = ""):
     return {"project_id": project_id, "path": path, "entries": entries}
 
 
-@router.get("/read")
+@router.get("/read", dependencies=[Depends(require_project_read)], response_model=FileReadResponse)
 async def read_file(project_id: str, path: str):
     """Read the contents of a project file as text or base64."""
     try:
@@ -118,7 +152,7 @@ async def read_file(project_id: str, path: str):
     }
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(require_project_write)], response_model=FileUploadResponse)
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
@@ -166,7 +200,7 @@ async def upload_file(
     }
 
 
-@router.get("/{project_id}/{path:path}")
+@router.get("/{project_id}/{path:path}", dependencies=[Depends(require_project_read)])
 async def serve_project_file(project_id: str, path: str):
     """Serve a file from a project's workspace for previews/downloads."""
     from homomics_lab.security import validate_project_id, safe_path

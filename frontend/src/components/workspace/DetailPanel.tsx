@@ -58,19 +58,19 @@ export function DetailPanel() {
       <p className="mb-4 text-sm text-muted-foreground">{task.description}</p>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary">
+        <Button size="sm" variant="secondary" disabled aria-label={t('workflow.run')}>
           <Play className="mr-1 h-3.5 w-3.5" />
           {t('workflow.run')}
         </Button>
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="outline" disabled aria-label={t('workflow.retry')}>
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
           {t('workflow.retry')}
         </Button>
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="outline" disabled aria-label={t('workflow.skip')}>
           <SkipForward className="mr-1 h-3.5 w-3.5" />
           {t('workflow.skip')}
         </Button>
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="outline" disabled aria-label={t('workflow.abort')}>
           <Square className="mr-1 h-3.5 w-3.5" />
           {t('workflow.abort')}
         </Button>

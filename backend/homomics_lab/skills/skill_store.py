@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from homomics_lab.security import safe_extractall, validate_git_url
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry
@@ -85,7 +86,10 @@ class SkillStore:
 
     Args:
         registry: Runtime skill registry. If None, a private registry is used.
-        store_dir: Directory for persisted metadata and imported skill copies.
+        store_dir: Directory for persisted metadata.
+        skills_dir: Canonical runtime directory for skill sources. Imported skills
+            are copied here; drop-in skills are registered in place. Defaults to
+            ``./skills``.
     """
 
     DEFAULT_NAMESPACE = "default"
@@ -94,12 +98,15 @@ class SkillStore:
         self,
         registry: Optional[SkillRegistry] = None,
         store_dir: Optional[Path] = None,
+        skills_dir: Optional[Path] = None,
     ):
         self.registry = registry or SkillRegistry()
-        self.store_dir = (store_dir or Path("./data/skill_store")).expanduser().resolve()
+        self.store_dir = (
+            (store_dir or Path("./data/skill_store")).expanduser().resolve()
+        )
         self.store_dir.mkdir(parents=True, exist_ok=True)
-        self.imported_dir = self.store_dir / "imported"
-        self.imported_dir.mkdir(parents=True, exist_ok=True)
+        self.skills_dir = (skills_dir or Path("./skills")).expanduser().resolve()
+        self.skills_dir.mkdir(parents=True, exist_ok=True)
         self.meta_path = self.store_dir / "skills.json"
         self._meta: Dict[str, Dict[str, Any]] = {}
         self._load_meta()
@@ -204,20 +211,23 @@ class SkillStore:
         validation = self.validate_skill(source_path)
         if not validation.valid:
             raise SkillStoreError(
-                "Skill validation failed:\n" + "\n".join(f"  - {e}" for e in validation.errors)
+                "Skill validation failed:\n"
+                + "\n".join(f"  - {e}" for e in validation.errors)
             )
 
-        # Copy skill into store for isolation/versioning before loading metadata.
-        # This keeps the canonical source_dir pointing at the imported copy and
-        # allows large external repos to be registered at discovery level.
+        # Copy skill into the canonical skills directory unless it is already
+        # there (e.g. a user drop-in skill). This keeps the runtime source of
+        # truth under ``skills_dir`` while allowing imports from git/zip/external.
         loader = SkillLoader(registry=self.registry)
         preview = loader.load_discovery(source_path)
         imported_skill_id = skill_id or preview.id
 
-        target_dir = self.imported_dir / namespace / imported_skill_id
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        shutil.copytree(source_path, target_dir)
+        target_dir = self.skills_dir / imported_skill_id
+        source_is_canonical = source_path.resolve() == target_dir.resolve()
+        if not source_is_canonical:
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_path, target_dir)
 
         # Load at discovery level; the runtime will activate on first execution.
         skill = loader.load_discovery(target_dir)
@@ -251,6 +261,53 @@ class SkillStore:
         )
         return skill
 
+    def register_dropin(
+        self,
+        source_dir: Path,
+        namespace: str = "user",
+        enable: bool = True,
+    ) -> SkillDefinition:
+        """Register a skill that already lives under ``skills_dir`` in place.
+
+        This is used for the user drop-in directory: the skill is not copied,
+        but its metadata is persisted and it is registered with the runtime.
+        """
+        source_dir = Path(source_dir).expanduser().resolve()
+        if not source_dir.exists():
+            raise SkillStoreError(f"Skill source not found: {source_dir}")
+
+        validation = self.validate_skill(source_dir)
+        if not validation.valid:
+            raise SkillStoreError(
+                "Skill validation failed:\n"
+                + "\n".join(f"  - {e}" for e in validation.errors)
+            )
+
+        loader = SkillLoader(registry=self.registry)
+        skill = loader.load_discovery(source_dir)
+        sha256 = self._compute_sha256(source_dir)
+
+        skill.metadata["source"] = "dropin"
+        skill.metadata["origin"] = str(source_dir)
+        skill.metadata["source_dir"] = str(source_dir)
+        skill.metadata["namespace"] = namespace
+        skill.metadata["trusted"] = False
+        skill.metadata["sha256"] = sha256
+        skill.metadata["disclosure_level"] = "discovery"
+
+        if enable:
+            self.registry.register(skill)
+        self._record_meta(
+            skill,
+            namespace,
+            "dropin",
+            source_dir,
+            enabled=enable,
+            trusted=False,
+            sha256=sha256,
+        )
+        return skill
+
     def update_skill(
         self,
         skill_id: str,
@@ -261,12 +318,13 @@ class SkillStore:
         namespace = namespace or self.DEFAULT_NAMESPACE
         key = self._meta_key(skill_id, namespace)
         if key not in self._meta:
-            raise SkillStoreError(f"Skill '{skill_id}' not found in namespace '{namespace}'")
+            raise SkillStoreError(
+                f"Skill '{skill_id}' not found in namespace '{namespace}'"
+            )
 
         enabled = self._meta[key].get("enabled", True)
-        # Remove old runtime registration
-        if self.registry.get(skill_id) is not None:
-            self.registry._skills.pop(skill_id, None)
+        # Remove old runtime registration and search index entry
+        self.registry.remove(skill_id)
 
         skill = self.import_skill(
             source=source,
@@ -276,32 +334,49 @@ class SkillStore:
         )
         return skill
 
+    def _is_managed_skill_dir(self, path: Path) -> bool:
+        """Return True if ``path`` is a directory managed under ``skills_dir``."""
+        try:
+            path.resolve().relative_to(self.skills_dir.resolve())
+        except ValueError:
+            return False
+        return path.is_dir()
+
     def remove_skill(self, skill_id: str, namespace: Optional[str] = None) -> None:
-        """Remove a skill from the store and runtime registry."""
+        """Remove a skill from the store and runtime registry.
+
+        If the skill's source directory lives under the canonical ``skills_dir``,
+        the directory is also deleted. Builtin and out-of-tree sources are only
+        unregistered.
+        """
         namespace = namespace or self.DEFAULT_NAMESPACE
         key = self._meta_key(skill_id, namespace)
         if key not in self._meta:
-            raise SkillStoreError(f"Skill '{skill_id}' not found in namespace '{namespace}'")
+            raise SkillStoreError(
+                f"Skill '{skill_id}' not found in namespace '{namespace}'"
+            )
 
         entry = self._meta.pop(key)
         target_dir = Path(entry.get("source_dir", ""))
-        if target_dir.exists():
+        if self._is_managed_skill_dir(target_dir):
             shutil.rmtree(target_dir)
-        if self.registry.get(skill_id) is not None:
-            self.registry._skills.pop(skill_id, None)
-            # Rebuild semantic index is handled lazily by the search engine
+        self.registry.remove(skill_id)
         self._save_meta()
 
     # ─────────────────────────────────────────
     # Enable / disable
     # ─────────────────────────────────────────
 
-    def enable_skill(self, skill_id: str, namespace: Optional[str] = None) -> SkillDefinition:
+    def enable_skill(
+        self, skill_id: str, namespace: Optional[str] = None
+    ) -> SkillDefinition:
         """Enable a previously disabled skill."""
         namespace = namespace or self.DEFAULT_NAMESPACE
         key = self._meta_key(skill_id, namespace)
         if key not in self._meta:
-            raise SkillStoreError(f"Skill '{skill_id}' not found in namespace '{namespace}'")
+            raise SkillStoreError(
+                f"Skill '{skill_id}' not found in namespace '{namespace}'"
+            )
 
         entry = self._meta[key]
         if entry.get("enabled", True):
@@ -330,7 +405,9 @@ class SkillStore:
         namespace = namespace or self.DEFAULT_NAMESPACE
         key = self._meta_key(skill_id, namespace)
         if key not in self._meta:
-            raise SkillStoreError(f"Skill '{skill_id}' not found in namespace '{namespace}'")
+            raise SkillStoreError(
+                f"Skill '{skill_id}' not found in namespace '{namespace}'"
+            )
 
         if self.registry.get(skill_id) is not None:
             self.registry._skills.pop(skill_id, None)
@@ -366,7 +443,9 @@ class SkillStore:
             key = self._meta_key(skill_id, namespace)
 
         if key not in self._meta:
-            raise SkillStoreError(f"Skill '{skill_id}' not found in namespace '{namespace}'")
+            raise SkillStoreError(
+                f"Skill '{skill_id}' not found in namespace '{namespace}'"
+            )
 
         entry = self._meta[key]
         entry["trusted"] = trusted
@@ -402,22 +481,36 @@ class SkillStore:
         for key, entry in self._meta.items():
             if namespace is not None and entry.get("namespace") != namespace:
                 continue
-            if enabled_only and not entry.get("enabled", True):
-                continue
             if category is not None and entry.get("category") != category:
+                continue
+            is_enabled = entry.get("enabled", True)
+            if not is_enabled and enabled_only:
                 continue
             skill_id = entry["id"]
             if skill_id in seen:
                 continue
-            is_enabled = entry.get("enabled", True)
             skill = self.registry.get(skill_id)
-            if skill is None and is_enabled:
+            registry_matches = (
+                skill is not None
+                and skill.metadata.get("namespace") == entry.get("namespace")
+            )
+            if (skill is None or not registry_matches) and is_enabled:
                 # Runtime registry lost the skill, re-enable from store
                 try:
                     skill = self.enable_skill(skill_id, entry.get("namespace"))
                 except SkillStoreError:
                     continue
-            if skill is not None and is_enabled:
+            elif skill is None or not registry_matches:
+                # Load a discovery-level view for listing without registering
+                try:
+                    source_dir = Path(entry["source_dir"])
+                    skill = SkillLoader(registry=self.registry).load_discovery(
+                        source_dir
+                    )
+                except Exception:
+                    continue
+            if skill is not None:
+                skill.metadata["enabled"] = is_enabled
                 seen.add(skill_id)
                 results.append(skill)
         return results
@@ -427,20 +520,22 @@ class SkillStore:
         skill_id: str,
         namespace: Optional[str] = None,
     ) -> Optional[SkillDefinition]:
-        """Get a skill by id and optional namespace."""
+        """Get a skill by id and optional namespace.
+
+        Disabled skills are only returned when ``namespace`` is explicitly
+        provided and the caller is prepared to handle a disabled entry; the
+        namespace-free lookup never implicitly re-enable a skill.
+        """
         if namespace is None:
-            # Try default namespace first, then any namespace
             skill = self.registry.get(skill_id)
             if skill is not None:
                 return skill
             for entry in self._meta.values():
-                if entry["id"] == skill_id:
+                if entry["id"] == skill_id and entry.get("enabled", True):
                     return self.enable_skill(skill_id, entry.get("namespace"))
             return None
         key = self._meta_key(skill_id, namespace)
         if key not in self._meta:
-            return None
-        if not self._meta[key].get("enabled", True):
             return None
         return self.registry.get(skill_id)
 
@@ -497,7 +592,9 @@ class SkillStore:
             if not script_files:
                 warnings.append("scripts/ directory is empty")
         elif entrypoint and str(entrypoint).startswith("scripts/"):
-            warnings.append(f"Entrypoint references missing scripts/ directory: {entrypoint}")
+            warnings.append(
+                f"Entrypoint references missing scripts/ directory: {entrypoint}"
+            )
 
         requirements = skill_dir / "requirements.txt"
         environment = skill_dir / "environment.yml"
@@ -508,7 +605,9 @@ class SkillStore:
             and not environment.exists()
             and not r_dependencies.exists()
         ):
-            warnings.append("scripts/ present but no requirements.txt, environment.yml or dependencies.R found")
+            warnings.append(
+                "scripts/ present but no requirements.txt, environment.yml or dependencies.R found"
+            )
 
         valid = len(errors) == 0
         return ValidationReport(valid=valid, errors=errors, warnings=warnings)
@@ -630,7 +729,9 @@ class SkillStore:
             if full_id not in lock.skills:
                 warnings.append(f"Skill '{full_id}' is enabled but not in lock file")
 
-        return ValidationReport(valid=len(errors) == 0, errors=errors, warnings=warnings)
+        return ValidationReport(
+            valid=len(errors) == 0, errors=errors, warnings=warnings
+        )
 
     # ─────────────────────────────────────────
     # Source resolution
@@ -653,6 +754,7 @@ class SkillStore:
 
         # Git URL
         if source.endswith(".git") or parsed.scheme in ("http", "https", "ssh"):
+            validate_git_url(source)
             temp_dir = Path(tempfile.mkdtemp(prefix="homomics_skill_git_"))
             clone_dir = temp_dir / "skill"
             try:
@@ -664,7 +766,9 @@ class SkillStore:
                     timeout=120,
                 )
             except subprocess.CalledProcessError as exc:
-                raise SkillStoreError(f"Failed to clone git repo: {exc.stderr}") from exc
+                raise SkillStoreError(
+                    f"Failed to clone git repo: {exc.stderr}"
+                ) from exc
             except FileNotFoundError as exc:
                 raise SkillStoreError("git command not found") from exc
             # If repo root contains skills/ subdir, caller should point deeper;
@@ -675,7 +779,7 @@ class SkillStore:
         if local_path.exists() and local_path.suffix == ".zip":
             temp_dir = Path(tempfile.mkdtemp(prefix="homomics_skill_zip_"))
             with zipfile.ZipFile(local_path, "r") as zf:
-                zf.extractall(temp_dir)
+                safe_extractall(zf, temp_dir)
             # Heuristic: if zip contains a single top-level directory, use it
             entries = [e for e in temp_dir.iterdir() if e.is_dir()]
             if len(entries) == 1 and (entries[0] / "SKILL.md").exists():

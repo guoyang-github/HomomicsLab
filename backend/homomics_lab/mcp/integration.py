@@ -111,7 +111,12 @@ def register_mcp_skills(
                 type="mcp",
                 executor="auto",
             ),
-            metadata={"tool_name": tool.name, "source": "mcp", "namespace": "mcp"},
+            metadata={
+                "tool_name": tool.name,
+                "source": "mcp",
+                "namespace": "mcp",
+                "trusted": False,
+            },
         )
         skill_executor.register_skill(skill)
         skills.append(skill)

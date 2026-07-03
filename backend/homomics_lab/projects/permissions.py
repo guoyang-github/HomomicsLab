@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from homomics_lab.api.auth import get_current_user
 from homomics_lab.config import settings
+from homomics_lab.database.connection import get_async_session
 from homomics_lab.database.models import ProjectMember, ProjectRecord
 
 
@@ -137,3 +138,25 @@ async def remove_project_member(
     await db.delete(member)
     await db.commit()
     return True
+
+
+def require_project_action(action: str):
+    """Return a FastAPI dependency that enforces project-level RBAC.
+
+    The dependency captures ``project_id`` from the endpoint's query/path
+    parameters, resolves the current user, and raises 403/404 if the user
+    lacks permission. When auth is disabled it is a no-op.
+    """
+
+    async def _dependency(
+        project_id: str,
+        db: AsyncSession = Depends(get_async_session),
+        user_id: str = Depends(get_current_user),
+    ) -> None:
+        await require_project_permission(project_id, action, db, user_id)
+
+    return _dependency
+
+
+require_project_read = require_project_action("read")
+require_project_write = require_project_action("write")

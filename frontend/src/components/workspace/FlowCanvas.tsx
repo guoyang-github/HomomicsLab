@@ -203,19 +203,19 @@ export function FlowCanvas() {
   return (
     <div className="h-full w-full">
       <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-border bg-card/90 p-1.5 shadow-card backdrop-blur">
-        <Button variant="ghost" size="sm" title={t('workflow.run')}>
+        <Button variant="ghost" size="sm" title={t('workflow.run')} disabled aria-label={t('workflow.run')}>
           <Play className="mr-1 h-3.5 w-3.5" />
           {t('workflow.run')}
         </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.retry')}>
+        <Button variant="ghost" size="sm" title={t('workflow.retry')} disabled aria-label={t('workflow.retry')}>
           <RotateCcw className="mr-1 h-3.5 w-3.5" />
           {t('workflow.retry')}
         </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.skip')}>
+        <Button variant="ghost" size="sm" title={t('workflow.skip')} disabled aria-label={t('workflow.skip')}>
           <SkipForward className="mr-1 h-3.5 w-3.5" />
           {t('workflow.skip')}
         </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.abort')}>
+        <Button variant="ghost" size="sm" title={t('workflow.abort')} disabled aria-label={t('workflow.abort')}>
           <Square className="mr-1 h-3.5 w-3.5" />
           {t('workflow.abort')}
         </Button>

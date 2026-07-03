@@ -3,7 +3,7 @@ import { create } from 'zustand'
 export interface LogEntry {
   id: string
   timestamp: string
-  level: 'info' | 'stdout' | 'stderr' | 'error' | 'success'
+  level: 'info' | 'stdout' | 'stderr' | 'error' | 'success' | 'warning'
   message: string
   taskId?: string
 }

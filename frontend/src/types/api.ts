@@ -62,6 +62,32 @@ export interface TestConnectionOut {
   error: string | null
 }
 
+export interface SystemSettingsOut {
+  skill_sandbox_backend: string
+  enable_semantic_memory: boolean
+  semantic_search_model: string | null
+  session_ttl_days: number
+  default_job_timeout_seconds: number
+  max_skill_timeout_seconds: number
+  result_inline_size_limit_bytes: number
+  max_llm_cost_per_request_usd: number | null
+  monthly_budget_usd: number | null
+  skill_hot_reload_enabled: boolean
+}
+
+export interface SystemSettingsUpdate {
+  skill_sandbox_backend?: string
+  enable_semantic_memory?: boolean
+  semantic_search_model?: string
+  session_ttl_days?: number
+  default_job_timeout_seconds?: number
+  max_skill_timeout_seconds?: number
+  result_inline_size_limit_bytes?: number
+  max_llm_cost_per_request_usd?: number
+  monthly_budget_usd?: number
+  skill_hot_reload_enabled?: boolean
+}
+
 export interface FileUploadResponse {
   filename: string
   path: string

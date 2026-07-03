@@ -89,7 +89,14 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
         >
           <Download className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="relative" title={t('topbar.notifications')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          title={t('topbar.notifications')}
+          disabled
+          aria-label={t('topbar.notifications')}
+        >
           <Bell className="h-5 w-5" />
           {notifications > 0 && (
             <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[10px] text-white">

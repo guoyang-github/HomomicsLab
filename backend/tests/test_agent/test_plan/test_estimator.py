@@ -1,6 +1,5 @@
 """Tests for plan phase estimator."""
 
-import pytest
 
 from homomics_lab.agent.plan.estimator import (
     _heuristic_cost_from_resources,

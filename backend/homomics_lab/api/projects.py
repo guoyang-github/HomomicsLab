@@ -2,7 +2,7 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -25,6 +25,28 @@ from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.provenance.rocrate import ROCrateExporter
 from homomics_lab.security import validate_project_id
 from homomics_lab.workspace.manager import WorkspaceManager
+
+
+class ProjectImportResponse(BaseModel):
+    project_id: str
+    message: str
+
+
+class ProjectAuditResponse(BaseModel):
+    project_id: str
+    entries: List[Dict[str, Any]]
+
+
+class FigureResponse(BaseModel):
+    figure_id: str
+    formats: Dict[str, Any]
+    preview_url: str
+    created_at: str
+
+
+class FigureDeleteResponse(BaseModel):
+    success: bool
+    deleted_files: int
 
 router = APIRouter()
 
@@ -234,7 +256,7 @@ async def export_project_rocrate(
     )
 
 
-@router.post("/import")
+@router.post("/import", response_model=ProjectImportResponse)
 async def import_project(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_session),
@@ -265,7 +287,9 @@ async def import_project(
         db.add(record)
         await db.commit()
 
-        return {"project_id": imported_id, "message": "Project imported successfully"}
+        return ProjectImportResponse(
+            project_id=imported_id, message="Project imported successfully"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -283,7 +307,7 @@ class MemberResponse(BaseModel):
     role: str
 
 
-@router.post("/{project_id}/members")
+@router.post("/{project_id}/members", response_model=MemberResponse)
 async def add_member(
     project_id: str,
     body: MemberCreate,
@@ -315,7 +339,7 @@ async def list_members(
     ]
 
 
-@router.get("/{project_id}/audit")
+@router.get("/{project_id}/audit", response_model=ProjectAuditResponse)
 async def get_project_audit_log(
     project_id: str,
     limit: int = 100,
@@ -324,10 +348,13 @@ async def get_project_audit_log(
 ):
     """Return recent audit log entries for a project."""
     await require_project_permission(project_id, "read", db, user_id)
-    return {"project_id": project_id, "entries": AuditLogger().list_for_project(project_id, limit=limit)}
+    return ProjectAuditResponse(
+        project_id=project_id,
+        entries=AuditLogger().list_for_project(project_id, limit=limit),
+    )
 
 
-@router.get("/{project_id}/figures")
+@router.get("/{project_id}/figures", response_model=List[FigureResponse])
 async def list_project_figures(
     project_id: str,
     db: AsyncSession = Depends(get_async_session),
@@ -344,16 +371,18 @@ async def list_project_figures(
         figure_id = metadata.get("figure_id") or Path(artifact.relative_path).name
         formats = metadata.get("formats", {})
         preview_path = formats.get("png") or formats.get("svg") or artifact.relative_path
-        figures.append({
-            "figure_id": figure_id,
-            "formats": formats,
-            "preview_url": f"/api/files/{project_id}/{preview_path}",
-            "created_at": artifact.created_at,
-        })
+        figures.append(
+            FigureResponse(
+                figure_id=figure_id,
+                formats=formats,
+                preview_url=f"/api/files/{project_id}/{preview_path}",
+                created_at=artifact.created_at,
+            )
+        )
     return figures
 
 
-@router.delete("/{project_id}/figures/{figure_id}")
+@router.delete("/{project_id}/figures/{figure_id}", response_model=FigureDeleteResponse)
 async def delete_project_figure(
     project_id: str,
     figure_id: str,
@@ -372,4 +401,4 @@ async def delete_project_figure(
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Figure not found")
 
-    return {"success": True, "deleted_files": deleted}
+    return FigureDeleteResponse(success=True, deleted_files=deleted)

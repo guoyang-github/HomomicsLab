@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+from homomics_lab.security import safe_extractall, validate_git_url
 from homomics_lab.skills.registry import SkillRegistry
 
 
@@ -124,13 +125,14 @@ class DomainMarketplace:
         is_git = parsed.scheme in {"http", "https", "git", "ssh"} or source.endswith(".git")
 
         if is_git:
+            validate_git_url(source)
             temp_dir = Path(tempfile.mkdtemp())
             self._clone_git(source, temp_dir)
             extracted = self._find_domain_root(temp_dir)
         elif zipfile.is_zipfile(source):
             temp_dir = Path(tempfile.mkdtemp())
             with zipfile.ZipFile(source, "r") as zf:
-                zf.extractall(temp_dir)
+                safe_extractall(zf, temp_dir)
             extracted = self._find_domain_root(temp_dir)
         else:
             source_path = Path(source)

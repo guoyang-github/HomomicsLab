@@ -6,7 +6,12 @@ from homomics_lab.config import settings
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.runtime import SkillRuntimeExecutor, UntrustedSkillError
-from homomics_lab.skills.sandbox import BubblewrapSandbox, ContainerSandbox, LocalSandbox, Sandbox
+from homomics_lab.skills.sandbox import (
+    BubblewrapSandbox,
+    ContainerSandbox,
+    LocalSandbox,
+    Sandbox,
+)
 from homomics_lab.skills.skill_store import SkillStore
 
 
@@ -19,7 +24,9 @@ class TestSandboxFactory:
         sandbox = ContainerSandbox(tmp_path)
         import shutil
 
-        has_docker = shutil.which("docker") is not None or shutil.which("podman") is not None
+        has_docker = (
+            shutil.which("docker") is not None or shutil.which("podman") is not None
+        )
         assert sandbox.is_available() == has_docker
 
     def test_bubblewrap_sandbox_availability_matches_bwrap(self, tmp_path):
@@ -55,7 +62,9 @@ Return doubled value.
 
 class TestSkillTrustEnforcement:
     @pytest.mark.asyncio
-    async def test_external_skill_rejected_without_trust(self, external_skill_dir, tmp_path):
+    async def test_external_skill_rejected_without_trust(
+        self, external_skill_dir, tmp_path
+    ):
         registry = SkillRegistry()
         loader = SkillLoader(registry=registry)
         skill = loader.load_discovery(external_skill_dir)
@@ -80,7 +89,9 @@ class TestSkillTrustEnforcement:
 
         assert result["doubled"] == 10
 
-    def test_untrusted_external_skill_disables_shell_injection(self, external_skill_dir):
+    def test_untrusted_external_skill_disables_shell_injection(
+        self, external_skill_dir
+    ):
         skill_dir = external_skill_dir
         (skill_dir / "SKILL.md").write_text(
             """\
@@ -136,8 +147,10 @@ tool_type: agent
 
 
 class TestSkillStoreTrust:
-    def test_import_marks_external_untrusted_and_records_sha256(self, external_skill_dir, tmp_path):
-        store = SkillStore(store_dir=tmp_path / "store")
+    def test_import_marks_external_untrusted_and_records_sha256(
+        self, external_skill_dir, tmp_path
+    ):
+        store = SkillStore(store_dir=tmp_path / "store", skills_dir=tmp_path / "skills")
         skill = store.import_skill(str(external_skill_dir), enable=True)
 
         assert skill.metadata["trusted"] is False
@@ -148,8 +161,10 @@ class TestSkillStoreTrust:
         assert meta["trusted"] is False
         assert meta["sha256"] == skill.metadata["sha256"]
 
-    def test_trust_skill_persists_and_updates_registry(self, external_skill_dir, tmp_path):
-        store = SkillStore(store_dir=tmp_path / "store")
+    def test_trust_skill_persists_and_updates_registry(
+        self, external_skill_dir, tmp_path
+    ):
+        store = SkillStore(store_dir=tmp_path / "store", skills_dir=tmp_path / "skills")
         skill = store.import_skill(str(external_skill_dir), enable=True)
 
         store.trust_skill(skill.id, trusted=True)

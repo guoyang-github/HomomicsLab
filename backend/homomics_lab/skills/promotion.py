@@ -79,7 +79,9 @@ class TransientSkillPromoter:
         scripts_dir = package_dir / "scripts"
         scripts_dir.mkdir(parents=True)
 
-        main_script = scripts_dir / "main.py"
+        # Use run.py so SkillLoader/SkillRuntimeExecutor pick up the entrypoint
+        # without requiring an explicit ``entrypoint`` declaration in SKILL.md.
+        main_script = scripts_dir / "run.py"
         main_script.write_text(self._wrap_as_skill(code), encoding="utf-8")
 
         skill_md = package_dir / "SKILL.md"
@@ -133,7 +135,7 @@ class TransientSkillPromoter:
             except json.JSONDecodeError:
                 pass
 
-        main_script = package_dir / "scripts" / "main.py"
+        main_script = package_dir / "scripts" / "run.py"
         sha256 = self._hash_file(main_script)
 
         skill = SkillDefinition(

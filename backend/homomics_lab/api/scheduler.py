@@ -3,10 +3,24 @@
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
 from homomics_lab.scheduler import HomomicsScheduler
 
 router = APIRouter(tags=["scheduler"])
+
+
+class ScheduledRunResponse(BaseModel):
+    """Response shape for a single scheduled task execution record."""
+
+    id: int
+    job_name: str
+    trigger_time: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    status: str
+    result_json: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 def _run_to_dict(run) -> Dict[str, Any]:
@@ -29,7 +43,7 @@ def _get_scheduler(request: Request) -> HomomicsScheduler:
     return scheduler
 
 
-@router.post("/jobs/{job_name}/run")
+@router.post("/jobs/{job_name}/run", response_model=ScheduledRunResponse)
 async def run_scheduled_job(
     job_name: str,
     request: Request,
@@ -43,7 +57,7 @@ async def run_scheduled_job(
     return _run_to_dict(run)
 
 
-@router.get("/runs")
+@router.get("/runs", response_model=List[ScheduledRunResponse])
 async def list_scheduled_runs(
     request: Request,
     job_name: Optional[str] = None,

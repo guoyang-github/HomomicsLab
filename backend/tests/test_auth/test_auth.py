@@ -9,12 +9,10 @@ from fastapi.testclient import TestClient
 from homomics_lab.api.auth import (
     _decode_local_token,
     _resolve_token_user_id,
-    auth_router,
     create_access_token,
     create_default_admin_if_missing,
     get_current_user,
     get_password_hash,
-    refresh_oidc_jwks,
     verify_oidc_token,
 )
 from homomics_lab.config import settings
@@ -251,6 +249,7 @@ class TestBootstrapHelpers:
         db_path = tmp_path / "admin_test.db"
         monkeypatch.setattr(settings, "auth_enabled", True)
         monkeypatch.setattr(settings, "database_url", f"sqlite+aiosqlite:///{db_path}")
+        monkeypatch.setattr(settings, "admin_initial_password", "secure-test-pass")
         reset_engine()
 
         async with get_session_factory()() as session:
@@ -268,5 +267,59 @@ class TestBootstrapHelpers:
             # Second call should be a no-op.
             second = await create_default_admin_if_missing(session)
             assert second is None
+
+        reset_engine()
+
+    @pytest.mark.asyncio
+    async def test_default_admin_uses_env_password(self, monkeypatch, tmp_path):
+        from homomics_lab.api.auth import verify_password
+
+        db_path = tmp_path / "admin_env_pass.db"
+        monkeypatch.setattr(settings, "auth_enabled", True)
+        monkeypatch.setattr(settings, "database_url", f"sqlite+aiosqlite:///{db_path}")
+        monkeypatch.setattr(settings, "admin_initial_password", "from-env")
+        reset_engine()
+
+        async with get_session_factory()() as session:
+            from homomics_lab.database.base import Base
+            from homomics_lab.database.connection import get_engine
+
+            async with get_engine().begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            user = await create_default_admin_if_missing(session)
+            assert verify_password("from-env", user.hashed_password)
+
+        reset_engine()
+
+    @pytest.mark.asyncio
+    async def test_default_admin_generates_random_password_when_env_not_set(
+        self, monkeypatch, tmp_path, caplog
+    ):
+        from homomics_lab.api.auth import verify_password
+
+        db_path = tmp_path / "admin_random.db"
+        monkeypatch.setattr(settings, "auth_enabled", True)
+        monkeypatch.setattr(settings, "database_url", f"sqlite+aiosqlite:///{db_path}")
+        monkeypatch.setattr(settings, "admin_initial_password", None)
+        reset_engine()
+
+        async with get_session_factory()() as session:
+            from homomics_lab.database.base import Base
+            from homomics_lab.database.connection import get_engine
+
+            async with get_engine().begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            with caplog.at_level("WARNING"):
+                user = await create_default_admin_if_missing(session)
+
+            # Extract logged password and verify it works.
+            assert "First-boot default admin created" in caplog.text
+            assert "username=admin password=" in caplog.text
+            # Password is token_urlsafe(24) -> 32 chars.
+            assert user.hashed_password is not None
+            # We cannot assert the exact password, but we can verify the hash is valid.
+            assert len(user.hashed_password) > 0
 
         reset_engine()

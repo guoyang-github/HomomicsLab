@@ -1,5 +1,6 @@
 """DomainLoader: reads a domain.yaml and registers everything into HomomicsLab."""
 
+import ast
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,182 @@ class DomainLoaderError(Exception):
     """Raised when domain.yaml is invalid or registration fails."""
 
     pass
+
+
+# ---------------------------------------------------------------------------
+# Safe expression evaluation for domain state-check conditions
+# ---------------------------------------------------------------------------
+
+
+def _safe_eval(node: ast.AST, namespace: Dict[str, Any]) -> Any:
+    """Evaluate an AST node using only a supplied namespace.
+
+    Supports comparisons, boolean/arithmetic operators, constants, names,
+    and ``ds.<attr>`` attribute access. All other nodes are rejected so that
+    domain condition expressions cannot execute arbitrary code.
+    """
+    if isinstance(node, ast.Expression):
+        return _safe_eval(node.body, namespace)
+
+    if isinstance(node, ast.Constant):
+        return node.value
+
+    if isinstance(node, ast.Name):
+        if node.id not in namespace:
+            raise NameError(f"Unknown variable in condition: {node.id}")
+        return namespace[node.id]
+
+    if isinstance(node, ast.Attribute):
+        # Build the attribute chain and ensure it starts with ``ds``.
+        attr_chain: List[str] = [node.attr]
+        root = node.value
+        while isinstance(root, ast.Attribute):
+            attr_chain.append(root.attr)
+            root = root.value
+        if not isinstance(root, ast.Name) or root.id != "ds":
+            raise ValueError(
+                "Only 'ds.<attr>' attribute access is allowed in conditions"
+            )
+        obj = namespace.get("ds")
+        for attr in reversed(attr_chain):
+            obj = getattr(obj, attr)
+        return obj
+
+    if isinstance(node, ast.Compare):
+        left = _safe_eval(node.left, namespace)
+        for op, comparator in zip(node.ops, node.comparators):
+            right = _safe_eval(comparator, namespace)
+            if isinstance(op, ast.Eq):
+                result = left == right
+            elif isinstance(op, ast.NotEq):
+                result = left != right
+            elif isinstance(op, ast.Lt):
+                result = left < right
+            elif isinstance(op, ast.LtE):
+                result = left <= right
+            elif isinstance(op, ast.Gt):
+                result = left > right
+            elif isinstance(op, ast.GtE):
+                result = left >= right
+            elif isinstance(op, ast.Is):
+                result = left is right
+            elif isinstance(op, ast.IsNot):
+                result = left is not right
+            elif isinstance(op, ast.In):
+                result = left in right
+            elif isinstance(op, ast.NotIn):
+                result = left not in right
+            else:
+                raise ValueError(f"Unsupported comparison operator: {type(op).__name__}")
+            if not result:
+                return False
+            left = right
+        return True
+
+    if isinstance(node, ast.BoolOp):
+        values = [_safe_eval(v, namespace) for v in node.values]
+        if isinstance(node.op, ast.And):
+            return all(values)
+        if isinstance(node.op, ast.Or):
+            return any(values)
+        raise ValueError(f"Unsupported boolean operator: {type(node.op).__name__}")
+
+    if isinstance(node, ast.UnaryOp):
+        operand = _safe_eval(node.operand, namespace)
+        if isinstance(node.op, ast.Not):
+            return not operand
+        if isinstance(node.op, ast.USub):
+            return -operand
+        if isinstance(node.op, ast.UAdd):
+            return +operand
+        raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+
+    if isinstance(node, ast.BinOp):
+        left = _safe_eval(node.left, namespace)
+        right = _safe_eval(node.right, namespace)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right
+        if isinstance(node.op, ast.FloorDiv):
+            return left // right
+        if isinstance(node.op, ast.Mod):
+            return left % right
+        if isinstance(node.op, ast.Pow):
+            return left ** right
+        raise ValueError(f"Unsupported binary operator: {type(node.op).__name__}")
+
+    raise ValueError(f"Unsupported expression node: {type(node).__name__}")
+
+
+_ALLOWED_CONDITION_NODES = {
+    ast.Expression,
+    ast.Constant,
+    ast.Name,
+    ast.Attribute,
+    ast.Compare,
+    ast.BoolOp,
+    ast.UnaryOp,
+    ast.BinOp,
+    ast.Load,
+    ast.And,
+    ast.Or,
+    ast.Not,
+    ast.Eq,
+    ast.NotEq,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.Is,
+    ast.IsNot,
+    ast.In,
+    ast.NotIn,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.FloorDiv,
+    ast.Mod,
+    ast.Pow,
+    ast.USub,
+    ast.UAdd,
+}
+
+
+def _attribute_root_name(node: ast.Attribute) -> Optional[str]:
+    """Return the root Name id for an attribute chain, or None."""
+    root = node.value
+    while isinstance(root, ast.Attribute):
+        root = root.value
+    if isinstance(root, ast.Name):
+        return root.id
+    return None
+
+
+def _validate_condition_expression(condition_str: str) -> None:
+    """Validate that a state-check condition is syntactically safe.
+
+    Unlike evaluation-time checks, this does not require names to be present
+    in the DataState namespace; it only ensures the AST contains allowed nodes
+    and that attribute access is restricted to ``ds.<attr>``.
+    """
+    tree = ast.parse(condition_str, mode="eval")
+    for node in ast.walk(tree):
+        if type(node) not in _ALLOWED_CONDITION_NODES:
+            raise ValueError(
+                f"Unsupported expression node: {type(node).__name__}"
+            )
+        if isinstance(node, ast.Attribute):
+            root = _attribute_root_name(node)
+            if root != "ds":
+                raise ValueError(
+                    "Only 'ds.<attr>' attribute access is allowed in conditions"
+                )
 
 
 @dataclass
@@ -152,11 +329,11 @@ class DomainValidator:
                 DomainValidationIssue("error", "Duplicate analysis_type in intents")
             )
 
-        # 7. Check that condition expressions are syntactically valid
+        # 7. Check that condition expressions are syntactically valid and safe
         for check in domain.state_checks:
             try:
-                compile(check.condition, "<string>", "eval")
-            except SyntaxError as e:
+                _validate_condition_expression(check.condition)
+            except (SyntaxError, ValueError) as e:
                 issues.append(
                     DomainValidationIssue(
                         "error",
@@ -413,15 +590,19 @@ class DomainLoader:
         - 'batch_detected and n_batches > 2'
 
         The compiled function takes a DataState instance as argument.
+        Expressions are parsed into an AST and evaluated against a restricted
+        namespace; no Python builtins are available.
         """
-        # Replace shorthand field names with ds.<field> access
-        # This is a simplified compilation - in production, use a proper
-        # expression parser or AST transformer
-        code = compile(condition_str, "<string>", "eval")
+        try:
+            tree = ast.parse(condition_str, mode="eval")
+        except SyntaxError as exc:
+            raise DomainLoaderError(
+                f"Invalid condition expression: {condition_str}"
+            ) from exc
 
         def evaluator(ds: DataState) -> bool:
             # Build namespace with DataState fields accessible by name
-            namespace = {"ds": ds}
+            namespace: Dict[str, Any] = {"ds": ds}
             # Add DataState attributes directly accessible
             for attr in dir(ds):
                 if not attr.startswith("_"):
@@ -431,7 +612,13 @@ class DomainLoader:
                 for domain_key, domain_values in ds.domain_state.items():
                     if isinstance(domain_values, dict):
                         namespace.update(domain_values)
-            return eval(code, {"__builtins__": {}}, namespace)
+            try:
+                return bool(_safe_eval(tree, namespace))
+            except Exception as exc:
+                logger.warning(
+                    "Failed to evaluate state condition '%s': %s", condition_str, exc
+                )
+                return False
 
         return evaluator
 

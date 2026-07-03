@@ -297,7 +297,7 @@ class SimpleNFTranslator:
             lines.append("}")
             return lines
 
-        lines.append("    inputs_ch = Channel.value(params.subMap([" + 
+        lines.append("    inputs_ch = Channel.value(params.subMap([" +
                      ", ".join(f"'{k}'" for k in inputs.keys()) + "]))")
 
         prev_var = "inputs_ch"

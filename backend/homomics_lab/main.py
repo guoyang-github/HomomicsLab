@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +12,10 @@ from homomics_lab.api.rate_limit import update_limiter_config
 from homomics_lab.metrics import metrics_endpoint, prometheus_middleware
 from homomics_lab.bootstrap import bootstrap_worker_context, close_worker_context
 from homomics_lab.config import settings
+from homomics_lab.domain.marketplace import DomainMarketplace
 from homomics_lab.jobs import JobService
 from homomics_lab.observability.trace_store import TraceStore
+from homomics_lab.reports.store import ReportStore
 from homomics_lab.settings_store import apply_runtime_settings
 from homomics_lab.logging_config import (
     configure_logging,
@@ -22,6 +25,7 @@ from homomics_lab.logging_config import (
 )
 from homomics_lab.plan import PlanStore
 from homomics_lab.scheduler import HomomicsScheduler
+from homomics_lab.version import app_version
 from homomics_lab.api.router import api_router
 from homomics_lab.tracing import instrument_fastapi, setup_tracing
 
@@ -69,6 +73,13 @@ async def lifespan(app: FastAPI):
     cbkb = ctx["cbkb"]
     app.state.cbkb = cbkb
 
+    # Domain template marketplace for importing and listing domain.yaml templates.
+    app.state.domain_marketplace = DomainMarketplace(
+        builtin_domains_dir=Path(__file__).parent / "domains",
+        marketplace_dir=settings.data_dir / "marketplace" / "domains",
+        skill_registry=app.state.skill_executor.registry,
+    )
+
     print(f"Registered {len(app.state.tool_registry.list_all())} builtin tools")
     for external_skills in settings.external_skills_dirs:
         if external_skills.exists():
@@ -79,6 +90,9 @@ async def lifespan(app: FastAPI):
 
     # Execution trace store for plan/job-level observability
     app.state.trace_store = TraceStore()
+
+    # Persistent analysis report store
+    app.state.report_store = ReportStore()
 
     # Start background job worker only when worker_mode is enabled.
     # Queued jobs persisted before a restart are recovered into the queue.
@@ -103,7 +117,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version=app_version(),
+    docs_url="/docs" if settings.openapi_docs_enabled else None,
+    redoc_url="/redoc" if settings.openapi_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.openapi_docs_enabled else None,
     lifespan=lifespan,
 )
 
@@ -187,12 +204,12 @@ if getattr(settings, "trusted_hosts", None):
 
 @app.get("/")
 async def root():
-    return {"name": settings.app_name, "version": "0.1.0"}
+    return {"name": settings.app_name, "version": app_version()}
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.5.0"}
+    return {"status": "ok", "version": app_version()}
 
 
 @app.get("/health/memory")

@@ -1,10 +1,13 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+import tempfile
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from homomics_lab.api.auth import require_admin, require_auth
+from homomics_lab.api.responses import MessageResponse
+from homomics_lab.security import PathSecurityError, safe_extractall
 from homomics_lab.skills.promotion import TransientSkillPromoter
 from homomics_lab.skills.skill_store import SkillStore
 from homomics_lab.tools.approval import get_default_approval_store
@@ -59,6 +62,21 @@ class ImportSkillResponse(BaseModel):
     enabled: bool
 
 
+class ImportDirectoryRequest(BaseModel):
+    source_dir: Optional[str] = "./skills"
+    namespace: Optional[str] = "user"
+
+
+class ImportDirectoryResponse(BaseModel):
+    imported: List[ImportSkillResponse]
+    failed: List[Dict[str, str]]
+
+
+class ImportZipResponse(BaseModel):
+    imported: List[ImportSkillResponse]
+    failed: List[Dict[str, str]]
+
+
 class ValidationResponse(BaseModel):
     valid: bool
     errors: List[str]
@@ -94,8 +112,79 @@ class LockResponse(BaseModel):
     skills: Dict[str, str]
 
 
+class PendingToolApproval(BaseModel):
+    call_id: str
+    tool_name: str
+    arguments: Dict[str, Any]
+    risk_level: str
 
-@router.get("/", response_model=List[SkillSummary], dependencies=[Depends(require_auth)])
+
+class ToolApprovalResponse(BaseModel):
+    call_id: str
+    approved: bool
+
+
+class SkillMetricsResponse(BaseModel):
+    skill_id: str
+    total_executions: int
+    success_rate: float
+    avg_duration_ms: float
+    min_duration_ms: float
+    max_duration_ms: float
+    avg_output_size: float
+    avg_cpu_percent: Optional[float]
+    avg_memory_mb: Optional[float]
+    avg_gpu_percent: Optional[float]
+    total_cost_usd: float
+
+
+class SkillExecutionRecord(BaseModel):
+    skill_id: str
+    timestamp: str
+    duration_ms: float
+    success: bool
+    output_size: int
+    executor_type: str
+    error_message: Optional[str]
+
+
+class TopSkillMetric(BaseModel):
+    skill_id: str
+    total_executions: int
+    success_rate: float
+    avg_duration_ms: float
+    total_cost_usd: float
+
+
+class SkillToggleResponse(BaseModel):
+    skill_id: str
+    namespace: str
+    enabled: bool
+
+
+class RemoveSkillResponse(BaseModel):
+    skill_id: str
+    namespace: str
+    removed: bool
+
+
+class PromoteSkillResponse(BaseModel):
+    skill_id: str
+    name: str
+    namespace: str
+    source_dir: str
+    trusted: bool
+
+
+class TrustSkillResponse(BaseModel):
+    skill_id: str
+    namespace: str
+    trusted: bool
+
+
+@router.get(
+    "/", response_model=List[SkillSummary], dependencies=[Depends(require_auth)]
+)
 async def list_skills(request: Request):
     """List all registered skills."""
     executor = request.app.state.skill_executor
@@ -118,7 +207,9 @@ async def list_skills(request: Request):
     ]
 
 
-@router.get("/search", response_model=List[SkillSummary], dependencies=[Depends(require_auth)])
+@router.get(
+    "/search", response_model=List[SkillSummary], dependencies=[Depends(require_auth)]
+)
 async def search_skills(request: Request, q: str):
     """Search skills by keyword."""
     executor = request.app.state.skill_executor
@@ -141,7 +232,11 @@ async def search_skills(request: Request, q: str):
     ]
 
 
-@router.get("/tools/pending", dependencies=[Depends(require_auth)])
+@router.get(
+    "/tools/pending",
+    response_model=List[PendingToolApproval],
+    dependencies=[Depends(require_auth)],
+)
 async def list_pending_tool_approvals():
     """List high-risk tool calls awaiting user approval."""
     store = get_default_approval_store()
@@ -156,25 +251,39 @@ async def list_pending_tool_approvals():
     ]
 
 
-@router.post("/approve-tool/{call_id}", dependencies=[Depends(require_admin)])
+@router.post(
+    "/approve-tool/{call_id}",
+    response_model=ToolApprovalResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def approve_tool_call(call_id: str):
     """Approve a pending high-risk tool call."""
     store = get_default_approval_store()
     if not store.approve(call_id):
-        raise HTTPException(status_code=404, detail=f"Approval request '{call_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Approval request '{call_id}' not found"
+        )
     return {"call_id": call_id, "approved": True}
 
 
-@router.post("/reject-tool/{call_id}", dependencies=[Depends(require_admin)])
+@router.post(
+    "/reject-tool/{call_id}",
+    response_model=ToolApprovalResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def reject_tool_call(call_id: str):
     """Reject a pending high-risk tool call."""
     store = get_default_approval_store()
     if not store.reject(call_id):
-        raise HTTPException(status_code=404, detail=f"Approval request '{call_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Approval request '{call_id}' not found"
+        )
     return {"call_id": call_id, "approved": False}
 
 
-@router.get("/{skill_id}", response_model=SkillDetail, dependencies=[Depends(require_auth)])
+@router.get(
+    "/{skill_id}", response_model=SkillDetail, dependencies=[Depends(require_auth)]
+)
 async def get_skill(request: Request, skill_id: str):
     """Get detailed information about a specific skill."""
     executor = request.app.state.skill_executor
@@ -203,7 +312,11 @@ async def get_skill(request: Request, skill_id: str):
     )
 
 
-@router.get("/{skill_id}/metrics", dependencies=[Depends(require_auth)])
+@router.get(
+    "/{skill_id}/metrics",
+    response_model=Union[SkillMetricsResponse, MessageResponse],
+    dependencies=[Depends(require_auth)],
+)
 async def get_skill_metrics(request: Request, skill_id: str):
     """Get performance metrics for a skill."""
     executor = request.app.state.skill_executor
@@ -218,7 +331,11 @@ async def get_skill_metrics(request: Request, skill_id: str):
     return executor.tracker.get_stats(skill_id)
 
 
-@router.get("/{skill_id}/executions", dependencies=[Depends(require_auth)])
+@router.get(
+    "/{skill_id}/executions",
+    response_model=List[SkillExecutionRecord],
+    dependencies=[Depends(require_auth)],
+)
 async def get_skill_executions(request: Request, skill_id: str, limit: int = 100):
     """Get recent execution records for a skill."""
     executor = request.app.state.skill_executor
@@ -245,7 +362,11 @@ async def get_skill_executions(request: Request, skill_id: str, limit: int = 100
     ]
 
 
-@router.get("/metrics/top", dependencies=[Depends(require_auth)])
+@router.get(
+    "/metrics/top",
+    response_model=List[TopSkillMetric],
+    dependencies=[Depends(require_auth)],
+)
 async def get_top_skills(request: Request, limit: int = 10):
     """Get top skills by execution count."""
     executor = request.app.state.skill_executor
@@ -256,7 +377,40 @@ async def get_top_skills(request: Request, limit: int = 10):
     return executor.tracker.get_top_skills(limit=limit)
 
 
-@router.post("/import", response_model=ImportSkillResponse, dependencies=[Depends(require_admin)])
+def _import_directory(
+    store: SkillStore, source_dir: Path, namespace: str
+) -> tuple[List[ImportSkillResponse], List[Dict[str, str]]]:
+    """Import every skill subdirectory under ``source_dir`` into the store."""
+    imported: List[ImportSkillResponse] = []
+    failed: List[Dict[str, str]] = []
+    for skill_path in sorted(source_dir.iterdir()):
+        if not skill_path.is_dir():
+            continue
+        if not (skill_path / "SKILL.md").exists():
+            continue
+        try:
+            skill = store.import_skill(
+                source=str(skill_path),
+                namespace=namespace,
+                enable=True,
+            )
+            imported.append(
+                ImportSkillResponse(
+                    skill_id=skill.id,
+                    name=skill.name,
+                    version=skill.version,
+                    namespace=skill.metadata.get("namespace", namespace),
+                    enabled=True,
+                )
+            )
+        except Exception as exc:
+            failed.append({"path": str(skill_path), "error": str(exc)})
+    return imported, failed
+
+
+@router.post(
+    "/import", response_model=ImportSkillResponse, dependencies=[Depends(require_admin)]
+)
 async def import_skill(request: Request, body: ImportSkillRequest):
     """Import a skill from a local path, git URL, or zip archive."""
     store = _get_store(request)
@@ -279,7 +433,73 @@ async def import_skill(request: Request, body: ImportSkillRequest):
     )
 
 
-@router.post("/{skill_id}/update", response_model=ImportSkillResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/import-directory",
+    response_model=ImportDirectoryResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def import_skill_directory(request: Request, body: ImportDirectoryRequest):
+    """Bulk import all skill subdirectories under a directory (e.g. ./skills)."""
+    store = _get_store(request)
+    source_dir = Path(body.source_dir or "./skills").expanduser().resolve()
+    if not source_dir.exists():
+        raise HTTPException(
+            status_code=400, detail=f"Directory not found: {source_dir}"
+        )
+
+    imported, failed = _import_directory(store, source_dir, body.namespace or "user")
+    return ImportDirectoryResponse(imported=imported, failed=failed)
+
+
+@router.post(
+    "/import-zip",
+    response_model=ImportZipResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def import_skill_zip(
+    request: Request,
+    file: UploadFile = File(...),
+    namespace: Optional[str] = "user",
+):
+    """Upload a zip archive containing skill directories and import them all."""
+    store = _get_store(request)
+    suffix = Path(file.filename or "skills.zip").suffix or ".zip"
+    with tempfile.TemporaryDirectory(prefix="homomics_skill_zip_") as tmp:
+        archive_path = Path(tmp) / f"upload{suffix}"
+        archive_path.write_bytes(await file.read())
+
+        extract_dir = Path(tmp) / "extracted"
+        extract_dir.mkdir()
+        import zipfile
+
+        try:
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                safe_extractall(zf, extract_dir)
+        except zipfile.BadZipFile as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid zip file: {exc}"
+            ) from exc
+        except PathSecurityError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Unsafe zip archive: {exc}"
+            ) from exc
+
+        # If the zip has a single top-level directory, drill into it.
+        entries = [e for e in extract_dir.iterdir() if e.is_dir()]
+        if len(entries) == 1 and not (entries[0] / "SKILL.md").exists():
+            scan_dir = entries[0]
+        else:
+            scan_dir = extract_dir
+
+        imported, failed = _import_directory(store, scan_dir, namespace or "user")
+    return ImportZipResponse(imported=imported, failed=failed)
+
+
+@router.post(
+    "/{skill_id}/update",
+    response_model=ImportSkillResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def update_skill(request: Request, skill_id: str, body: ImportSkillRequest):
     """Re-import a skill from a new source."""
     store = _get_store(request)
@@ -301,7 +521,11 @@ async def update_skill(request: Request, skill_id: str, body: ImportSkillRequest
     )
 
 
-@router.delete("/{skill_id}", dependencies=[Depends(require_admin)])
+@router.delete(
+    "/{skill_id}",
+    response_model=RemoveSkillResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def remove_skill(
     request: Request,
     skill_id: str,
@@ -316,7 +540,11 @@ async def remove_skill(
     return {"skill_id": skill_id, "namespace": namespace, "removed": True}
 
 
-@router.post("/{skill_id}/enable", dependencies=[Depends(require_admin)])
+@router.post(
+    "/{skill_id}/enable",
+    response_model=SkillToggleResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def enable_skill(
     request: Request,
     skill_id: str,
@@ -331,7 +559,11 @@ async def enable_skill(
     return {"skill_id": skill.id, "namespace": namespace, "enabled": True}
 
 
-@router.post("/{skill_id}/disable", dependencies=[Depends(require_admin)])
+@router.post(
+    "/{skill_id}/disable",
+    response_model=SkillToggleResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def disable_skill(
     request: Request,
     skill_id: str,
@@ -346,7 +578,11 @@ async def disable_skill(
     return {"skill_id": skill_id, "namespace": namespace, "enabled": False}
 
 
-@router.post("/{skill_id}/validate", response_model=ValidationResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/{skill_id}/validate",
+    response_model=ValidationResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def validate_skill(
     request: Request,
     skill_id: str,
@@ -366,7 +602,11 @@ async def validate_skill(
     )
 
 
-@router.post("/{skill_id}/test", response_model=TestResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/{skill_id}/test",
+    response_model=TestResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def test_skill(
     request: Request,
     skill_id: str,
@@ -389,7 +629,11 @@ async def test_skill(
     )
 
 
-@router.post("/promote", dependencies=[Depends(require_admin)])
+@router.post(
+    "/promote",
+    response_model=PromoteSkillResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def promote_skill(request: Request, body: PromoteSkillRequest):
     """Promote a successful CodeAct run into a curated skill.
 
@@ -400,7 +644,9 @@ async def promote_skill(request: Request, body: PromoteSkillRequest):
     """
     store = _get_store(request)
     if not Path(body.source_dir).exists():
-        raise HTTPException(status_code=400, detail=f"Source directory not found: {body.source_dir}")
+        raise HTTPException(
+            status_code=400, detail=f"Source directory not found: {body.source_dir}"
+        )
 
     try:
         promoter = TransientSkillPromoter(skill_registry=store.registry)
@@ -433,7 +679,11 @@ async def promote_skill(request: Request, body: PromoteSkillRequest):
     }
 
 
-@router.post("/{skill_id}/trust", dependencies=[Depends(require_admin)])
+@router.post(
+    "/{skill_id}/trust",
+    response_model=TrustSkillResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def trust_skill(
     request: Request,
     skill_id: str,
@@ -457,7 +707,9 @@ async def trust_skill(
     }
 
 
-@router.post("/lock", response_model=LockResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/lock", response_model=LockResponse, dependencies=[Depends(require_admin)]
+)
 async def lock_skills(request: Request, project_id: str):
     """Create a version lock for currently enabled skills."""
     store = _get_store(request)

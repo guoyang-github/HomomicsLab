@@ -1,6 +1,5 @@
 """Tests for the BioMCPClient in embedded, stdio, and SSE modes."""
 
-import asyncio
 import sys
 import tempfile
 from pathlib import Path

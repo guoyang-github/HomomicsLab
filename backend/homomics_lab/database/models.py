@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -191,3 +191,76 @@ class TraceRecord(Base):
     ended_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
     nodes_json: Mapped[str] = mapped_column(Text, default="[]")
+
+    nodes: Mapped[list["TraceNodeRecord"]] = relationship(
+        "TraceNodeRecord",
+        back_populates="trace",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="TraceNodeRecord.id",
+    )
+
+
+class TraceNodeRecord(Base):
+    """Individual node within an execution trace.
+
+    Storing nodes in separate rows allows TraceStore to update a single node
+    without rewriting the entire trace JSON blob.
+    """
+
+    __tablename__ = "execution_trace_nodes"
+
+    __table_args__ = (UniqueConstraint("trace_id", "node_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trace_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("execution_traces.trace_id"),
+        nullable=False,
+        index=True,
+    )
+    node_id: Mapped[str] = mapped_column(String, nullable=False)
+    parent_id: Mapped[str] = mapped_column(String, nullable=True)
+    node_type: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="running")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    ended_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    inputs_json: Mapped[str] = mapped_column(Text, default="null")
+    outputs_json: Mapped[str] = mapped_column(Text, default="null")
+    error: Mapped[str] = mapped_column(Text, nullable=True)
+    logs_json: Mapped[str] = mapped_column(Text, default="[]")
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+    trace: Mapped["TraceRecord"] = relationship("TraceRecord", back_populates="nodes")
+
+
+class ReportRecord(Base):
+    """Persistent analysis report."""
+
+    __tablename__ = "analysis_reports"
+
+    report_id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    project_name: Mapped[str] = mapped_column(
+        String, nullable=False, default="", index=True
+    )
+    analysis_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="", index=True
+    )
+    author: Mapped[str] = mapped_column(String, nullable=False, default="HomomicsLab Agent")
+    tags_json: Mapped[str] = mapped_column(Text, default="[]")
+    parameters_json: Mapped[str] = mapped_column(Text, default="{}")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    sections_json: Mapped[str] = mapped_column(Text, default="[]")
+    steps_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

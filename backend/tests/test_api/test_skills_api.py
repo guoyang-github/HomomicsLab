@@ -74,3 +74,38 @@ def test_get_skill_not_found(client_with_skills):
     response = client_with_skills.get("/api/skills/nonexistent")
 
     assert response.status_code == 404
+
+
+def test_import_directory_bulk_imports_skills(
+    client_with_skills, tmp_path, monkeypatch
+):
+    """Batch import endpoint discovers and imports all skill subdirectories."""
+    from homomics_lab.skills.skill_store import SkillStore
+
+    store = SkillStore(
+        registry=app.state.skill_executor.registry,
+        store_dir=tmp_path / "skill_store",
+        skills_dir=tmp_path / "skills",
+    )
+    monkeypatch.setattr(app.state, "skill_store", store, raising=False)
+
+    skills_dir = tmp_path / "skills"
+    (skills_dir / "batch-skill-a").mkdir()
+    (skills_dir / "batch-skill-a" / "SKILL.md").write_text(
+        "---\nname: batch-skill-a\n---\n", encoding="utf-8"
+    )
+    (skills_dir / "batch-skill-b").mkdir()
+    (skills_dir / "batch-skill-b" / "SKILL.md").write_text(
+        "---\nname: batch-skill-b\n---\n", encoding="utf-8"
+    )
+
+    response = client_with_skills.post(
+        "/api/skills/import-directory",
+        json={"source_dir": str(skills_dir), "namespace": "batch"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    imported_ids = {s["skill_id"] for s in data["imported"]}
+    assert imported_ids == {"batch-skill-a", "batch-skill-b"}
+    assert data["failed"] == []

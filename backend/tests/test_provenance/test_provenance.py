@@ -35,6 +35,22 @@ def test_record_and_load_provenance(recorder, tmp_path):
     assert loaded == []
 
 
+def test_provenance_roundtrip_preserves_parameters(recorder):
+    """Regression test: parameters must survive record -> load roundtrip."""
+    prov = ExecutionProvenance(
+        execution_id="exec-params",
+        skill_id="test-skill",
+        skill_version="1.0.0",
+        project_id="proj-1",
+        parameters={"threads": 8, "mode": "fast"},
+        sandbox_backend="local",
+    )
+    recorder.record(prov)
+    loaded = recorder.list_by_project("proj-1")
+    assert len(loaded) == 1
+    assert loaded[0].parameters == {"threads": 8, "mode": "fast"}
+
+
 def test_rocrate_export(tmp_path):
     crate_dir = tmp_path / "crate"
     exporter = ROCrateExporter(crate_dir)

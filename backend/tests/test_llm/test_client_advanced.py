@@ -5,11 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from homomics_lab.llm.cache import LLMResponseCache
-from homomics_lab.llm.router import LLMRouter
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.secrets import reset_secrets_manager
 
-import pytest
 
 
 @pytest.fixture(autouse=True)

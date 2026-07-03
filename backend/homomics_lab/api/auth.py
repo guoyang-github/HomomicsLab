@@ -11,6 +11,8 @@ provider's JWKS. Otherwise locally-issued JWTs are validated using
 """
 
 import hmac
+import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -29,6 +31,7 @@ from homomics_lab.database.connection import get_async_session
 from homomics_lab.database.models import User
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Role constants
@@ -376,6 +379,39 @@ require_viewer_or_above = RequireRole([ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
 
 
 # ---------------------------------------------------------------------------
+# WebSocket authentication
+# ---------------------------------------------------------------------------
+
+
+async def require_ws_auth(websocket: Any) -> str:
+    """Authenticate a WebSocket connection.
+
+    When auth is disabled, returns ``anonymous``. Otherwise validates the
+    ``token`` query parameter as a JWT/OIDC token or configured API key.
+    Closes the connection with 1008 on failure.
+    """
+    if not settings.auth_enabled:
+        return "anonymous"
+
+    token = websocket.query_params.get("token") or ""
+    if not token:
+        await websocket.close(code=1008, reason="Missing token")
+        raise RuntimeError("WebSocket authentication failed: missing token")
+
+    if _looks_like_jwt(token):
+        user_id = await _resolve_token_user_id(token)
+        if user_id:
+            return user_id
+
+    expected = settings.api_key
+    if expected and hmac.compare_digest(token, expected):
+        return "authenticated_user"
+
+    await websocket.close(code=1008, reason="Invalid token")
+    raise RuntimeError("WebSocket authentication failed: invalid token")
+
+
+# ---------------------------------------------------------------------------
 # Admin-only placeholder router
 # ---------------------------------------------------------------------------
 
@@ -459,8 +495,11 @@ async def read_current_user(
 async def create_default_admin_if_missing(session: AsyncSession) -> Optional[User]:
     """Create a default admin user/tenant when auth is enabled and no users exist.
 
-    This is intended for first-boot convenience only. In production, users and
-    tenants should be provisioned through an admin CLI or onboarding flow.
+    The initial password is taken from ``settings.admin_initial_password`` if set;
+    otherwise a random 24-character password is generated and logged at WARNING
+    level. In production, always set ``HOMOMICS_ADMIN_INITIAL_PASSWORD`` or
+    provision users through an admin CLI/onboarding flow instead of relying on
+    this bootstrap account.
     """
     result = await session.execute(select(User))
     if result.scalars().first() is not None:
@@ -471,11 +510,26 @@ async def create_default_admin_if_missing(session: AsyncSession) -> Optional[Use
     tenant_id = f"tenant_{uuid.uuid4().hex[:8]}"
     user_id = f"user_{uuid.uuid4().hex[:8]}"
     tenant = Tenant(id=tenant_id, name="Default")
+
+    password = settings.admin_initial_password
+    if password:
+        source = "HOMOMICS_ADMIN_INITIAL_PASSWORD"
+    else:
+        password = secrets.token_urlsafe(24)
+        source = "randomly generated"
+        logger.warning(
+            "First-boot default admin created. username=admin password=%s "
+            "(source=%s). Change this password immediately or set "
+            "HOMOMICS_ADMIN_INITIAL_PASSWORD before first start.",
+            password,
+            source,
+        )
+
     user = User(
         id=user_id,
         tenant_id=tenant_id,
         username="admin",
-        hashed_password=get_password_hash("admin"),
+        hashed_password=get_password_hash(password),
         role="admin",
         is_active=True,
     )

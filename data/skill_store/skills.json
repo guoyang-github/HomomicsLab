@@ -10,8 +10,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.201043+00:00",
-    "updated_at": "2026-07-01T07:10:07.201062+00:00"
+    "imported_at": "2026-07-03T04:11:42.593154+00:00",
+    "updated_at": "2026-07-03T04:11:42.593175+00:00"
   },
   "builtin:core_hitl": {
     "id": "core_hitl",
@@ -24,8 +24,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.207501+00:00",
-    "updated_at": "2026-07-01T07:10:07.207522+00:00"
+    "imported_at": "2026-07-03T04:11:42.599827+00:00",
+    "updated_at": "2026-07-03T04:11:42.599843+00:00"
   },
   "builtin:core_interpretation": {
     "id": "core_interpretation",
@@ -38,8 +38,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.214198+00:00",
-    "updated_at": "2026-07-01T07:10:07.214213+00:00"
+    "imported_at": "2026-07-03T04:11:42.605072+00:00",
+    "updated_at": "2026-07-03T04:11:42.605084+00:00"
   },
   "builtin:core_planning": {
     "id": "core_planning",
@@ -52,8 +52,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.220744+00:00",
-    "updated_at": "2026-07-01T07:10:07.220762+00:00"
+    "imported_at": "2026-07-03T04:11:42.612106+00:00",
+    "updated_at": "2026-07-03T04:11:42.612127+00:00"
   },
   "builtin:core_reproducibility": {
     "id": "core_reproducibility",
@@ -66,8 +66,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.227368+00:00",
-    "updated_at": "2026-07-01T07:10:07.227390+00:00"
+    "imported_at": "2026-07-03T04:11:42.617599+00:00",
+    "updated_at": "2026-07-03T04:11:42.617612+00:00"
   },
   "builtin:core_skill_router": {
     "id": "core_skill_router",
@@ -80,8 +80,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.233591+00:00",
-    "updated_at": "2026-07-01T07:10:07.233607+00:00"
+    "imported_at": "2026-07-03T04:11:42.622459+00:00",
+    "updated_at": "2026-07-03T04:11:42.622474+00:00"
   },
   "builtin:utils_workflow_management_nextflow": {
     "id": "utils_workflow_management_nextflow",
@@ -94,8 +94,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-01T07:10:07.239146+00:00",
-    "updated_at": "2026-07-01T07:10:07.239163+00:00"
+    "imported_at": "2026-07-03T04:11:42.629649+00:00",
+    "updated_at": "2026-07-03T04:11:42.629669+00:00"
   },
   "builtin:data_loader": {
     "id": "data_loader",
@@ -1690,8 +1690,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-06-15T08:43:26.386388+00:00",
-    "updated_at": "2026-06-15T08:43:26.386398+00:00"
+    "imported_at": "2026-07-03T04:11:42.635210+00:00",
+    "updated_at": "2026-07-03T04:11:42.635222+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-celltypist": {
     "id": "bio-single-cell-annotation-celltypist",
@@ -5038,5 +5038,33 @@
     "sha256": null,
     "imported_at": "2026-07-01T07:10:08.314809+00:00",
     "updated_at": "2026-07-01T07:10:08.314831+00:00"
+  },
+  "builtin:batch-skill-a": {
+    "id": "batch-skill-a",
+    "namespace": "builtin",
+    "name": "batch-skill-a",
+    "version": "1.0.0",
+    "category": "general",
+    "source": "imported",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-32/test_import_directory_bulk_imp0/skills/batch-skill-a",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-03T04:11:42.639823+00:00",
+    "updated_at": "2026-07-03T04:11:42.639836+00:00"
+  },
+  "builtin:batch-skill-b": {
+    "id": "batch-skill-b",
+    "namespace": "builtin",
+    "name": "batch-skill-b",
+    "version": "1.0.0",
+    "category": "general",
+    "source": "imported",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-32/test_import_directory_bulk_imp0/skills/batch-skill-b",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-03T04:11:42.644593+00:00",
+    "updated_at": "2026-07-03T04:11:42.644610+00:00"
   }
 }

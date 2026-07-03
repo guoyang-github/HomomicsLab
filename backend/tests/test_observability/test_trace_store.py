@@ -1,5 +1,7 @@
 """Tests for the execution trace store."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 import pytest_asyncio
 
@@ -91,3 +93,37 @@ async def test_list_recent(store):
 
     recent = await store.list_recent(limit=10)
     assert len(recent) == 2
+
+
+@pytest.mark.asyncio
+async def test_retention_delete_by_status(store):
+    await store.start_trace(trace_id="job_old", root_name="old")
+    await store.finish_trace("job_old", status="completed")
+    await store.start_trace(trace_id="job_active", root_name="active")
+
+    deleted = await store.delete_by_status("completed")
+    assert deleted == 1
+
+    assert await store.get_trace("job_old") is None
+    assert await store.get_trace("job_active") is not None
+
+
+@pytest.mark.asyncio
+async def test_retention_delete_before(store):
+    await store.start_trace(trace_id="job_a", root_name="a")
+    await store.start_trace(trace_id="job_b", root_name="b")
+
+    # All traces are recent; deleting before a future timestamp removes none.
+    future = datetime.now(timezone.utc) + timedelta(days=1)
+    assert await store.delete_before(future) == 2
+    assert await store.get_trace("job_a") is None
+    assert await store.get_trace("job_b") is None
+
+
+@pytest.mark.asyncio
+async def test_retention_delete_older_than(store):
+    await store.start_trace(trace_id="job_a", root_name="a")
+
+    deleted = await store.delete_older_than(days=0)
+    assert deleted == 1
+    assert await store.get_trace("job_a") is None

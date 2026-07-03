@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "homomics-lab"
-version = "0.1.0"
+version = "0.5.0"
 description = "A general-purpose agent for bioinformatics analysis"
 readme = "README.md"
 license = {text = "MIT"}
@@ -63,6 +63,48 @@ knowledge = ["pypdf>=5.0", "python-docx>=1.1", "beautifulsoup4>=4.12", "httpx>=0
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 norecursedirs = ["data", ".git", ".venv", "node_modules", "dist", "build"]
+filterwarnings = [
+    "ignore:'crypt' is deprecated:DeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient`:starlette.exceptions.StarletteDeprecationWarning",
+    "ignore:SelectableGroups dict interface is deprecated:DeprecationWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+implicit_optional = true
+warn_return_any = false
+warn_unused_ignores = false
+# Baseline: these error categories are suppressed while the codebase is being
+# gradually typed. Remove them incrementally as type coverage improves.
+disable_error_code = [
+    "annotation-unchecked",
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "call-overload",
+    "has-type",
+    "index",
+    "misc",
+    "operator",
+    "override",
+    "return",
+    "return-value",
+    "union-attr",
+    "used-before-def",
+    "valid-type",
+    "var-annotated",
+]
 
 [project.scripts]
 homomics = "homomics_lab.cli.main:main"

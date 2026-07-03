@@ -273,6 +273,7 @@ class PlanEngine:
             "retrieval_context": retrieval_context.to_prompt_context(),
             "learned_defaults": learned_defaults,
             "template": template.to_dict() if template is not None else None,
+            "state_checks": strategy.last_triggered_state_checks(),
         }
 
         return PlanResult(
@@ -402,17 +403,14 @@ class PlanEngine:
         data_state: DataState,
     ) -> List[Dict[str, Any]]:
         """Record which strategy state checks fired for the chosen plan."""
-        from homomics_lab.agent.plan.strategies import AnalysisStrategy
-
         triggered: List[Dict[str, Any]] = []
-        # The reproducibility_context already stores the strategy name.
         strategy_name = plan_result.strategy_name
-        # We cannot reach back into the library from a static helper, so callers
-        # that need richer detail should pass the strategy object. This minimal
-        # version records checks embedded in the reproducibility_context if any.
         checks = plan_result.reproducibility_context.get("state_checks", [])
         for check in checks:
-            triggered.append(dict(check))
+            entry = dict(check)
+            entry.setdefault("strategy", strategy_name)
+            entry.setdefault("data_state_snapshot", data_state.to_dict())
+            triggered.append(entry)
         return triggered
 
     def _evaluate_skill_dag_risks(self, plan_result: PlanResult) -> List[Dict[str, Any]]:

@@ -266,6 +266,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.collapse': 'Collapse',
     'executionLog.expand': 'Expand',
     'executionLog.empty': 'No logs yet',
+    'executionLog.reconnecting': 'SSE disconnected. Reconnecting in {{delay}}ms (attempt {{count}}/{{max}})...',
+    'executionLog.reconnectFailed': 'SSE connection lost and reconnect limit reached.',
 
     // Domain Marketplace
     'domain.title': 'Domain Marketplace',
@@ -465,6 +467,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'settings.general.retentionForever': 'Forever',
     'settings.general.retentionHint': '0 means keep forever; positive values clean up historical data after that many days',
     'settings.general.localNoKey': 'Local models usually do not require a key',
+    'settings.general.authToken': 'Authentication Token / API Key',
+    'settings.general.authTokenDesc': 'Used when the backend has authentication enabled. Leave empty for anonymous access.',
+    'settings.general.authTokenHint': 'Bearer token or API key',
 
     // Figures
     'figures.title': 'Figure Workbench',
@@ -784,6 +789,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.collapse': '收起',
     'executionLog.expand': '展开',
     'executionLog.empty': '暂无日志',
+    'executionLog.reconnecting': 'SSE 断开，{{delay}}ms 后重连（第 {{count}}/{{max}} 次）...',
+    'executionLog.reconnectFailed': 'SSE 连接丢失，已达到最大重试次数。',
 
     // Domain Marketplace
     'domain.title': 'Domain 市场',
@@ -983,6 +990,9 @@ const resources: Record<Locale, Record<string, string>> = {
     'settings.general.retentionForever': '永久',
     'settings.general.retentionHint': '0 表示永久保留，正整数表示按天数清理历史数据',
     'settings.general.localNoKey': 'Local 模型通常无需 Key',
+    'settings.general.authToken': '认证 Token / API Key',
+    'settings.general.authTokenDesc': '当后端启用认证时填写。留空则以匿名身份访问。',
+    'settings.general.authTokenHint': 'Bearer token 或 API key',
 
     // Figures
     'figures.title': '作图工作台',

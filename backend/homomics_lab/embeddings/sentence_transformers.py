@@ -30,7 +30,10 @@ class SentenceTransformersProvider(EmbeddingProvider):
     @property
     def dimension(self) -> int:
         model = self._load_model()
-        return int(model.get_sentence_embedding_dimension())
+        getter = getattr(model, "get_embedding_dimension", None)
+        if getter is None:
+            getter = model.get_sentence_embedding_dimension
+        return int(getter())
 
     def is_available(self) -> bool:
         try:

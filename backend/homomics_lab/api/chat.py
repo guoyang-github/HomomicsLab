@@ -1,23 +1,30 @@
+import logging
 import uuid
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
+
+from homomics_lab.api.auth import require_auth, require_ws_auth
+from homomics_lab.logging_config import get_correlation_id
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer as IntentAnalyzer
 from homomics_lab.agent.sla import SLAEngine
 from homomics_lab.agent.turn_runner import TurnRunner
+from homomics_lab.api.chat_references import resolve_chat_references
+from homomics_lab.api.deps import get_job_service, get_plan_store, get_trace_store
 from homomics_lab.context.memory_manager import MemoryManager
+from homomics_lab.debate_store import DebateStore
 from homomics_lab.hitl.nlu import HITLNLUParser
 from homomics_lab.hitl.preference_resolver import HITLPreferenceResolver
 from homomics_lab.jobs import JobService, JobStatus
 from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan import PlanPresenter, PlanStore
-from homomics_lab.api.chat_references import resolve_chat_references
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-_debates: dict[str, dict] = {}
+_debate_store = DebateStore()
 
 
 class SendMessageRequest(BaseModel):
@@ -79,22 +86,30 @@ class DebateResponseResponse(BaseModel):
     status: str = "completed"
 
 
-@router.post("/send", response_model=SendMessageResponse)
+class ChatSessionSummary(BaseModel):
+    id: str
+    project_id: Optional[str]
+    name: str
+    updated_at: str
+    created_at: str
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+
+
+@router.post("/send", response_model=SendMessageResponse, dependencies=[Depends(require_auth)])
 async def send_message(
     request: SendMessageRequest,
     http_request: Request,
+    job_service: JobService = Depends(get_job_service),
+    plan_store: PlanStore = Depends(get_plan_store),
+    trace_store: TraceStore = Depends(get_trace_store),
 ):
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     working_memory, task_tree = await memory_manager.load_session(
         request.session_id, request.project_id
     )
-
-    job_service: JobService = getattr(
-        http_request.app.state, "job_service", None
-    ) or JobService()
-    plan_store: PlanStore = getattr(
-        http_request.app.state, "plan_store", None
-    ) or PlanStore()
 
     skill_executor = getattr(http_request.app.state, "skill_executor", None)
     user_message = await resolve_chat_references(
@@ -102,7 +117,6 @@ async def send_message(
     )
 
     trace_id = str(uuid.uuid4())
-    trace_store = getattr(http_request.app.state, "trace_store", None) or TraceStore()
     try:
         await trace_store.start_trace(
             trace_id=trace_id,
@@ -110,8 +124,13 @@ async def send_message(
             project_id=request.project_id,
             root_name="chat_turn",
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Failed to start execution trace (correlation_id=%s, session=%s): %s",
+            get_correlation_id(),
+            request.session_id,
+            exc,
+        )
 
     # Use TurnRunner for consistent handling of all intents, including LLM fallback.
     runner = TurnRunner(
@@ -168,7 +187,7 @@ async def send_message(
     elif result.mode == "awaiting_debate":
         status = "awaiting_debate"
         if result.agent_message is not None and isinstance(result.agent_message.content, dict):
-            _debates[request.session_id] = dict(result.agent_message.content)
+            await _debate_store.save(request.session_id, dict(result.agent_message.content))
 
     return SendMessageResponse(
         response=response_text,
@@ -182,37 +201,32 @@ async def send_message(
     )
 
 
-@router.get("/messages")
-async def get_messages(session_id: str, http_request: Request) -> List[dict]:
+@router.get("/messages", response_model=List[ChatMessage], dependencies=[Depends(require_auth)])
+async def get_messages(session_id: str, http_request: Request) -> List[ChatMessage]:
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     working_memory, _ = await memory_manager.load_session(session_id, "")
-    return [m.model_dump() for m in working_memory.get_recent_messages()]
+    return working_memory.get_recent_messages()
 
 
-@router.get("/sessions")
-async def list_sessions(http_request: Request, project_id: Optional[str] = None) -> List[dict]:
+@router.get("/sessions", response_model=List[ChatSessionSummary], dependencies=[Depends(require_auth)])
+async def list_sessions(http_request: Request, project_id: Optional[str] = None) -> List[ChatSessionSummary]:
     """List persisted chat sessions, optionally filtered by project."""
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     return await memory_manager.list_sessions(project_id=project_id)
 
 
-@router.post("/regenerate", response_model=SendMessageResponse)
+@router.post("/regenerate", response_model=SendMessageResponse, dependencies=[Depends(require_auth)])
 async def regenerate_message(
     request: SendMessageRequest,
     http_request: Request,
+    job_service: JobService = Depends(get_job_service),
+    plan_store: PlanStore = Depends(get_plan_store),
 ):
     """Regenerate the last assistant response for the most recent user message."""
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     working_memory, task_tree = await memory_manager.load_session(
         request.session_id, request.project_id
     )
-
-    job_service: JobService = getattr(
-        http_request.app.state, "job_service", None
-    ) or JobService()
-    plan_store: PlanStore = getattr(
-        http_request.app.state, "plan_store", None
-    ) or PlanStore()
 
     runner = TurnRunner(
         tool_registry=getattr(http_request.app.state, "tool_registry", None),
@@ -265,7 +279,7 @@ async def regenerate_message(
     elif result.mode == "awaiting_debate":
         status = "awaiting_debate"
         if result.agent_message is not None and isinstance(result.agent_message.content, dict):
-            _debates[request.session_id] = dict(result.agent_message.content)
+            await _debate_store.save(request.session_id, dict(result.agent_message.content))
 
     return SendMessageResponse(
         response=response_text,
@@ -279,14 +293,12 @@ async def regenerate_message(
     )
 
 
-@router.post("/hitl/respond", response_model=HITLResponseResponse)
+@router.post("/hitl/respond", response_model=HITLResponseResponse, dependencies=[Depends(require_auth)])
 async def respond_to_hitl(
     request: HITLResponseRequest,
     http_request: Request,
+    job_service: JobService = Depends(get_job_service),
 ):
-    job_service: JobService = getattr(
-        http_request.app.state, "job_service", None
-    ) or JobService()
 
     # Find the job that is currently awaiting human input for this session.
     job = await job_service.get_latest_job(
@@ -355,7 +367,7 @@ async def respond_to_hitl(
     )
 
 
-@router.post("/tool-approval/respond", response_model=ToolApprovalResponseResponse)
+@router.post("/tool-approval/respond", response_model=ToolApprovalResponseResponse, dependencies=[Depends(require_auth)])
 async def respond_to_tool_approval(
     request: ToolApprovalResponseRequest,
     http_request: Request,
@@ -398,15 +410,17 @@ async def respond_to_tool_approval(
     )
 
 
-@router.post("/debate/respond", response_model=DebateResponseResponse)
+@router.post("/debate/respond", response_model=DebateResponseResponse, dependencies=[Depends(require_auth)])
 async def respond_to_debate(
     request: DebateResponseRequest,
     http_request: Request,
+    job_service: JobService = Depends(get_job_service),
+    plan_store: PlanStore = Depends(get_plan_store),
 ):
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     working_memory, _ = await memory_manager.load_session(request.session_id, "")
 
-    debate = _debates.get(request.session_id)
+    debate = await _debate_store.get(request.session_id)
     if debate is None or debate.get("debate_id") != request.debate_id:
         raise HTTPException(status_code=404, detail="Debate not found")
 
@@ -414,13 +428,6 @@ async def respond_to_debate(
     chosen = next((o for o in options if o.get("id") == request.choice_id), None)
     if chosen is None:
         raise HTTPException(status_code=400, detail="Invalid debate choice")
-
-    job_service: JobService = getattr(
-        http_request.app.state, "job_service", None
-    ) or JobService()
-    plan_store: PlanStore = getattr(
-        http_request.app.state, "plan_store", None
-    ) or PlanStore()
 
     project_id = await memory_manager.get_project_id(request.session_id)
     if project_id is None:
@@ -450,6 +457,8 @@ async def respond_to_debate(
             "parameters": request.parameters,
         },
     )
+
+    await _debate_store.delete(request.session_id)
 
     status = "completed"
     if result.mode == "queued":
@@ -482,6 +491,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
     and pushes back the agent reply together with any plot attachments. When
     ``stream`` is true the raw LLM tokens are streamed directly.
     """
+    await require_ws_auth(websocket)
     await websocket.accept()
     memory_manager: MemoryManager = websocket.app.state.memory_manager
     llm_client = getattr(websocket.app.state, "llm_client", None)
@@ -515,6 +525,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                         await websocket.send_json({"type": "token", "token": token})
                     await websocket.send_json({"type": "token", "done": True})
                 except Exception as exc:
+                    logger.warning(
+                        "WebSocket streaming failed (correlation_id=%s, session=%s): %s",
+                        get_correlation_id(),
+                        session_id,
+                        exc,
+                    )
                     await websocket.send_json({"type": "error", "error": str(exc)})
                 continue
 
@@ -577,7 +593,7 @@ class SLAResponse(BaseModel):
     nfcore_pipeline: Optional[str] = None
 
 
-@router.post("/feedback")
+@router.post("/feedback", response_model=FeedbackResponse, dependencies=[Depends(require_auth)])
 async def submit_feedback(
     request: FeedbackRequest,
     http_request: Request,
@@ -592,10 +608,10 @@ async def submit_feedback(
         session_id=session_id,
         comment=request.comment,
     )
-    return {"status": "ok"}
+    return FeedbackResponse(status="ok")
 
 
-@router.post("/sla", response_model=SLAResponse)
+@router.post("/sla", response_model=SLAResponse, dependencies=[Depends(require_auth)])
 async def assess_sla(
     request: SLARequest,
     http_request: Request,

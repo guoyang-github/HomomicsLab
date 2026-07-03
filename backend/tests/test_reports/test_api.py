@@ -4,11 +4,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from homomics_lab.main import app
+from homomics_lab.reports.store import ReportStore
 
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    app.state.report_store = ReportStore()
+    with TestClient(app) as c:
+        yield c
 
 
 class TestReportsAPI:

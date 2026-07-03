@@ -1,0 +1,31 @@
+
+> homomics-lab-frontend@0.1.0-mvp test
+> vitest --run
+
+
+ RUN  v4.1.8 /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/frontend
+
+ ✓ src/stores/planStore.test.ts (7 tests) 5ms
+stdout | src/pwa/serviceWorker.test.ts > serviceWorker > registers the service worker after window load
+Service Worker registered: /
+
+ ✓ src/pwa/serviceWorker.test.ts (3 tests) 5ms
+ ✓ src/hooks/useTheme.test.ts (5 tests) 21ms
+ ✓ src/stores/settingsStore.test.ts (7 tests) 3ms
+ ✓ src/api/collab.test.ts (3 tests) 18ms
+ ✓ src/stores/chatStore.test.ts (4 tests) 3ms
+ ✓ src/stores/taskStore.test.ts (2 tests) 2ms
+ ✓ src/components/chat/HITLRequest.test.tsx (2 tests) 106ms
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ✓ src/components/Figures/FigureWorkbench.test.tsx (3 tests) 155ms
+ ✓ src/stores/projectStore.test.ts (5 tests) 4ms
+
+ Test Files  10 passed (10)
+      Tests  41 passed (41)
+   Start at  17:49:54
+   Duration  15.16s (transform 1.74s, setup 0ms, import 21.93s, tests 324ms, environment 78.94s)
+
+EXIT:0

@@ -91,13 +91,38 @@ class SkillRegistry:
         """Search skills by semantic similarity with scores."""
         return self._semantic.search(query, top_k)
 
+    def remove(self, skill_id: str) -> bool:
+        """Remove a skill from the registry and search index.
+
+        Returns True if the skill existed and was removed.
+        """
+        if skill_id not in self._skills:
+            return False
+        self._skills.pop(skill_id, None)
+        self._semantic.remove(skill_id)
+        return True
+
     def reset(self) -> None:
         self._skills.clear()
         self._semantic = self._create_search_engine()
 
 
-_default_registry = SkillRegistry()
+_default_registry: Optional[SkillRegistry] = None
 
 
 def get_default_registry() -> SkillRegistry:
+    """Return the process-wide default registry, creating it lazily.
+
+    Lazy creation avoids heavy import-time side effects (e.g. loading embedding
+    models) in scripts and tests that do not need the default registry.
+    """
+    global _default_registry
+    if _default_registry is None:
+        _default_registry = SkillRegistry()
     return _default_registry
+
+
+def reset_default_registry() -> None:
+    """Reset the process-wide default registry. Useful in tests."""
+    global _default_registry
+    _default_registry = None

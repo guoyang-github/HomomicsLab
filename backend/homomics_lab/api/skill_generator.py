@@ -40,6 +40,11 @@ class SuggestedSkillResponse(BaseModel):
     keywords: str
 
 
+class ScriptTemplateResponse(BaseModel):
+    tool_type: str
+    template: str
+
+
 @router.post("/generate", response_model=GeneratedSkillResponse)
 async def generate_skill(request: GenerateSkillRequest):
     """Generate a new skill from requirements."""
@@ -81,7 +86,7 @@ async def suggest_skill(request: SuggestSkillRequest):
     return SuggestedSkillResponse(**suggestions)
 
 
-@router.get("/templates/{tool_type}")
+@router.get("/templates/{tool_type}", response_model=ScriptTemplateResponse)
 async def get_script_template(tool_type: str):
     """Get a script template for a given tool type."""
     from homomics_lab.skills.generator.templates import SkillTemplateBuilder

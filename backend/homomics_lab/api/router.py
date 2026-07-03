@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings, reproducibility, knowledge, templates
+from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, results, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings, reproducibility, knowledge, templates
 from .auth import admin_router, auth_router, require_admin, require_analyst_or_admin, require_auth
 from .rate_limit import rate_limit_dependency
 
@@ -19,8 +19,8 @@ api_router.include_router(health.router, tags=["health"])
 # Authentication endpoints are public by design.
 api_router.include_router(auth_router)
 
-# Admin-only placeholder router.
-api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
+# Admin-only placeholder router (admin_router already declares /admin prefix).
+api_router.include_router(admin_router, tags=["admin"])
 
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(collab.router, prefix="/collab", tags=["collaboration"])
@@ -43,3 +43,4 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(reproducibility.router, prefix="/reproducibility", tags=["reproducibility"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"], dependencies=_PROTECTED_DEPS)
+api_router.include_router(results.router, prefix="/results", tags=["results"], dependencies=_PROTECTED_DEPS)

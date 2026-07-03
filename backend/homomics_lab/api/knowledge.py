@@ -3,12 +3,16 @@
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from homomics_lab.api.auth import get_current_user
 from homomics_lab.config import settings
+from homomics_lab.database.connection import get_async_session
 from homomics_lab.knowledge.ingestion import CognifyOptions, KnowledgeIndex
 from homomics_lab.knowledge.ingestion.models import IngestionResult
+from homomics_lab.projects.permissions import require_project_permission
 from homomics_lab.security import validate_project_id
 
 router = APIRouter()
@@ -37,6 +41,13 @@ class SearchResponse(BaseModel):
     results: List[Dict[str, Any]]
 
 
+class CognifyProjectResponse(BaseModel):
+    project_id: str
+    processed: int
+    errors: List[str]
+    documents: List[Dict[str, Any]]
+
+
 def _get_knowledge_index(request: Request) -> Optional[KnowledgeIndex]:
     return getattr(request.app.state, "knowledge_index", None)
 
@@ -63,13 +74,19 @@ def _build_options(payload: Optional[Dict[str, Any]]) -> CognifyOptions:
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest(request: Request, body: IngestRequest):
+async def ingest(
+    request: Request,
+    body: IngestRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
     """Ingest a file path, URL or inline text into the knowledge graph."""
     index = _get_knowledge_index(request)
     if index is None:
         raise HTTPException(status_code=503, detail="Knowledge index is not available")
 
     project_id = _validate_project(body.project_id)
+    await require_project_permission(project_id, "write", db, user_id)
     options = _build_options(body.options)
 
     try:
@@ -92,6 +109,8 @@ async def ingest_upload(
     file: UploadFile = File(...),
     project_id: str = Form("default"),
     options: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     """Upload a file and ingest it into the knowledge graph."""
     index = _get_knowledge_index(request)
@@ -99,6 +118,7 @@ async def ingest_upload(
         raise HTTPException(status_code=503, detail="Knowledge index is not available")
 
     project_id = _validate_project(project_id)
+    await require_project_permission(project_id, "write", db, user_id)
     content = await file.read()
     max_bytes = settings.max_upload_file_bytes
     if len(content) > max_bytes:
@@ -124,14 +144,20 @@ async def ingest_upload(
     return _result_to_response(result)
 
 
-@router.post("/cognify-project")
-async def cognify_project(request: Request, project_id: str):
+@router.post("/cognify-project", response_model=CognifyProjectResponse)
+async def cognify_project(
+    request: Request,
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
     """Ingest all supported files in a project directory."""
     index = _get_knowledge_index(request)
     if index is None:
         raise HTTPException(status_code=503, detail="Knowledge index is not available")
 
     project_id = _validate_project(project_id)
+    await require_project_permission(project_id, "write", db, user_id)
     project_dir = settings.data_dir / "raw" / project_id
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail="Project directory not found")
@@ -189,6 +215,8 @@ async def search(
     project_id: Optional[str] = None,
     type: Literal["chunk", "entity"] = "chunk",
     top_k: int = 5,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
 ):
     """Semantic search over ingested knowledge chunks."""
     index = _get_knowledge_index(request)
@@ -198,15 +226,18 @@ async def search(
     if type != "chunk":
         raise HTTPException(status_code=400, detail="Only chunk search is implemented")
 
+    validated_project_id = _validate_project(project_id)
+    await require_project_permission(validated_project_id, "read", db, user_id)
+
     try:
-        results = await index.search_chunks(q, project_id=project_id, top_k=top_k)
+        results = await index.search_chunks(q, project_id=validated_project_id, top_k=top_k)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return SearchResponse(results=results)
 
 
-@router.get("/documents/{document_id}")
+@router.get("/documents/{document_id}", response_model=Dict[str, Any])
 async def get_document(request: Request, document_id: str):
     """Return the graph context for a specific document."""
     index = _get_knowledge_index(request)

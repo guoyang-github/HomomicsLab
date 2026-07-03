@@ -26,6 +26,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@/components/ui'
+import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { toastSuccess, toastError } from '@/stores/toastStore'
 import { useTranslation } from '@/i18n'
@@ -94,6 +95,7 @@ function apiKeyPlaceholder(provider: string): string {
 export function SettingsPanel() {
   const { t } = useTranslation()
   const settings = useSettingsStore()
+  const auth = useAuthStore()
   const [activeTab, setActiveTab] = useState('model')
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -488,6 +490,19 @@ export function SettingsPanel() {
                     options={languageOptions}
                     onChange={(e) => {
                       settings.setLocale(e.target.value as 'en' | 'zh')
+                      handleChange()
+                    }}
+                  />
+                </div>
+                <div className="space-y-2 rounded-lg border border-border p-4">
+                  <label className="text-sm font-medium">{t('settings.general.authToken')}</label>
+                  <p className="text-sm text-muted-foreground">{t('settings.general.authTokenDesc')}</p>
+                  <Input
+                    type="password"
+                    value={auth.token}
+                    placeholder={t('settings.general.authTokenHint')}
+                    onChange={(e) => {
+                      auth.setToken(e.target.value)
                       handleChange()
                     }}
                   />

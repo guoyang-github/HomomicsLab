@@ -61,7 +61,7 @@ services:
       - /app/gunicorn.conf.py
     environment:
       - HOMOMICS_DEBUG=false
-      - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
+      - HOMOMICS_EXTERNAL_SKILLS_DIRS=/app/external_skills
       - HOMOMICS_DATABASE_URL=postgresql+asyncpg://homomics:homomics@postgres:5432/homics_lab
       - HOMOMICS_SESSION_STORE_URL=postgresql+asyncpg://homomics:homomics@postgres:5432/homics_lab
       - HOMOMICS_QUEUE_BACKEND=redis
@@ -78,11 +78,16 @@ services:
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro
+      - ./skills:/app/skills
       # Mount the host Docker socket so the backend can launch sibling sandbox containers.
       - /var/run/docker.sock:/var/run/docker.sock
-    # Run as root so the container process can access the Docker socket.
-    # In a locked-down environment, use group_add with the host docker GID instead.
-    user: "0:0"
+    # Run as the non-root ``homomics`` user from the image.  Access to the host
+    # Docker socket is granted by adding the host's docker group (set DOCKER_GID
+    # in a .env file, e.g. DOCKER_GID=$(getent group docker | cut -d: -f3)).
+    group_add:
+      - "${DOCKER_GID:-999}"
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health/live')\""]
       interval: 15s
@@ -105,7 +110,7 @@ services:
     command: ["homomics-worker"]
     environment:
       - HOMOMICS_DEBUG=false
-      - HOMOMICS_EXTERNAL_SKILLS_DIR=/app/external_skills
+      - HOMOMICS_EXTERNAL_SKILLS_DIRS=/app/external_skills
       - HOMOMICS_DATABASE_URL=postgresql+asyncpg://homomics:homomics@postgres:5432/homics_lab
       - HOMOMICS_SESSION_STORE_URL=postgresql+asyncpg://homomics:homomics@postgres:5432/homics_lab
       - HOMOMICS_QUEUE_BACKEND=redis
@@ -120,8 +125,12 @@ services:
     volumes:
       - ./data:/app/data
       - ./external_skills:/app/external_skills:ro
+      - ./skills:/app/skills
       - /var/run/docker.sock:/var/run/docker.sock
-    user: "0:0"
+    group_add:
+      - "${DOCKER_GID:-999}"
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q homomics-worker"]
       interval: 15s

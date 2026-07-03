@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import json
 import re
@@ -59,6 +59,11 @@ class RenderRequest(BaseModel):
     params: Dict[str, Any]
 
 
+class PlotTypeInfo(BaseModel):
+    type: str
+    description: str
+
+
 @router.post("/plot", response_model=PlotResponse)
 async def generate_plot(request: PlotRequest):
     """Generate a bioinformatics plot and return as base64 PNG."""
@@ -108,7 +113,7 @@ async def generate_plot_data(request: PlotDataRequest):
         raise HTTPException(status_code=500, detail=f"Plot data generation failed: {str(e)}")
 
 
-@router.get("/plot/types")
+@router.get("/plot/types", response_model=List[PlotTypeInfo])
 async def list_plot_types():
     """List available plot types."""
     return [
@@ -263,7 +268,7 @@ async def _apply_vision_edit(
     return params
 
 
-@router.post("/sessions")
+@router.post("/sessions", response_model=Dict[str, Any])
 async def create_session(
     request: CreateVizSessionRequest,
     http_request: Request,
@@ -295,7 +300,7 @@ async def create_session(
     return {"session_id": session_id, **result}
 
 
-@router.post("/sessions/{session_id}/render")
+@router.post("/sessions/{session_id}/render", response_model=Dict[str, Any])
 async def render(
     session_id: str,
     request: RenderRequest,

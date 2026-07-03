@@ -120,3 +120,20 @@ class TestDataStore:
         artifacts = store.list_artifacts()
         assert len(artifacts) == 1  # only the DataFrame is offloaded
         assert all(str(p).endswith(".parquet") for p in artifacts)
+
+    def test_zarr_array_offloaded(self, store):
+        zarr = pytest.importorskip("zarr")
+        arr = zarr.zeros(shape=(10, 20), chunks=(5, 5), dtype="float32")
+        arr[:] = 1.0
+
+        ref = store.store("task_zarr", arr)
+        assert ref.inline is False
+        assert ref.format == "zarr"
+        assert ref.path is not None
+        assert Path(ref.path).exists()
+        assert Path(ref.path).is_dir()
+
+        loaded = store.load(ref)
+        assert isinstance(loaded, zarr.Array)
+        assert loaded.shape == (10, 20)
+        np.testing.assert_array_equal(loaded[:], arr[:])

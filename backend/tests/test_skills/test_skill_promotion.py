@@ -26,8 +26,8 @@ def test_create_package_generates_skill_files(codeact_workdir):
     package_dir = promoter.create_package(codeact_workdir)
 
     assert (package_dir / "SKILL.md").exists()
-    assert (package_dir / "scripts" / "main.py").exists()
-    assert "scanpy" in (package_dir / "scripts" / "main.py").read_text()
+    assert (package_dir / "scripts" / "run.py").exists()
+    assert "scanpy" in (package_dir / "scripts" / "run.py").read_text()
 
 
 def test_promote_registers_skill(codeact_workdir):

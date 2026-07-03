@@ -7,7 +7,6 @@ tools, skills, and domain registry.
 
 import inspect
 import logging
-import shutil
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -197,14 +196,16 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     )
 
     print("[bootstrap] creating skill store...")
-    # SkillStore manages skill lifecycle (import / enable / disable / lock)
+    # SkillStore manages skill lifecycle (import / enable / disable / lock).
+    # skills_dir is the canonical runtime source directory: imported skills are
+    # copied here, and drop-in skills are registered in place.
     skill_store = SkillStore(
         registry=skill_executor.registry,
         store_dir=settings.data_dir / "skill_store",
+        skills_dir=settings.skills_dir,
     )
 
     print("[bootstrap] registering builtin skills...")
-    # Register builtin skills through SkillStore
     register_builtin_skills(skill_executor)
     for skill in list(skill_executor.registry.list_all()):
         skill_store._record_meta(
@@ -215,36 +216,36 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
             enabled=True,
         )
 
-    print("[bootstrap] importing external skills...")
-    # Import external skill directories into the canonical skill store path.
-    # Each skill subdirectory is copied to data/skill_store/imported/<namespace>/
-    # so the runtime no longer depends on the original external location.
     discovery_loader = SkillLoader(registry=skill_executor.registry)
     auto_trusted_dirs = _discover_external_skill_dirs()
     external_dirs = settings.external_skills_dirs or auto_trusted_dirs
 
-    # Normalize collection folder names to clean namespaces and remove stale
-    # imported directories (e.g. old "external" or renamed collections).
-    # Preserve locally-bundled skills shipped under data/skill_store/imported/<namespace>/.
-    expected_namespaces = {
-        _namespace_for_external_dir(d) for d in external_dirs if d.exists()
-    }
-    local_namespaces: set[str] = set()
-    if skill_store.imported_dir.exists():
-        for ns_dir in skill_store.imported_dir.iterdir():
-            if not ns_dir.is_dir():
+    # Ensure the user drop-in directory exists.
+    settings.skills_dir.mkdir(parents=True, exist_ok=True)
+
+    print("[bootstrap] importing user drop-in skills...")
+    # Register skills placed directly under ./skills/ in place (no copy).
+    for skill_path in settings.skills_dir.iterdir():
+        if not skill_path.is_dir():
+            continue
+        if not (skill_path / "SKILL.md").exists():
+            continue
+        try:
+            preview = discovery_loader.load_discovery(skill_path)
+            if skill_executor.registry.get(preview.id) is not None:
                 continue
-            for maybe_skill in ns_dir.iterdir():
-                if maybe_skill.is_dir() and (maybe_skill / "SKILL.md").exists():
-                    local_namespaces.add(ns_dir.name)
-                    break
-    expected_namespaces |= local_namespaces
+            skill = skill_store.register_dropin(
+                source_dir=skill_path,
+                namespace="user",
+                enable=True,
+            )
+            skill_executor.register_skill(skill)
+            print(f"Registered user skill: {skill.id}")
+        except Exception as exc:
+            print(f"Warning: Failed to register user skill from {skill_path}: {exc}")
 
-    if skill_store.imported_dir.exists():
-        for subdir in skill_store.imported_dir.iterdir():
-            if subdir.is_dir() and subdir.name not in expected_namespaces:
-                shutil.rmtree(subdir)
-
+    print("[bootstrap] importing external skills...")
+    # Copy external skill collections into the canonical skills_dir.
     for external_skills_dir in external_dirs:
         if not external_skills_dir.exists():
             continue
@@ -256,16 +257,13 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         for skill_path in external_skills_dir.iterdir():
             if not skill_path.is_dir():
                 continue
-            skill_md = skill_path / "SKILL.md"
-            if not skill_md.exists():
+            if not (skill_path / "SKILL.md").exists():
                 continue
             try:
-                # Peek at the skill at discovery level to check for builtin
-                # collisions before copying; the runtime activates lazily.
                 preview = discovery_loader.load_discovery(skill_path)
+                # Do not override user drop-in or builtin skills.
                 if skill_executor.registry.get(preview.id) is not None:
                     continue
-                # Copy into the canonical skill store and register at discovery level.
                 skill = skill_store.import_skill(
                     source=str(skill_path),
                     namespace=namespace,
@@ -280,37 +278,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 skill_executor.register_skill(skill)
             except Exception as exc:
                 print(f"Warning: Failed to import skill from {skill_path}: {exc}")
-
-    # Register locally-bundled skills (e.g. bio-statistics-visualization) that
-    # are already staged under data/skill_store/imported/<namespace>/.
-    for namespace in local_namespaces:
-        ns_dir = skill_store.imported_dir / namespace
-        if not ns_dir.exists():
-            continue
-        for skill_path in ns_dir.iterdir():
-            if not skill_path.is_dir() or not (skill_path / "SKILL.md").exists():
-                continue
-            try:
-                if skill_executor.registry.get(skill_path.name) is not None:
-                    continue
-                skill = discovery_loader.load_discovery(skill_path)
-                skill.metadata["source"] = "local"
-                skill.metadata["source_dir"] = str(skill_path)
-                skill.metadata["namespace"] = namespace
-                skill.metadata["trusted"] = True
-                skill_store._record_meta(
-                    skill=skill,
-                    namespace=namespace,
-                    source="local",
-                    source_dir=skill_path,
-                    enabled=True,
-                    trusted=True,
-                )
-                skill_executor.register_skill(skill)
-            except Exception as exc:
-                print(
-                    f"Warning: Failed to register local skill from {skill_path}: {exc}"
-                )
 
     # Wrap MCP tools as skills so the planner can orchestrate them
     if mcp_client is not None:
@@ -343,34 +310,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 print(f"Warning: Failed to load domain from {domain_yaml}: {e}")
     print(f"Loaded {len(loaded_domains)} domains: {loaded_domains}")
 
-    # Hot reload watchers (only for the API process)
-    domain_reloader = None
-    skill_reloader = None
-    if enable_hot_reload:
-        domain_reloader = DomainHotReloader(
-            domain_registry=domain_registry,
-            domain_loader=domain_loader,
-        )
-        for domain_yaml in domains_dir.rglob("domain.yaml"):
-            domain_reloader.watch_domain(domain_yaml)
-        await domain_reloader.start()
-
-        for external_skills_dir in external_dirs:
-            if external_skills_dir.exists():
-                if skill_reloader is None:
-                    skill_reloader = SkillHotReloader(
-                        skill_registry=skill_executor.registry,
-                    )
-                skill_reloader.watch_skills_directory(external_skills_dir)
-        if skill_reloader is not None:
-            await skill_reloader.start()
-
-    # Session / memory management
-    session_store = create_session_store_from_settings()
-    await session_store.init()
-
-    semantic_memory = create_semantic_memory(settings)
-
     # Shared embedding/vector/graph backends so that CapabilityIndex and
     # KnowledgeIndex do not duplicate or double-close resources.
     try:
@@ -394,6 +333,46 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         vector_store=shared_vector_store,
         graph_backend=shared_graph_backend,
     )
+
+    # Hot reload watchers (only for the API process)
+    domain_reloader = None
+    skill_reloader = None
+    if enable_hot_reload:
+        domain_reloader = DomainHotReloader(
+            domain_registry=domain_registry,
+            domain_loader=domain_loader,
+        )
+        for domain_yaml in domains_dir.rglob("domain.yaml"):
+            domain_reloader.watch_domain(domain_yaml)
+        await domain_reloader.start()
+
+        for external_skills_dir in external_dirs:
+            if external_skills_dir.exists():
+                if skill_reloader is None:
+                    skill_reloader = SkillHotReloader(
+                        skill_registry=skill_executor.registry,
+                        skill_store=skill_store,
+                        capability_index=capability_index,
+                    )
+                skill_reloader.watch_skills_directory(external_skills_dir)
+        if settings.skills_dir.exists():
+            if skill_reloader is None:
+                skill_reloader = SkillHotReloader(
+                    skill_registry=skill_executor.registry,
+                    skill_store=skill_store,
+                    capability_index=capability_index,
+                )
+            skill_reloader.watch_skills_directory(settings.skills_dir)
+        if skill_reloader is not None:
+            await skill_reloader.start()
+
+    # Session / memory management
+    session_store = create_session_store_from_settings()
+    await session_store.init()
+
+    semantic_memory = create_semantic_memory(settings)
+
+    # Populate the capability index with all current skills, tools, and SOPs.
     try:
         for skill in skill_executor.registry.list_all():
             try:

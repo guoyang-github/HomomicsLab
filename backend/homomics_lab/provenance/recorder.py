@@ -170,6 +170,7 @@ class ProvenanceRecorder:
             skill_version=data["skill_version"],
             project_id=data.get("project_id"),
             session_id=data.get("session_id"),
+            parameters=data.get("parameters", {}),
             input_files=[FileRecord(**f) for f in data.get("input_files", [])],
             output_files=[FileRecord(**f) for f in data.get("output_files", [])],
             sandbox_backend=data.get("sandbox_backend", ""),

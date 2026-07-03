@@ -9,7 +9,14 @@ from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.skill_store import SkillStore
 
 SKILL_ID = "bio-statistics-visualization"
-SKILL_DIR = Path(__file__).parents[2] / "data" / "skill_store" / "imported" / "local" / "bio-statistics-visualization"
+SKILL_DIR = (
+    Path(__file__).parents[2]
+    / "data"
+    / "skill_store"
+    / "imported"
+    / "local"
+    / "bio-statistics-visualization"
+)
 SKILL_DIR = SKILL_DIR.resolve()
 
 pytestmark = pytest.mark.skipif(
@@ -31,7 +38,11 @@ def executor(tmp_path):
 
     registry = SkillRegistry()
     executor = SkillRuntimeExecutor(registry=registry, working_dir=tmp_path)
-    skill_store = SkillStore(registry=registry, store_dir=tmp_path / "skill_store")
+    skill_store = SkillStore(
+        registry=registry,
+        store_dir=tmp_path / "skill_store",
+        skills_dir=tmp_path / "skills",
+    )
 
     source = str(SKILL_DIR.resolve())
     skill = skill_store.import_skill(source=source, namespace="local", enable=True)

@@ -39,8 +39,12 @@ class AnalysisStrategy:
     fallback_rules: List[Dict[str, str]] = field(default_factory=list)
     phase_transitions: List[Dict[str, str]] = field(default_factory=list)
 
+    def __post_init__(self):
+        self._last_triggered_state_checks: List[Dict[str, Any]] = []
+
     def generate_skeleton(self, data_state: DataState) -> List[Phase]:
         """Generate the base skeleton, applying state-based modifications."""
+        self._last_triggered_state_checks = []
         phases = [
             Phase(
                 phase_type=p.phase_type,
@@ -52,6 +56,14 @@ class AnalysisStrategy:
 
         for check in self.state_checks:
             if check.condition(data_state):
+                self._last_triggered_state_checks.append(
+                    {
+                        "action": check.action,
+                        "target": check.target,
+                        "value": check.value,
+                        "after": check.after,
+                    }
+                )
                 if check.action == "insert":
                     self._insert_phase(phases, check)
                 elif check.action == "skip":
@@ -60,6 +72,10 @@ class AnalysisStrategy:
                     self._modify_param(phases, check)
 
         return phases
+
+    def last_triggered_state_checks(self) -> List[Dict[str, Any]]:
+        """Return the state checks that fired during the last skeleton generation."""
+        return list(self._last_triggered_state_checks)
 
     @staticmethod
     def _insert_phase(phases: List[Phase], check: StateCheck) -> None:

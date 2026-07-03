@@ -85,7 +85,7 @@ def _normalize_base_url(provider: Optional[str], base_url: Optional[str]) -> Opt
     return base_url
 
 
-@router.get("/llm")
+@router.get("/llm", response_model=LLMConfigOut)
 async def get_llm_config() -> LLMConfigOut:
     """Return the currently effective LLM configuration.
 
@@ -95,7 +95,7 @@ async def get_llm_config() -> LLMConfigOut:
     return LLMConfigOut(**config.to_frontend_dict())
 
 
-@router.put("/llm")
+@router.put("/llm", response_model=LLMConfigOut)
 async def update_llm_config(
     request: Request,
     body: LLMConfigUpdate,
@@ -148,7 +148,7 @@ async def update_llm_config(
     return LLMConfigOut(**effective.to_frontend_dict())
 
 
-@router.post("/llm/test")
+@router.post("/llm/test", response_model=TestConnectionOut)
 async def test_llm_connection(
     request: Request,
     body: Optional[LLMConfigUpdate] = None,

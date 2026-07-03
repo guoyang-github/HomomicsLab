@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
+import { useAuthStore } from '@/stores/authStore'
+
 export interface PresenceUser {
   user_id: string
   cursor_x?: number | null
@@ -48,8 +50,13 @@ export function usePresence(projectId: string | null, userId: string) {
       return
     }
 
+    const token = useAuthStore.getState().token
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/api/collab/${projectId}/ws?user_id=${encodeURIComponent(userId)}`
+    const params = new URLSearchParams({ user_id: userId })
+    if (token) {
+      params.set('token', token)
+    }
+    const wsUrl = `${protocol}//${window.location.host}/api/collab/${projectId}/ws?${params.toString()}`
     const socket = new WebSocket(wsUrl)
     socketRef.current = socket
 

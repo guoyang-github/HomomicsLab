@@ -38,7 +38,6 @@ jobs:
       - name: Run ruff
         run: ruff check backend/homomics_lab backend/tests
       - name: Run mypy
-        continue-on-error: true
         run: mypy backend/homomics_lab
 
   backend-docker:

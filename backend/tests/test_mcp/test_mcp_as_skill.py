@@ -58,6 +58,9 @@ async def test_mcp_skill_execution(mcp_skill_registry):
     executor = mcp_skill_registry
     register_mcp_skills(executor, executor.tool_registry)
 
+    skill = executor.registry.get("mcp_uniprot_search")
+    skill.metadata["trusted"] = True
+
     result = await executor.execute(
         "mcp_uniprot_search",
         {"query": "p53", "limit": 3},

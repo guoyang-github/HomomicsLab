@@ -1,6 +1,44 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from homomics_lab.tasks.models import TaskNode, TaskStatus
+
+
+def build_dependencies_from_phase_transitions(
+    task_ids: List[str],
+    phase_transitions: List[Dict[str, Any]],
+) -> Dict[str, List[str]]:
+    """Build task dependency lists from phase transition edges.
+
+    For each transition of type ``followed_by`` (the default) or any other
+    execution-oriented edge, the ``from`` task becomes a dependency of the
+    ``to`` task. ``alternative_to`` and ``parallel_to`` edges are ignored.
+
+    When no transitions apply, a linear chain is returned (each task depends
+    on the previous one in ``task_ids`` order).
+    """
+    incoming: Dict[str, List[str]] = {task_id: [] for task_id in task_ids}
+
+    for transition in phase_transitions or []:
+        edge_type = transition.get("type", "followed_by")
+        if edge_type in ("alternative_to", "parallel_to"):
+            continue
+        from_id = transition.get("from")
+        to_id = transition.get("to")
+        if from_id and to_id and from_id in incoming and to_id in incoming:
+            if from_id not in incoming[to_id]:
+                incoming[to_id].append(from_id)
+
+    # Preserve declared order; only fallback to linear if no edges resolved.
+    if phase_transitions and not any(incoming.values()):
+        for i, task_id in enumerate(task_ids):
+            if i > 0:
+                incoming[task_id].append(task_ids[i - 1])
+    elif not phase_transitions:
+        for i, task_id in enumerate(task_ids):
+            if i > 0:
+                incoming[task_id].append(task_ids[i - 1])
+
+    return incoming
 
 
 class TaskTree(BaseModel):

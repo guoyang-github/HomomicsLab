@@ -8,7 +8,7 @@ from homomics_lab.llm.runtime_config import (
     load_llm_runtime_config,
     save_llm_runtime_config,
 )
-from homomics_lab.secrets import get_secrets_manager, reset_secrets_manager
+from homomics_lab.secrets import reset_secrets_manager
 
 
 @pytest.fixture(autouse=True)

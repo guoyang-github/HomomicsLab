@@ -1,31 +1,42 @@
-.PHONY: install dev test lint format clean lint-frontend format-frontend
+.PHONY: install dev-backend dev-frontend test test-backend test-frontend lint lint-backend lint-frontend format format-backend format-frontend clean
 
 install:
-	cd backend && pip install -e ".[dev]"
+	pip install -e ".[dev,test]"
 	cd frontend && npm install
 
 dev-backend:
-	cd backend && uvicorn homomics_lab.main:app --reload --port 8080
+	uvicorn homomics_lab.main:app --reload --port 8080
 
 dev-frontend:
 	cd frontend && npm run dev
 
+test:
+	pytest backend/tests --import-mode=importlib -q
+
 test-backend:
-	cd backend && pytest -v
+	pytest backend/tests --import-mode=importlib -q
 
 test-frontend:
 	cd frontend && npm test -- --run
 
-lint-backend:
-	cd backend && ruff check .
-	cd backend && mypy homomics_lab
+lint:
+	ruff check backend/homomics_lab backend/tests
+	mypy backend/homomics_lab
+	cd frontend && npx tsc --noEmit
 
-format:
-	cd backend && black .
-	cd backend && ruff check . --fix
+lint-backend:
+	ruff check backend/homomics_lab backend/tests
+	mypy backend/homomics_lab
 
 lint-frontend:
 	cd frontend && npx tsc --noEmit
+
+format:
+	ruff format backend/homomics_lab backend/tests
+	cd frontend && npx prettier --write "src/**/*.{ts,tsx}"
+
+format-backend:
+	ruff format backend/homomics_lab backend/tests
 
 format-frontend:
 	cd frontend && npx prettier --write "src/**/*.{ts,tsx}"

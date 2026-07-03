@@ -1,0 +1,6 @@
+{
+  "key": "5a1f38e8d4f2b6845aeb5df8b4c0c39315801f122b4fcd51bbf0171c4be8ca26",
+  "task": "QC filter single-cell h5ad",
+  "language": "python",
+  "code": "import scanpy as sc\nadata = sc.read_h5ad(\"/tmp/pytest-of-guoyang/pytest-250/test_run_code_act_rule_based_w0/adata.h5ad\")\nprint(f\"Loaded {adata.n_obs} cells x {adata.n_vars} genes\")\nresult = {\"cells\": int(adata.n_obs), \"genes\": int(adata.n_vars), \"output_path\": \"/tmp/pytest-of-guoyang/pytest-250/test_run_code_act_rule_based_w0/adata.h5ad\"}\n"
+}

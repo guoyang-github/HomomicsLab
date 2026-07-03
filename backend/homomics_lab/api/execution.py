@@ -1,21 +1,65 @@
 """Execution monitoring endpoints (SSE + Nextflow webhook)."""
 
 import asyncio
+import hmac
 import json
-from typing import Any, Dict, Optional
+import logging
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from homomics_lab.api.auth import require_analyst_or_admin, require_auth
+from homomics_lab.api.deps import (
+    get_execution_pubsub,
+    get_job_service,
+    get_trace_store,
+)
 from homomics_lab.api.rate_limit import rate_limit_dependency
+from homomics_lab.api.responses import StatusResponse
+from homomics_lab.config import settings
 
-from homomics_lab.hpc.pubsub import get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs import JobService
-from homomics_lab.observability.trace_store import TraceStore
+from homomics_lab.observability.trace_store import ExecutionTrace, TraceStore
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["execution"])
+
+
+class _TaskProgress(BaseModel):
+    total: int
+    pending: int
+    running: int
+    completed: int
+    failed: int
+    awaiting_human: int
+    percent: int
+
+
+class _ExecutionStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    mode: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    error_message: Optional[str] = None
+    latest_state: Optional[Dict[str, Any]] = None
+
+
+class _ExecutionTasksResponse(BaseModel):
+    job_id: str
+    status: str
+    tasks: List[Dict[str, Any]] = Field(default_factory=list)
+    progress: _TaskProgress
+
+
+class _CancelJobResponse(BaseModel):
+    job_id: str
+    status: str
+    cancelled: bool
 
 
 def _format_sse(data: str, event: Optional[str] = None) -> str:
@@ -31,16 +75,15 @@ def _format_sse(data: str, event: Optional[str] = None) -> str:
 
 @router.get(
     "/{job_id}/status",
+    response_model=_ExecutionStatusResponse,
     dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
 )
 async def execution_status(
     job_id: str,
     request: Request,
+    job_service: JobService = Depends(get_job_service),
 ) -> Dict[str, Any]:
     """Return the current status of a background job."""
-    job_service: JobService = getattr(
-        request.app.state, "job_service", None
-    ) or JobService()
     job = await job_service.get_job(job_id)
     if job is None:
         return {"job_id": job_id, "status": "not_found"}
@@ -59,16 +102,15 @@ async def execution_status(
 
 @router.get(
     "/{job_id}/tasks",
+    response_model=_ExecutionTasksResponse,
     dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
 )
 async def execution_tasks(
     job_id: str,
     request: Request,
+    job_service: JobService = Depends(get_job_service),
 ) -> Dict[str, Any]:
     """Return the current task tree snapshot for a background job."""
-    job_service: JobService = getattr(
-        request.app.state, "job_service", None
-    ) or JobService()
     job = await job_service.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
@@ -97,7 +139,6 @@ def _job_progress(tree: Optional[Any]) -> Dict[str, Any]:
             "awaiting_human": 0,
             "percent": 0,
         }
-    from homomics_lab.tasks.models import TaskStatus
 
     counts = {
         "pending": 0,
@@ -117,16 +158,15 @@ def _job_progress(tree: Optional[Any]) -> Dict[str, Any]:
 
 @router.post(
     "/{job_id}/cancel",
+    response_model=_CancelJobResponse,
     dependencies=[Depends(rate_limit_dependency), Depends(require_analyst_or_admin)],
 )
 async def cancel_job(
     job_id: str,
     request: Request,
+    job_service: JobService = Depends(get_job_service),
 ) -> Dict[str, Any]:
     """Cancel a queued or running background job."""
-    job_service: JobService = getattr(
-        request.app.state, "job_service", None
-    ) or JobService()
     job = await job_service.cancel_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
@@ -139,14 +179,16 @@ async def cancel_job(
 
 @router.get(
     "/{job_id}/trace",
+    response_model=ExecutionTrace,
     dependencies=[Depends(rate_limit_dependency), Depends(require_auth)],
 )
 async def get_job_trace(
     job_id: str,
     request: Request,
+    trace_store: TraceStore = Depends(get_trace_store),
 ) -> Dict[str, Any]:
     """Return the persisted execution trace for a job."""
-    trace = await TraceStore().get_trace(job_id)
+    trace = await trace_store.get_trace(job_id)
     if trace is None:
         raise HTTPException(status_code=404, detail=f"Trace for job '{job_id}' not found")
     return trace.model_dump(mode="json")
@@ -159,9 +201,9 @@ async def get_job_trace(
 async def execution_events(
     job_id: str,
     request: Request,
+    pubsub=Depends(get_execution_pubsub),
 ) -> StreamingResponse:
     """Stream execution state updates for a job via SSE."""
-    pubsub = getattr(request.app.state, "execution_pubsub", None) or get_default_pubsub()
     latest = await pubsub.latest(job_id)
 
     async def event_stream():
@@ -197,13 +239,37 @@ async def execution_events(
     )
 
 
-@router.post("/webhook/nextflow")
+@router.post("/webhook/nextflow", response_model=StatusResponse)
 async def nextflow_webhook(
     payload: Dict[str, Any],
     request: Request,
+    x_nextflow_webhook_secret: Optional[str] = Header(None, alias="X-Nextflow-Webhook-Secret"),
+    pubsub=Depends(get_execution_pubsub),
 ) -> Dict[str, str]:
-    """Receive Nextflow weblog events and forward them to the pubsub bus."""
-    pubsub = getattr(request.app.state, "execution_pubsub", None) or get_default_pubsub()
+    """Receive Nextflow weblog events and forward them to the pubsub bus.
+
+    When ``settings.auth_enabled`` is true or ``nextflow_webhook_secret`` is set,
+    the request must include the ``X-Nextflow-Webhook-Secret`` header and its value
+    must match the configured secret. This prevents external actors from forging
+    execution state updates.
+    """
+    secret = settings.nextflow_webhook_secret
+    if secret:
+        if x_nextflow_webhook_secret is None:
+            raise HTTPException(status_code=401, detail="Missing X-Nextflow-Webhook-Secret header")
+        if not hmac.compare_digest(x_nextflow_webhook_secret, secret):
+            raise HTTPException(status_code=403, detail="Invalid Nextflow webhook secret")
+    elif settings.auth_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="Nextflow webhook secret is not configured. Set HOMOMICS_NEXTFLOW_WEBHOOK_SECRET.",
+        )
+    else:
+        logger.warning(
+            "Accepting unauthenticated Nextflow webhook; configure HOMOMICS_NEXTFLOW_WEBHOOK_SECRET in production."
+        )
+
+    pubsub = request.app.state.execution_pubsub
 
     run_name = payload.get("runName") or payload.get("runId") or "unknown"
     event = payload.get("event", "UNKNOWN")

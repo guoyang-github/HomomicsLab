@@ -216,7 +216,7 @@ class LocalScheduler(BaseScheduler):
         safety_result = scanner.scan(code, language=exec_type)
         hitl_required = (
             settings.interactive_mode
-            and requires_hitl(safety_result, min_risk_level=settings.code_act_hitl_risk_level)
+            and requires_hitl(safety_result, min_risk_level=settings.codeact_hitl_level)
         )
         if safety_result.risk_level == "critical":
             return {

@@ -1,6 +1,7 @@
 """Tests for SkillStore."""
 
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -42,7 +43,10 @@ Test skill.
 
 @pytest.fixture
 def store(tmp_path):
-    return SkillStore(store_dir=tmp_path / "skill_store")
+    return SkillStore(
+        store_dir=tmp_path / "skill_store",
+        skills_dir=tmp_path / "skills",
+    )
 
 
 class TestSkillStoreImport:
@@ -84,17 +88,21 @@ class TestSkillStoreQuery:
         store.import_skill(str(sample_skill_dir), namespace="ns1")
         store.import_skill(str(sample_skill_dir), namespace="ns2", enable=False)
 
+        # Default listing includes both enabled and disabled, de-duplicated by id.
         all_skills = store.list_skills()
         assert len(all_skills) == 1
+        assert all_skills[0].metadata.get("namespace") == "ns1"
 
         ns1 = store.list_skills(namespace="ns1")
         assert len(ns1) == 1
 
+        # Disabled skills are returned unless ``enabled_only=True``.
         ns2 = store.list_skills(namespace="ns2")
-        assert len(ns2) == 0
+        assert len(ns2) == 1
+        assert ns2[0].metadata.get("enabled") is False
 
-        disabled = store.list_skills(namespace="ns2", enabled_only=False)
-        assert len(disabled) == 0  # disabled skills are not in registry
+        enabled_only = store.list_skills(namespace="ns2", enabled_only=True)
+        assert len(enabled_only) == 0
 
     def test_get_skill_namespace_fallback(self, store, sample_skill_dir):
         store.import_skill(str(sample_skill_dir), namespace="custom")
@@ -171,6 +179,28 @@ class TestSkillStoreVersionLock:
         lock.skills["default/bio-test-qc"] = "9.9.9"
         report = store.verify_lock(lock)
         assert report.valid is False
+
+
+class TestSkillStoreDropin:
+    def test_register_dropin_does_not_copy(self, store, sample_skill_dir):
+        skill = store.register_dropin(sample_skill_dir, namespace="user")
+
+        assert skill.id == "bio-test-qc"
+        assert skill.metadata["source"] == "dropin"
+        assert skill.metadata["trusted"] is False
+        assert store.get_meta("bio-test-qc", "user")["source_dir"] == str(
+            sample_skill_dir.resolve()
+        )
+
+    def test_remove_skill_deletes_managed_dir(self, store, sample_skill_dir):
+        skill = store.import_skill(str(sample_skill_dir))
+        target_dir = Path(skill.metadata["source_dir"])
+        assert target_dir.exists()
+
+        store.remove_skill("bio-test-qc")
+
+        assert not target_dir.exists()
+        assert store.get_meta("bio-test-qc") is None
 
 
 class TestSkillStoreZipImport:

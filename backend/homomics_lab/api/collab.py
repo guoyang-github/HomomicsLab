@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
+from homomics_lab.api.auth import require_ws_auth
+
 router = APIRouter()
 
 
@@ -116,6 +118,7 @@ async def collab_websocket(websocket: WebSocket, project_id: str):
         {"type": "cursor", "cursor_x": 120, "cursor_y": 340}
         {"type": "editing", "editing": true}
     """
+    await require_ws_auth(websocket)
     query_params = dict(websocket.query_params)
     user_id = query_params.get("user_id") or "anonymous"
     await websocket.accept()

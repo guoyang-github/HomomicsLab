@@ -41,8 +41,13 @@ class UserPreferenceStore:
                 importance REAL NOT NULL DEFAULT 0.5,
                 context_hash TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                UNIQUE(project_id, scope_type, scope_id, key)
             )
+        """)
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_prefs_unique
+            ON user_preferences(project_id, scope_type, scope_id, key)
         """)
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_prefs_project_scope

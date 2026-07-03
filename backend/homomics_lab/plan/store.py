@@ -11,7 +11,10 @@ from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.database.connection import AsyncSessionLocal
 from homomics_lab.database.models import PlanRecord, PlanTemplateRecord
 from homomics_lab.tasks.models import TaskNode
-from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.task_tree import (
+    TaskTree,
+    build_dependencies_from_phase_transitions,
+)
 
 from .models import Plan, PlanModification, PlanStatus
 from .modifier import PlanModifier
@@ -358,6 +361,10 @@ class PlanStore:
         if record is None:
             raise ValueError(f"Template {template_id} not found")
         plan_result = PlanResult.from_dict(json.loads(record.plan_result_json))
+        task_ids = [phase.phase_type for phase in plan_result.phases]
+        incoming = build_dependencies_from_phase_transitions(
+            task_ids, plan_result.phase_transitions
+        )
         task_tree = TaskTree(
             tasks=[
                 TaskNode(
@@ -369,7 +376,9 @@ class PlanStore:
                     if phase.selected_skill is not None
                     else [],
                     parameters=phase.parameters,
-                    dependencies=[],
+                    dependencies=list(
+                        dict.fromkeys(incoming.get(phase.phase_type, []))
+                    ),
                 )
                 for phase in plan_result.phases
             ]

@@ -2,7 +2,9 @@
 
 import argparse
 import sys
+import traceback
 
+from homomics_lab.logging_config import configure_logging
 from homomics_lab.cli.commands.init import init_domain
 from homomics_lab.cli.commands.validate import validate_domain
 from homomics_lab.cli.commands.install import install_domain
@@ -21,6 +23,12 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="homomics",
         description="HomomicsLab CLI - Manage bioinformatics domains",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output (DEBUG logging and full tracebacks)",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -112,12 +120,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="HomomicsLab domains directory",
         default="./domains",
     )
-    list_parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Show detailed info",
-    )
 
     # trace
     register_trace_parser(subparsers)
@@ -144,6 +146,11 @@ def create_parser() -> argparse.ArgumentParser:
 def main(argv=None):
     parser = create_parser()
     args = parser.parse_args(argv)
+
+    configure_logging(
+        level="DEBUG" if args.verbose else "INFO",
+        json_format=False,
+    )
 
     if args.command is None:
         parser.print_help()
@@ -174,7 +181,10 @@ def main(argv=None):
             return run_export(args)
         return 0
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        if args.verbose:
+            traceback.print_exc()
+        else:
+            print(f"Error: {e}", file=sys.stderr)
         return 1
 
 

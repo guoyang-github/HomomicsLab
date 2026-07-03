@@ -48,11 +48,14 @@ class DataStore:
         # Detect known large object types.
         df = self._as_dataframe(data)
         adata = self._as_anndata(data)
+        zarr_obj = self._as_zarr(data)
 
         if df is not None:
             return self._store_dataframe(task_id, df)
         if adata is not None:
             return self._store_anndata(task_id, adata)
+        if zarr_obj is not None:
+            return self._store_zarr(task_id, zarr_obj)
 
         # Fallback: JSON-serializable object.
         return self._store_json(task_id, data)
@@ -70,6 +73,8 @@ class DataStore:
             return self._read_dataframe(path)
         if ref.format == "h5ad":
             return self._read_anndata(path)
+        if ref.format == "zarr":
+            return self._read_zarr(path)
         if ref.format == "pickle":
             if not settings.allow_pickle_serialization:
                 raise ValueError(
@@ -126,6 +131,24 @@ class DataStore:
         size = path.stat().st_size
         return ResultReference(inline=False, path=str(path), format="h5ad", size=size)
 
+    def _store_zarr(self, task_id: str, zarr_obj) -> ResultReference:
+        # Zarr stores are directories; use a stable directory name under results_dir.
+        path = self.results_dir / f"{task_id}_{uuid.uuid4().hex[:8]}.zarr"
+        if path.exists():
+            import shutil
+
+            shutil.rmtree(path)
+        if hasattr(zarr_obj, "copy"):
+            zarr_obj.copy(path)
+        else:
+            # Fallback: create a new array/group from the object.
+            import zarr as _zarr
+
+            arr = _zarr.open_array(path, mode="w", shape=zarr_obj.shape, dtype=zarr_obj.dtype)
+            arr[:] = zarr_obj[:]
+        size = sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+        return ResultReference(inline=False, path=str(path), format="zarr", size=size)
+
     def _artifact_path(self, task_id: str, ext: str) -> Path:
         filename = f"{task_id}_{uuid.uuid4().hex[:8]}.{ext}"
         return self.results_dir / filename
@@ -163,6 +186,23 @@ class DataStore:
         import anndata
 
         return anndata.read_h5ad(path)
+
+    @staticmethod
+    def _as_zarr(data: Any):
+        """Return the data if it is a zarr Array or Group, else None."""
+        try:
+            import zarr
+        except ImportError:
+            return None
+        if isinstance(data, (zarr.Array, zarr.Group)):
+            return data
+        return None
+
+    @staticmethod
+    def _read_zarr(path: Path):
+        import zarr
+
+        return zarr.open(str(path), mode="r")
 
     def list_artifacts(self) -> Dict[str, int]:
         """List stored artifact files with sizes."""

@@ -1,19 +1,12 @@
-"""Qdrant vector store backend."""
+"""Qdrant vector store backend.
+
+Qdrant client imports are deferred until this backend is actually instantiated so
+that the package can be imported even when ``qdrant-client`` is not installed.
+"""
 
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
-
-from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    Distance,
-    FieldCondition,
-    Filter,
-    MatchValue,
-    PointIdsList,
-    PointStruct,
-    VectorParams,
-)
 
 from homomics_lab.context.vector_store.base import VectorSearchResult, VectorStoreBackend
 
@@ -27,6 +20,8 @@ class QdrantBackend(VectorStoreBackend):
     """Qdrant-backed vector store. Supports in-memory mode for tests."""
 
     def __init__(self, url: Optional[str] = None, api_key: Optional[str] = None) -> None:
+        from qdrant_client import QdrantClient
+
         if url and url.lower() == ":memory:":
             self.client: QdrantClient = QdrantClient(":memory:")
         elif url:
@@ -35,6 +30,8 @@ class QdrantBackend(VectorStoreBackend):
             self.client = QdrantClient(":memory:")
 
     async def create_collection(self, collection: str, dimension: int) -> None:
+        from qdrant_client.models import Distance, VectorParams
+
         try:
             self.client.create_collection(
                 collection_name=collection,
@@ -52,6 +49,8 @@ class QdrantBackend(VectorStoreBackend):
         embeddings: List[List[float]],
         metadata: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
+        from qdrant_client.models import PointStruct
+
         await self.create_collection(collection, len(embeddings[0]))
         points = []
         for i, doc_id in enumerate(ids):
@@ -108,6 +107,8 @@ class QdrantBackend(VectorStoreBackend):
         return scored[:top_k]
 
     async def delete(self, collection: str, ids: List[str]) -> None:
+        from qdrant_client.models import PointIdsList
+
         self.client.delete(
             collection_name=collection,
             points_selector=PointIdsList(points=[self._to_uuid(i) for i in ids]),
@@ -132,9 +133,11 @@ class QdrantBackend(VectorStoreBackend):
         )
 
     @staticmethod
-    def _build_filter(filters: Optional[Dict[str, Any]]) -> Optional[Filter]:
+    def _build_filter(filters: Optional[Dict[str, Any]]) -> Optional[Any]:
         if not filters:
             return None
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
         conditions = []
         for key, value in filters.items():
             conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))

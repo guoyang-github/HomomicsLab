@@ -36,6 +36,8 @@ def test_get_messages(client):
 
 
 def test_respond_to_debate(client):
+    import asyncio
+
     session_id = "sess_debate_api"
     # Seed a session by sending a message that triggers a debate
     response = client.post("/api/chat/send", json={
@@ -47,7 +49,7 @@ def test_respond_to_debate(client):
 
     # Manually inject debate state for the test
     from homomics_lab.api import chat as chat_api
-    chat_api._debates[session_id] = {
+    asyncio.run(chat_api._debate_store.save(session_id, {
         "debate_id": "debate_1",
         "topic": "请选择您需要的分析类型",
         "options": [
@@ -55,7 +57,7 @@ def test_respond_to_debate(client):
             {"id": "single_cell_analysis", "label": "单细胞分析"},
         ],
         "recommendation": None,
-    }
+    }))
 
     response = client.post("/api/chat/debate/respond", json={
         "session_id": session_id,

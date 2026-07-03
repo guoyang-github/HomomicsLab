@@ -12,6 +12,7 @@ from homomics_lab.agent.plan.models import PlanResult
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
 from homomics_lab.api.auth import require_analyst_or_admin
+from homomics_lab.api.deps import get_job_service, get_plan_store
 from homomics_lab.api.rate_limit import rate_limit_dependency
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.jobs import JobMode, JobService
@@ -29,7 +30,10 @@ from homomics_lab.plan import (
 )
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.tasks.models import TaskNode
-from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.task_tree import (
+    TaskTree,
+    build_dependencies_from_phase_transitions,
+)
 
 router = APIRouter()
 
@@ -76,12 +80,19 @@ class PlanJobResponse(BaseModel):
     job_status: Optional[str] = None
 
 
+class PlanRationaleResponse(BaseModel):
+    plan_id: str
+    strategy_name: str
+    strategy_trace: Dict[str, Any]
+    reproducibility_context: Any
+
+
 def _get_plan_store(request: Request) -> PlanStore:
-    return getattr(request.app.state, "plan_store", None) or PlanStore()
+    return get_plan_store(request)
 
 
 def _get_job_service(request: Request) -> JobService:
-    return getattr(request.app.state, "job_service", None) or JobService()
+    return get_job_service(request)
 
 
 @router.post(
@@ -256,7 +267,7 @@ async def list_session_plans(session_id: str, request: Request):
     return {"plans": [PlanPresenter.to_user_payload(p) for p in plans]}
 
 
-@router.get("/{plan_id}")
+@router.get("/{plan_id}", response_model=Dict[str, Any])
 async def get_plan(plan_id: str, request: Request):
     """Return a human-readable plan payload."""
     plan_store = _get_plan_store(request)
@@ -268,7 +279,7 @@ async def get_plan(plan_id: str, request: Request):
     return PlanPresenter.to_user_payload(plan)
 
 
-@router.get("/{plan_id}/versions")
+@router.get("/{plan_id}/versions", response_model=PlanListResponse)
 async def get_plan_versions(plan_id: str, request: Request):
     """Return the version chain for a plan."""
     plan_store = _get_plan_store(request)
@@ -277,7 +288,7 @@ async def get_plan_versions(plan_id: str, request: Request):
     return {"plans": [PlanPresenter.to_user_payload(p) for p in versions]}
 
 
-@router.get("/{plan_id}/diff")
+@router.get("/{plan_id}/diff", response_model=PlanDiffResponse)
 async def diff_plans(
     plan_id: str,
     request: Request,
@@ -422,14 +433,14 @@ def _get_template_store(http_request: Request) -> AnalysisTemplateStore:
 
 
 def _build_task_tree(plan_result: PlanResult) -> TaskTree:
-    """Convert a PlanResult into a linear TaskTree."""
+    """Convert a PlanResult into a TaskTree using phase transitions."""
+    task_ids = [phase.phase_type for phase in plan_result.phases]
+    incoming = build_dependencies_from_phase_transitions(
+        task_ids, plan_result.phase_transitions
+    )
     tasks: list[TaskNode] = []
-    prev_id: Optional[str] = None
     for phase in plan_result.phases:
         task_id = phase.phase_type
-        dependencies: list[str] = []
-        if prev_id is not None:
-            dependencies.append(prev_id)
         tasks.append(
             TaskNode(
                 id=task_id,
@@ -440,10 +451,9 @@ def _build_task_tree(plan_result: PlanResult) -> TaskTree:
                 if phase.selected_skill is not None
                 else [],
                 parameters=dict(phase.parameters),
-                dependencies=dependencies,
+                dependencies=list(dict.fromkeys(incoming.get(task_id, []))),
             )
         )
-        prev_id = task_id
     return TaskTree(tasks=tasks)
 
 
@@ -459,7 +469,7 @@ def _merge_user_modifications(
             phase.parameters = merged
 
 
-@router.get("/{plan_id}/rationale")
+@router.get("/{plan_id}/rationale", response_model=PlanRationaleResponse)
 async def get_plan_rationale(plan_id: str, http_request: Request):
     """Return the auditable strategy trace for a plan."""
     plan_store = _get_plan_store(http_request)

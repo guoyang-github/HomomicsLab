@@ -35,7 +35,16 @@ class CheckpointOut(BaseModel):
     created_at: str
 
 
-@router.post("/{job_id}/checkpoints")
+class DeleteCheckpointResponse(BaseModel):
+    deleted: bool
+
+
+class ResumeFromCheckpointResponse(BaseModel):
+    new_job_id: str
+    checkpoint_id: str
+
+
+@router.post("/{job_id}/checkpoints", response_model=CheckpointOut)
 async def record_checkpoint(
     job_id: str,
     body: CheckpointCreate,
@@ -52,7 +61,7 @@ async def record_checkpoint(
     return _to_out(cp)
 
 
-@router.get("/{job_id}/checkpoints/latest")
+@router.get("/{job_id}/checkpoints/latest", response_model=CheckpointOut)
 async def get_latest_checkpoint(
     job_id: str,
     status: Optional[str] = None,
@@ -64,7 +73,7 @@ async def get_latest_checkpoint(
     return _to_out(cp)
 
 
-@router.get("/{job_id}/checkpoints")
+@router.get("/{job_id}/checkpoints", response_model=List[CheckpointOut])
 async def list_checkpoints(
     job_id: str,
     task_id: Optional[str] = None,
@@ -76,7 +85,7 @@ async def list_checkpoints(
     return [_to_out(cp) for cp in checkpoints]
 
 
-@router.get("/{job_id}/checkpoints/{checkpoint_id}")
+@router.get("/{job_id}/checkpoints/{checkpoint_id}", response_model=CheckpointOut)
 async def get_checkpoint(
     job_id: str,
     checkpoint_id: str,
@@ -88,24 +97,26 @@ async def get_checkpoint(
     return _to_out(cp)
 
 
-@router.delete("/{job_id}/checkpoints/{checkpoint_id}")
+@router.delete(
+    "/{job_id}/checkpoints/{checkpoint_id}", response_model=DeleteCheckpointResponse
+)
 async def delete_checkpoint(
     job_id: str,
     checkpoint_id: str,
     repo: CheckpointRepository = Depends(get_checkpoint_repository),
-) -> dict:
+) -> DeleteCheckpointResponse:
     cp = repo.get(checkpoint_id)
     if cp is None or cp.job_id != job_id:
         raise HTTPException(status_code=404, detail="Checkpoint not found")
     repo.delete(checkpoint_id)
-    return {"deleted": True}
+    return DeleteCheckpointResponse(deleted=True)
 
 
-@router.post("/{job_id}/resume")
+@router.post("/{job_id}/resume", response_model=ResumeFromCheckpointResponse)
 async def resume_from_checkpoint(
     job_id: str,
     repo: CheckpointRepository = Depends(get_checkpoint_repository),
-) -> dict:
+) -> ResumeFromCheckpointResponse:
     """Enqueue a checkpoint-resume job for the given job_id."""
     from homomics_lab.jobs.service import JobService
 
@@ -120,7 +131,9 @@ async def resume_from_checkpoint(
         checkpoint_payload=cp.payload,
         plan_id=cp.payload.get("plan_id"),
     )
-    return {"new_job_id": new_job.job_id, "checkpoint_id": cp.checkpoint_id}
+    return ResumeFromCheckpointResponse(
+        new_job_id=new_job.job_id, checkpoint_id=cp.checkpoint_id
+    )
 
 
 def _to_out(cp) -> CheckpointOut:

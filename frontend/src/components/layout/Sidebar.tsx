@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { useEffect, useState } from 'react'
 import {
   MessageSquare,
   Workflow,
@@ -50,6 +51,22 @@ interface SidebarProps {
 
 export function Sidebar({ activeItem, onNavigate, collapsed = false }: SidebarProps) {
   const { t } = useTranslation()
+  const [version, setVersion] = useState<string>('')
+
+  useEffect(() => {
+    fetch('/api/health/live')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.version) {
+          setVersion(data.version)
+        }
+      })
+      .catch(() => {
+        // ignore; keep empty fallback
+      })
+  }, [])
+
+  const versionLabel = version ? `v${version}` : 'v0.1'
   return (
     <aside
       className={clsx(
@@ -105,7 +122,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false }: SidebarPr
             collapsed && 'px-2 text-center'
           )}
         >
-          {collapsed ? 'v0.4' : 'HomomicsLab v0.4.2'}
+          {collapsed ? versionLabel : `HomomicsLab ${versionLabel}`}
         </div>
       </div>
     </aside>

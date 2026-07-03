@@ -9,13 +9,17 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="HOMOMICS_")
 
     app_name: str = "HomomicsLab"
+    api_version: str = "v1"
     port: int = 8080
     host: str = "0.0.0.0"
     debug: bool = False
+    openapi_docs_enabled: bool = True
     database_url: str = "sqlite+aiosqlite:///./homomics_lab.db"
     database_pool_size: int = 5
     database_max_overflow: int = 10
     data_dir: Path = Path("./data")
+    # User skill drop-in directory. Skills placed here are auto-imported on
+    # startup (namespace "user"). Can be overridden via HOMOMICS_SKILLS_DIR.
     skills_dir: Path = Path("./skills")
     external_skills_dirs: List[Path] = Field(default_factory=list)
 
@@ -118,6 +122,15 @@ class Settings(BaseSettings):
                 paths.append(item)
         return paths
 
+    @field_validator("allowed_skill_git_urls", mode="before")
+    @classmethod
+    def _parse_allowed_skill_git_urls(cls, v: Any) -> List[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [part.strip() for part in v.split(",") if part.strip()]
+        return [str(item).strip() for item in v if str(item).strip()]
+
     @field_validator("session_store_url")
     @classmethod
     def _validate_session_store_url(cls, v: str) -> str:
@@ -178,6 +191,10 @@ class Settings(BaseSettings):
     # Skill sandbox / security settings
     auto_load_domain_strategies: bool = True
     skill_sandbox_backend: str = "auto"  # "auto" | "local" | "bubblewrap" | "container"
+    # Comma-separated list of allowed git URL prefixes for skill/domain import.
+    # Empty list allows all git URLs (development default). Set this in production
+    # to restrict imports to trusted hosts, e.g. "https://github.com/your-org/".
+    allowed_skill_git_urls: List[str] = Field(default_factory=list)
     skill_container_image: str = "python:3.10-slim"
     r_container_image: str = "r-base:4.3.0"
     skill_container_memory_mb: int = 1024
@@ -200,9 +217,6 @@ class Settings(BaseSettings):
     force_sandbox: bool = (
         True  # if True, shell_exec and CodeAct must run through a sandbox
     )
-    code_act_hitl_risk_level: str = (
-        "high"  # "never" | "low" | "medium" | "high" | "critical"
-    )
     allow_pickle_serialization: bool = (
         False  # if False, DataStore refuses pickle fallback
     )
@@ -210,6 +224,7 @@ class Settings(BaseSettings):
     # Auth / rate limiting (opt-in for local development)
     auth_enabled: bool = False
     api_key: Optional[str] = None  # production single-shared-key or bootstrap key
+    admin_initial_password: Optional[str] = None  # password for the first-boot admin user
 
     # JWT settings (required when auth_enabled=True and no OIDC is configured)
     jwt_secret_key: Optional[str] = None
@@ -357,6 +372,7 @@ class Settings(BaseSettings):
     workflow_cache_enabled: bool = True
     workflow_cache_dir: Optional[Path] = None
     workflow_cache_content_hash_limit: int = 10 * 1024 * 1024  # 10 MB
+    nextflow_webhook_secret: Optional[str] = None  # shared secret for Nextflow weblog callbacks
 
     @model_validator(mode="after")
     def _validate_timeout_bounds(self):

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { settingsApi } from '@/services/api'
+import type { SystemSettingsOut, SystemSettingsUpdate } from '@/types/api'
 
 export type LlmProvider = 'openai' | 'anthropic' | 'azure' | 'moonshot' | 'deepseek' | 'qwen' | 'local' | 'custom'
 export type SandboxBackend = 'subprocess' | 'docker' | 'local'
@@ -101,6 +102,36 @@ const backendToFrontendProvider = (provider: string | null): LlmProvider => {
   return (known.includes(provider as LlmProvider) ? (provider as LlmProvider) : 'custom')
 }
 
+const systemSettingsToPartialState = (
+  server: SystemSettingsOut,
+  state: SettingsState
+): Partial<SettingsState> => ({
+  execution: {
+    ...state.execution,
+    sandboxBackend: server.skill_sandbox_backend as SandboxBackend,
+    timeoutSeconds: server.default_job_timeout_seconds,
+  },
+  search: {
+    ...state.search,
+    embeddingModel: server.semantic_search_model ?? state.search.embeddingModel,
+  },
+  budget: {
+    ...state.budget,
+    perRequestBudget: server.max_llm_cost_per_request_usd ?? state.budget.perRequestBudget,
+    monthlyBudget: server.monthly_budget_usd ?? state.budget.monthlyBudget,
+  },
+  dataRetentionDays: server.session_ttl_days,
+})
+
+const stateToSystemSettingsUpdate = (state: SettingsState): SystemSettingsUpdate => ({
+  skill_sandbox_backend: state.execution.sandboxBackend,
+  default_job_timeout_seconds: state.execution.timeoutSeconds,
+  semantic_search_model: state.search.embeddingModel,
+  max_llm_cost_per_request_usd: state.budget.perRequestBudget,
+  monthly_budget_usd: state.budget.monthlyBudget,
+  session_ttl_days: state.dataRetentionDays,
+})
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
@@ -129,18 +160,22 @@ export const useSettingsStore = create<SettingsState>()(
 
       loadSettings: async () => {
         try {
-          const { data } = await settingsApi.getLlmConfig()
+          const [{ data: llmData }, { data: systemData }] = await Promise.all([
+            settingsApi.getLlmConfig(),
+            settingsApi.getSystemSettings(),
+          ])
           set((state) => ({
             model: {
               ...state.model,
-              provider: backendToFrontendProvider(data.provider),
-              model: data.model || state.model.model,
-              baseUrl: data.base_url || '',
-              temperature: data.temperature,
-              maxTokens: data.max_tokens,
+              provider: backendToFrontendProvider(llmData.provider),
+              model: llmData.model || state.model.model,
+              baseUrl: llmData.base_url || '',
+              temperature: llmData.temperature,
+              maxTokens: llmData.max_tokens,
               // Never overwrite the in-memory API key from server; server returns masked/null.
             },
-            apiKeySet: data.api_key_set,
+            apiKeySet: llmData.api_key_set,
+            ...systemSettingsToPartialState(systemData, state),
             saveError: null,
           }))
         } catch (err: any) {
@@ -152,28 +187,32 @@ export const useSettingsStore = create<SettingsState>()(
         set({ isSaving: true, saveError: null })
         try {
           const state = get()
-          const { data } = await settingsApi.updateLlmConfig({
-            provider: state.model.provider,
-            model: state.model.model,
-            base_url: state.model.baseUrl || undefined,
-            api_key: state.model.apiKey || undefined,
-            temperature: state.model.temperature,
-            max_tokens: state.model.maxTokens,
-          })
+          const [{ data: llmData }, { data: systemData }] = await Promise.all([
+            settingsApi.updateLlmConfig({
+              provider: state.model.provider,
+              model: state.model.model,
+              base_url: state.model.baseUrl || undefined,
+              api_key: state.model.apiKey || undefined,
+              temperature: state.model.temperature,
+              max_tokens: state.model.maxTokens,
+            }),
+            settingsApi.updateSystemSettings(stateToSystemSettingsUpdate(state)),
+          ])
           set((state) => ({
             isSaving: false,
             model: {
               ...state.model,
-              provider: backendToFrontendProvider(data.provider),
-              model: data.model || state.model.model,
-              baseUrl: data.base_url || '',
-              temperature: data.temperature,
-              maxTokens: data.max_tokens,
+              provider: backendToFrontendProvider(llmData.provider),
+              model: llmData.model || state.model.model,
+              baseUrl: llmData.base_url || '',
+              temperature: llmData.temperature,
+              maxTokens: llmData.max_tokens,
               // Keep the key in memory so the user can change other fields
               // (model, temperature, etc.) and save again without re-entering it.
               apiKey: state.model.apiKey,
             },
-            apiKeySet: data.api_key_set,
+            apiKeySet: llmData.api_key_set,
+            ...systemSettingsToPartialState(systemData, state),
             saveError: null,
           }))
           return true

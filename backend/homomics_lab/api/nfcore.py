@@ -1,9 +1,8 @@
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-
-from pathlib import Path
 
 from homomics_lab.config import settings
 from homomics_lab.nfcore_integration import get_nfcore_manager
@@ -29,6 +28,80 @@ class NFCoreRunRequest(BaseModel):
     version: Optional[str] = None
     params: Dict[str, Any] = {}
     profiles: Optional[List[str]] = None
+
+
+class NFCoreDownloadResponse(BaseModel):
+    pipeline: str
+    version: Optional[str]
+    path: str
+
+
+class NFCoreRunResponse(BaseModel):
+    pipeline: str
+    version: Optional[str]
+    pipeline_dir: str
+    params: Dict[str, Any]
+    profiles: List[str]
+    nextflow_cmd: str
+
+
+class NFCoreSuggestResponse(BaseModel):
+    suggestion: Optional[str]
+    message: Optional[str] = None
+
+
+class NFCoreReleasesResponse(BaseModel):
+    pipeline: str
+    releases: List[str]
+
+
+class NFCoreParameterFieldResponse(BaseModel):
+    name: str
+    type: str
+    title: str
+    description: str
+    required: bool
+    default: Optional[Any] = None
+    enum: Optional[List[Any]] = None
+    enum_names: Optional[List[str]] = None
+    help_text: str
+    format: Optional[str] = None
+    hidden: bool
+    group: str
+
+
+class NFCoreSchemaResponse(BaseModel):
+    pipeline: str
+    version: Optional[str]
+    groups: List[str]
+    required_global: List[str]
+    fields: List[NFCoreParameterFieldResponse]
+
+
+class NFCoreValidateResponse(BaseModel):
+    valid: bool
+
+
+class NFCoreProfilesResponse(BaseModel):
+    available: List[str]
+    recommended: List[str]
+    default: List[str]
+
+
+class NFCoreArtifactResponse(BaseModel):
+    artifact_type: str
+    workspace_type: str
+    filename: str
+    path: str
+    description: str
+
+
+class NFCoreIngestResponse(BaseModel):
+    project_id: str
+    output_dir: str
+    task_id: str
+    artifacts: List[NFCoreArtifactResponse]
+    multiqc_summary: Optional[Dict[str, Any]] = None
 
 
 @router.get("/pipelines", response_model=List[NFCorePipelineResponse])
@@ -63,7 +136,7 @@ async def list_nfcore_pipelines(
     ]
 
 
-@router.post("/download/{pipeline}")
+@router.post("/download/{pipeline}", response_model=NFCoreDownloadResponse)
 async def download_nfcore_pipeline(
     pipeline: str,
     version: Optional[str] = None,
@@ -80,7 +153,7 @@ async def download_nfcore_pipeline(
     return {"pipeline": pipeline, "version": version, "path": str(path)}
 
 
-@router.post("/run")
+@router.post("/run", response_model=NFCoreRunResponse)
 async def run_nfcore_pipeline(
     request: NFCoreRunRequest,
 ):
@@ -104,7 +177,7 @@ async def run_nfcore_pipeline(
     return result
 
 
-@router.get("/suggest")
+@router.get("/suggest", response_model=NFCoreSuggestResponse)
 async def suggest_nfcore_pipeline(
     intent: str,
 ):
@@ -118,7 +191,7 @@ async def suggest_nfcore_pipeline(
     return {"suggestion": suggestion}
 
 
-@router.get("/releases/{pipeline}")
+@router.get("/releases/{pipeline}", response_model=NFCoreReleasesResponse)
 async def list_nfcore_releases(
     pipeline: str,
 ):
@@ -134,7 +207,7 @@ async def list_nfcore_releases(
     return {"pipeline": pipeline, "releases": releases}
 
 
-@router.get("/schema/{pipeline}")
+@router.get("/schema/{pipeline}", response_model=NFCoreSchemaResponse)
 async def get_nfcore_schema(
     pipeline: str,
     version: Optional[str] = None,
@@ -158,7 +231,7 @@ class ValidateParamsRequest(BaseModel):
     params: Dict[str, Any] = {}
 
 
-@router.post("/validate")
+@router.post("/validate", response_model=NFCoreValidateResponse)
 async def validate_nfcore_params(
     request: ValidateParamsRequest,
 ):
@@ -178,7 +251,7 @@ async def validate_nfcore_params(
     return {"valid": True}
 
 
-@router.get("/profiles")
+@router.get("/profiles", response_model=NFCoreProfilesResponse)
 async def detect_nfcore_profiles():
     """Detect available container/conda profiles on the host."""
     if not settings.nfcore_enabled:
@@ -199,7 +272,7 @@ class IngestResultsRequest(BaseModel):
     source_task: Optional[str] = None
 
 
-@router.post("/ingest")
+@router.post("/ingest", response_model=NFCoreIngestResponse)
 async def ingest_nfcore_results(request: IngestResultsRequest):
     """Scan an nf-core output directory and register artifacts in a workspace."""
     if not settings.nfcore_enabled:

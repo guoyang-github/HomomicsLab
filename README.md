@@ -2,7 +2,7 @@
 
 A general-purpose agent platform for computational biology that bridges the gap between **rigid bioinformatics pipelines** and **unstructured notebook collections**. HomomicsLab turns natural language research questions into reproducible, auditable, and extensible analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.4.1** — End-to-end analysis automation with single-file domain declarations, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, CBKB auto-curation, multi-layer stability guards, complete reproducibility capture, DataStore offloading for large results, skill result memoization, **CodeAct code caching**, **cross-process tool invocation sandbox**, and a **domain template marketplace**.
+> **v0.5.0** — End-to-end analysis automation with single-file domain declarations, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving skill knowledge graphs, dynamic replanning, CBKB auto-curation, multi-layer stability guards, complete reproducibility capture, DataStore offloading for large results, skill result memoization, **CodeAct code caching**, **cross-process tool invocation sandbox**, and a **domain template marketplace**.
 
 ---
 
@@ -49,7 +49,7 @@ HomomicsLab is best understood as a **production-ready agent framework** with a 
 
 ---
 
-## What's New in v0.4.1
+## What's New in v0.5.0
 
 ### Cross-Process Tool Invocation Sandbox
 - `backend/homomics_lab/tools/invoke_tool.py` provides a uniform protocol for invoking atomic tools across process boundaries.
@@ -262,7 +262,7 @@ HomomicsLab/
 │   │   │   ├── orchestrator.py # Task scheduler with retry & HITL
 │   │   │   ├── evolution.py    # AgentEvolutionEngine
 │   │   │   └── turn_runner.py  # Unified conversational turn loop
-│   │   ├── domain/             # Domain declaration system (v0.4.1)
+│   │   ├── domain/             # Domain declaration system (v0.5.0)
 │   │   │   ├── models.py
 │   │   │   ├── loader.py       # DomainLoader — reads domain.yaml
 │   │   │   ├── registry.py     # DomainRegistry

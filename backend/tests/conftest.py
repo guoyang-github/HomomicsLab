@@ -1,7 +1,6 @@
 """Global pytest configuration for the HomomicsLab backend."""
 
 import os
-from pathlib import Path
 
 import pytest
 

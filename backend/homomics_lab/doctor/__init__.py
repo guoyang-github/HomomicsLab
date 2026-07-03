@@ -15,6 +15,7 @@ Usage:
 """
 
 import asyncio
+import importlib.metadata
 import inspect
 import shutil
 import sys
@@ -198,7 +199,10 @@ class HealthChecker:
         for mod_name, description in optional_deps.items():
             try:
                 mod = __import__(mod_name)
-                versions[description] = getattr(mod, "__version__", "unknown")
+                try:
+                    versions[description] = importlib.metadata.version(mod_name.replace("_", "-"))
+                except importlib.metadata.PackageNotFoundError:
+                    versions[description] = getattr(mod, "__version__", "unknown")
             except ImportError:
                 missing.append(description)
 

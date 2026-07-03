@@ -158,3 +158,69 @@ def is_sandbox_forced() -> bool:
     """Return whether the configuration forces sandboxed execution."""
     # In production we default to forcing sandboxing unless explicitly disabled.
     return getattr(settings, "force_sandbox", True)
+
+
+def validate_git_url(url: str) -> None:
+    """Raise PathSecurityError if the git URL is not in the configured whitelist.
+
+    When ``settings.allowed_skill_git_urls`` is empty, all URLs are allowed and a
+    warning is logged. Otherwise the URL must start with one of the configured
+    prefixes.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    allowed = getattr(settings, "allowed_skill_git_urls", [])
+    if not allowed:
+        logger.warning(
+            "No allowed_skill_git_urls configured; accepting git URL %s. "
+            "Set HOMOMICS_ALLOWED_SKILL_GIT_URLS in production.",
+            url,
+        )
+        return
+
+    for prefix in allowed:
+        if url.startswith(prefix):
+            return
+
+    raise PathSecurityError(
+        f"Git URL '{url}' is not in the configured whitelist. "
+        f"Allowed prefixes: {', '.join(allowed)}"
+    )
+
+
+def safe_extractall(zip_file, extract_dir: Union[str, Path]) -> None:
+    """Extract a zip archive while preventing path traversal attacks.
+
+    Rejects entries that contain ``..`` components, absolute paths, or would
+    resolve outside ``extract_dir``. Raises ``PathSecurityError`` on violation.
+    """
+    from zipfile import ZipFile
+
+    if not isinstance(zip_file, ZipFile):
+        raise TypeError("zip_file must be a zipfile.ZipFile instance")
+
+    target_root = Path(extract_dir).resolve()
+    for member in zip_file.infolist():
+        member_path = Path(member.filename)
+        # Reject absolute paths and parent references.
+        if member_path.is_absolute():
+            raise PathSecurityError(f"Zip entry has absolute path: {member.filename}")
+        if ".." in member_path.parts:
+            raise PathSecurityError(f"Zip entry escapes archive: {member.filename}")
+
+        target_path = (target_root / member_path).resolve()
+        try:
+            target_path.relative_to(target_root)
+        except ValueError as exc:
+            raise PathSecurityError(
+                f"Zip entry escapes extraction directory: {member.filename}"
+            ) from exc
+
+        if member.is_dir():
+            target_path.mkdir(parents=True, exist_ok=True)
+        else:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            with zip_file.open(member) as src, open(target_path, "wb") as dst:
+                dst.write(src.read())

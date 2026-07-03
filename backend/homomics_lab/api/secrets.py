@@ -39,12 +39,16 @@ class SecretValueOut(BaseModel):
     value: str
 
 
-@router.get("/namespaces")
+class SecretDeletedResponse(BaseModel):
+    deleted: bool
+
+
+@router.get("/namespaces", response_model=List[str])
 async def list_namespaces(manager: SecretsManager = Depends(get_secrets_manager)) -> List[str]:
     return manager.list_namespaces()
 
 
-@router.post("/")
+@router.post("/", response_model=SecretOut)
 async def create_secret(
     body: SecretCreate,
     manager: SecretsManager = Depends(get_secrets_manager),
@@ -71,7 +75,7 @@ async def create_secret(
     )
 
 
-@router.get("/{namespace}")
+@router.get("/{namespace}", response_model=List[SecretOut])
 async def list_secrets(
     namespace: str,
     manager: SecretsManager = Depends(get_secrets_manager),
@@ -88,7 +92,7 @@ async def list_secrets(
     ]
 
 
-@router.get("/{namespace}/{key}")
+@router.get("/{namespace}/{key}", response_model=SecretValueOut)
 async def get_secret_value(
     namespace: str,
     key: str,
@@ -101,7 +105,7 @@ async def get_secret_value(
     return SecretValueOut(key=key, namespace=namespace, value=value)
 
 
-@router.put("/{namespace}/{key}")
+@router.put("/{namespace}/{key}", response_model=SecretOut)
 async def update_secret(
     namespace: str,
     key: str,
@@ -125,13 +129,13 @@ async def update_secret(
     )
 
 
-@router.delete("/{namespace}/{key}")
+@router.delete("/{namespace}/{key}", response_model=SecretDeletedResponse)
 async def delete_secret(
     namespace: str,
     key: str,
     manager: SecretsManager = Depends(get_secrets_manager),
-) -> dict:
+) -> SecretDeletedResponse:
     deleted = manager.delete(key, namespace)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Secret '{key}' not found")
-    return {"deleted": True}
+    return SecretDeletedResponse(deleted=True)

@@ -13,7 +13,10 @@ from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 from homomics_lab.tasks.models import TaskNode
-from homomics_lab.tasks.task_tree import TaskTree
+from homomics_lab.tasks.task_tree import (
+    TaskTree,
+    build_dependencies_from_phase_transitions,
+)
 
 
 # Map common sub-intent analysis types to the phase IDs declared in domain
@@ -228,23 +231,12 @@ class TaskDecomposer:
 
         # Build dependencies from phase transitions.
         task_ids_in_order = [t.id for t in tasks]
-        if plan.phase_transitions:
-            incoming: Dict[str, List[str]] = {t.id: [] for t in tasks}
-            for transition in plan.phase_transitions:
-                edge_type = transition.get("type", "followed_by")
-                if edge_type in ("alternative_to", "parallel_to"):
-                    continue
-                from_id = phase_to_task_id.get(transition.get("from", ""))
-                to_id = phase_to_task_id.get(transition.get("to", ""))
-                if from_id and to_id and from_id != to_id:
-                    incoming[to_id].append(from_id)
-            for task in tasks:
-                task.dependencies = list(dict.fromkeys(incoming.get(task.id, [])))
-        else:
-            # No transitions declared: fall back to a linear chain.
-            for i, task in enumerate(tasks):
-                if i > 0:
-                    task.dependencies = [task_ids_in_order[i - 1]]
+        incoming = build_dependencies_from_phase_transitions(
+            task_ids_in_order,
+            plan.phase_transitions,
+        )
+        for task in tasks:
+            task.dependencies = list(dict.fromkeys(incoming.get(task.id, [])))
 
         return TaskTree(tasks)
 

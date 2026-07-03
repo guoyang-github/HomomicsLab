@@ -7,7 +7,7 @@ from httpx import ASGITransport
 
 from homomics_lab.api.execution import router
 from homomics_lab.database import Base, async_engine
-from homomics_lab.jobs import Job, JobMode, JobRepository, JobStatus
+from homomics_lab.jobs import Job, JobMode, JobRepository, JobService, JobStatus
 
 
 @pytest_asyncio.fixture(autouse=True, loop_scope="function")
@@ -27,8 +27,13 @@ async def repo():
 @pytest_asyncio.fixture
 async def client():
     from fastapi import FastAPI
+    from homomics_lab.observability.trace_store import TraceStore
 
     app = FastAPI()
+    job_service = JobService()
+    app.state.job_service = job_service
+    app.state.trace_store = TraceStore()
+    app.state.execution_pubsub = job_service.pubsub
     app.include_router(router, prefix="/api/execution")
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

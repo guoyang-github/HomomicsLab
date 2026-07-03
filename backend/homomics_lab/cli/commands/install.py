@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from homomics_lab.security import validate_git_url
+
 
 def install_domain(args):
     """Install a domain from a local directory or git repository."""
@@ -14,6 +16,7 @@ def install_domain(args):
 
     if source.startswith("http") or source.endswith(".git"):
         # Clone from git
+        validate_git_url(source)
         repo_name = source.split("/")[-1].replace(".git", "")
         temp_dir = Path(f"/tmp/homomics_install_{repo_name}")
 

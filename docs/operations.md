@@ -138,6 +138,28 @@ And inspect recent runs:
 curl http://localhost:8080/api/scheduler/runs?limit=10
 ```
 
+### Job Queue & Workers (P3)
+
+HomomicsLab can run background jobs either in-process with an `asyncio.Queue` or out-of-process using Redis for multi-replica deployments.
+
+```env
+# In-process queue (default, single-process development)
+HOMOMICS_QUEUE_BACKEND=memory
+HOMOMICS_WORKER_MODE=true
+
+# Redis-backed queue + pub/sub (production / multiple workers)
+HOMOMICS_QUEUE_BACKEND=redis
+HOMOMICS_REDIS_URL=redis://redis:6379/0
+HOMOMICS_WORKER_MODE=true
+HOMOMICS_WORKER_CONCURRENCY=1
+HOMOMICS_WORKER_HEARTBEAT_TTL=30
+HOMOMICS_WORKER_LOCK_TTL=600
+```
+
+When `HOMOMICS_WORKER_MODE=true`, the API process starts a local worker that consumes the queue. For horizontal scaling, set `HOMOMICS_WORKER_MODE=false` on API replicas and run dedicated worker processes that share the same Redis URL.
+
+Jobs transition through the same statuses as synchronous analyses (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`/`AWAITING_HUMAN`). Progress is published to an in-memory or Redis pub/sub bus and is observable via `/api/jobs/{job_id}/state`.
+
 ### MCP Tools
 
 HomomicsLab ships with embedded MCP tools for public bioinformatics databases:
@@ -409,6 +431,32 @@ ws.onmessage = (event) => {
 | `COMPLETED` | Analysis finished successfully |
 | `FAILED` | Error occurred (check logs) |
 | `ABORTED` | User cancelled or system shutdown |
+
+### Result Storage & Loading (P3)
+
+Large or non-JSON skill outputs are persisted by `DataStore` and returned as `ResultReference` objects. Supported formats include JSON, Parquet, HDF5 (`.h5ad`), Zarr, and (opt-in) Pickle.
+
+```python
+from homomics_lab.data import DataStore
+
+store = DataStore("./data")
+ref = store.store("task_1", large_anndata_object)  # may return a path reference
+```
+
+Zarr arrays and groups are detected automatically and stored as on-disk `.zarr` directories. You can reload any reference through the API:
+
+```bash
+curl -X POST http://localhost:8080/api/results/load \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inline": false,
+    "path": "./data/results/task_1_a1b2c3d4.zarr",
+    "format": "zarr",
+    "size": 0
+  }'
+```
+
+For `zarr`, `parquet`, `h5ad`, and `pickle` references the endpoint returns a streaming `FileResponse`. For JSON-compatible references it returns the deserialized payload.
 
 ---
 

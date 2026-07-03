@@ -1,0 +1,1022 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_code_act",
+        "description": "Generate and execute code actions to fulfill a concrete sub-task.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_code_act"
+    },
+    {
+      "id": "category:agent_core"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_hitl",
+        "description": "Manage human-in-the-loop checkpoints and clarifications.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_hitl"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_interpretation",
+        "description": "Interpret analysis outputs and generate human-readable explanations.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_interpretation"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_planning",
+        "description": "Decompose a user request into a structured, executable analysis plan.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_planning"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_reproducibility",
+        "description": "Capture provenance and generate reproducibility records for executed skills.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_reproducibility"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "core_skill_router",
+        "description": "Select the most appropriate skill(s) for a given task and data state.",
+        "category": "agent_core",
+        "project_id": null
+      },
+      "id": "skill:core_skill_router"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "utils-workflow-management-nextflow",
+        "description": "Transform bioinformatics analysis scripts into production-grade Nextflow DSL2 workflows for SLURM HPC execution. Use when wrapping existing tools/pipelines into portable workflows, designing channel dataflows, or configuring resource-aware cluster submission. Supports Singularity, Conda, and locally installed software.",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:utils_workflow_management_nextflow"
+    },
+    {
+      "id": "category:general"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "file_read",
+        "description": "Read the contents of a file within the workspace",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:file_read"
+    },
+    {
+      "id": "category:builtin"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "file_write",
+        "description": "Write content to a file within the workspace",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:file_write"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "file_list",
+        "description": "List files in a workspace directory",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:file_list"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "file_edit",
+        "description": "Edit a file by replacing an exact substring within the workspace",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:file_edit"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "shell_exec",
+        "description": "Execute a shell command inside the configured sandbox",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:shell_exec"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "web_search",
+        "description": "Search the web using DuckDuckGo",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:web_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Tool"
+      ],
+      "properties": {
+        "name": "memory_search",
+        "description": "Search the semantic memory store",
+        "category": "builtin",
+        "project_id": null
+      },
+      "id": "tool:memory_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "发表级图表导出 SOP",
+        "description": "发表级图表导出 SOP",
+        "category": "viz_biomedical",
+        "project_id": null
+      },
+      "id": "sop:figure_export_sop"
+    },
+    {
+      "id": "category:viz_biomedical"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Spatial Transcriptomics Analysis SOP",
+        "description": "Spatial Transcriptomics Analysis SOP",
+        "category": "spatial",
+        "project_id": null
+      },
+      "id": "sop:sop_spatial_v3"
+    },
+    {
+      "id": "category:spatial"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Single-Cell RNA-seq Analysis SOP",
+        "description": "Single-Cell RNA-seq Analysis SOP",
+        "category": "single_cell",
+        "project_id": null
+      },
+      "id": "sop:sop_single_cell_v3"
+    },
+    {
+      "id": "category:single_cell"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Ribo-seq Analysis SOP",
+        "description": "Ribo-seq Analysis SOP",
+        "category": "riboseq",
+        "project_id": null
+      },
+      "id": "sop:sop_riboseq_v3"
+    },
+    {
+      "id": "category:riboseq"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Scientific Paper Writing SOP",
+        "description": "Scientific Paper Writing SOP",
+        "category": "paperwriting",
+        "project_id": null
+      },
+      "id": "sop:sop_paperwriting_v3"
+    },
+    {
+      "id": "category:paperwriting"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Bulk mRNA-seq Analysis SOP",
+        "description": "Bulk mRNA-seq Analysis SOP",
+        "category": "mrnaseq",
+        "project_id": null
+      },
+      "id": "sop:sop_mrnaseq_v3"
+    },
+    {
+      "id": "category:mrnaseq"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Genomics Analysis SOP",
+        "description": "Genomics Analysis SOP",
+        "category": "genomics",
+        "project_id": null
+      },
+      "id": "sop:sop_genomics_v3"
+    },
+    {
+      "id": "category:genomics"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Bioinformatics Database Query SOP",
+        "description": "Bioinformatics Database Query SOP",
+        "category": "database",
+        "project_id": null
+      },
+      "id": "sop:sop_database_v2"
+    },
+    {
+      "id": "category:database"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:40:47.203158+00:00"
+      },
+      "id": "0de4d8ef-03d2-49e1-908d-f12a08af7ec2"
+    },
+    {
+      "id": "proj_1"
+    },
+    {
+      "id": "sess_1"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-02T08:40:47.632952+00:00"
+      },
+      "id": "91b11b89-9176-4290-a523-82a8f9eef660"
+    },
+    {
+      "id": "sess_debate_api"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-02T08:40:47.960261+00:00"
+      },
+      "id": "fba74210-d222-4e28-a48e-85564b15f2ec"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-02T08:40:48.408588+00:00"
+      },
+      "id": "ae63cc41-84ec-459e-bb59-030b93082a54"
+    },
+    {
+      "id": "sess_regenerate_api"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-02T08:40:48.970139+00:00"
+      },
+      "id": "1704e049-a95f-457b-bdd1-211b34863b60"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-02T08:40:49.371756+00:00"
+      },
+      "id": "e0886897-da0c-4b2b-8ade-ccbc20e2403b"
+    },
+    {
+      "id": "sess_list_api"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-02T08:40:49.827232+00:00"
+      },
+      "id": "c88a9852-80c7-4676-bb12-5122ac01c516"
+    },
+    {
+      "id": "sess_feedback_api"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-02T08:40:51.516818+00:00"
+      },
+      "id": "e0135fea-ce93-4ec3-8189-b1e22f9bd9e8"
+    },
+    {
+      "id": "sess_persist_api"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-02T08:40:52.102668+00:00"
+      },
+      "id": "dfb56f2c-c6d4-479b-8bbc-95f3f6cc2e24"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "Test Skill",
+        "description": "A test skill for API testing",
+        "category": "test",
+        "project_id": null
+      },
+      "id": "skill:test-skill"
+    },
+    {
+      "id": "category:test"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "batch-skill-a",
+        "description": "",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:batch-skill-a"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Skill"
+      ],
+      "properties": {
+        "name": "batch-skill-b",
+        "description": "",
+        "category": "general",
+        "project_id": null
+      },
+      "id": "skill:batch-skill-b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project alpha session one",
+        "memory_type": "note",
+        "project_id": "proj_a",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:00.154470+00:00"
+      },
+      "id": "165a8dcc-736c-4ca7-9698-f836fc6ae3ad"
+    },
+    {
+      "id": "proj_a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project beta session one",
+        "memory_type": "note",
+        "project_id": "proj_b",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:00.697525+00:00"
+      },
+      "id": "ff4228b7-a9d4-49da-a53c-4b6a63512128"
+    },
+    {
+      "id": "proj_b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project alpha session two",
+        "memory_type": "note",
+        "project_id": "proj_a",
+        "session_id": "sess_2",
+        "created_at": "2026-07-02T08:43:01.069911+00:00"
+      },
+      "id": "1418ddf1-94a1-4118-a91b-6080094801d4"
+    },
+    {
+      "id": "sess_2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "unique keyword xyz123 only appears here",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-02T08:43:02.524834+00:00"
+      },
+      "id": "d3d5ce21-a1dc-49ea-bca3-1146a7203338"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "some other generic note",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-02T08:43:02.968690+00:00"
+      },
+      "id": "cd9b5272-e7b8-4625-957d-1e851d925558"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "unique keyword abc999",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-02T08:43:03.832957+00:00"
+      },
+      "id": "bdd34709-6522-4f44-936f-e7be08f76a6c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User asked about PBMC QC filtering parameters.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:04.789367+00:00"
+      },
+      "id": "bd9dc4e6-fd5d-411d-af44-2cb175813457"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User followed up on PBMC quality control thresholds.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:05.234343+00:00"
+      },
+      "id": "bb564dd8-e044-448b-b629-e4e3350d9f5d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User asked about RNA velocity plotting.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:05.606809+00:00"
+      },
+      "id": "becc9126-ad88-4ef0-a6d3-1376fb57b30e"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Concept"
+      ],
+      "properties": {
+        "text": "Summary of 2 conversation memories:\nUser asked about PBMC QC filtering parameters.\n---\nUser followed up on PBMC quality control thresholds.",
+        "memory_type": "concept",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-02T08:43:06.921915+00:00"
+      },
+      "id": "fc4790da-e47d-4052-96ec-d2166cada1f5"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "recent conversation about QC",
+        "memory_type": "conversation",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-02T08:43:07.486104+00:00"
+      },
+      "id": "ee0865f3-3022-4be4-85e6-cfaf9e8e9b37"
+    }
+  ],
+  "edges": [
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_code_act"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_hitl"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_interpretation"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_planning"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_reproducibility"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:agent_core",
+      "target": "skill:core_skill_router"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:utils_workflow_management_nextflow"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:batch-skill-a"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:general",
+      "target": "skill:batch-skill-b"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:file_read"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:file_write"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:file_list"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:file_edit"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:shell_exec"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:web_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:builtin",
+      "target": "tool:memory_search"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:viz_biomedical",
+      "target": "sop:figure_export_sop"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:spatial",
+      "target": "sop:sop_spatial_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single_cell",
+      "target": "sop:sop_single_cell_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:riboseq",
+      "target": "sop:sop_riboseq_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:paperwriting",
+      "target": "sop:sop_paperwriting_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:mrnaseq",
+      "target": "sop:sop_mrnaseq_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:genomics",
+      "target": "sop:sop_genomics_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:database",
+      "target": "sop:sop_database_v2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0de4d8ef-03d2-49e1-908d-f12a08af7ec2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "91b11b89-9176-4290-a523-82a8f9eef660"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "fba74210-d222-4e28-a48e-85564b15f2ec"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ae63cc41-84ec-459e-bb59-030b93082a54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "1704e049-a95f-457b-bdd1-211b34863b60"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "e0886897-da0c-4b2b-8ade-ccbc20e2403b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "c88a9852-80c7-4676-bb12-5122ac01c516"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "e0135fea-ce93-4ec3-8189-b1e22f9bd9e8"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "dfb56f2c-c6d4-479b-8bbc-95f3f6cc2e24"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "bd9dc4e6-fd5d-411d-af44-2cb175813457"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "bb564dd8-e044-448b-b629-e4e3350d9f5d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "becc9126-ad88-4ef0-a6d3-1376fb57b30e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "fc4790da-e47d-4052-96ec-d2166cada1f5"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "0de4d8ef-03d2-49e1-908d-f12a08af7ec2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "165a8dcc-736c-4ca7-9698-f836fc6ae3ad"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "ff4228b7-a9d4-49da-a53c-4b6a63512128"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "bd9dc4e6-fd5d-411d-af44-2cb175813457"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "bb564dd8-e044-448b-b629-e4e3350d9f5d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "becc9126-ad88-4ef0-a6d3-1376fb57b30e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "fc4790da-e47d-4052-96ec-d2166cada1f5"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "91b11b89-9176-4290-a523-82a8f9eef660"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "fba74210-d222-4e28-a48e-85564b15f2ec"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "ae63cc41-84ec-459e-bb59-030b93082a54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "1704e049-a95f-457b-bdd1-211b34863b60"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "e0886897-da0c-4b2b-8ade-ccbc20e2403b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "c88a9852-80c7-4676-bb12-5122ac01c516"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "e0135fea-ce93-4ec3-8189-b1e22f9bd9e8"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "dfb56f2c-c6d4-479b-8bbc-95f3f6cc2e24"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:test",
+      "target": "skill:test-skill"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_a",
+      "target": "165a8dcc-736c-4ca7-9698-f836fc6ae3ad"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_a",
+      "target": "1418ddf1-94a1-4118-a91b-6080094801d4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_b",
+      "target": "ff4228b7-a9d4-49da-a53c-4b6a63512128"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_2",
+      "target": "1418ddf1-94a1-4118-a91b-6080094801d4"
+    }
+  ]
+}
