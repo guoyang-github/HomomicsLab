@@ -2334,6 +2334,7 @@ class TurnRunner:
                 user_message=user_message,
                 working_memory=WorkingMemory(max_messages=0),
                 project_context=project_context,
+                mode="analysis",
             )
             prompt_messages = [{"role": "user", "content": prompt}]
 
@@ -2372,8 +2373,28 @@ class TurnRunner:
 
         logger = logging.getLogger(__name__)
 
-        # Build response-type-specific instructions.
-        type_instructions = {
+        # Layered system prompt from the prompt registry (base + domain + mode).
+        mode_map = {
+            "greeting": "base",
+            "qa": "qa",
+            "information_request": "qa",
+        }
+        from homomics_lab.prompts import render_prompt
+
+        base_prompt = render_prompt("system.base", domain=intent.domain, combine=True)
+        if base_prompt is None:
+            base_prompt = (
+                "You are HomomicsLab, an AI assistant specialized in bioinformatics and computational biology. "
+                "You have access to project context, SOPs, CBKB knowledge, and executable skills/workflows."
+            )
+
+        mode_prompt = render_prompt(
+            f"system.{mode_map.get(response_type, 'qa')}",
+            domain=intent.domain,
+            combine=True,
+        )
+
+        response_type_instructions = {
             "greeting": (
                 "Greet the user warmly and briefly introduce HomomicsLab. "
                 "Mention that you can help with bioinformatics analysis, "
@@ -2391,14 +2412,15 @@ class TurnRunner:
             ),
         }
 
-        system_prompt = (
-            "You are HomomicsLab, an AI assistant specialized in bioinformatics and computational biology. "
-            "You have access to project context, SOPs, CBKB knowledge, and executable skills/workflows. "
-            "Respond to the user in a helpful, accurate, and structured way.\n\n"
+        parts = [base_prompt]
+        if mode_prompt:
+            parts.append(mode_prompt)
+        parts.append(
             f"Task type: {response_type}\n"
-            f"Instructions: {type_instructions.get(response_type, type_instructions['qa'])}\n\n"
+            f"Instructions: {response_type_instructions.get(response_type, response_type_instructions['qa'])}\n\n"
             "Use the provided context and intent, but do not mention internal fields or system internals."
         )
+        system_prompt = "\n\n".join(parts)
 
         messages: List[Dict[str, str]] = []
 

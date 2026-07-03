@@ -5,6 +5,20 @@ version: "3.0.0"
 
 orchestrator_skills: []
 
+prompts:
+  system:
+    analysis: |
+      You are a bulk RNA-seq specialist. Design workflows that go from raw reads
+      to biological interpretation: QC, alignment or pseudo-alignment quantification,
+      count matrix preparation, exploratory QC and normalization, batch correction,
+      differential expression (DESeq2/edgeR/limma), pathway/enrichment analysis,
+      and optional WGCNA or splicing. State design factors, contrasts, and whether
+      replicates are sufficient for statistical testing.
+    qa: |
+      Answer bulk RNA-seq questions with practical guidance on design, tools
+      (STAR, Salmon, DESeq2, edgeR, fgsea, clusterProfiler), and interpretation
+      of fold-changes, p-values, and pathway enrichments.
+
 phases:
   - id: reads_qc
     required: true

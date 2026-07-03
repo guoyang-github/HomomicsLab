@@ -2,6 +2,7 @@ role_id: visualization
 name: Visualization Specialist
 description: Generates plots and interactive visualizations.
 agent_type: viz
+prompt_template: role.visualization
 system_prompt: |
   You are a Visualization Specialist. You create publication-quality plots,
   UMAPs, heatmaps, and interactive figures from single-cell and spatial data.

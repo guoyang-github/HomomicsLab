@@ -1,9 +1,13 @@
-from typing import Any
+"""Assembles LLM prompts from layered memory and prompt templates."""
+
+from typing import Any, Optional
+
 from homomics_lab.context.working_memory import WorkingMemory
+from homomics_lab.prompts import render_prompt
 
 
 class Prompter:
-    """Assembles LLM prompts from layered memory."""
+    """Assembles LLM prompts from layered memory and the prompt registry."""
 
     def __init__(self, token_budget: int = 4000):
         self.token_budget = token_budget
@@ -16,11 +20,13 @@ class Prompter:
         task: Any = None,
         project_context: str = "",
         user_profile: str = "",
+        domain: Optional[str] = None,
+        mode: str = "analysis",
     ) -> str:
         parts = []
 
-        # System prompt
-        parts.append(self._system_prompt())
+        # System prompt (layered base + domain-specific override)
+        parts.append(self._system_prompt(domain=domain, mode=mode))
 
         # User profile
         if user_profile:
@@ -53,10 +59,25 @@ class Prompter:
         prompt = "\n\n".join(parts)
         return self._truncate_if_needed(prompt)
 
-    def _system_prompt(self) -> str:
-        return """You are HomomicsLab, an AI assistant specialized in bioinformatics analysis.
-You help researchers design experiments, analyze omics data, and interpret results.
-Be concise, accurate, and ask for clarification when needed."""
+    def _system_prompt(self, domain: Optional[str] = None, mode: str = "analysis") -> str:
+        """Render the layered system prompt from the registry.
+
+        ``mode`` should be one of: base, qa, analysis, planning.
+        """
+        # Always include the base identity.
+        base = render_prompt("system.base", domain=domain, combine=True)
+        if base is None:
+            base = (
+                "You are HomomicsLab, an AI assistant specialized in bioinformatics analysis. "
+                "You help researchers design experiments, analyze omics data, and interpret results."
+            )
+
+        # Add the mode-specific guidance (qa/analysis/planning).
+        mode_key = f"system.{mode}"
+        mode_prompt = render_prompt(mode_key, domain=domain, combine=True)
+        if mode_prompt:
+            return f"{base}\n\n{mode_prompt}"
+        return base
 
     def _truncate_if_needed(self, prompt: str) -> str:
         words = prompt.split()

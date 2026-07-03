@@ -67,7 +67,7 @@ testpaths = ["backend/tests"]
 norecursedirs = ["data", ".git", ".venv", "node_modules", "dist", "build"]
 filterwarnings = [
     "ignore:'crypt' is deprecated:DeprecationWarning",
-    "ignore:Using `httpx` with `starlette.testclient`:starlette.exceptions.StarletteDeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning",
     "ignore:SelectableGroups dict interface is deprecated:DeprecationWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
 ]

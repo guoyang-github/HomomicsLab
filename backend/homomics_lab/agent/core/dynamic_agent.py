@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.base_agent import BaseAgent
 from homomics_lab.models.common import AgentType
+from homomics_lab.prompts import render_prompt
 
 from .role import RoleDefinition
 
@@ -70,8 +71,30 @@ class DynamicAgent(BaseAgent):
             "role_id": self.role.role_id,
         }
 
-    def get_system_prompt(self, context: Optional[Dict[str, Any]] = None) -> str:
-        """Render system prompt with optional context substitution."""
+    def get_system_prompt(
+        self,
+        context: Optional[Dict[str, Any]] = None,
+        domain: Optional[str] = None,
+    ) -> str:
+        """Render system prompt with optional context substitution.
+
+        If the role defines ``prompt_template``, render that template from the
+        prompt registry. Domain-specific templates override or augment the base
+        template. Falls back to ``role.system_prompt`` with Python ``.format()``
+        substitution if no registry template is configured or found.
+        """
+        context = context or {}
+
+        if self.role.prompt_template:
+            rendered = render_prompt(
+                self.role.prompt_template,
+                domain=domain,
+                combine=True,
+                context=context,
+            )
+            if rendered is not None:
+                return rendered
+
         prompt = self.role.system_prompt
         if context:
             try:

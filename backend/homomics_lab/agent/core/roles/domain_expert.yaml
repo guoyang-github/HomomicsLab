@@ -1,6 +1,10 @@
 role_id: domain_expert
 name: Domain Expert
 agent_type: specialist
+prompt_template: role.domain_expert
+system_prompt: |
+  You are a Domain Expert participant in a structured debate. Evaluate candidate
+  options from a domain-science perspective and explain trade-offs.
 description: |
   A debate participant that evaluates candidate options from a domain
   perspective based on allowed skills and categories.

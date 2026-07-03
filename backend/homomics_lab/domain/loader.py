@@ -16,6 +16,8 @@ from homomics_lab.domain.models import (
 from homomics_lab.agent.plan.models import DataState, Phase
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StateCheck, StrategyLibrary
 from homomics_lab.knowledge.cbkb import CBKB, LabSOP
+from homomics_lab.prompts import get_prompt_registry, load_domain_prompts
+from homomics_lab.prompts.registry import PromptRegistry
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -359,6 +361,7 @@ class DomainLoader:
         skill_dag: Optional[Any] = None,
         cbkb: Optional[CBKB] = None,
         strict: Optional[bool] = None,
+        prompt_registry: Optional[PromptRegistry] = None,
     ):
         self.skill_registry = skill_registry
         self.strategy_lib = strategy_lib
@@ -368,6 +371,7 @@ class DomainLoader:
         self.strict = (
             strict if strict is not None else getattr(settings, "domain_strict_validation", False)
         )
+        self.prompt_registry = prompt_registry or get_prompt_registry()
 
     def load(self, domain_yaml_path: Path) -> DomainDefinition:
         """Load a domain.yaml and register all components.
@@ -411,6 +415,11 @@ class DomainLoader:
 
         # 6. Register SOPs
         self._register_sops(domain)
+
+        # 7. Register prompt templates declared by the domain
+        if domain.prompts:
+            self.prompt_registry.clear_domain(domain.domain)
+            load_domain_prompts(domain.domain, domain.prompts, registry=self.prompt_registry)
 
         return domain
 

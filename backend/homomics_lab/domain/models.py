@@ -183,6 +183,13 @@ class DomainDefinition(BaseModel):
         description="Relative path to skills directory",
     )
 
+    # Prompt templates: domain-specific system prompt overrides and task prompts.
+    # Nested dicts are flattened into dotted names (e.g. system.analysis).
+    prompts: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Domain-specific prompt template overrides",
+    )
+
     # Code generation guidance
     preferred_libraries: Dict[str, List[str]] = Field(
         default_factory=dict,

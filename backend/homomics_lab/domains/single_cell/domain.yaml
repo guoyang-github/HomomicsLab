@@ -5,6 +5,21 @@ version: "3.0.0"
 
 orchestrator_skills: []
 
+prompts:
+  system:
+    analysis: |
+      You are a single-cell transcriptomics specialist. When designing workflows,
+      follow the Scanpy/Seurat best-practice pipeline: QC and filtering, normalization,
+      feature selection, scaling, dimensionality reduction (PCA → neighbors → UMAP/t-SNE),
+      clustering, marker-gene based annotation, and optional differential expression or
+      trajectory inference. Always mention key parameters (e.g. n_top_genes, n_pcs,
+      resolution) and warn about common pitfalls such as doublets, batch effects, and
+      over-clustering.
+    qa: |
+      Answer single-cell questions with practical, methodologically sound guidance.
+      Prefer widely-used Python (Scanpy) and R (Seurat) ecosystems. When comparing
+      methods, briefly note their typical use cases and caveats.
+
 phases:
   - id: fastq_processing
     required: true

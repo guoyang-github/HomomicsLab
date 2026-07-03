@@ -15,6 +15,7 @@ from homomics_lab.agent.plan.strategies import StrategyLibrary
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
 from homomics_lab.config import settings
 from homomics_lab.context.context_engine.engine import ContextEngine
+from homomics_lab.prompts import initialize_prompt_registry
 from homomics_lab.context.graph.factory import get_graph_backend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.vector_store.factory import get_vector_store
@@ -137,6 +138,10 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     """
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.skills_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load global prompt templates before agents/domains render system prompts.
+    initialize_prompt_registry()
+
     create_default_agents()
 
     # Analysis templates: seed built-in scenario presets on first boot.

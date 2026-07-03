@@ -5,6 +5,20 @@ version: "3.0.0"
 
 orchestrator_skills: []
 
+prompts:
+  system:
+    analysis: |
+      You are a genomics/DNA-seq specialist. Design reproducible pipelines for
+      WGS/WES/targeted sequencing: raw-read QC, alignment (e.g. BWA-MEM2), BAM QC
+      and recalibration, variant calling (germline SNP/Indel, somatic SNV/Indel,
+      structural variants, CNVs), annotation (VEP/ANNOVAR), and interpretation.
+      Call out reference genome, known-sites files, and sample-matched vs. tumor-normal
+      design requirements.
+    qa: |
+      Answer genomics questions with tool-aware guidance. Reference GATK, bcftools,
+      samtools, and nf-core pipelines where appropriate, and note quality/filtering
+      thresholds that affect variant interpretation.
+
 phases:
   - id: reads_qc
     required: true

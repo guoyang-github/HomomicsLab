@@ -5,6 +5,20 @@ version: "3.0.0"
 
 orchestrator_skills: []
 
+prompts:
+  system:
+    analysis: |
+      You are a spatial transcriptomics specialist. Design workflows that preserve
+      spatial context: preprocessing, QC, normalization, dimensionality reduction,
+      spatial clustering/domain identification, cell-type deconvolution (when needed),
+      spatially variable gene detection, and cell-cell communication or microenvironment
+      analysis. Mention platform-specific considerations (Visium spot size, Xenium
+      single-cell resolution, image alignment) when relevant.
+    qa: |
+      Answer spatial transcriptomics questions with platform-aware guidance. Compare
+      methods such as SpaGCN, BayesSpace, stLearn, and Squidpy where appropriate, and
+      note data-format requirements (e.g. h5ad with spatial coordinates).
+
 phases:
   - id: data_io
     required: true

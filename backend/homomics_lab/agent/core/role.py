@@ -40,6 +40,12 @@ class RoleDefinition(BaseModel):
     # Prompting
     system_prompt: str = "You are a helpful bioinformatics assistant."
     prompt_template: Optional[str] = None
+    """Optional key into the prompt registry (e.g. ``role.analyst``).
+
+    When set, ``DynamicAgent.get_system_prompt`` renders this template from the
+    registry with the supplied context and optional domain. Falls back to
+    ``system_prompt`` if the registry template is not found.
+    """
 
     # Metadata
     permissions: RolePermissions = Field(default_factory=RolePermissions)
