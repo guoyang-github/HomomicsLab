@@ -593,8 +593,7 @@ class CascadeIntentAnalyzer:
                         reason="no classifier produced a match",
                     ),
                 ),
-                needs_clarification=True,
-                clarification_question="我不太确定您的需求，请再具体描述一下您想做什么分析。",
+                needs_clarification=False,
             )
 
         # --- Build alternatives from the union of non-primary signals ---

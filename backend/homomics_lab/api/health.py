@@ -1,6 +1,6 @@
 """Health check API endpoints."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -13,11 +13,42 @@ from homomics_lab.version import app_version
 router = APIRouter()
 
 
+def _effective_llm_status() -> Dict[str, Any]:
+    """Return the effective runtime LLM configuration status.
+
+    Reads from the encrypted runtime config (set via Settings UI) rather than
+    static environment variables, so the indicator reflects the currently active
+    provider/model.
+    """
+    try:
+        from homomics_lab.llm.runtime_config import load_llm_runtime_config
+
+        config = load_llm_runtime_config()
+        return {
+            "llm_configured": config.is_configured,
+            "llm_provider": config.provider,
+            "llm_model": config.model,
+        }
+    except Exception:
+        # If runtime config cannot be loaded (e.g. secrets not initialized),
+        # fall back to the static environment-based settings.
+        provider = settings.llm_provider
+        model = settings.llm_model
+        return {
+            "llm_configured": bool(provider and model),
+            "llm_provider": provider,
+            "llm_model": model,
+        }
+
+
 class HealthStatusResponse(BaseModel):
     """Basic health / liveness response."""
 
     status: str
     version: str
+    llm_configured: bool = False
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
 
 
 class HealthCheckItem(BaseModel):
@@ -41,13 +72,13 @@ class HealthReportResponse(BaseModel):
 @router.get("/health", response_model=HealthStatusResponse)
 async def health_basic():
     """Basic health check — returns quickly, no deep diagnostics."""
-    return {"status": "ok", "version": app_version()}
+    return {"status": "ok", "version": app_version(), **_effective_llm_status()}
 
 
 @router.get("/health/live", response_model=HealthStatusResponse)
 async def health_live():
     """Liveness probe: returns immediately; indicates the process is up."""
-    return {"status": "alive", "version": app_version()}
+    return {"status": "alive", "version": app_version(), **_effective_llm_status()}
 
 
 @router.get("/health/ready", response_model=HealthReportResponse)

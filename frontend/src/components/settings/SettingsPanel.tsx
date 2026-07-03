@@ -115,6 +115,11 @@ export function SettingsPanel() {
     await settings.testConnection()
     if (settings.testResult?.ok) {
       toastSuccess(t('settings.testSuccess'))
+      // Persist the working configuration so the rest of the app (including
+      // the sidebar LLM status indicator) uses it immediately.
+      if (hasChanges) {
+        await handleSave()
+      }
     } else {
       toastError(settings.testResult?.message || t('settings.testFailed'))
     }

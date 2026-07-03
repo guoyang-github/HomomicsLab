@@ -2562,7 +2562,59 @@ class TurnRunner:
                 "空间转录组分析、实验设计等任务。请问有什么具体需求？"
             ),
         }
-        return qa_responses.get(domain, qa_responses["general"])
+        if domain in qa_responses and domain != "general":
+            return qa_responses[domain]
+
+        # No domain-specific template: try a web search fallback when no LLM is
+        # available, so general real-time questions (weather, news, etc.) still
+        # get a useful answer.
+        search_response = await self._try_web_search_response(user_message)
+        if search_response:
+            return search_response
+
+        return qa_responses["general"]
+
+    async def _try_web_search_response(self, user_message: str) -> Optional[str]:
+        """Fallback to a web search summary when no LLM or domain template is available.
+
+        Only runs if the ``web_search`` builtin tool is registered and returns
+        results. Network failures or missing dependencies are silently ignored so
+        the caller can fall back to the generic template.
+        """
+        if not self._tool_registry:
+            return None
+
+        web_tools = [t for t in self._tool_registry.list_by_source("builtin") if t.name == "web_search"]
+        if not web_tools:
+            return None
+
+        try:
+            result = await self._tool_registry.invoke_async(
+                "web_search", {"query": user_message, "num_results": 3}
+            )
+            if not result.success or not result.output:
+                return None
+
+            results = result.output
+            if not isinstance(results, list) or not results:
+                return None
+
+            lines: List[str] = []
+            for r in results[:3]:
+                title = r.get("title", "").strip()
+                href = r.get("href", "").strip()
+                body = r.get("body", "").strip()
+                if not title and not body:
+                    continue
+                snippet = body[:200] + "..." if len(body) > 200 else body
+                lines.append(f"- **{title}**\n  {snippet}\n  {href}")
+
+            if not lines:
+                return None
+
+            return "我查到了一些相关信息：\n\n" + "\n\n".join(lines)
+        except Exception:
+            return None
 
     async def _generate_information_request_response(
         self,

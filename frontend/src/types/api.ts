@@ -88,6 +88,14 @@ export interface SystemSettingsUpdate {
   skill_hot_reload_enabled?: boolean
 }
 
+export interface HealthStatusResponse {
+  status: string
+  version: string
+  llm_configured: boolean
+  llm_provider: string | null
+  llm_model: string | null
+}
+
 export interface FileUploadResponse {
   filename: string
   path: string

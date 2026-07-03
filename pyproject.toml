@@ -51,6 +51,8 @@ dependencies = [
     "bleach>=6.4.0",
     "qdrant-client>=1.18.0",
     "neo4j>=6.2.0",
+    "ddgs>=9.14.4",
+    "openai>=2.44.0",
 ]
 
 [project.optional-dependencies]

@@ -209,7 +209,28 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": app_version()}
+    from homomics_lab.llm.runtime_config import load_llm_runtime_config
+
+    try:
+        config = load_llm_runtime_config()
+        llm_status = {
+            "llm_configured": config.is_configured,
+            "llm_provider": config.provider,
+            "llm_model": config.model,
+        }
+    except Exception:
+        provider = settings.llm_provider
+        model = settings.llm_model
+        llm_status = {
+            "llm_configured": bool(provider and model),
+            "llm_provider": provider,
+            "llm_model": model,
+        }
+    return {
+        "status": "ok",
+        "version": app_version(),
+        **llm_status,
+    }
 
 
 @app.get("/health/memory")

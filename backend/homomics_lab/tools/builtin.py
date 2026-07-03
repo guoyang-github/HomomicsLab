@@ -192,14 +192,14 @@ async def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
         num_results: Maximum number of results.
     """
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
     except ImportError:
-        # Fallback: return a mock result if duckduckgo-search not installed
+        # Fallback: return a mock result if ddgs package is not installed
         return [
             {
-                "title": "DuckDuckGo search not available",
+                "title": "Web search not available",
                 "href": "",
-                "body": "Install duckduckgo-search package to use this tool.",
+                "body": "Install ddgs package to use this tool.",
             }
         ]
 

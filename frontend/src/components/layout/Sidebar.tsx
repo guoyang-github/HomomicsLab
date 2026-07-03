@@ -52,21 +52,39 @@ interface SidebarProps {
 export function Sidebar({ activeItem, onNavigate, collapsed = false }: SidebarProps) {
   const { t } = useTranslation()
   const [version, setVersion] = useState<string>('')
+  const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null)
+  const [llmModel, setLlmModel] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/health/live')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.version) {
-          setVersion(data.version)
-        }
-      })
-      .catch(() => {
-        // ignore; keep empty fallback
-      })
+    const fetchHealth = () => {
+      fetch('/api/health/live')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.version) {
+            setVersion(data.version)
+          }
+          if (typeof data?.llm_configured === 'boolean') {
+            setLlmConfigured(data.llm_configured)
+          }
+          if (data?.llm_model) {
+            setLlmModel(data.llm_model)
+          }
+        })
+        .catch(() => {
+          // ignore; keep empty fallback
+        })
+    }
+
+    fetchHealth()
+    const interval = setInterval(fetchHealth, 10_000)
+    return () => clearInterval(interval)
   }, [])
 
   const versionLabel = version ? `v${version}` : 'v0.1'
+  const llmTooltip = llmConfigured
+    ? `LLM connected: ${llmModel ?? 'unknown'}`
+    : 'LLM not configured — answers use rule-based fallback and web search.'
+
   return (
     <aside
       className={clsx(
@@ -75,12 +93,34 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false }: SidebarPr
       )}
     >
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
+        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
           <Command className="h-5 w-5" />
+          {collapsed && (
+            <span
+              className={clsx(
+                'absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card shadow-sm',
+                llmConfigured === true && 'bg-green-500',
+                llmConfigured === false && 'animate-pulse bg-red-500',
+                llmConfigured === null && 'bg-muted-foreground/50'
+              )}
+              title={llmTooltip}
+            />
+          )}
         </div>
         {!collapsed && (
-          <div className="flex flex-col overflow-hidden">
-            <span className="truncate text-sm font-bold text-foreground">HomomicsLab</span>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-bold text-foreground">HomomicsLab</span>
+              <span
+                className={clsx(
+                  'h-3 w-3 shrink-0 rounded-full shadow-sm',
+                  llmConfigured === true && 'bg-green-500',
+                  llmConfigured === false && 'animate-pulse bg-red-500',
+                  llmConfigured === null && 'bg-muted-foreground/50'
+                )}
+                title={llmTooltip}
+              />
+            </div>
             <span className="truncate text-[10px] text-muted-foreground">Bioinfo Agent</span>
           </div>
         )}
