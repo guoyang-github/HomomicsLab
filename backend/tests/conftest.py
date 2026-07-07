@@ -24,6 +24,23 @@ settings.external_skills_dirs = []
 # attempts for other default models.
 settings.embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Do not let persisted runtime settings (e.g. from the user's data directory)
+# leak into the test suite. Tests that need dense semantic search set this
+# explicitly themselves.
+settings.semantic_search_model = None
+
+# Do not use a real LLM in the test suite. Intent-analyzer tests are expected
+# to be deterministic against keyword/embedding classifiers; LLM-specific tests
+# patch LLMClient explicitly.
+settings.llm_provider = "none"
+
+# Avoid loading persisted secrets (e.g. LLM provider / API key) from the real
+# data directory during tests.
+settings.secrets_master_key = "test-key"
+from homomics_lab.secrets import reset_secrets_manager  # noqa: E402
+
+reset_secrets_manager()
+
 
 class _FakeEmbeddingProvider:
     """Deterministic, zero-cost embedding provider for test bootstrapping."""
@@ -54,6 +71,7 @@ _embedding_factory._provider_instance = _FakeEmbeddingProvider()
 # TestClient lifespan shutdown and are not needed for unit tests.
 import homomics_lab.bootstrap  # noqa: E402
 import homomics_lab.main  # noqa: E402
+import homomics_lab.settings_store  # noqa: E402
 
 _orig_bootstrap = homomics_lab.bootstrap.bootstrap_worker_context
 
@@ -64,6 +82,15 @@ async def _bootstrap_without_hot_reload(enable_hot_reload: bool = False, **kwarg
 
 homomics_lab.bootstrap.bootstrap_worker_context = _bootstrap_without_hot_reload
 homomics_lab.main.bootstrap_worker_context = _bootstrap_without_hot_reload
+
+
+# Prevent persisted runtime settings (e.g. semantic_search_model) from leaking
+# into tests via app lifespan / apply_runtime_settings.
+def _empty_runtime_settings():
+    return {}
+
+
+homomics_lab.settings_store.load_runtime_settings = _empty_runtime_settings
 
 
 @pytest.fixture(autouse=True)

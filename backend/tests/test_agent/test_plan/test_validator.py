@@ -68,7 +68,7 @@ class TestPlanValidator:
                     selected_skill=registry.get("scanpy_normalize"),
                 ),
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 
@@ -87,7 +87,7 @@ class TestPlanValidator:
         )
         plan = PlanResult(
             phases=[Phase(phase_type="qc", selected_skill=unregistered)],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 
@@ -106,7 +106,7 @@ class TestPlanValidator:
                     parameters={},
                 )
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 
@@ -123,7 +123,7 @@ class TestPlanValidator:
             phases=[
                 Phase(phase_type="qc", selected_skill=registry.get("scanpy_qc"))
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
             gaps=[
                 PlannedGap(
@@ -144,7 +144,7 @@ class TestPlanValidator:
         validator = PlanValidator(registry)
         plan = PlanResult(
             phases=[Phase(phase_type="visualization", required=False)],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 
@@ -161,7 +161,7 @@ class TestPlanValidator:
                     selected_skill=registry.get("scanpy_qc"),
                 )
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 

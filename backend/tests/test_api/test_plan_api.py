@@ -81,7 +81,7 @@ def _make_pending_plan_with_phase(
                 parameters={"min_genes": 200},
             )
         ],
-        strategy_name="single_cell",
+        strategy_name="single-cell-transcriptomics",
         data_state=DataState(),
     )
     return Plan(
@@ -427,7 +427,7 @@ async def test_switch_strategy_endpoint_creates_new_version(monkeypatch):
 
         response = client.post(
             f"/api/plan/{plan.plan_id}/switch-strategy",
-            json={"strategy_name": "spatial", "preserve_user_modifications": True},
+            json={"strategy_name": "spatial-transcriptomics", "preserve_user_modifications": True},
         )
         assert response.status_code == 200
         data = response.json()
@@ -438,7 +438,7 @@ async def test_switch_strategy_endpoint_creates_new_version(monkeypatch):
         new_plan = await plan_store.get(data["new_plan_id"])
         assert new_plan is not None
         assert new_plan.parent_plan_id == plan.plan_id
-        assert new_plan.plan_result.strategy_name == "spatial"
+        assert new_plan.plan_result.strategy_name == "spatial-transcriptomics"
         # User parameter should be preserved for the matching qc phase.
         qc_phase = next(
             (p for p in new_plan.plan_result.phases if p.phase_type == "qc"), None
@@ -458,6 +458,6 @@ async def test_switch_strategy_for_non_pending_plan_returns_400(monkeypatch):
 
         response = client.post(
             f"/api/plan/{plan.plan_id}/switch-strategy",
-            json={"strategy_name": "spatial"},
+            json={"strategy_name": "spatial-transcriptomics"},
         )
         assert response.status_code == 400

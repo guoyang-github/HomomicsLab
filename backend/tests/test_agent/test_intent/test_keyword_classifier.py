@@ -13,7 +13,7 @@ def definitions():
             analysis_type="single_cell_analysis",
             keywords=["单细胞", "single cell", "scRNA", "10x", "scanpy"],
             complexity_indicators=["分析", "流程", "pipeline"],
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
         ),
         IntentDefinition(
             analysis_type="file_conversion",

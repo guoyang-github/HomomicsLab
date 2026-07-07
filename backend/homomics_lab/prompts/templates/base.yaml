@@ -117,6 +117,10 @@ prompts:
           - ``analysis`` -> the matching analysis_type id from ``# Available analysis types``
           - ``tool_call`` -> the tool name (e.g., ``pubmed_search``)
       12. If nothing matches, use ``intent_type=general``, ``interaction_mode=answer``.
+      13. If the user gives only a bare analysis verb such as "分析数据", "analyze data",
+          "run analysis", or "做个分析" without specifying domain, data type, target, or
+          samples, classify as ``clarification`` with ``interaction_mode=clarify`` and
+          ``needs_clarification=true``.
 
       # Few-shot examples
 
@@ -125,7 +129,7 @@ prompts:
         "primary_intent": {
           "intent_type": "analysis",
           "interaction_mode": "execute",
-          "domain": "single_cell",
+          "domain": "single-cell-transcriptomics",
           "target": "single_cell_analysis",
           "scope": "full",
           "entities": {},
@@ -143,7 +147,7 @@ prompts:
         "primary_intent": {
           "intent_type": "information_request",
           "interaction_mode": "answer",
-          "domain": "single_cell",
+          "domain": "single-cell-transcriptomics",
           "target": null,
           "scope": "single_step",
           "entities": {},
@@ -197,7 +201,7 @@ prompts:
         "primary_intent": {
           "intent_type": "analysis",
           "interaction_mode": "execute",
-          "domain": "single_cell",
+          "domain": "single-cell-transcriptomics",
           "target": "single_cell_analysis",
           "scope": "partial",
           "entities": {},
@@ -206,11 +210,29 @@ prompts:
         },
         "alternative_intents": [],
         "sub_intents": [
-          {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single_cell", "target": "qc", "scope": "single_step", "confidence": 0.9},
-          {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single_cell", "target": "clustering", "scope": "single_step", "confidence": 0.9}
+          {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single-cell-transcriptomics", "target": "qc", "scope": "single_step", "confidence": 0.9},
+          {"intent_type": "analysis", "interaction_mode": "execute", "domain": "single-cell-transcriptomics", "target": "clustering", "scope": "single_step", "confidence": 0.9}
         ],
         "needs_clarification": false,
         "clarification_question": null
+      }
+
+      User: "分析数据"
+      Output: {
+        "primary_intent": {
+          "intent_type": "clarification",
+          "interaction_mode": "clarify",
+          "domain": null,
+          "target": null,
+          "scope": "single_step",
+          "entities": {},
+          "confidence": 0.0,
+          "reason": "User gives only a bare analysis verb without domain or data type"
+        },
+        "alternative_intents": [],
+        "sub_intents": [],
+        "needs_clarification": true,
+        "clarification_question": "您希望进行哪类分析？例如单细胞分析、空间转录组分析等。请补充数据类型或分析目标。"
       }
 
       User: "请帮我选择分析类型"
@@ -286,7 +308,7 @@ prompts:
       }
 
       # Recent conversation context
-      {{ context }}
+      {{ formatted_context }}
 
       # User message
       {{ message }}

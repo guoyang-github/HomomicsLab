@@ -13,7 +13,7 @@ import time
 import uuid
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from homomics_lab.config import settings
 from homomics_lab.data import DataStore, ResultReference
@@ -55,6 +55,7 @@ class SkillRuntimeExecutor:
         tool_registry: Optional[ToolRegistry] = None,
         llm_client: Optional[LLMClient] = None,
         provenance_recorder = None,
+        progress_callback: Optional[Callable[[Any], None]] = None,
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
@@ -65,6 +66,7 @@ class SkillRuntimeExecutor:
         self.tool_registry = tool_registry or get_default_tool_registry()
         self.llm_client = llm_client
         self.provenance_recorder = provenance_recorder
+        self.progress_callback = progress_callback
         self._agent_executor: Optional[AgentSkillExecutor] = None
         self.data_store = DataStore(
             working_dir or Path.cwd(),

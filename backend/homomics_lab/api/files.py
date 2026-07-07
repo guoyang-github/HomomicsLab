@@ -1,5 +1,8 @@
 import base64
 import mimetypes
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -47,6 +50,7 @@ class FileUploadResponse(BaseModel):
 
 
 _MAX_READ_BYTES = 5 * 1024 * 1024  # 5 MB preview limit
+_CHUNK_SIZE = 1024 * 1024  # 1 MB upload chunk size
 
 
 def _project_root(project_id: str) -> Path:
@@ -158,46 +162,58 @@ async def upload_file(
     file: UploadFile = File(...),
     project_id: str = "default",
 ):
-    # Enforce per-file size limit.
-    max_bytes = settings.max_upload_file_bytes
-    content = await file.read()
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds maximum upload size of {max_bytes} bytes",
-        )
-
+    # Validate identifiers before consuming the stream so malformed requests
+    # fail fast without touching disk.
     try:
         project_id = validate_project_id(project_id)
         filename = sanitize_filename(file.filename or "upload.bin")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Store in configured backend (local or S3/MinIO).
-    backend = get_storage_backend()
-    key = StorageBackend.make_key(project_id, "uploads", filename)
-    uri = backend.put(key, content)
+    max_bytes = settings.max_upload_file_bytes
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = tmp.name
+            total_size = 0
+            while chunk := await file.read(_CHUNK_SIZE):
+                total_size += len(chunk)
+                if total_size > max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File exceeds maximum upload size of {max_bytes} bytes",
+                    )
+                tmp.write(chunk)
 
-    # Also keep a local workspace copy for backward compatibility / fast access.
-    project_dir = settings.data_dir / "raw" / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
-    file_path = project_dir / filename
-    file_path.write_bytes(content)
+        # Stream the staged temp file into the configured object store.
+        backend = get_storage_backend()
+        key = StorageBackend.make_key(project_id, "uploads", filename)
+        with open(tmp_path, "rb") as src:
+            uri = backend.put(key, src)
 
-    # Mirror into the project's workspace data directory so skills (e.g.
-    # bio-statistics-visualization) can find the file when creating a session.
-    ws = WorkspaceManager(settings.data_dir, project_id)
-    ws_data_path = ws.get_data_path(filename)
-    ws_data_path.parent.mkdir(parents=True, exist_ok=True)
-    ws_data_path.write_bytes(content)
+        # Keep a local project copy for backward compatibility / fast access.
+        project_dir = settings.data_dir / "raw" / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        file_path = project_dir / filename
+        shutil.copy2(tmp_path, file_path)
 
-    return {
-        "filename": filename,
-        "path": str(file_path),
-        "storage_uri": uri,
-        "size": len(content),
-        "project_id": project_id,
-    }
+        # Mirror into the project's workspace data directory so skills can find
+        # the file when creating a session.
+        ws = WorkspaceManager(settings.data_dir, project_id)
+        ws_data_path = ws.get_data_path(filename)
+        ws_data_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(tmp_path, ws_data_path)
+
+        return {
+            "filename": filename,
+            "path": str(file_path),
+            "storage_uri": uri,
+            "size": total_size,
+            "project_id": project_id,
+        }
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @router.get("/{project_id}/{path:path}", dependencies=[Depends(require_project_read)])

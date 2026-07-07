@@ -28,16 +28,16 @@ class TestDataStateV2:
         ds = DataState()
         ds.set("host_contamination", 0.05, domain="metagenomics")
         ds.set("n_asvs", 5000, domain="metagenomics")
-        ds.set("n_cells", 3000, domain="single_cell")
+        ds.set("n_cells", 3000, domain="single-cell-transcriptomics")
 
         assert ds.get("host_contamination", domain="metagenomics") == 0.05
         assert ds.get("n_asvs", domain="metagenomics") == 5000
-        assert ds.get("n_cells", domain="single_cell") == 3000
+        assert ds.get("n_cells", domain="single-cell-transcriptomics") == 3000
         # Cross-domain lookup without domain returns the first found key
         assert ds.get("n_cells") == 3000
         assert ds.get("host_contamination") == 0.05
         # Missing in namespace returns default
-        assert ds.get("host_contamination", domain="single_cell") is None
+        assert ds.get("host_contamination", domain="single-cell-transcriptomics") is None
 
     def test_set_universal_field(self):
         ds = DataState()

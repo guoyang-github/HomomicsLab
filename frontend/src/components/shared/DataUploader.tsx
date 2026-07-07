@@ -29,7 +29,7 @@ export function DataUploader() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/octet-stream': ['.h5ad', '.mtx', '.fastq.gz', '.csv', '.tsv', '.gz'],
+      'application/octet-stream': ['.h5ad', '.mtx', '.fastq.gz', '.csv', '.tsv', '.gz', '.rds', '.RData', '.rda'],
       'text/csv': ['.csv'],
       'text/tab-separated-values': ['.tsv'],
     },

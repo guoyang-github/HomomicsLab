@@ -10,8 +10,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.437501+00:00",
-    "updated_at": "2026-07-03T07:58:13.437520+00:00"
+    "imported_at": "2026-07-07T03:56:38.501311+00:00",
+    "updated_at": "2026-07-07T03:56:38.501329+00:00"
   },
   "builtin:core_hitl": {
     "id": "core_hitl",
@@ -24,8 +24,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.448093+00:00",
-    "updated_at": "2026-07-03T07:58:13.448114+00:00"
+    "imported_at": "2026-07-07T03:56:38.514137+00:00",
+    "updated_at": "2026-07-07T03:56:38.514155+00:00"
   },
   "builtin:core_interpretation": {
     "id": "core_interpretation",
@@ -38,8 +38,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.454901+00:00",
-    "updated_at": "2026-07-03T07:58:13.454919+00:00"
+    "imported_at": "2026-07-07T03:56:38.521864+00:00",
+    "updated_at": "2026-07-07T03:56:38.521885+00:00"
   },
   "builtin:core_planning": {
     "id": "core_planning",
@@ -52,8 +52,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.461485+00:00",
-    "updated_at": "2026-07-03T07:58:13.461500+00:00"
+    "imported_at": "2026-07-07T03:56:38.528796+00:00",
+    "updated_at": "2026-07-07T03:56:38.528807+00:00"
   },
   "builtin:core_reproducibility": {
     "id": "core_reproducibility",
@@ -66,8 +66,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.468552+00:00",
-    "updated_at": "2026-07-03T07:58:13.468573+00:00"
+    "imported_at": "2026-07-07T03:56:38.535814+00:00",
+    "updated_at": "2026-07-07T03:56:38.535833+00:00"
   },
   "builtin:core_skill_router": {
     "id": "core_skill_router",
@@ -80,8 +80,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.475384+00:00",
-    "updated_at": "2026-07-03T07:58:13.475402+00:00"
+    "imported_at": "2026-07-07T03:56:38.541840+00:00",
+    "updated_at": "2026-07-07T03:56:38.541850+00:00"
   },
   "builtin:utils_workflow_management_nextflow": {
     "id": "utils_workflow_management_nextflow",
@@ -94,8 +94,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-03T07:58:13.482324+00:00",
-    "updated_at": "2026-07-03T07:58:13.482343+00:00"
+    "imported_at": "2026-07-07T03:56:38.547064+00:00",
+    "updated_at": "2026-07-07T03:56:38.547071+00:00"
   },
   "builtin:data_loader": {
     "id": "data_loader",
@@ -249,7 +249,7 @@
     "trusted": true,
     "sha256": "b0e1d2373996810c54ca8efa24ee65ed6ab3bf07554922e6a23d81b52e08135a",
     "imported_at": "2026-07-03T04:42:32.066239+00:00",
-    "updated_at": "2026-07-03T04:48:37.938123+00:00"
+    "updated_at": "2026-07-07T03:56:57.505444+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -263,7 +263,7 @@
     "trusted": true,
     "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
     "imported_at": "2026-07-03T04:42:32.163340+00:00",
-    "updated_at": "2026-07-03T04:48:38.537128+00:00"
+    "updated_at": "2026-07-07T03:58:24.715403+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -277,7 +277,7 @@
     "trusted": true,
     "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
     "imported_at": "2026-07-03T04:42:32.888744+00:00",
-    "updated_at": "2026-07-03T04:48:38.988254+00:00"
+    "updated_at": "2026-07-07T03:58:25.234692+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -291,7 +291,7 @@
     "trusted": true,
     "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
     "imported_at": "2026-07-03T04:42:33.211830+00:00",
-    "updated_at": "2026-07-03T04:48:39.355467+00:00"
+    "updated_at": "2026-07-07T03:58:25.775156+00:00"
   },
   "nanoresearch:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -305,7 +305,7 @@
     "trusted": true,
     "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
     "imported_at": "2026-07-03T04:42:33.585598+00:00",
-    "updated_at": "2026-07-03T04:48:39.948026+00:00"
+    "updated_at": "2026-07-07T03:58:26.130439+00:00"
   },
   "nanoresearch:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -319,7 +319,7 @@
     "trusted": true,
     "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
     "imported_at": "2026-07-03T04:42:33.970106+00:00",
-    "updated_at": "2026-07-03T04:48:40.260128+00:00"
+    "updated_at": "2026-07-07T03:58:26.447443+00:00"
   },
   "nanoresearch:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -333,7 +333,7 @@
     "trusted": true,
     "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
     "imported_at": "2026-07-03T04:42:34.287923+00:00",
-    "updated_at": "2026-07-03T04:48:40.528718+00:00"
+    "updated_at": "2026-07-07T03:58:26.788871+00:00"
   },
   "nanoresearch:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -347,7 +347,7 @@
     "trusted": true,
     "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
     "imported_at": "2026-07-03T04:42:35.257004+00:00",
-    "updated_at": "2026-07-03T04:48:41.057673+00:00"
+    "updated_at": "2026-07-07T03:58:27.259091+00:00"
   },
   "nanoresearch:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -361,7 +361,7 @@
     "trusted": true,
     "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
     "imported_at": "2026-07-03T04:42:35.490585+00:00",
-    "updated_at": "2026-07-03T04:48:41.406806+00:00"
+    "updated_at": "2026-07-07T03:58:27.801918+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -375,7 +375,7 @@
     "trusted": true,
     "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
     "imported_at": "2026-07-03T04:42:35.774814+00:00",
-    "updated_at": "2026-07-03T04:48:41.666357+00:00"
+    "updated_at": "2026-07-07T03:58:28.079540+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -389,7 +389,7 @@
     "trusted": true,
     "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
     "imported_at": "2026-07-03T04:42:36.047773+00:00",
-    "updated_at": "2026-07-03T04:48:41.930958+00:00"
+    "updated_at": "2026-07-07T03:58:28.367508+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -403,7 +403,7 @@
     "trusted": true,
     "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
     "imported_at": "2026-07-03T04:42:36.826576+00:00",
-    "updated_at": "2026-07-03T04:48:42.318302+00:00"
+    "updated_at": "2026-07-07T03:58:28.708125+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -417,7 +417,7 @@
     "trusted": true,
     "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
     "imported_at": "2026-07-03T04:42:37.124169+00:00",
-    "updated_at": "2026-07-03T04:48:42.666802+00:00"
+    "updated_at": "2026-07-07T03:58:29.263084+00:00"
   },
   "nanoresearch:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -431,7 +431,7 @@
     "trusted": true,
     "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
     "imported_at": "2026-07-03T04:42:37.439342+00:00",
-    "updated_at": "2026-07-03T04:48:42.929950+00:00"
+    "updated_at": "2026-07-07T03:58:29.556970+00:00"
   },
   "nanoresearch:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -445,7 +445,7 @@
     "trusted": true,
     "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
     "imported_at": "2026-07-03T04:42:37.848982+00:00",
-    "updated_at": "2026-07-03T04:48:43.272317+00:00"
+    "updated_at": "2026-07-07T03:58:29.913391+00:00"
   },
   "nanoresearch:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -459,7 +459,7 @@
     "trusted": true,
     "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
     "imported_at": "2026-07-03T04:42:38.615691+00:00",
-    "updated_at": "2026-07-03T04:48:43.740806+00:00"
+    "updated_at": "2026-07-07T03:58:30.395853+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -473,7 +473,7 @@
     "trusted": true,
     "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
     "imported_at": "2026-07-03T04:42:39.188809+00:00",
-    "updated_at": "2026-07-03T04:48:44.146493+00:00"
+    "updated_at": "2026-07-07T03:58:30.885887+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -487,7 +487,7 @@
     "trusted": true,
     "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
     "imported_at": "2026-07-03T04:42:39.612763+00:00",
-    "updated_at": "2026-07-03T04:48:44.475170+00:00"
+    "updated_at": "2026-07-07T03:58:31.263444+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -501,7 +501,7 @@
     "trusted": true,
     "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
     "imported_at": "2026-07-03T04:42:40.079998+00:00",
-    "updated_at": "2026-07-03T04:48:44.832852+00:00"
+    "updated_at": "2026-07-07T03:58:31.603399+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -515,7 +515,7 @@
     "trusted": true,
     "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
     "imported_at": "2026-07-03T04:42:41.021692+00:00",
-    "updated_at": "2026-07-03T04:48:45.294150+00:00"
+    "updated_at": "2026-07-07T03:58:31.974786+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -529,7 +529,7 @@
     "trusted": true,
     "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
     "imported_at": "2026-07-03T04:42:41.399667+00:00",
-    "updated_at": "2026-07-03T04:48:45.742129+00:00"
+    "updated_at": "2026-07-07T03:58:32.900604+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -543,7 +543,7 @@
     "trusted": true,
     "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
     "imported_at": "2026-07-03T04:42:41.851916+00:00",
-    "updated_at": "2026-07-03T04:48:46.046546+00:00"
+    "updated_at": "2026-07-07T03:58:33.236126+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -557,7 +557,7 @@
     "trusted": true,
     "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
     "imported_at": "2026-07-03T04:42:42.710093+00:00",
-    "updated_at": "2026-07-03T04:48:46.524075+00:00"
+    "updated_at": "2026-07-07T03:58:33.615117+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -571,7 +571,7 @@
     "trusted": true,
     "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
     "imported_at": "2026-07-03T04:42:43.735934+00:00",
-    "updated_at": "2026-07-03T04:48:47.133324+00:00"
+    "updated_at": "2026-07-07T03:58:34.345816+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -585,7 +585,7 @@
     "trusted": true,
     "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
     "imported_at": "2026-07-03T04:42:44.041161+00:00",
-    "updated_at": "2026-07-03T04:48:47.489476+00:00"
+    "updated_at": "2026-07-07T03:58:34.967511+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -599,7 +599,7 @@
     "trusted": true,
     "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
     "imported_at": "2026-07-03T04:42:44.474873+00:00",
-    "updated_at": "2026-07-03T04:48:47.873866+00:00"
+    "updated_at": "2026-07-07T03:58:35.293606+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -613,7 +613,7 @@
     "trusted": true,
     "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
     "imported_at": "2026-07-03T04:42:44.968960+00:00",
-    "updated_at": "2026-07-03T04:48:48.214311+00:00"
+    "updated_at": "2026-07-07T03:58:35.675739+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -627,7 +627,7 @@
     "trusted": true,
     "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
     "imported_at": "2026-07-03T04:42:45.841254+00:00",
-    "updated_at": "2026-07-03T04:48:48.689064+00:00"
+    "updated_at": "2026-07-07T03:58:36.076546+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -641,7 +641,7 @@
     "trusted": true,
     "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
     "imported_at": "2026-07-03T04:42:46.216502+00:00",
-    "updated_at": "2026-07-03T04:48:49.023478+00:00"
+    "updated_at": "2026-07-07T03:58:36.657203+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -655,7 +655,7 @@
     "trusted": true,
     "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
     "imported_at": "2026-07-03T04:42:46.665015+00:00",
-    "updated_at": "2026-07-03T04:48:49.340419+00:00"
+    "updated_at": "2026-07-07T03:58:37.051188+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -669,7 +669,7 @@
     "trusted": true,
     "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
     "imported_at": "2026-07-03T04:42:46.949702+00:00",
-    "updated_at": "2026-07-03T04:48:49.603305+00:00"
+    "updated_at": "2026-07-07T03:58:37.411217+00:00"
   },
   "nanoresearch:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -683,7 +683,7 @@
     "trusted": true,
     "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
     "imported_at": "2026-07-03T04:42:47.334539+00:00",
-    "updated_at": "2026-07-03T04:48:49.922425+00:00"
+    "updated_at": "2026-07-07T03:58:37.743641+00:00"
   },
   "nanoresearch:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -697,7 +697,7 @@
     "trusted": true,
     "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
     "imported_at": "2026-07-03T04:42:47.729658+00:00",
-    "updated_at": "2026-07-03T04:48:50.203101+00:00"
+    "updated_at": "2026-07-07T03:58:38.118158+00:00"
   },
   "nanoresearch:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -711,7 +711,7 @@
     "trusted": true,
     "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
     "imported_at": "2026-07-03T04:42:48.492829+00:00",
-    "updated_at": "2026-07-03T04:48:50.701959+00:00"
+    "updated_at": "2026-07-07T03:58:38.598578+00:00"
   },
   "nanoresearch:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -725,7 +725,7 @@
     "trusted": true,
     "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
     "imported_at": "2026-07-03T04:42:48.841368+00:00",
-    "updated_at": "2026-07-03T04:48:51.044053+00:00"
+    "updated_at": "2026-07-07T03:58:39.211903+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -739,7 +739,7 @@
     "trusted": true,
     "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
     "imported_at": "2026-07-03T04:42:49.190533+00:00",
-    "updated_at": "2026-07-03T04:48:51.300722+00:00"
+    "updated_at": "2026-07-07T03:58:39.542893+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -753,7 +753,7 @@
     "trusted": true,
     "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
     "imported_at": "2026-07-03T04:42:50.213069+00:00",
-    "updated_at": "2026-07-03T04:48:51.767648+00:00"
+    "updated_at": "2026-07-07T03:58:39.938803+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -767,7 +767,7 @@
     "trusted": true,
     "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
     "imported_at": "2026-07-03T04:42:51.282815+00:00",
-    "updated_at": "2026-07-03T04:48:52.395662+00:00"
+    "updated_at": "2026-07-07T03:58:40.884698+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -781,7 +781,7 @@
     "trusted": true,
     "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
     "imported_at": "2026-07-03T04:42:51.709093+00:00",
-    "updated_at": "2026-07-03T04:48:52.811841+00:00"
+    "updated_at": "2026-07-07T03:58:41.661753+00:00"
   },
   "nanoresearch:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -795,7 +795,7 @@
     "trusted": true,
     "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
     "imported_at": "2026-07-03T04:42:51.952557+00:00",
-    "updated_at": "2026-07-03T04:48:53.005776+00:00"
+    "updated_at": "2026-07-07T03:58:41.947355+00:00"
   },
   "nanoresearch:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -809,7 +809,7 @@
     "trusted": true,
     "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
     "imported_at": "2026-07-03T04:42:52.935591+00:00",
-    "updated_at": "2026-07-03T04:48:53.496644+00:00"
+    "updated_at": "2026-07-07T03:58:42.344670+00:00"
   },
   "nanoresearch:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -823,7 +823,7 @@
     "trusted": true,
     "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
     "imported_at": "2026-07-03T04:42:53.242003+00:00",
-    "updated_at": "2026-07-03T04:48:53.857518+00:00"
+    "updated_at": "2026-07-07T03:58:43.092830+00:00"
   },
   "nanoresearch:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -837,7 +837,7 @@
     "trusted": true,
     "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
     "imported_at": "2026-07-03T04:42:54.245507+00:00",
-    "updated_at": "2026-07-03T04:48:54.295541+00:00"
+    "updated_at": "2026-07-07T03:58:43.471772+00:00"
   },
   "nanoresearch:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -851,7 +851,7 @@
     "trusted": true,
     "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
     "imported_at": "2026-07-03T04:42:54.665005+00:00",
-    "updated_at": "2026-07-03T04:48:54.690371+00:00"
+    "updated_at": "2026-07-07T03:58:44.148492+00:00"
   },
   "nanoresearch:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -865,7 +865,7 @@
     "trusted": true,
     "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
     "imported_at": "2026-07-03T04:42:55.050970+00:00",
-    "updated_at": "2026-07-03T04:48:54.966875+00:00"
+    "updated_at": "2026-07-07T03:58:44.499951+00:00"
   },
   "nanoresearch:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -879,7 +879,7 @@
     "trusted": true,
     "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
     "imported_at": "2026-07-03T04:42:56.029730+00:00",
-    "updated_at": "2026-07-03T04:48:55.455941+00:00"
+    "updated_at": "2026-07-07T03:58:44.902329+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -893,7 +893,7 @@
     "trusted": true,
     "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
     "imported_at": "2026-07-03T04:42:56.862521+00:00",
-    "updated_at": "2026-07-03T04:48:55.798763+00:00"
+    "updated_at": "2026-07-07T03:58:45.638873+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -907,7 +907,7 @@
     "trusted": true,
     "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
     "imported_at": "2026-07-03T04:42:57.201129+00:00",
-    "updated_at": "2026-07-03T04:48:56.051459+00:00"
+    "updated_at": "2026-07-07T03:58:46.150048+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -921,7 +921,7 @@
     "trusted": true,
     "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
     "imported_at": "2026-07-03T04:42:57.424935+00:00",
-    "updated_at": "2026-07-03T04:48:56.259848+00:00"
+    "updated_at": "2026-07-07T03:58:46.426402+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -935,7 +935,7 @@
     "trusted": true,
     "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
     "imported_at": "2026-07-03T04:42:57.782157+00:00",
-    "updated_at": "2026-07-03T04:48:56.506681+00:00"
+    "updated_at": "2026-07-07T03:58:46.862274+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -949,7 +949,7 @@
     "trusted": true,
     "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
     "imported_at": "2026-07-03T04:42:58.911270+00:00",
-    "updated_at": "2026-07-03T04:48:57.056307+00:00"
+    "updated_at": "2026-07-07T03:58:53.845321+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -963,7 +963,7 @@
     "trusted": true,
     "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
     "imported_at": "2026-07-03T04:43:00.039118+00:00",
-    "updated_at": "2026-07-03T04:48:57.687597+00:00"
+    "updated_at": "2026-07-07T03:58:54.604371+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -977,7 +977,7 @@
     "trusted": true,
     "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
     "imported_at": "2026-07-03T04:43:00.939131+00:00",
-    "updated_at": "2026-07-03T04:48:58.209854+00:00"
+    "updated_at": "2026-07-07T03:58:55.226584+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -991,7 +991,7 @@
     "trusted": true,
     "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
     "imported_at": "2026-07-03T04:43:01.650949+00:00",
-    "updated_at": "2026-07-03T04:48:58.719541+00:00"
+    "updated_at": "2026-07-07T03:58:55.878989+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -1005,7 +1005,7 @@
     "trusted": true,
     "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
     "imported_at": "2026-07-03T04:43:02.156644+00:00",
-    "updated_at": "2026-07-03T04:48:59.106038+00:00"
+    "updated_at": "2026-07-07T03:58:56.487593+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -1019,7 +1019,7 @@
     "trusted": true,
     "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
     "imported_at": "2026-07-03T04:43:03.469076+00:00",
-    "updated_at": "2026-07-03T04:48:59.763404+00:00"
+    "updated_at": "2026-07-07T03:58:56.958959+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -1033,7 +1033,7 @@
     "trusted": true,
     "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
     "imported_at": "2026-07-03T04:43:03.920009+00:00",
-    "updated_at": "2026-07-03T04:49:00.248049+00:00"
+    "updated_at": "2026-07-07T03:59:04.386744+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -1047,7 +1047,7 @@
     "trusted": true,
     "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
     "imported_at": "2026-07-03T04:43:04.338979+00:00",
-    "updated_at": "2026-07-03T04:49:00.579100+00:00"
+    "updated_at": "2026-07-07T03:59:04.920078+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -1061,7 +1061,7 @@
     "trusted": true,
     "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
     "imported_at": "2026-07-03T04:43:05.613710+00:00",
-    "updated_at": "2026-07-03T04:49:01.174047+00:00"
+    "updated_at": "2026-07-07T03:59:05.337404+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -1075,7 +1075,7 @@
     "trusted": true,
     "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
     "imported_at": "2026-07-03T04:43:06.064629+00:00",
-    "updated_at": "2026-07-03T04:49:01.634084+00:00"
+    "updated_at": "2026-07-07T03:59:06.099795+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -1089,7 +1089,7 @@
     "trusted": true,
     "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
     "imported_at": "2026-07-03T04:43:06.435842+00:00",
-    "updated_at": "2026-07-03T04:49:01.909460+00:00"
+    "updated_at": "2026-07-07T03:59:06.432298+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -1103,7 +1103,7 @@
     "trusted": true,
     "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
     "imported_at": "2026-07-03T04:43:07.677594+00:00",
-    "updated_at": "2026-07-03T04:49:02.424306+00:00"
+    "updated_at": "2026-07-07T03:59:06.812250+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -1117,7 +1117,7 @@
     "trusted": true,
     "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
     "imported_at": "2026-07-03T04:43:08.944612+00:00",
-    "updated_at": "2026-07-03T04:49:03.084418+00:00"
+    "updated_at": "2026-07-07T03:59:07.559265+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -1131,7 +1131,7 @@
     "trusted": true,
     "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
     "imported_at": "2026-07-03T04:43:10.311702+00:00",
-    "updated_at": "2026-07-03T04:49:03.736861+00:00"
+    "updated_at": "2026-07-07T03:59:08.454976+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -1145,7 +1145,7 @@
     "trusted": true,
     "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
     "imported_at": "2026-07-03T04:43:10.741537+00:00",
-    "updated_at": "2026-07-03T04:49:04.187194+00:00"
+    "updated_at": "2026-07-07T03:59:09.164621+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -1159,7 +1159,7 @@
     "trusted": true,
     "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
     "imported_at": "2026-07-03T04:43:11.997980+00:00",
-    "updated_at": "2026-07-03T04:49:04.733731+00:00"
+    "updated_at": "2026-07-07T03:59:09.535035+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -1173,7 +1173,7 @@
     "trusted": true,
     "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
     "imported_at": "2026-07-03T04:43:12.508686+00:00",
-    "updated_at": "2026-07-03T04:49:05.315066+00:00"
+    "updated_at": "2026-07-07T03:59:10.217696+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -1187,7 +1187,7 @@
     "trusted": true,
     "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
     "imported_at": "2026-07-03T04:43:13.021487+00:00",
-    "updated_at": "2026-07-03T04:49:05.701119+00:00"
+    "updated_at": "2026-07-07T03:59:10.599258+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -1201,7 +1201,7 @@
     "trusted": true,
     "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
     "imported_at": "2026-07-03T04:43:13.524309+00:00",
-    "updated_at": "2026-07-03T04:49:06.001055+00:00"
+    "updated_at": "2026-07-07T03:59:10.963142+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -1215,7 +1215,7 @@
     "trusted": true,
     "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
     "imported_at": "2026-07-03T04:43:13.818211+00:00",
-    "updated_at": "2026-07-03T04:49:06.421472+00:00"
+    "updated_at": "2026-07-07T03:59:11.272447+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -1229,7 +1229,7 @@
     "trusted": true,
     "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
     "imported_at": "2026-07-03T04:43:14.036817+00:00",
-    "updated_at": "2026-07-03T04:49:06.628847+00:00"
+    "updated_at": "2026-07-07T03:59:11.509549+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -1243,7 +1243,7 @@
     "trusted": true,
     "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
     "imported_at": "2026-07-03T04:43:15.794843+00:00",
-    "updated_at": "2026-07-03T04:49:07.258944+00:00"
+    "updated_at": "2026-07-07T03:59:11.889777+00:00"
   },
   "nanoresearch:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -1257,7 +1257,7 @@
     "trusted": true,
     "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
     "imported_at": "2026-07-03T04:43:17.658478+00:00",
-    "updated_at": "2026-07-03T04:43:17.663738+00:00"
+    "updated_at": "2026-07-07T03:59:13.165766+00:00"
   },
   "nanoresearch:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -1271,7 +1271,7 @@
     "trusted": true,
     "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
     "imported_at": "2026-07-03T04:43:19.000399+00:00",
-    "updated_at": "2026-07-03T04:43:19.005563+00:00"
+    "updated_at": "2026-07-07T03:59:14.116018+00:00"
   },
   "genomics:bio-genomics-alignment": {
     "id": "bio-genomics-alignment",
@@ -2609,13 +2609,13 @@
     "name": "bio-single-cell-annotation-celltypist",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-annotation-celltypist",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-celltypist",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.302373+00:00",
-    "updated_at": "2026-07-03T04:48:37.938792+00:00"
+    "sha256": "b0e1d2373996810c54ca8efa24ee65ed6ab3bf07554922e6a23d81b52e08135a",
+    "imported_at": "2026-07-04T18:41:13.721080+00:00",
+    "updated_at": "2026-07-07T03:56:57.757222+00:00"
   },
   "builtin:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -2623,13 +2623,13 @@
     "name": "bio-single-cell-annotation-markers",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-annotation-markers",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-markers",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.308859+00:00",
-    "updated_at": "2026-07-03T04:48:38.537714+00:00"
+    "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
+    "imported_at": "2026-07-04T18:41:13.729147+00:00",
+    "updated_at": "2026-07-07T03:58:24.832066+00:00"
   },
   "builtin:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -2637,13 +2637,13 @@
     "name": "bio-single-cell-annotation-sctype-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-annotation-sctype-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-sctype-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.315506+00:00",
-    "updated_at": "2026-07-03T04:48:38.988782+00:00"
+    "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
+    "imported_at": "2026-07-04T18:41:13.737152+00:00",
+    "updated_at": "2026-07-07T03:58:25.415562+00:00"
   },
   "builtin:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -2651,13 +2651,13 @@
     "name": "bio-single-cell-annotation-singler-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-annotation-singler-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-singler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.321947+00:00",
-    "updated_at": "2026-07-03T04:48:39.356298+00:00"
+    "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
+    "imported_at": "2026-07-04T18:41:13.745109+00:00",
+    "updated_at": "2026-07-07T03:58:25.861771+00:00"
   },
   "builtin:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -2665,13 +2665,13 @@
     "name": "bio-single-cell-atac-archr-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-atac-archr-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-archr-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.328883+00:00",
-    "updated_at": "2026-07-03T04:48:39.949537+00:00"
+    "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
+    "imported_at": "2026-07-04T18:41:13.754250+00:00",
+    "updated_at": "2026-07-07T03:58:26.206855+00:00"
   },
   "builtin:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -2679,13 +2679,13 @@
     "name": "bio-single-cell-atac-chromvar-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-atac-chromvar-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-chromvar-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.337296+00:00",
-    "updated_at": "2026-07-03T04:48:40.260521+00:00"
+    "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
+    "imported_at": "2026-07-04T18:41:13.763119+00:00",
+    "updated_at": "2026-07-07T03:58:26.531639+00:00"
   },
   "builtin:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -2693,13 +2693,13 @@
     "name": "bio-single-cell-atac-signac-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-atac-signac-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-signac-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.345200+00:00",
-    "updated_at": "2026-07-03T04:48:40.529621+00:00"
+    "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
+    "imported_at": "2026-07-04T18:41:13.770718+00:00",
+    "updated_at": "2026-07-07T03:58:26.868238+00:00"
   },
   "builtin:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -2707,13 +2707,13 @@
     "name": "bio-single-cell-batch-integration",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-batch-integration",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-batch-integration",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.353785+00:00",
-    "updated_at": "2026-07-03T04:48:41.058747+00:00"
+    "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
+    "imported_at": "2026-07-04T18:41:13.778301+00:00",
+    "updated_at": "2026-07-07T03:58:27.491013+00:00"
   },
   "builtin:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -2721,13 +2721,13 @@
     "name": "bio-single-cell-clustering",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-clustering",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-clustering",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.361588+00:00",
-    "updated_at": "2026-07-03T04:48:41.407739+00:00"
+    "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
+    "imported_at": "2026-07-04T18:41:13.785612+00:00",
+    "updated_at": "2026-07-07T03:58:27.856898+00:00"
   },
   "builtin:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -2735,13 +2735,13 @@
     "name": "bio-single-cell-cnv-fastcnv-r",
     "version": "1.2",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-cnv-fastcnv-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.369105+00:00",
-    "updated_at": "2026-07-03T04:48:41.667149+00:00"
+    "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
+    "imported_at": "2026-07-04T18:41:13.794549+00:00",
+    "updated_at": "2026-07-07T03:58:28.156037+00:00"
   },
   "builtin:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -2749,13 +2749,13 @@
     "name": "bio-single-cell-cnv-infercnv-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-cnv-infercnv-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.375879+00:00",
-    "updated_at": "2026-07-03T04:48:41.931755+00:00"
+    "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
+    "imported_at": "2026-07-04T18:41:13.805623+00:00",
+    "updated_at": "2026-07-07T03:58:28.434463+00:00"
   },
   "builtin:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -2763,13 +2763,13 @@
     "name": "bio-single-cell-cnv-infercnvpy",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-cnv-infercnvpy",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnvpy",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.383463+00:00",
-    "updated_at": "2026-07-03T04:48:42.319464+00:00"
+    "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
+    "imported_at": "2026-07-04T18:41:13.814776+00:00",
+    "updated_at": "2026-07-07T03:58:28.914489+00:00"
   },
   "builtin:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -2777,13 +2777,13 @@
     "name": "bio-single-cell-cnv-scevan-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-cnv-scevan-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-scevan-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.391843+00:00",
-    "updated_at": "2026-07-03T04:48:42.667706+00:00"
+    "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
+    "imported_at": "2026-07-04T18:41:13.822528+00:00",
+    "updated_at": "2026-07-07T03:58:29.328741+00:00"
   },
   "builtin:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -2791,13 +2791,13 @@
     "name": "bio-single-cell-communication-cellchat-r",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-communication-cellchat-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.399495+00:00",
-    "updated_at": "2026-07-03T04:48:42.931156+00:00"
+    "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
+    "imported_at": "2026-07-04T18:41:13.831474+00:00",
+    "updated_at": "2026-07-07T03:58:29.625454+00:00"
   },
   "builtin:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -2805,13 +2805,13 @@
     "name": "bio-single-cell-communication-nichenet-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-communication-nichenet-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-nichenet-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.406501+00:00",
-    "updated_at": "2026-07-03T04:48:43.273507+00:00"
+    "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
+    "imported_at": "2026-07-04T18:41:13.839176+00:00",
+    "updated_at": "2026-07-07T03:58:30.024408+00:00"
   },
   "builtin:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -2819,13 +2819,13 @@
     "name": "bio-single-cell-data-io",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-data-io",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-data-io",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.413472+00:00",
-    "updated_at": "2026-07-03T04:48:43.741597+00:00"
+    "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
+    "imported_at": "2026-07-04T18:41:13.846374+00:00",
+    "updated_at": "2026-07-07T03:58:30.587450+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -2833,13 +2833,13 @@
     "name": "bio-single-cell-differential-abundance-diffcyt-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-differential-abundance-diffcyt-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-diffcyt-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.419823+00:00",
-    "updated_at": "2026-07-03T04:48:44.147436+00:00"
+    "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
+    "imported_at": "2026-07-04T18:41:13.879081+00:00",
+    "updated_at": "2026-07-07T03:58:30.974044+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -2847,13 +2847,13 @@
     "name": "bio-single-cell-differential-abundance-milor-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-differential-abundance-milor-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-milor-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.426325+00:00",
-    "updated_at": "2026-07-03T04:48:44.476855+00:00"
+    "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
+    "imported_at": "2026-07-04T18:41:13.887082+00:00",
+    "updated_at": "2026-07-07T03:58:31.350296+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -2861,13 +2861,13 @@
     "name": "bio-single-cell-differential-abundance-roe-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-differential-abundance-roe-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.432939+00:00",
-    "updated_at": "2026-07-03T04:48:44.833561+00:00"
+    "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
+    "imported_at": "2026-07-04T18:41:13.895260+00:00",
+    "updated_at": "2026-07-07T03:58:31.692427+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -2875,13 +2875,13 @@
     "name": "bio-single-cell-differential-abundance-sccoda",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-differential-abundance-sccoda",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-sccoda",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.439903+00:00",
-    "updated_at": "2026-07-03T04:48:45.295001+00:00"
+    "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
+    "imported_at": "2026-07-04T18:41:13.902975+00:00",
+    "updated_at": "2026-07-07T03:58:32.215450+00:00"
   },
   "builtin:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -2889,13 +2889,13 @@
     "name": "bio-single-cell-doublet-doubletfinder-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-doublet-doubletfinder-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-doubletfinder-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.446823+00:00",
-    "updated_at": "2026-07-03T04:48:45.743007+00:00"
+    "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
+    "imported_at": "2026-07-04T18:41:13.910785+00:00",
+    "updated_at": "2026-07-07T03:58:32.982691+00:00"
   },
   "builtin:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -2903,13 +2903,13 @@
     "name": "bio-single-cell-doublet-scdblfinder-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-doublet-scdblfinder-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scdblfinder-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.453335+00:00",
-    "updated_at": "2026-07-03T04:48:46.047346+00:00"
+    "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
+    "imported_at": "2026-07-04T18:41:13.918523+00:00",
+    "updated_at": "2026-07-07T03:58:33.324505+00:00"
   },
   "builtin:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -2917,13 +2917,13 @@
     "name": "bio-single-cell-doublet-scrublet",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-doublet-scrublet",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scrublet",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.459340+00:00",
-    "updated_at": "2026-07-03T04:48:46.525460+00:00"
+    "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
+    "imported_at": "2026-07-04T18:41:13.925414+00:00",
+    "updated_at": "2026-07-07T03:58:33.854279+00:00"
   },
   "builtin:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -2931,13 +2931,13 @@
     "name": "bio-single-cell-doublet-solo",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-doublet-solo",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-solo",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.466400+00:00",
-    "updated_at": "2026-07-03T04:48:47.134004+00:00"
+    "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
+    "imported_at": "2026-07-04T18:41:13.932749+00:00",
+    "updated_at": "2026-07-07T03:58:34.608929+00:00"
   },
   "builtin:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -2945,13 +2945,13 @@
     "name": "bio-single-cell-enrichment-aucell-r",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-aucell-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-aucell-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.472341+00:00",
-    "updated_at": "2026-07-03T04:48:47.490353+00:00"
+    "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
+    "imported_at": "2026-07-04T18:41:13.939815+00:00",
+    "updated_at": "2026-07-07T03:58:35.029334+00:00"
   },
   "builtin:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -2959,13 +2959,13 @@
     "name": "bio-single-cell-enrichment-clusterprofiler-r",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-clusterprofiler-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-clusterprofiler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.478474+00:00",
-    "updated_at": "2026-07-03T04:48:47.875298+00:00"
+    "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
+    "imported_at": "2026-07-04T18:41:13.948252+00:00",
+    "updated_at": "2026-07-07T03:58:35.409513+00:00"
   },
   "builtin:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -2973,13 +2973,13 @@
     "name": "bio-single-cell-enrichment-decoupler-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-decoupler-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-decoupler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.484499+00:00",
-    "updated_at": "2026-07-03T04:48:48.215822+00:00"
+    "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
+    "imported_at": "2026-07-04T18:41:13.955490+00:00",
+    "updated_at": "2026-07-07T03:58:35.763508+00:00"
   },
   "builtin:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -2987,13 +2987,13 @@
     "name": "bio-single-cell-enrichment-gseapy",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-gseapy",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-gseapy",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.489787+00:00",
-    "updated_at": "2026-07-03T04:48:48.690165+00:00"
+    "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
+    "imported_at": "2026-07-04T18:41:13.964659+00:00",
+    "updated_at": "2026-07-07T03:58:36.295474+00:00"
   },
   "builtin:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -3001,13 +3001,13 @@
     "name": "bio-single-cell-enrichment-irgsea-r",
     "version": "2.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-irgsea-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-irgsea-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.495645+00:00",
-    "updated_at": "2026-07-03T04:48:49.024067+00:00"
+    "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
+    "imported_at": "2026-07-04T18:41:13.973090+00:00",
+    "updated_at": "2026-07-07T03:58:36.734232+00:00"
   },
   "builtin:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -3015,13 +3015,13 @@
     "name": "bio-single-cell-enrichment-progeny-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-progeny-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-progeny-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.502271+00:00",
-    "updated_at": "2026-07-03T04:48:49.341626+00:00"
+    "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
+    "imported_at": "2026-07-04T18:41:13.981206+00:00",
+    "updated_at": "2026-07-07T03:58:37.151284+00:00"
   },
   "builtin:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -3029,13 +3029,13 @@
     "name": "bio-single-cell-enrichment-ucell-r",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-enrichment-ucell-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-ucell-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.508827+00:00",
-    "updated_at": "2026-07-03T04:48:49.604893+00:00"
+    "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
+    "imported_at": "2026-07-04T18:41:13.988682+00:00",
+    "updated_at": "2026-07-07T03:58:37.465650+00:00"
   },
   "builtin:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -3043,13 +3043,13 @@
     "name": "bio-single-cell-fastq2mtx",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-fastq2mtx",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-fastq2mtx",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.514937+00:00",
-    "updated_at": "2026-07-03T04:48:49.923679+00:00"
+    "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
+    "imported_at": "2026-07-04T18:41:13.998086+00:00",
+    "updated_at": "2026-07-07T03:58:37.822902+00:00"
   },
   "builtin:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -3057,13 +3057,13 @@
     "name": "bio-single-cell-markers",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-markers",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-markers",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.521445+00:00",
-    "updated_at": "2026-07-03T04:48:50.203827+00:00"
+    "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
+    "imported_at": "2026-07-04T18:41:14.006965+00:00",
+    "updated_at": "2026-07-07T03:58:38.233642+00:00"
   },
   "builtin:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -3071,13 +3071,13 @@
     "name": "bio-single-cell-metabolism-compass",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-metabolism-compass",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-compass",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.528135+00:00",
-    "updated_at": "2026-07-03T04:48:50.702661+00:00"
+    "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
+    "imported_at": "2026-07-04T18:41:14.013882+00:00",
+    "updated_at": "2026-07-07T03:58:38.827517+00:00"
   },
   "builtin:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -3085,13 +3085,13 @@
     "name": "bio-single-cell-metabolism-scmetabolism-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-metabolism-scmetabolism-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-scmetabolism-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.534882+00:00",
-    "updated_at": "2026-07-03T04:48:51.044880+00:00"
+    "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
+    "imported_at": "2026-07-04T18:41:14.021311+00:00",
+    "updated_at": "2026-07-07T03:58:39.299023+00:00"
   },
   "builtin:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -3099,13 +3099,13 @@
     "name": "bio-single-cell-perturbation-augur-r",
     "version": "1.1",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-perturbation-augur-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-augur-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.541593+00:00",
-    "updated_at": "2026-07-03T04:48:51.301948+00:00"
+    "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
+    "imported_at": "2026-07-04T18:41:14.028684+00:00",
+    "updated_at": "2026-07-07T03:58:39.625119+00:00"
   },
   "builtin:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -3113,13 +3113,13 @@
     "name": "bio-single-cell-perturbation-pertpy",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-perturbation-pertpy",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-pertpy",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.549169+00:00",
-    "updated_at": "2026-07-03T04:48:51.768777+00:00"
+    "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
+    "imported_at": "2026-07-04T18:41:14.035892+00:00",
+    "updated_at": "2026-07-07T03:58:40.216116+00:00"
   },
   "builtin:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -3127,13 +3127,13 @@
     "name": "bio-single-cell-perturbation-scgen",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-perturbation-scgen",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-scgen",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.557132+00:00",
-    "updated_at": "2026-07-03T04:48:52.396551+00:00"
+    "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
+    "imported_at": "2026-07-04T18:41:14.043025+00:00",
+    "updated_at": "2026-07-07T03:58:41.162180+00:00"
   },
   "builtin:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -3141,13 +3141,13 @@
     "name": "bio-single-cell-perturbation-sctenifoldknk-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-perturbation-sctenifoldknk-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-sctenifoldknk-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.564793+00:00",
-    "updated_at": "2026-07-03T04:48:52.812549+00:00"
+    "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
+    "imported_at": "2026-07-04T18:41:14.049785+00:00",
+    "updated_at": "2026-07-07T03:58:41.745114+00:00"
   },
   "builtin:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -3155,13 +3155,13 @@
     "name": "bio-single-cell-preprocessing",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-preprocessing",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-preprocessing",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.571811+00:00",
-    "updated_at": "2026-07-03T04:48:53.006513+00:00"
+    "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
+    "imported_at": "2026-07-04T18:41:14.056913+00:00",
+    "updated_at": "2026-07-07T03:58:41.996962+00:00"
   },
   "builtin:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -3169,13 +3169,13 @@
     "name": "bio-single-cell-regulatory-pyscenic",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-regulatory-pyscenic",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-pyscenic",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.578549+00:00",
-    "updated_at": "2026-07-03T04:48:53.497342+00:00"
+    "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
+    "imported_at": "2026-07-04T18:41:14.063749+00:00",
+    "updated_at": "2026-07-07T03:58:42.637162+00:00"
   },
   "builtin:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -3183,13 +3183,13 @@
     "name": "bio-single-cell-regulatory-scenic-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-regulatory-scenic-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-scenic-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.584955+00:00",
-    "updated_at": "2026-07-03T04:48:53.858349+00:00"
+    "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
+    "imported_at": "2026-07-04T18:41:14.070753+00:00",
+    "updated_at": "2026-07-07T03:58:43.173703+00:00"
   },
   "builtin:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -3197,13 +3197,13 @@
     "name": "bio-single-cell-splicing-brie2",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-splicing-brie2",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-splicing-brie2",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.591189+00:00",
-    "updated_at": "2026-07-03T04:48:54.296218+00:00"
+    "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
+    "imported_at": "2026-07-04T18:41:14.077715+00:00",
+    "updated_at": "2026-07-07T03:58:43.716331+00:00"
   },
   "builtin:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -3211,13 +3211,13 @@
     "name": "bio-single-cell-tcr-startrac-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-tcr-startrac-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-tcr-startrac-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.597646+00:00",
-    "updated_at": "2026-07-03T04:48:54.691356+00:00"
+    "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
+    "imported_at": "2026-07-04T18:41:14.084770+00:00",
+    "updated_at": "2026-07-07T03:58:44.245320+00:00"
   },
   "builtin:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -3225,13 +3225,13 @@
     "name": "bio-single-cell-trajectory-monocle3-r",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-trajectory-monocle3-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-monocle3-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.604437+00:00",
-    "updated_at": "2026-07-03T04:48:54.967829+00:00"
+    "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
+    "imported_at": "2026-07-04T18:41:14.091858+00:00",
+    "updated_at": "2026-07-07T03:58:44.590685+00:00"
   },
   "builtin:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -3239,13 +3239,13 @@
     "name": "bio-single-cell-trajectory-scvelo",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-single-cell-trajectory-scvelo",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-scvelo",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.612599+00:00",
-    "updated_at": "2026-07-03T04:48:55.456651+00:00"
+    "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
+    "imported_at": "2026-07-04T18:41:14.098756+00:00",
+    "updated_at": "2026-07-07T03:58:45.150399+00:00"
   },
   "builtin:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -3253,13 +3253,13 @@
     "name": "bio-spatial-transcriptomics-batch-integration",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-batch-integration",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-batch-integration",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.618487+00:00",
-    "updated_at": "2026-07-03T04:48:55.799865+00:00"
+    "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
+    "imported_at": "2026-07-04T18:41:14.106946+00:00",
+    "updated_at": "2026-07-07T03:58:45.696196+00:00"
   },
   "builtin:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -3267,13 +3267,13 @@
     "name": "bio-spatial-transcriptomics-cnv-fastcnv-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-cnv-fastcnv-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.625079+00:00",
-    "updated_at": "2026-07-03T04:48:56.052696+00:00"
+    "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
+    "imported_at": "2026-07-04T18:41:14.114818+00:00",
+    "updated_at": "2026-07-07T03:58:46.225018+00:00"
   },
   "builtin:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -3281,13 +3281,13 @@
     "name": "bio-spatial-transcriptomics-cnv-numbat-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-cnv-numbat-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-numbat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.630579+00:00",
-    "updated_at": "2026-07-03T04:48:56.260599+00:00"
+    "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
+    "imported_at": "2026-07-04T18:41:14.124453+00:00",
+    "updated_at": "2026-07-07T03:58:46.490175+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -3295,13 +3295,13 @@
     "name": "bio-spatial-transcriptomics-communication-cellchat-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-communication-cellchat-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.636542+00:00",
-    "updated_at": "2026-07-03T04:48:56.507706+00:00"
+    "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
+    "imported_at": "2026-07-04T18:41:14.132124+00:00",
+    "updated_at": "2026-07-07T03:58:46.955996+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -3309,13 +3309,13 @@
     "name": "bio-spatial-transcriptomics-communication-commot",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-communication-commot",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-commot",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.643078+00:00",
-    "updated_at": "2026-07-03T04:48:57.057047+00:00"
+    "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
+    "imported_at": "2026-07-04T18:41:14.142954+00:00",
+    "updated_at": "2026-07-07T03:58:54.098441+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -3323,13 +3323,13 @@
     "name": "bio-spatial-transcriptomics-communication-fastccc",
     "version": "1.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-communication-fastccc",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-fastccc",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.649491+00:00",
-    "updated_at": "2026-07-03T04:48:57.688682+00:00"
+    "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
+    "imported_at": "2026-07-04T18:41:14.151061+00:00",
+    "updated_at": "2026-07-07T03:58:54.773800+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -3337,13 +3337,13 @@
     "name": "bio-spatial-transcriptomics-communication-liana",
     "version": "1.0.0",
     "category": "single-cell",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-communication-liana",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-liana",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.655439+00:00",
-    "updated_at": "2026-07-03T04:48:58.210662+00:00"
+    "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
+    "imported_at": "2026-07-04T18:41:14.160018+00:00",
+    "updated_at": "2026-07-07T03:58:55.468048+00:00"
   },
   "builtin:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -3351,13 +3351,13 @@
     "name": "bio-spatial-transcriptomics-data-io",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-data-io",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-data-io",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.663416+00:00",
-    "updated_at": "2026-07-03T04:48:58.720522+00:00"
+    "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
+    "imported_at": "2026-07-04T18:41:14.167872+00:00",
+    "updated_at": "2026-07-07T03:58:56.029465+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -3365,13 +3365,13 @@
     "name": "bio-spatial-transcriptomics-deconvolution-card-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-deconvolution-card-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-card-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.671787+00:00",
-    "updated_at": "2026-07-03T04:48:59.106926+00:00"
+    "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
+    "imported_at": "2026-07-04T18:41:14.177664+00:00",
+    "updated_at": "2026-07-07T03:58:56.603930+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -3379,13 +3379,13 @@
     "name": "bio-spatial-transcriptomics-deconvolution-cell2location",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-deconvolution-cell2location",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-cell2location",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.681236+00:00",
-    "updated_at": "2026-07-03T04:48:59.764612+00:00"
+    "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
+    "imported_at": "2026-07-04T18:41:14.187713+00:00",
+    "updated_at": "2026-07-07T03:58:57.197857+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -3393,13 +3393,13 @@
     "name": "bio-spatial-transcriptomics-deconvolution-rctd-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-deconvolution-rctd-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-rctd-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.688684+00:00",
-    "updated_at": "2026-07-03T04:49:00.248909+00:00"
+    "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
+    "imported_at": "2026-07-04T18:41:14.196019+00:00",
+    "updated_at": "2026-07-07T03:59:04.474538+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -3407,13 +3407,13 @@
     "name": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-deconvolution-spotlight-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-spotlight-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.695778+00:00",
-    "updated_at": "2026-07-03T04:49:00.580288+00:00"
+    "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
+    "imported_at": "2026-07-04T18:41:14.207504+00:00",
+    "updated_at": "2026-07-07T03:59:05.012367+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -3421,13 +3421,13 @@
     "name": "bio-spatial-transcriptomics-deconvolution-tangram",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-deconvolution-tangram",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-tangram",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.702077+00:00",
-    "updated_at": "2026-07-03T04:49:01.174835+00:00"
+    "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
+    "imported_at": "2026-07-04T18:41:14.217534+00:00",
+    "updated_at": "2026-07-07T03:59:05.654718+00:00"
   },
   "builtin:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -3435,13 +3435,13 @@
     "name": "bio-spatial-transcriptomics-differential-abundance-roe-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-differential-abundance-roe-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.708444+00:00",
-    "updated_at": "2026-07-03T04:49:01.635034+00:00"
+    "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
+    "imported_at": "2026-07-04T18:41:14.228215+00:00",
+    "updated_at": "2026-07-07T03:59:06.209102+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -3449,13 +3449,13 @@
     "name": "bio-spatial-transcriptomics-domains-bayesspace-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-domains-bayesspace-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-bayesspace-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.714641+00:00",
-    "updated_at": "2026-07-03T04:49:01.910266+00:00"
+    "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
+    "imported_at": "2026-07-04T18:41:14.239508+00:00",
+    "updated_at": "2026-07-07T03:59:06.504132+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -3463,13 +3463,13 @@
     "name": "bio-spatial-transcriptomics-domains-graphst",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-domains-graphst",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-graphst",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.720815+00:00",
-    "updated_at": "2026-07-03T04:49:02.425149+00:00"
+    "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
+    "imported_at": "2026-07-04T18:41:14.248544+00:00",
+    "updated_at": "2026-07-07T03:59:07.122287+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -3477,13 +3477,13 @@
     "name": "bio-spatial-transcriptomics-domains-spagcn",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-domains-spagcn",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-spagcn",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.726567+00:00",
-    "updated_at": "2026-07-03T04:49:03.085139+00:00"
+    "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
+    "imported_at": "2026-07-04T18:41:14.256447+00:00",
+    "updated_at": "2026-07-07T03:59:07.910676+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -3491,13 +3491,13 @@
     "name": "bio-spatial-transcriptomics-domains-stagate",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-domains-stagate",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-stagate",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.732312+00:00",
-    "updated_at": "2026-07-03T04:49:03.737798+00:00"
+    "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
+    "imported_at": "2026-07-04T18:41:14.263866+00:00",
+    "updated_at": "2026-07-07T03:59:08.780578+00:00"
   },
   "builtin:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -3505,13 +3505,13 @@
     "name": "bio-spatial-transcriptomics-fastq2spatial",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-fastq2spatial",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-fastq2spatial",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.737563+00:00",
-    "updated_at": "2026-07-03T04:49:04.188904+00:00"
+    "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
+    "imported_at": "2026-07-04T18:41:14.272750+00:00",
+    "updated_at": "2026-07-07T03:59:09.261740+00:00"
   },
   "builtin:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -3519,13 +3519,13 @@
     "name": "bio-spatial-transcriptomics-integration-spclue",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-integration-spclue",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-integration-spclue",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.744151+00:00",
-    "updated_at": "2026-07-03T04:49:04.734664+00:00"
+    "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
+    "imported_at": "2026-07-04T18:41:14.282157+00:00",
+    "updated_at": "2026-07-07T03:59:09.805671+00:00"
   },
   "builtin:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -3533,13 +3533,13 @@
     "name": "bio-spatial-transcriptomics-layers",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-layers",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-layers",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.750906+00:00",
-    "updated_at": "2026-07-03T04:49:05.316204+00:00"
+    "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
+    "imported_at": "2026-07-04T18:41:14.290297+00:00",
+    "updated_at": "2026-07-07T03:59:10.338631+00:00"
   },
   "builtin:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -3547,13 +3547,13 @@
     "name": "bio-spatial-transcriptomics-microenvironment-misty-r",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-microenvironment-misty-r",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-microenvironment-misty-r",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.756989+00:00",
-    "updated_at": "2026-07-03T04:49:05.701717+00:00"
+    "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
+    "imported_at": "2026-07-04T18:41:14.297844+00:00",
+    "updated_at": "2026-07-07T03:59:10.712505+00:00"
   },
   "builtin:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -3561,13 +3561,13 @@
     "name": "bio-spatial-transcriptomics-neighbors",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-neighbors",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-neighbors",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.763068+00:00",
-    "updated_at": "2026-07-03T04:49:06.002007+00:00"
+    "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
+    "imported_at": "2026-07-04T18:41:14.305247+00:00",
+    "updated_at": "2026-07-07T03:59:11.077908+00:00"
   },
   "builtin:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -3575,13 +3575,13 @@
     "name": "bio-spatial-transcriptomics-niches",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-niches",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-niches",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.768991+00:00",
-    "updated_at": "2026-07-03T04:49:06.422226+00:00"
+    "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
+    "imported_at": "2026-07-04T18:41:14.313872+00:00",
+    "updated_at": "2026-07-07T03:59:11.356887+00:00"
   },
   "builtin:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -3589,13 +3589,13 @@
     "name": "bio-spatial-transcriptomics-preprocessing",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-preprocessing",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-preprocessing",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.774976+00:00",
-    "updated_at": "2026-07-03T04:49:06.629904+00:00"
+    "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
+    "imported_at": "2026-07-04T18:41:14.323576+00:00",
+    "updated_at": "2026-07-07T03:59:11.548648+00:00"
   },
   "builtin:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -3603,13 +3603,13 @@
     "name": "bio-spatial-transcriptomics-statistics",
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-spatial-transcriptomics-statistics",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-statistics",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.780455+00:00",
-    "updated_at": "2026-07-03T04:49:07.260075+00:00"
+    "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
+    "imported_at": "2026-07-04T18:41:14.331354+00:00",
+    "updated_at": "2026-07-07T03:59:12.365390+00:00"
   },
   "builtin:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -3617,13 +3617,13 @@
     "name": "bio-workflows-scrnaseq-pipeline",
     "version": "1.0.0",
     "category": "workflows",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-workflows-scrnaseq-pipeline",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-scrnaseq-pipeline",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.786212+00:00",
-    "updated_at": "2026-06-22T02:47:40.786230+00:00"
+    "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
+    "imported_at": "2026-07-04T18:41:14.340495+00:00",
+    "updated_at": "2026-07-07T03:59:13.518402+00:00"
   },
   "builtin:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -3631,13 +3631,13 @@
     "name": "bio-workflows-spatial-pipeline",
     "version": "1.0.0",
     "category": "workflows",
-    "source": "imported",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/skill_store/imported/nanoresearch/bio-workflows-spatial-pipeline",
+    "source": "dropin",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-spatial-pipeline",
     "enabled": true,
     "trusted": false,
-    "sha256": null,
-    "imported_at": "2026-06-22T02:47:40.791994+00:00",
-    "updated_at": "2026-06-22T02:47:40.792009+00:00"
+    "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
+    "imported_at": "2026-07-04T18:41:14.348307+00:00",
+    "updated_at": "2026-07-07T03:59:14.407462+00:00"
   },
   "builtin:bio-genomics-alignment": {
     "id": "bio-genomics-alignment",
@@ -4980,8 +4980,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-02T08:42:51.580193+00:00",
-    "updated_at": "2026-07-02T08:42:51.580208+00:00"
+    "imported_at": "2026-07-04T18:41:14.357102+00:00",
+    "updated_at": "2026-07-04T18:41:14.357130+00:00"
   },
   "builtin:batch-skill-a": {
     "id": "batch-skill-a",
@@ -4990,12 +4990,12 @@
     "version": "1.0.0",
     "category": "general",
     "source": "imported",
-    "source_dir": "/tmp/pytest-of-guoyang/pytest-255/test_import_directory_bulk_imp0/skills/batch-skill-a",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-86/test_import_directory_bulk_imp0/skills/batch-skill-a",
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-02T08:42:51.586449+00:00",
-    "updated_at": "2026-07-02T08:42:51.586466+00:00"
+    "imported_at": "2026-07-04T18:41:14.366822+00:00",
+    "updated_at": "2026-07-04T18:41:14.366849+00:00"
   },
   "builtin:batch-skill-b": {
     "id": "batch-skill-b",
@@ -5004,12 +5004,12 @@
     "version": "1.0.0",
     "category": "general",
     "source": "imported",
-    "source_dir": "/tmp/pytest-of-guoyang/pytest-255/test_import_directory_bulk_imp0/skills/batch-skill-b",
+    "source_dir": "/tmp/pytest-of-guoyang/pytest-86/test_import_directory_bulk_imp0/skills/batch-skill-b",
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-02T08:42:51.592074+00:00",
-    "updated_at": "2026-07-02T08:42:51.592097+00:00"
+    "imported_at": "2026-07-04T18:41:14.374823+00:00",
+    "updated_at": "2026-07-04T18:41:14.374836+00:00"
   },
   "paperwriting:scientific-publishing-ethics": {
     "id": "scientific-publishing-ethics",
@@ -5956,12 +5956,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-annotation-celltypist",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-celltypist",
     "enabled": true,
     "trusted": false,
     "sha256": "b0e1d2373996810c54ca8efa24ee65ed6ab3bf07554922e6a23d81b52e08135a",
-    "imported_at": "2026-07-03T04:56:33.714294+00:00",
-    "updated_at": "2026-07-03T04:56:33.714323+00:00"
+    "imported_at": "2026-07-07T03:56:38.905960+00:00",
+    "updated_at": "2026-07-07T03:56:58.037896+00:00"
   },
   "user:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -5970,12 +5970,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-annotation-markers",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-markers",
     "enabled": true,
     "trusted": false,
     "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
-    "imported_at": "2026-07-03T04:56:33.752160+00:00",
-    "updated_at": "2026-07-03T04:56:33.752180+00:00"
+    "imported_at": "2026-07-07T03:56:38.949943+00:00",
+    "updated_at": "2026-07-07T03:58:24.891007+00:00"
   },
   "user:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -5984,12 +5984,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-annotation-sctype-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-sctype-r",
     "enabled": true,
     "trusted": false,
     "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
-    "imported_at": "2026-07-03T04:56:33.981215+00:00",
-    "updated_at": "2026-07-03T04:56:33.981236+00:00"
+    "imported_at": "2026-07-07T03:56:39.227252+00:00",
+    "updated_at": "2026-07-07T03:58:25.590837+00:00"
   },
   "user:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -5998,12 +5998,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-annotation-singler-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-singler-r",
     "enabled": true,
     "trusted": false,
     "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
-    "imported_at": "2026-07-03T04:56:34.077414+00:00",
-    "updated_at": "2026-07-03T04:56:34.077434+00:00"
+    "imported_at": "2026-07-07T03:56:39.336670+00:00",
+    "updated_at": "2026-07-07T03:58:25.964207+00:00"
   },
   "user:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -6012,12 +6012,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-atac-archr-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-archr-r",
     "enabled": true,
     "trusted": false,
     "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
-    "imported_at": "2026-07-03T04:56:34.176877+00:00",
-    "updated_at": "2026-07-03T04:56:34.176890+00:00"
+    "imported_at": "2026-07-07T03:56:39.455083+00:00",
+    "updated_at": "2026-07-07T03:58:26.304063+00:00"
   },
   "user:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -6026,12 +6026,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-atac-chromvar-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-chromvar-r",
     "enabled": true,
     "trusted": false,
     "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
-    "imported_at": "2026-07-03T04:56:34.259271+00:00",
-    "updated_at": "2026-07-03T04:56:34.259307+00:00"
+    "imported_at": "2026-07-07T03:56:39.574400+00:00",
+    "updated_at": "2026-07-07T03:58:26.625950+00:00"
   },
   "user:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -6040,12 +6040,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-atac-signac-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-signac-r",
     "enabled": true,
     "trusted": false,
     "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
-    "imported_at": "2026-07-03T04:56:34.339345+00:00",
-    "updated_at": "2026-07-03T04:56:34.339365+00:00"
+    "imported_at": "2026-07-07T03:56:39.719242+00:00",
+    "updated_at": "2026-07-07T03:58:26.962502+00:00"
   },
   "user:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -6054,12 +6054,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-batch-integration",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-batch-integration",
     "enabled": true,
     "trusted": false,
     "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
-    "imported_at": "2026-07-03T04:56:34.567203+00:00",
-    "updated_at": "2026-07-03T04:56:34.567247+00:00"
+    "imported_at": "2026-07-07T03:56:40.124095+00:00",
+    "updated_at": "2026-07-07T03:58:27.682729+00:00"
   },
   "user:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -6068,12 +6068,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-clustering",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-clustering",
     "enabled": true,
     "trusted": false,
     "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
-    "imported_at": "2026-07-03T04:56:34.616822+00:00",
-    "updated_at": "2026-07-03T04:56:34.616841+00:00"
+    "imported_at": "2026-07-07T03:56:40.209163+00:00",
+    "updated_at": "2026-07-07T03:58:27.912461+00:00"
   },
   "user:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -6082,12 +6082,12 @@
     "version": "1.2",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-cnv-fastcnv-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
     "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
-    "imported_at": "2026-07-03T04:56:34.740603+00:00",
-    "updated_at": "2026-07-03T04:56:34.740620+00:00"
+    "imported_at": "2026-07-07T03:56:40.314646+00:00",
+    "updated_at": "2026-07-07T03:58:28.229387+00:00"
   },
   "user:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -6096,12 +6096,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-cnv-infercnv-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnv-r",
     "enabled": true,
     "trusted": false,
     "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
-    "imported_at": "2026-07-03T04:56:34.849226+00:00",
-    "updated_at": "2026-07-03T04:56:34.849265+00:00"
+    "imported_at": "2026-07-07T03:56:40.409357+00:00",
+    "updated_at": "2026-07-07T03:58:28.495310+00:00"
   },
   "user:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -6110,12 +6110,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-cnv-infercnvpy",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnvpy",
     "enabled": true,
     "trusted": false,
     "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
-    "imported_at": "2026-07-03T04:56:35.028655+00:00",
-    "updated_at": "2026-07-03T04:56:35.028689+00:00"
+    "imported_at": "2026-07-07T03:56:40.642706+00:00",
+    "updated_at": "2026-07-07T03:58:29.115777+00:00"
   },
   "user:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -6124,12 +6124,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-cnv-scevan-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-scevan-r",
     "enabled": true,
     "trusted": false,
     "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
-    "imported_at": "2026-07-03T04:56:35.092534+00:00",
-    "updated_at": "2026-07-03T04:56:35.092556+00:00"
+    "imported_at": "2026-07-07T03:56:40.781825+00:00",
+    "updated_at": "2026-07-07T03:58:29.395578+00:00"
   },
   "user:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -6138,12 +6138,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-communication-cellchat-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
     "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
-    "imported_at": "2026-07-03T04:56:35.157835+00:00",
-    "updated_at": "2026-07-03T04:56:35.157869+00:00"
+    "imported_at": "2026-07-07T03:56:40.905913+00:00",
+    "updated_at": "2026-07-07T03:58:29.710205+00:00"
   },
   "user:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -6152,12 +6152,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-communication-nichenet-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-nichenet-r",
     "enabled": true,
     "trusted": false,
     "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
-    "imported_at": "2026-07-03T04:56:35.314060+00:00",
-    "updated_at": "2026-07-03T04:56:35.314081+00:00"
+    "imported_at": "2026-07-07T03:56:41.037698+00:00",
+    "updated_at": "2026-07-07T03:58:30.128085+00:00"
   },
   "user:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -6166,12 +6166,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-data-io",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-data-io",
     "enabled": true,
     "trusted": false,
     "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
-    "imported_at": "2026-07-03T04:56:35.479044+00:00",
-    "updated_at": "2026-07-03T04:56:35.479067+00:00"
+    "imported_at": "2026-07-07T03:56:41.276637+00:00",
+    "updated_at": "2026-07-07T03:58:30.719831+00:00"
   },
   "user:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -6180,12 +6180,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-differential-abundance-diffcyt-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-diffcyt-r",
     "enabled": true,
     "trusted": false,
     "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
-    "imported_at": "2026-07-03T04:56:35.570516+00:00",
-    "updated_at": "2026-07-03T04:56:35.570558+00:00"
+    "imported_at": "2026-07-07T03:56:41.400110+00:00",
+    "updated_at": "2026-07-07T03:58:31.097625+00:00"
   },
   "user:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -6194,12 +6194,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-differential-abundance-milor-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-milor-r",
     "enabled": true,
     "trusted": false,
     "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
-    "imported_at": "2026-07-03T04:56:35.824172+00:00",
-    "updated_at": "2026-07-03T04:56:35.824223+00:00"
+    "imported_at": "2026-07-07T03:56:41.532395+00:00",
+    "updated_at": "2026-07-07T03:58:31.440589+00:00"
   },
   "user:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -6208,12 +6208,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-differential-abundance-roe-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
     "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
-    "imported_at": "2026-07-03T04:56:36.109027+00:00",
-    "updated_at": "2026-07-03T04:56:36.109051+00:00"
+    "imported_at": "2026-07-07T03:56:41.650201+00:00",
+    "updated_at": "2026-07-07T03:58:31.758622+00:00"
   },
   "user:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -6222,12 +6222,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-differential-abundance-sccoda",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-sccoda",
     "enabled": true,
     "trusted": false,
     "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
-    "imported_at": "2026-07-03T04:56:36.274815+00:00",
-    "updated_at": "2026-07-03T04:56:36.274848+00:00"
+    "imported_at": "2026-07-07T03:56:41.919791+00:00",
+    "updated_at": "2026-07-07T03:58:32.442682+00:00"
   },
   "user:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -6236,12 +6236,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-doublet-doubletfinder-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-doubletfinder-r",
     "enabled": true,
     "trusted": false,
     "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
-    "imported_at": "2026-07-03T04:56:36.385494+00:00",
-    "updated_at": "2026-07-03T04:56:36.385534+00:00"
+    "imported_at": "2026-07-07T03:56:42.048988+00:00",
+    "updated_at": "2026-07-07T03:58:33.073195+00:00"
   },
   "user:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -6250,12 +6250,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-doublet-scdblfinder-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scdblfinder-r",
     "enabled": true,
     "trusted": false,
     "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
-    "imported_at": "2026-07-03T04:56:36.478592+00:00",
-    "updated_at": "2026-07-03T04:56:36.478612+00:00"
+    "imported_at": "2026-07-07T03:56:42.166567+00:00",
+    "updated_at": "2026-07-07T03:58:33.406642+00:00"
   },
   "user:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -6264,12 +6264,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-doublet-scrublet",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scrublet",
     "enabled": true,
     "trusted": false,
     "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
-    "imported_at": "2026-07-03T04:56:36.677307+00:00",
-    "updated_at": "2026-07-03T04:56:36.677352+00:00"
+    "imported_at": "2026-07-07T03:56:42.389583+00:00",
+    "updated_at": "2026-07-07T03:58:34.105886+00:00"
   },
   "user:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -6278,12 +6278,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-doublet-solo",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-solo",
     "enabled": true,
     "trusted": false,
     "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
-    "imported_at": "2026-07-03T04:56:36.897313+00:00",
-    "updated_at": "2026-07-03T04:56:36.897337+00:00"
+    "imported_at": "2026-07-07T03:56:42.674077+00:00",
+    "updated_at": "2026-07-07T03:58:34.825053+00:00"
   },
   "user:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -6292,12 +6292,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-aucell-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-aucell-r",
     "enabled": true,
     "trusted": false,
     "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
-    "imported_at": "2026-07-03T04:56:36.982206+00:00",
-    "updated_at": "2026-07-03T04:56:36.982247+00:00"
+    "imported_at": "2026-07-07T03:56:42.764679+00:00",
+    "updated_at": "2026-07-07T03:58:35.101761+00:00"
   },
   "user:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -6306,12 +6306,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-clusterprofiler-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-clusterprofiler-r",
     "enabled": true,
     "trusted": false,
     "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
-    "imported_at": "2026-07-03T04:56:37.177348+00:00",
-    "updated_at": "2026-07-03T04:56:37.177393+00:00"
+    "imported_at": "2026-07-07T03:56:42.901524+00:00",
+    "updated_at": "2026-07-07T03:58:35.501277+00:00"
   },
   "user:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -6320,12 +6320,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-decoupler-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-decoupler-r",
     "enabled": true,
     "trusted": false,
     "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
-    "imported_at": "2026-07-03T04:56:37.293638+00:00",
-    "updated_at": "2026-07-03T04:56:37.293663+00:00"
+    "imported_at": "2026-07-07T03:56:43.039237+00:00",
+    "updated_at": "2026-07-07T03:58:35.858137+00:00"
   },
   "user:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -6334,12 +6334,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-gseapy",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-gseapy",
     "enabled": true,
     "trusted": false,
     "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
-    "imported_at": "2026-07-03T04:56:37.444477+00:00",
-    "updated_at": "2026-07-03T04:56:37.444509+00:00"
+    "imported_at": "2026-07-07T03:56:43.301696+00:00",
+    "updated_at": "2026-07-07T03:58:36.485549+00:00"
   },
   "user:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -6348,12 +6348,12 @@
     "version": "2.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-irgsea-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-irgsea-r",
     "enabled": true,
     "trusted": false,
     "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
-    "imported_at": "2026-07-03T04:56:37.504914+00:00",
-    "updated_at": "2026-07-03T04:56:37.504946+00:00"
+    "imported_at": "2026-07-07T03:56:43.449379+00:00",
+    "updated_at": "2026-07-07T03:58:36.808796+00:00"
   },
   "user:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -6362,12 +6362,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-progeny-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-progeny-r",
     "enabled": true,
     "trusted": false,
     "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
-    "imported_at": "2026-07-03T04:56:37.646006+00:00",
-    "updated_at": "2026-07-03T04:56:37.646055+00:00"
+    "imported_at": "2026-07-07T03:56:43.626684+00:00",
+    "updated_at": "2026-07-07T03:58:37.256085+00:00"
   },
   "user:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -6376,12 +6376,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-enrichment-ucell-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-ucell-r",
     "enabled": true,
     "trusted": false,
     "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
-    "imported_at": "2026-07-03T04:56:37.732372+00:00",
-    "updated_at": "2026-07-03T04:56:37.732424+00:00"
+    "imported_at": "2026-07-07T03:56:43.764166+00:00",
+    "updated_at": "2026-07-07T03:58:37.524303+00:00"
   },
   "user:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -6390,12 +6390,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-fastq2mtx",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-fastq2mtx",
     "enabled": true,
     "trusted": false,
     "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
-    "imported_at": "2026-07-03T04:56:37.862523+00:00",
-    "updated_at": "2026-07-03T04:56:37.862547+00:00"
+    "imported_at": "2026-07-07T03:56:43.922543+00:00",
+    "updated_at": "2026-07-07T03:58:37.905099+00:00"
   },
   "user:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -6404,12 +6404,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-markers",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-markers",
     "enabled": true,
     "trusted": false,
     "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
-    "imported_at": "2026-07-03T04:56:37.970249+00:00",
-    "updated_at": "2026-07-03T04:56:37.970275+00:00"
+    "imported_at": "2026-07-07T03:56:44.087720+00:00",
+    "updated_at": "2026-07-07T03:58:38.338353+00:00"
   },
   "user:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -6418,12 +6418,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-metabolism-compass",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-compass",
     "enabled": true,
     "trusted": false,
     "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
-    "imported_at": "2026-07-03T04:56:38.237176+00:00",
-    "updated_at": "2026-07-03T04:56:38.237207+00:00"
+    "imported_at": "2026-07-07T03:56:44.382783+00:00",
+    "updated_at": "2026-07-07T03:58:39.060275+00:00"
   },
   "user:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -6432,12 +6432,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-metabolism-scmetabolism-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-scmetabolism-r",
     "enabled": true,
     "trusted": false,
     "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
-    "imported_at": "2026-07-03T04:56:38.347096+00:00",
-    "updated_at": "2026-07-03T04:56:38.347121+00:00"
+    "imported_at": "2026-07-07T03:56:44.508608+00:00",
+    "updated_at": "2026-07-07T03:58:39.379401+00:00"
   },
   "user:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -6446,12 +6446,12 @@
     "version": "1.1",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-perturbation-augur-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-augur-r",
     "enabled": true,
     "trusted": false,
     "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
-    "imported_at": "2026-07-03T04:56:38.478489+00:00",
-    "updated_at": "2026-07-03T04:56:38.478508+00:00"
+    "imported_at": "2026-07-07T03:56:44.608926+00:00",
+    "updated_at": "2026-07-07T03:58:39.703577+00:00"
   },
   "user:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -6460,12 +6460,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-perturbation-pertpy",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-pertpy",
     "enabled": true,
     "trusted": false,
     "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
-    "imported_at": "2026-07-03T04:56:38.719186+00:00",
-    "updated_at": "2026-07-03T04:56:38.719226+00:00"
+    "imported_at": "2026-07-07T03:56:44.923965+00:00",
+    "updated_at": "2026-07-07T03:58:40.532137+00:00"
   },
   "user:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -6474,12 +6474,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-perturbation-scgen",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-scgen",
     "enabled": true,
     "trusted": false,
     "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
-    "imported_at": "2026-07-03T04:56:38.939963+00:00",
-    "updated_at": "2026-07-03T04:56:38.940007+00:00"
+    "imported_at": "2026-07-07T03:56:45.203296+00:00",
+    "updated_at": "2026-07-07T03:58:41.487498+00:00"
   },
   "user:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -6488,12 +6488,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-perturbation-sctenifoldknk-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-sctenifoldknk-r",
     "enabled": true,
     "trusted": false,
     "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
-    "imported_at": "2026-07-03T04:56:39.081610+00:00",
-    "updated_at": "2026-07-03T04:56:39.081629+00:00"
+    "imported_at": "2026-07-07T03:56:45.329956+00:00",
+    "updated_at": "2026-07-07T03:58:41.842258+00:00"
   },
   "user:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -6502,12 +6502,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-preprocessing",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-preprocessing",
     "enabled": true,
     "trusted": false,
     "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
-    "imported_at": "2026-07-03T04:56:39.168940+00:00",
-    "updated_at": "2026-07-03T04:56:39.168963+00:00"
+    "imported_at": "2026-07-07T03:56:45.404074+00:00",
+    "updated_at": "2026-07-07T03:58:42.051121+00:00"
   },
   "user:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -6516,12 +6516,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-regulatory-pyscenic",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-pyscenic",
     "enabled": true,
     "trusted": false,
     "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
-    "imported_at": "2026-07-03T04:56:39.420968+00:00",
-    "updated_at": "2026-07-03T04:56:39.420990+00:00"
+    "imported_at": "2026-07-07T03:56:45.701533+00:00",
+    "updated_at": "2026-07-07T03:58:42.918204+00:00"
   },
   "user:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -6530,12 +6530,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-regulatory-scenic-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-scenic-r",
     "enabled": true,
     "trusted": false,
     "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
-    "imported_at": "2026-07-03T04:56:39.506785+00:00",
-    "updated_at": "2026-07-03T04:56:39.506806+00:00"
+    "imported_at": "2026-07-07T03:56:45.837489+00:00",
+    "updated_at": "2026-07-07T03:58:43.251608+00:00"
   },
   "user:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -6544,12 +6544,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-splicing-brie2",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-splicing-brie2",
     "enabled": true,
     "trusted": false,
     "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
-    "imported_at": "2026-07-03T04:56:39.731574+00:00",
-    "updated_at": "2026-07-03T04:56:39.731599+00:00"
+    "imported_at": "2026-07-07T03:56:46.135448+00:00",
+    "updated_at": "2026-07-07T03:58:43.957118+00:00"
   },
   "user:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -6558,12 +6558,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-tcr-startrac-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-tcr-startrac-r",
     "enabled": true,
     "trusted": false,
     "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
-    "imported_at": "2026-07-03T04:56:39.870291+00:00",
-    "updated_at": "2026-07-03T04:56:39.870310+00:00"
+    "imported_at": "2026-07-07T03:56:46.280984+00:00",
+    "updated_at": "2026-07-07T03:58:44.333802+00:00"
   },
   "user:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -6572,12 +6572,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-trajectory-monocle3-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-monocle3-r",
     "enabled": true,
     "trusted": false,
     "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
-    "imported_at": "2026-07-03T04:56:39.962487+00:00",
-    "updated_at": "2026-07-03T04:56:39.962521+00:00"
+    "imported_at": "2026-07-07T03:56:46.441108+00:00",
+    "updated_at": "2026-07-07T03:58:44.675855+00:00"
   },
   "user:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -6586,12 +6586,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-single-cell-trajectory-scvelo",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-scvelo",
     "enabled": true,
     "trusted": false,
     "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
-    "imported_at": "2026-07-03T04:56:40.218646+00:00",
-    "updated_at": "2026-07-03T04:56:40.218663+00:00"
+    "imported_at": "2026-07-07T03:56:46.806634+00:00",
+    "updated_at": "2026-07-07T03:58:45.390090+00:00"
   },
   "user:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -6600,12 +6600,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-batch-integration",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-batch-integration",
     "enabled": true,
     "trusted": false,
     "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
-    "imported_at": "2026-07-03T04:56:40.313090+00:00",
-    "updated_at": "2026-07-03T04:56:40.313111+00:00"
+    "imported_at": "2026-07-07T03:56:46.931761+00:00",
+    "updated_at": "2026-07-07T03:58:45.756347+00:00"
   },
   "user:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -6614,12 +6614,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-cnv-fastcnv-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
     "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
-    "imported_at": "2026-07-03T04:56:40.421897+00:00",
-    "updated_at": "2026-07-03T04:56:40.421930+00:00"
+    "imported_at": "2026-07-07T03:56:47.069399+00:00",
+    "updated_at": "2026-07-07T03:58:46.305109+00:00"
   },
   "user:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -6628,12 +6628,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-cnv-numbat-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-numbat-r",
     "enabled": true,
     "trusted": false,
     "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
-    "imported_at": "2026-07-03T04:56:40.510329+00:00",
-    "updated_at": "2026-07-03T04:56:40.510352+00:00"
+    "imported_at": "2026-07-07T03:56:47.174994+00:00",
+    "updated_at": "2026-07-07T03:58:46.552628+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -6642,12 +6642,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-communication-cellchat-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
     "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
-    "imported_at": "2026-07-03T04:56:40.607280+00:00",
-    "updated_at": "2026-07-03T04:56:40.607301+00:00"
+    "imported_at": "2026-07-07T03:56:47.282773+00:00",
+    "updated_at": "2026-07-07T03:58:47.037430+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -6656,12 +6656,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-communication-commot",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-commot",
     "enabled": true,
     "trusted": false,
     "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
-    "imported_at": "2026-07-03T04:56:40.922380+00:00",
-    "updated_at": "2026-07-03T04:56:40.922419+00:00"
+    "imported_at": "2026-07-07T03:56:47.674508+00:00",
+    "updated_at": "2026-07-07T03:58:54.330476+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -6670,12 +6670,12 @@
     "version": "1.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-communication-fastccc",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-fastccc",
     "enabled": true,
     "trusted": false,
     "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
-    "imported_at": "2026-07-03T04:56:41.113819+00:00",
-    "updated_at": "2026-07-03T04:56:41.113839+00:00"
+    "imported_at": "2026-07-07T03:56:48.055475+00:00",
+    "updated_at": "2026-07-07T03:58:55.017167+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -6684,12 +6684,12 @@
     "version": "1.0.0",
     "category": "single-cell",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-communication-liana",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-liana",
     "enabled": true,
     "trusted": false,
     "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
-    "imported_at": "2026-07-03T04:56:41.358509+00:00",
-    "updated_at": "2026-07-03T04:56:41.358532+00:00"
+    "imported_at": "2026-07-07T03:56:48.299388+00:00",
+    "updated_at": "2026-07-07T03:58:55.652048+00:00"
   },
   "user:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -6698,12 +6698,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-data-io",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-data-io",
     "enabled": true,
     "trusted": false,
     "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
-    "imported_at": "2026-07-03T04:56:41.530571+00:00",
-    "updated_at": "2026-07-03T04:56:41.530591+00:00"
+    "imported_at": "2026-07-07T03:56:48.541896+00:00",
+    "updated_at": "2026-07-07T03:58:56.227446+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -6712,12 +6712,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-deconvolution-card-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-card-r",
     "enabled": true,
     "trusted": false,
     "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
-    "imported_at": "2026-07-03T04:56:41.632425+00:00",
-    "updated_at": "2026-07-03T04:56:41.632464+00:00"
+    "imported_at": "2026-07-07T03:56:48.692392+00:00",
+    "updated_at": "2026-07-07T03:58:56.718147+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -6726,12 +6726,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-deconvolution-cell2location",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-cell2location",
     "enabled": true,
     "trusted": false,
     "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
-    "imported_at": "2026-07-03T04:56:41.937759+00:00",
-    "updated_at": "2026-07-03T04:56:41.937799+00:00"
+    "imported_at": "2026-07-07T03:56:49.049608+00:00",
+    "updated_at": "2026-07-07T03:58:57.518178+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -6740,12 +6740,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-deconvolution-rctd-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-rctd-r",
     "enabled": true,
     "trusted": false,
     "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
-    "imported_at": "2026-07-03T04:56:42.067607+00:00",
-    "updated_at": "2026-07-03T04:56:42.067626+00:00"
+    "imported_at": "2026-07-07T03:56:49.170817+00:00",
+    "updated_at": "2026-07-07T03:59:04.570795+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -6754,12 +6754,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-deconvolution-spotlight-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-spotlight-r",
     "enabled": true,
     "trusted": false,
     "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
-    "imported_at": "2026-07-03T04:56:42.164295+00:00",
-    "updated_at": "2026-07-03T04:56:42.164347+00:00"
+    "imported_at": "2026-07-07T03:56:49.281747+00:00",
+    "updated_at": "2026-07-07T03:59:05.084297+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -6768,12 +6768,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-deconvolution-tangram",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-tangram",
     "enabled": true,
     "trusted": false,
     "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
-    "imported_at": "2026-07-03T04:56:42.462301+00:00",
-    "updated_at": "2026-07-03T04:56:42.462342+00:00"
+    "imported_at": "2026-07-07T03:56:49.686658+00:00",
+    "updated_at": "2026-07-07T03:59:05.935474+00:00"
   },
   "user:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -6782,12 +6782,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-differential-abundance-roe-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
     "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
-    "imported_at": "2026-07-03T04:56:42.602577+00:00",
-    "updated_at": "2026-07-03T04:56:42.602604+00:00"
+    "imported_at": "2026-07-07T03:56:49.874387+00:00",
+    "updated_at": "2026-07-07T03:59:06.292775+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -6796,12 +6796,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-domains-bayesspace-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-bayesspace-r",
     "enabled": true,
     "trusted": false,
     "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
-    "imported_at": "2026-07-03T04:56:42.679185+00:00",
-    "updated_at": "2026-07-03T04:56:42.679211+00:00"
+    "imported_at": "2026-07-07T03:56:49.991202+00:00",
+    "updated_at": "2026-07-07T03:59:06.568595+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -6810,12 +6810,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-domains-graphst",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-graphst",
     "enabled": true,
     "trusted": false,
     "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
-    "imported_at": "2026-07-03T04:56:42.972037+00:00",
-    "updated_at": "2026-07-03T04:56:42.972057+00:00"
+    "imported_at": "2026-07-07T03:56:50.402866+00:00",
+    "updated_at": "2026-07-07T03:59:07.354748+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -6824,12 +6824,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-domains-spagcn",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-spagcn",
     "enabled": true,
     "trusted": false,
     "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
-    "imported_at": "2026-07-03T04:56:43.258052+00:00",
-    "updated_at": "2026-07-03T04:56:43.258075+00:00"
+    "imported_at": "2026-07-07T03:56:50.809517+00:00",
+    "updated_at": "2026-07-07T03:59:08.251758+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -6838,12 +6838,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-domains-stagate",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-stagate",
     "enabled": true,
     "trusted": false,
     "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
-    "imported_at": "2026-07-03T04:56:43.508833+00:00",
-    "updated_at": "2026-07-03T04:56:43.508864+00:00"
+    "imported_at": "2026-07-07T03:56:51.151817+00:00",
+    "updated_at": "2026-07-07T03:59:09.059453+00:00"
   },
   "user:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -6852,12 +6852,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-fastq2spatial",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-fastq2spatial",
     "enabled": true,
     "trusted": false,
     "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
-    "imported_at": "2026-07-03T04:56:43.619110+00:00",
-    "updated_at": "2026-07-03T04:56:43.619141+00:00"
+    "imported_at": "2026-07-07T03:56:51.315789+00:00",
+    "updated_at": "2026-07-07T03:59:09.340259+00:00"
   },
   "user:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -6866,12 +6866,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-integration-spclue",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-integration-spclue",
     "enabled": true,
     "trusted": false,
     "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
-    "imported_at": "2026-07-03T04:56:43.832790+00:00",
-    "updated_at": "2026-07-03T04:56:43.832820+00:00"
+    "imported_at": "2026-07-07T03:56:51.716174+00:00",
+    "updated_at": "2026-07-07T03:59:10.073594+00:00"
   },
   "user:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -6880,12 +6880,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-layers",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-layers",
     "enabled": true,
     "trusted": false,
     "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
-    "imported_at": "2026-07-03T04:56:43.981503+00:00",
-    "updated_at": "2026-07-03T04:56:43.981523+00:00"
+    "imported_at": "2026-07-07T03:56:51.890189+00:00",
+    "updated_at": "2026-07-07T03:59:10.436253+00:00"
   },
   "user:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -6894,12 +6894,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-microenvironment-misty-r",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-microenvironment-misty-r",
     "enabled": true,
     "trusted": false,
     "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
-    "imported_at": "2026-07-03T04:56:44.099847+00:00",
-    "updated_at": "2026-07-03T04:56:44.099869+00:00"
+    "imported_at": "2026-07-07T03:56:52.043495+00:00",
+    "updated_at": "2026-07-07T03:59:10.814563+00:00"
   },
   "user:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -6908,12 +6908,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-neighbors",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-neighbors",
     "enabled": true,
     "trusted": false,
     "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
-    "imported_at": "2026-07-03T04:56:44.257384+00:00",
-    "updated_at": "2026-07-03T04:56:44.257404+00:00"
+    "imported_at": "2026-07-07T03:56:52.198534+00:00",
+    "updated_at": "2026-07-07T03:59:11.184552+00:00"
   },
   "user:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -6922,12 +6922,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-niches",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-niches",
     "enabled": true,
     "trusted": false,
     "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
-    "imported_at": "2026-07-03T04:56:44.323673+00:00",
-    "updated_at": "2026-07-03T04:56:44.323707+00:00"
+    "imported_at": "2026-07-07T03:56:52.318256+00:00",
+    "updated_at": "2026-07-07T03:59:11.431160+00:00"
   },
   "user:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -6936,12 +6936,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-preprocessing",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-preprocessing",
     "enabled": true,
     "trusted": false,
     "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
-    "imported_at": "2026-07-03T04:56:44.399614+00:00",
-    "updated_at": "2026-07-03T04:56:44.399636+00:00"
+    "imported_at": "2026-07-07T03:56:52.391907+00:00",
+    "updated_at": "2026-07-07T03:59:11.601034+00:00"
   },
   "user:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -6950,12 +6950,12 @@
     "version": "1.0.0",
     "category": "spatial-transcriptomics",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-spatial-transcriptomics-statistics",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-statistics",
     "enabled": true,
     "trusted": false,
     "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
-    "imported_at": "2026-07-03T04:56:44.794972+00:00",
-    "updated_at": "2026-07-03T04:56:44.794996+00:00"
+    "imported_at": "2026-07-07T03:56:52.880071+00:00",
+    "updated_at": "2026-07-07T03:59:12.796416+00:00"
   },
   "user:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -6964,12 +6964,12 @@
     "version": "1.0.0",
     "category": "workflows",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-workflows-scrnaseq-pipeline",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-scrnaseq-pipeline",
     "enabled": true,
     "trusted": false,
     "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
-    "imported_at": "2026-07-03T04:56:45.182302+00:00",
-    "updated_at": "2026-07-03T04:56:45.182320+00:00"
+    "imported_at": "2026-07-07T03:56:53.395915+00:00",
+    "updated_at": "2026-07-07T03:59:13.850762+00:00"
   },
   "user:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -6978,12 +6978,12 @@
     "version": "1.0.0",
     "category": "workflows",
     "source": "dropin",
-    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/skills/bio-workflows-spatial-pipeline",
+    "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-spatial-pipeline",
     "enabled": true,
     "trusted": false,
     "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
-    "imported_at": "2026-07-03T04:56:45.462120+00:00",
-    "updated_at": "2026-07-03T04:56:45.462152+00:00"
+    "imported_at": "2026-07-07T03:56:53.805074+00:00",
+    "updated_at": "2026-07-07T03:59:14.646599+00:00"
   },
   "user:clinical-database-cbioportal": {
     "id": "clinical-database-cbioportal",

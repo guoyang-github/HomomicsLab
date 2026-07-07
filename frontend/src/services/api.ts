@@ -6,14 +6,18 @@ import type { ChatMessage } from '@/types/chat'
 import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api'
+const defaultBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api'
 
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: defaultBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+export function setApiBaseUrl(baseUrl: string): void {
+  api.defaults.baseURL = baseUrl
+}
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token

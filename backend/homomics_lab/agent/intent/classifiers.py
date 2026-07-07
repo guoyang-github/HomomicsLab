@@ -392,6 +392,22 @@ class LLMIntentClassifier(IntentClassifier):
 
         matches = []
         primary = parsed.get("primary_intent", {})
+        # Robust fallback: some models return a flat object instead of the
+        # documented primary_intent wrapper.
+        if not primary and "intent_type" in parsed:
+            primary = parsed
+        if not primary and "intent" in parsed:
+            primary = {
+                "intent_type": parsed.get("intent"),
+                "interaction_mode": parsed.get("interaction_mode"),
+                "domain": parsed.get("domain"),
+                "target": parsed.get("target"),
+                "scope": parsed.get("scope", "single_step"),
+                "entities": parsed.get("entities", {}),
+                "confidence": parsed.get("confidence", 0.0),
+                "reason": parsed.get("reason", ""),
+                "needs_clarification": parsed.get("needs_clarification", False),
+            }
         if primary and primary.get("intent_type"):
             structured = self._parse_structured_intent(primary)
             matches.append(
@@ -441,13 +457,18 @@ class LLMIntentClassifier(IntentClassifier):
     @staticmethod
     def _parse_structured_intent(data: Dict[str, Any]) -> StructuredIntent:
         """Parse a JSON intent object into a StructuredIntent."""
+        entities = data.get("entities") or {}
+        if not isinstance(entities, dict):
+            # LLMs occasionally return entities as a string or a list; coerce to
+            # a safe dict so downstream metadata merging never crashes.
+            entities = {"_raw": entities}
         return StructuredIntent(
             intent_type=data.get("intent_type", "general"),
             interaction_mode=data.get("interaction_mode", "answer"),
             domain=data.get("domain") or None,
             target=data.get("target") or None,
             scope=data.get("scope", "single_step"),
-            entities=data.get("entities") or {},
+            entities=entities,
             confidence=float(data.get("confidence", 0.0)),
             reason=data.get("reason", ""),
         )

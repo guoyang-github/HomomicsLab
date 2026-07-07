@@ -186,6 +186,11 @@ elif settings.debug:
     _allow_origins = ["http://localhost:5173", "http://localhost:3000"]
 else:
     _allow_origins = []
+    logger.warning(
+        "HOMOMICS_CORS_ORIGINS is not set and debug mode is disabled. "
+        "Cross-origin frontend requests will be blocked. "
+        "Set HOMOMICS_CORS_ORIGINS to your frontend URL for separated deployments."
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,

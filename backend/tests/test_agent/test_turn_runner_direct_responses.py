@@ -39,7 +39,7 @@ async def test_qa_fallback_when_llm_unavailable(working_memory):
     intent = UserIntent(
         analysis_type="qa",
         complexity="direct_response",
-        domain="single_cell",
+        domain="single-cell-transcriptomics",
         original_message="什么是单细胞测序？",
     )
     response = await runner._generate_qa_response(
@@ -55,7 +55,7 @@ async def test_information_request_fallback_when_llm_unavailable(working_memory)
     intent = UserIntent(
         analysis_type="information_request",
         complexity="direct_response",
-        domain="single_cell",
+        domain="single-cell-transcriptomics",
         original_message="单细胞分析包括哪些步骤？",
     )
     response = await runner._generate_information_request_response(
@@ -87,7 +87,7 @@ async def test_qa_uses_llm_when_available(mock_llm_client, working_memory):
     intent = UserIntent(
         analysis_type="qa",
         complexity="direct_response",
-        domain="spatial",
+        domain="spatial-transcriptomics",
         original_message="什么是空间转录组？",
     )
     response = await runner._generate_qa_response(
@@ -104,7 +104,7 @@ async def test_information_request_uses_llm_when_available(mock_llm_client, work
     intent = UserIntent(
         analysis_type="information_request",
         complexity="direct_response",
-        domain="spatial",
+        domain="spatial-transcriptomics",
         original_message="空间分析怎么做？",
     )
     response = await runner._generate_information_request_response(
@@ -151,7 +151,7 @@ async def test_information_request_fallback_when_llm_raises(mock_llm_client, wor
     intent = UserIntent(
         analysis_type="information_request",
         complexity="direct_response",
-        domain="spatial",
+        domain="spatial-transcriptomics",
         original_message="空间分析有哪些步骤？",
     )
     response = await runner._generate_information_request_response(
@@ -177,7 +177,7 @@ async def test_direct_response_via_llm_includes_context(
     intent = UserIntent(
         analysis_type="qa",
         complexity="direct_response",
-        domain="single_cell",
+        domain="single-cell-transcriptomics",
         confidence=0.95,
         original_message="What is single-cell RNA-seq?",
     )
@@ -187,6 +187,6 @@ async def test_direct_response_via_llm_includes_context(
     assert response == "LLM generated response"
     messages = mock_llm_client.chat_completion.await_args.kwargs["messages"]
     content = "\n".join(m.get("content", "") for m in messages)
-    assert "single_cell" in content
+    assert "single-cell-transcriptomics" in content
     assert "0.95" in content
     assert "What is single-cell RNA-seq?" in content

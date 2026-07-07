@@ -50,6 +50,8 @@ class AnalysisStrategy:
                 phase_type=p.phase_type,
                 required=p.required,
                 description=p.description,
+                candidate_skills=list(p.candidate_skills),
+                default_skill=p.default_skill,
             )
             for p in self.skeleton
         ]

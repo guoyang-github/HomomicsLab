@@ -1,0 +1,4 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	38/6154fe	4566	SC_QC (PA12_sc)	COMPLETED	0	2026-07-06 19:12:17.329	12.8s	12.7s	52.7%	2 GB	3.6 GB	774.6 MB	723.7 MB
+2	3e/5040ad	5249	SC_NORMALIZE (PA12_sc)	COMPLETED	0	2026-07-06 19:12:30.187	27.2s	27.1s	52.8%	1.6 GB	4.2 GB	778.4 MB	724.2 MB
+3	0c/aadd5f	6172	SC_CLUSTER (PA12_sc)	COMPLETED	0	2026-07-06 19:12:57.416	58.7s	58.6s	212.4%	2 GB	9.8 GB	890.1 MB	65.6 MB

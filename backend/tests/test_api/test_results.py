@@ -1,13 +1,11 @@
 """Tests for the result loading API."""
 
 import io
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 from anndata import AnnData
-from fastapi.testclient import TestClient
 
 from homomics_lab.data import DataStore, ResultReference
 

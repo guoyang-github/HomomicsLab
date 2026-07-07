@@ -36,10 +36,10 @@ class TestPromptRegistry:
     def test_domain_override(self):
         registry = PromptRegistry()
         registry.register("system.base", "Base identity")
-        registry.register("system.base", "Single-cell add-on", domain="single_cell")
+        registry.register("system.base", "Single-cell add-on", domain="single-cell-transcriptomics")
 
         assert registry.get("system.base") == "Base identity"
-        assert registry.get("system.base", domain="single_cell") == "Single-cell add-on"
+        assert registry.get("system.base", domain="single-cell-transcriptomics") == "Single-cell add-on"
 
     def test_get_combined_base_and_domain(self):
         registry = PromptRegistry()
@@ -88,25 +88,25 @@ class TestPromptLoader:
     def test_load_domain_prompts_flattens_nested_dict(self):
         registry = PromptRegistry()
         load_domain_prompts(
-            "single_cell",
+            "single-cell-transcriptomics",
             {"system": {"analysis": "Single-cell guidance"}},
             registry=registry,
         )
-        assert registry.get("system.analysis", domain="single_cell") == "Single-cell guidance"
+        assert registry.get("system.analysis", domain="single-cell-transcriptomics") == "Single-cell guidance"
 
     def test_load_domain_prompts_clears_previous_domain_templates(self):
         registry = PromptRegistry()
         load_domain_prompts(
-            "single_cell",
+            "single-cell-transcriptomics",
             {"system": {"analysis": "Old"}},
             registry=registry,
         )
         load_domain_prompts(
-            "single_cell",
+            "single-cell-transcriptomics",
             {"system": {"analysis": "New"}},
             registry=registry,
         )
-        assert registry.get("system.analysis", domain="single_cell") == "New"
+        assert registry.get("system.analysis", domain="single-cell-transcriptomics") == "New"
 
     def test_initialize_prompt_registry_uses_global(self):
         registry = initialize_prompt_registry()
@@ -149,7 +149,7 @@ class TestDynamicAgentRolePrompt:
     def test_domain_override_for_role_template(self):
         registry = get_prompt_registry()
         registry.register("role.test", "Base role prompt")
-        registry.register("role.test", "Domain-specific guidance", domain="single_cell")
+        registry.register("role.test", "Domain-specific guidance", domain="single-cell-transcriptomics")
         role = RoleDefinition(
             role_id="test",
             name="Test",
@@ -157,6 +157,6 @@ class TestDynamicAgentRolePrompt:
             system_prompt="Fallback",
         )
         agent = DynamicAgent(role=role)
-        rendered = agent.get_system_prompt(domain="single_cell")
+        rendered = agent.get_system_prompt(domain="single-cell-transcriptomics")
         assert "Base role prompt" in rendered
         assert "Domain-specific guidance" in rendered

@@ -17,6 +17,7 @@ RUN npm run build
 FROM nginx:alpine
 
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+COPY --chown=nginx:nginx scripts/generate-config.cjs /usr/share/nginx/html/generate-config.cjs
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/templates/default.conf.template
 
 # Ensure nginx can write its cache, logs, pid file, and generated config.
@@ -28,5 +29,5 @@ USER nginx
 
 EXPOSE 8080
 
-# Substitute env vars into nginx config at startup.
-CMD ["/bin/sh", "-c", "envsubst '$NGINX_LISTEN_PORT $NGINX_SERVER_NAME $NGINX_BACKEND_HOST $NGINX_BACKEND_PORT $NGINX_CLIENT_MAX_BODY_SIZE' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+# Generate runtime frontend config and substitute nginx env vars at startup.
+CMD ["/bin/sh", "-c", "node /usr/share/nginx/html/generate-config.cjs /usr/share/nginx/html && envsubst '$NGINX_LISTEN_PORT $NGINX_SERVER_NAME $NGINX_BACKEND_HOST $NGINX_BACKEND_PORT $NGINX_CLIENT_MAX_BODY_SIZE' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"

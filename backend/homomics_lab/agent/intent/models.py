@@ -45,7 +45,7 @@ class StructuredIntent:
             - ``modify``: change an existing plan or result.
             - ``approve``: user is confirming/rejecting a plan.
             - ``clarify``: ask the user a follow-up question.
-        domain: Optional domain tag (e.g. ``single_cell``, ``spatial``).
+        domain: Optional domain tag (e.g. ``single-cell-transcriptomics``, ``spatial-transcriptomics``).
         target: Concrete skill id, phase id, or tool name when known.
         scope: ``single_step`` | ``partial`` | ``full``.
         entities: Key-value entities extracted from the message.
@@ -175,8 +175,10 @@ class UserIntent:
             self.domain = s.domain
         if self.target is None:
             self.target = s.target
-        # Merge entities into metadata for downstream use.
-        if s.entities:
+        # Merge entities into metadata for downstream use. Some LLMs return
+        # entities as a string or a list instead of the requested object; guard
+        # against that instead of crashing intent analysis.
+        if s.entities and isinstance(s.entities, dict):
             self.metadata = {**s.entities, **self.metadata}
 
     def _derive_interaction_mode(self) -> str:
@@ -207,8 +209,8 @@ class UserIntent:
         if self.structured_intent and self.structured_intent.domain:
             return self.structured_intent.domain
         mapping = {
-            "single_cell_analysis": "single_cell",
-            "spatial_analysis": "spatial",
+            "single_cell_analysis": "single-cell-transcriptomics",
+            "spatial_analysis": "spatial-transcriptomics",
             "metagenomics_analysis": "metagenomics",
             "genomics_analysis": "genomics",
             "proteomics_analysis": "proteomics",

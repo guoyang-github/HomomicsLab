@@ -1,0 +1,354 @@
+domain: single-cell-transcriptomics
+display_name: Single-Cell Transcriptomics
+description: |
+  Best-practice single-cell and single-nucleus RNA-seq analysis (Scanpy/Seurat workflow).
+  Covers raw-read processing, data loading, QC, doublet removal, normalization, integration,
+  dimensionality reduction, clustering, cell-type annotation, differential analysis,
+  trajectory, cell-cell communication, and functional enrichment.
+version: "4.0.0"
+
+orchestrator_skills:
+  - bio-workflows-scrnaseq-pipeline
+
+prompts:
+  system:
+    analysis: |
+      You are a single-cell transcriptomics specialist. When designing workflows, follow the
+      standard Scanpy/Seurat best-practice pipeline: FASTQ → count matrix → data loading →
+      QC and filtering → doublet detection → normalization → optional batch integration →
+      dimensionality reduction (PCA) → clustering (Leiden/Louvain) → cell-type annotation →
+      downstream analyses (differential expression, trajectory, communication, enrichment).
+      Always state key parameters (n_top_genes, n_pcs, resolution, batch key) and warn about
+      doublets, batch effects, and over-clustering. Prefer reproducible, widely-used tools.
+    qa: |
+      Answer single-cell questions with practical, methodologically sound guidance.
+      Prefer Python (Scanpy) and R (Seurat) ecosystems. When comparing methods, note their
+      typical use cases and main caveats.
+
+phases:
+  - id: fastq_processing
+    required: false
+    description: Convert raw FASTQ files to a gene-cell count matrix (e.g. Cell Ranger, STARsolo).
+    skills: [bio-single-cell-fastq2mtx]
+    default_skill: bio-single-cell-fastq2mtx
+
+  - id: data_io
+    required: true
+    description: Load single-cell data into AnnData/Seurat objects and prepare metadata.
+    skills: [bio-single-cell-data-io]
+    default_skill: bio-single-cell-data-io
+
+  - id: qc
+    required: true
+    description: Calculate QC metrics, filter low-quality cells/genes, and flag artifacts.
+    skills: [bio-single-cell-preprocessing]
+    default_skill: bio-single-cell-preprocessing
+
+  - id: doublet_removal
+    required: false
+    description: Detect and remove doublet/multiplet cells.
+    skills:
+      - bio-single-cell-doublet-scrublet
+      - bio-single-cell-doublet-solo
+      - bio-single-cell-doublet-doubletfinder-r
+      - bio-single-cell-doublet-scdblfinder-r
+    default_skill: bio-single-cell-doublet-scrublet
+
+  - id: normalization
+    required: true
+    description: Normalize counts, select highly variable genes, and scale data.
+    skills: [bio-single-cell-preprocessing]
+    default_skill: bio-single-cell-preprocessing
+
+  - id: batch_integration
+    required: false
+    description: Correct batch effects and integrate multiple samples/batches.
+    skills: [bio-single-cell-batch-integration]
+    default_skill: bio-single-cell-batch-integration
+
+  - id: dim_reduction
+    required: true
+    description: Run PCA and nonlinear dimensionality reduction (UMAP/t-SNE).
+    skills: [bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
+
+  - id: clustering
+    required: true
+    description: Cluster cells with graph-based methods (Leiden/Louvain).
+    skills: [bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
+
+  - id: annotation
+    required: true
+    description: Annotate cell types with marker genes or reference atlases.
+    skills:
+      - bio-single-cell-annotation-markers
+      - bio-single-cell-annotation-celltypist
+      - bio-single-cell-annotation-sctype-r
+      - bio-single-cell-annotation-singler-r
+      - bio-single-cell-markers
+    default_skill: bio-single-cell-annotation-markers
+
+  - id: differential_expression
+    required: false
+    description: Differential expression/abundance between clusters or conditions.
+    skills:
+      - bio-single-cell-differential-abundance-roe-r
+      - bio-single-cell-differential-abundance-milor-r
+      - bio-single-cell-differential-abundance-sccoda
+      - bio-single-cell-differential-abundance-diffcyt-r
+    default_skill: bio-single-cell-differential-abundance-roe-r
+
+  - id: cnv
+    required: false
+    description: Infer copy-number variation from scRNA-seq.
+    skills:
+      - bio-single-cell-cnv-infercnvpy
+      - bio-single-cell-cnv-infercnv-r
+      - bio-single-cell-cnv-fastcnv-r
+      - bio-single-cell-cnv-scevan-r
+    default_skill: bio-single-cell-cnv-infercnvpy
+
+  - id: trajectory
+    required: false
+    description: Trajectory inference and pseudotime analysis.
+    skills:
+      - bio-single-cell-trajectory-scvelo
+      - bio-single-cell-trajectory-monocle3-r
+    default_skill: bio-single-cell-trajectory-scvelo
+
+  - id: communication
+    required: false
+    description: Infer cell-cell communication networks.
+    skills:
+      - bio-single-cell-communication-cellchat-r
+      - bio-single-cell-communication-nichenet-r
+    default_skill: bio-single-cell-communication-cellchat-r
+
+  - id: enrichment
+    required: false
+    description: Pathway and functional enrichment analysis.
+    skills:
+      - bio-single-cell-enrichment-gseapy
+      - bio-single-cell-enrichment-decoupler-r
+      - bio-single-cell-enrichment-clusterprofiler-r
+      - bio-single-cell-enrichment-aucell-r
+      - bio-single-cell-enrichment-progeny-r
+      - bio-single-cell-enrichment-ucell-r
+      - bio-single-cell-enrichment-irgsea-r
+    default_skill: bio-single-cell-enrichment-gseapy
+
+  - id: metabolism
+    required: false
+    description: Estimate single-cell metabolic pathway activity.
+    skills:
+      - bio-single-cell-metabolism-compass
+      - bio-single-cell-metabolism-scmetabolism-r
+    default_skill: bio-single-cell-metabolism-compass
+
+  - id: regulatory
+    required: false
+    description: Gene regulatory network inference.
+    skills:
+      - bio-single-cell-regulatory-pyscenic
+      - bio-single-cell-regulatory-scenic-r
+    default_skill: bio-single-cell-regulatory-pyscenic
+
+  - id: splicing
+    required: false
+    description: Alternative splicing analysis.
+    skills: [bio-single-cell-splicing-brie2]
+    default_skill: bio-single-cell-splicing-brie2
+
+  - id: perturbation
+    required: false
+    description: Perturbation effect and screen analysis.
+    skills:
+      - bio-single-cell-perturbation-pertpy
+      - bio-single-cell-perturbation-augur-r
+      - bio-single-cell-perturbation-scgen
+      - bio-single-cell-perturbation-sctenifoldknk-r
+    default_skill: bio-single-cell-perturbation-pertpy
+
+  - id: tcr_analysis
+    required: false
+    description: T-cell receptor repertoire analysis.
+    skills: [bio-single-cell-tcr-startrac-r]
+    default_skill: bio-single-cell-tcr-startrac-r
+
+  - id: scatac
+    required: false
+    description: Single-cell ATAC-seq analysis.
+    skills:
+      - bio-single-cell-atac-signac-r
+      - bio-single-cell-atac-archr-r
+      - bio-single-cell-atac-chromvar-r
+    default_skill: bio-single-cell-atac-signac-r
+
+  - id: visualization
+    required: false
+    description: Generate UMAP, heatmap, violin, and other publication-quality figures.
+    skills: [bio-single-cell-clustering]
+    default_skill: bio-single-cell-clustering
+
+phase_transitions:
+  - from: fastq_processing
+    to: data_io
+  - from: data_io
+    to: qc
+  - from: qc
+    to: doublet_removal
+  - from: doublet_removal
+    to: normalization
+  - from: normalization
+    to: dim_reduction
+  - from: normalization
+    to: batch_integration
+    type: depends_on
+  - from: batch_integration
+    to: dim_reduction
+  - from: dim_reduction
+    to: clustering
+  - from: clustering
+    to: annotation
+  - from: annotation
+    to: differential_expression
+  - from: annotation
+    to: cnv
+    type: alternative_to
+  - from: annotation
+    to: trajectory
+    type: alternative_to
+  - from: annotation
+    to: communication
+    type: alternative_to
+  - from: annotation
+    to: enrichment
+    type: alternative_to
+  - from: annotation
+    to: metabolism
+    type: alternative_to
+  - from: annotation
+    to: regulatory
+    type: alternative_to
+  - from: annotation
+    to: splicing
+    type: alternative_to
+  - from: annotation
+    to: perturbation
+    type: alternative_to
+  - from: annotation
+    to: tcr_analysis
+    type: alternative_to
+  - from: annotation
+    to: scatac
+    type: alternative_to
+  - from: differential_expression
+    to: enrichment
+  - from: clustering
+    to: visualization
+
+state_checks:
+  - condition: "n_batches is not None and n_batches > 1"
+    action: insert
+    target: batch_integration
+    after: normalization
+
+intents:
+  - analysis_type: single_cell_analysis
+    keywords:
+      - 单细胞
+      - scRNA-seq
+      - single cell
+      - single-cell
+      - scrnaseq
+      - 单细胞转录组
+      - scRNA
+      - 细胞类型注释
+      - 聚类
+      - UMAP
+    examples:
+      - 帮我分析单细胞数据
+      - 做一个scRNA-seq质控和聚类
+      - 单细胞转录组差异分析
+
+roles:
+  - role_id: single_cell_specialist
+    name: Single-Cell Specialist
+    description: Specialist for single-cell transcriptomics analysis.
+    allowed_skills:
+      - "bio-single-cell-*"
+      - bio-workflows-scrnaseq-pipeline
+    allowed_tools:
+      - file_read
+      - file_write
+      - file_list
+    permissions:
+      can_execute: true
+      can_spawn_specialist: false
+      max_concurrent_tasks: 3
+
+sops:
+  - id: scrnaseq-best-practice
+    title: Single-Cell RNA-seq Best Practice
+    version: "4.0.0"
+    steps:
+      - Load raw data or count matrix and metadata.
+      - Compute QC metrics and filter low-quality cells/genes.
+      - Detect and remove doublets.
+      - Normalize counts and select highly variable genes.
+      - Integrate batches if n_batches > 1.
+      - Run PCA, neighbors, UMAP, and Leiden clustering.
+      - Annotate clusters with marker genes or reference atlases.
+      - Run downstream analyses (DE, trajectory, communication, enrichment) as needed.
+
+preferred_libraries:
+  python: [scanpy, anndata, leidenalg, scvelo, gseapy]
+  r: [Seurat, SingleR, scType, infercnv, monocle3, CellChat]
+
+dag_seeds:
+  - from: bio-single-cell-fastq2mtx
+    to: bio-single-cell-data-io
+    type: followed_by
+    context: Load count matrix after FASTQ processing.
+  - from: bio-single-cell-data-io
+    to: bio-single-cell-preprocessing
+    type: followed_by
+    context: Preprocess after loading data.
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-doublet-scrublet
+    type: followed_by
+    context: Detect doublets after QC and normalization.
+  - from: bio-single-cell-doublet-scrublet
+    to: bio-single-cell-preprocessing
+    type: followed_by
+    context: Re-preprocess after doublet removal.
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-clustering
+    type: followed_by
+    context: Cluster after preprocessing.
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-annotation-markers
+    type: followed_by
+    context: Annotate clusters after clustering.
+  - from: bio-single-cell-annotation-markers
+    to: bio-single-cell-differential-abundance-roe-r
+    type: followed_by
+    context: DE analysis after annotation.
+  - from: bio-single-cell-differential-abundance-roe-r
+    to: bio-single-cell-enrichment-gseapy
+    type: followed_by
+    context: Enrichment after DE.
+
+data_state_schema:
+  type: object
+  properties:
+    n_cells: { type: integer, description: Number of cells after filtering }
+    n_genes: { type: integer, description: Number of genes }
+    n_batches: { type: integer, description: Number of batches/samples }
+    batch_detected: { type: boolean, description: Whether batch effects were detected }
+    has_qc: { type: boolean, description: QC completed }
+    has_normalization: { type: boolean, description: Normalization completed }
+    has_pca: { type: boolean, description: PCA computed }
+    has_clustering: { type: boolean, description: Clusters identified }
+    has_annotation: { type: boolean, description: Cell types annotated }

@@ -6,7 +6,7 @@ variable formatting helpers and the public ``build_classification_prompt`` entry
 point for backward compatibility.
 """
 
-from typing import Any, Dict, List
+from typing import List
 
 from homomics_lab.agent.intent.models import IntentDefinition
 from homomics_lab.prompts import render_prompt
@@ -57,7 +57,7 @@ def build_classification_prompt(
     rendered = render_prompt(
         "intent.classification",
         intent_descriptions=format_intent_descriptions(definitions),
-        context=format_context(context),
+        formatted_context=format_context(context),
         message=message,
     )
     if rendered is not None:

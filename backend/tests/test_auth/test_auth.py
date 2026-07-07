@@ -296,7 +296,6 @@ class TestBootstrapHelpers:
     async def test_default_admin_generates_random_password_when_env_not_set(
         self, monkeypatch, tmp_path, caplog
     ):
-        from homomics_lab.api.auth import verify_password
 
         db_path = tmp_path / "admin_random.db"
         monkeypatch.setattr(settings, "auth_enabled", True)

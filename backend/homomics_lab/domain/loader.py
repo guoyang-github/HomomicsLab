@@ -102,11 +102,18 @@ def _safe_eval(node: ast.AST, namespace: Dict[str, Any]) -> Any:
         return True
 
     if isinstance(node, ast.BoolOp):
-        values = [_safe_eval(v, namespace) for v in node.values]
+        # Short-circuit evaluation so guards like
+        # ``n_batches is not None and n_batches > 1`` do not raise.
         if isinstance(node.op, ast.And):
-            return all(values)
+            for value in node.values:
+                if not _safe_eval(value, namespace):
+                    return False
+            return True
         if isinstance(node.op, ast.Or):
-            return any(values)
+            for value in node.values:
+                if _safe_eval(value, namespace):
+                    return True
+            return False
         raise ValueError(f"Unsupported boolean operator: {type(node.op).__name__}")
 
     if isinstance(node, ast.UnaryOp):
@@ -535,6 +542,8 @@ class DomainLoader:
                 phase_type=phase.id,
                 required=phase.required,
                 description=phase.description or f"{phase.id} analysis step",
+                candidate_skills=list(phase.skills),
+                default_skill=phase.default_skill,
             )
             for phase in domain.phases
         ]

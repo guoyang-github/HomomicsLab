@@ -478,10 +478,21 @@ class PlanEngine:
     ) -> Optional[Any]:
         """Select the best skill for a given phase.
 
-        When a retrieval context is available we re-rank the retrieved skills
-        by how well they match the phase type/description. Otherwise we fall
-        back to direct registry semantic search.
+        The domain's configured candidate skills (from domain.yaml) are tried
+        first so the plan engine honours explicit phase-to-skill mappings.
+        When no candidate is available, we fall back to retrieval context,
+        SkillDAG, or direct registry search.
         """
+        # 1. Prefer explicitly configured candidate skills from the domain.
+        candidate_ids = list(phase.candidate_skills)
+        if phase.default_skill and phase.default_skill not in candidate_ids:
+            candidate_ids.insert(0, phase.default_skill)
+        if candidate_ids:
+            for skill_id in candidate_ids:
+                skill = self.skill_registry.get(skill_id)
+                if skill is not None:
+                    return skill
+
         query = f"{phase.phase_type} {phase.description}"
 
         if retrieval_context is not None and retrieval_context.skills:

@@ -110,6 +110,34 @@ class TestBackendSelection:
         assert result.success is True
         orchestrator.run_tree.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_nextflow_result_failure_falls_back_to_local(self, service, plan, monkeypatch):
+        """A Nextflow run that returns a failed WorkflowResult also triggers local fallback."""
+        monkeypatch.setattr("homomics_lab.hpc.scheduler.NextflowRunner.is_available", lambda: True)
+        monkeypatch.setattr("homomics_lab.config.settings.workflow_nextflow_min_phases", 3)
+
+        with patch.object(
+            service.__class__,
+            "_execute_nextflow",
+            new=AsyncMock(
+                return_value=WorkflowResult(
+                    success=False,
+                    backend="nextflow",
+                    task_tree=plan.task_tree,
+                    error_message="container not available",
+                )
+            ),
+        ):
+            orchestrator = MagicMock()
+            orchestrator.run_tree = AsyncMock(return_value={"t1": {"success": True}})
+            service.orchestrator = orchestrator
+
+            result = await service.execute(plan, project_id="proj_test")
+
+        assert result.backend == "local"
+        assert result.success is True
+        orchestrator.run_tree.assert_awaited_once()
+
 
 class TestLocalExecution:
     @pytest.mark.asyncio

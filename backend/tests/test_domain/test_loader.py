@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from homomics_lab.agent.plan.models import DataState
 from homomics_lab.domain.loader import DomainLoader, DomainLoaderError, DomainValidator
 from homomics_lab.domain.models import DomainDefinition
 from homomics_lab.agent.plan.strategies import StrategyLibrary
@@ -144,6 +145,57 @@ class TestDomainLoader:
         assert strategy.skeleton[0].phase_type == "qc"
         assert "metagenomics_analysis" in strategy.applicable_intents
         assert "16S" in strategy.applicable_intents
+
+    def test_build_strategy_preserves_candidate_skills_and_default(self):
+        """Regression test: domain.yaml phase skills must survive into the strategy skeleton."""
+        domain = DomainDefinition(
+            domain="single-cell-transcriptomics",
+            description="Test scRNA-seq",
+            phases=[
+                {
+                    "id": "data_io",
+                    "required": True,
+                    "skills": ["bio-single-cell-data-io"],
+                    "default_skill": "bio-single-cell-data-io",
+                },
+                {
+                    "id": "clustering",
+                    "required": True,
+                    "skills": [
+                        "bio-single-cell-clustering",
+                        "bio-single-cell-annotation-markers",
+                    ],
+                    "default_skill": "bio-single-cell-clustering",
+                },
+            ],
+            intents=[{"analysis_type": "single_cell_analysis", "keywords": ["sc"]}],
+        )
+
+        registry = SkillRegistry()
+        lib = StrategyLibrary()
+        loader = DomainLoader(registry, lib)
+        strategy = loader._build_strategy(domain)
+
+        data_io = next(p for p in strategy.skeleton if p.phase_type == "data_io")
+        clustering = next(p for p in strategy.skeleton if p.phase_type == "clustering")
+
+        assert data_io.candidate_skills == ["bio-single-cell-data-io"]
+        assert data_io.default_skill == "bio-single-cell-data-io"
+        assert clustering.candidate_skills == [
+            "bio-single-cell-clustering",
+            "bio-single-cell-annotation-markers",
+        ]
+        assert clustering.default_skill == "bio-single-cell-clustering"
+
+        # The critical regression: generate_skeleton must not drop candidate_skills.
+        skeleton = strategy.generate_skeleton(
+            DataState()
+        ) if hasattr(
+            strategy, "generate_skeleton"
+        ) else strategy.skeleton
+        data_io_copy = next(p for p in skeleton if p.phase_type == "data_io")
+        assert data_io_copy.candidate_skills == ["bio-single-cell-data-io"]
+        assert data_io_copy.default_skill == "bio-single-cell-data-io"
 
     def test_compile_state_condition(self):
         from homomics_lab.agent.plan.models import DataState

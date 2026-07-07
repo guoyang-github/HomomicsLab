@@ -271,7 +271,7 @@ async def test_code_fallback_uses_intent_not_keywords(registry_with_code_act):
         analysis_type="unknown_type",
         complexity="single_step",
         original_message="single cell clustering",
-        structured_intent=StructuredIntent(intent_type="analysis", domain="single_cell"),
+        structured_intent=StructuredIntent(intent_type="analysis", domain="single-cell-transcriptomics"),
     )
     bio_plan = await planner.generate_plan(bio_intent, DataState())
     assert "No suitable skills" in bio_plan.suggestion_text or "install" in bio_plan.suggestion_text

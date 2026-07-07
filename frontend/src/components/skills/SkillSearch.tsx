@@ -85,7 +85,7 @@ export function SkillSearch() {
     }
   }
 
-  const allowedSources = new Set(['external', 'imported'])
+  const allowedSources = new Set(['external', 'imported', 'dropin'])
   const visibleSkills = skills.filter(
     (s) => allowedSources.has(s.source) && s.category !== 'agent_core' && !s.id.startsWith('core_')
   )

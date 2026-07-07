@@ -224,6 +224,11 @@ class LLMFallbackPlanner:
         candidate_skills: List[SkillDefinition],
     ) -> List[Dict[str, Any]]:
         """Ask the LLM to select and order skills from the candidate list."""
+        if self.deterministic_fallback and self.llm_client is None:
+            # Deterministic mode never needs the LLM; skip client construction
+            # so tests and offline runs are not blocked by secret-store state.
+            return []
+
         if self.llm_client is None:
             self.llm_client = LLMClient()
 

@@ -29,7 +29,7 @@ def definitions():
             analysis_type="single_cell_analysis",
             keywords=["单细胞"],
             examples=["帮我分析单细胞数据"],
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
         ),
         IntentDefinition(
             analysis_type="general_help",

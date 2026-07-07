@@ -10,9 +10,10 @@ files can be offloaded to the configured backend instead of the local disk.
 
 from __future__ import annotations
 
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
+from typing import BinaryIO, Optional, Union
 
 from homomics_lab.config import settings
 
@@ -21,8 +22,12 @@ class StorageBackend(ABC):
     """Abstract object storage backend."""
 
     @abstractmethod
-    def put(self, key: str, data: bytes) -> str:
-        """Store an object and return its URI."""
+    def put(self, key: str, data: Union[bytes, BinaryIO]) -> str:
+        """Store an object and return its URI.
+
+        Accepts either an in-memory bytes buffer or a readable binary file-like
+        object for streaming uploads.
+        """
         pass
 
     @abstractmethod
@@ -77,10 +82,14 @@ class LocalStorageBackend(StorageBackend):
             raise ValueError(f"Invalid storage key: {key}")
         return self.base_dir / key
 
-    def put(self, key: str, data: bytes) -> str:
+    def put(self, key: str, data: Union[bytes, BinaryIO]) -> str:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, "wb") as out:
+                shutil.copyfileobj(data, out)
         return f"file://{path.resolve()}"
 
     def get(self, key: str) -> bytes:
@@ -156,7 +165,7 @@ class S3StorageBackend(StorageBackend):
                         f"Could not ensure S3 bucket '{self.bucket}' exists"
                     ) from exc
 
-    def put(self, key: str, data: bytes) -> str:
+    def put(self, key: str, data: Union[bytes, BinaryIO]) -> str:
         self._client.put_object(Bucket=self.bucket, Key=key, Body=data)
         return self.get_uri(key)
 

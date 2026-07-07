@@ -1400,7 +1400,7 @@ class TurnRunner:
                     "target": intent.target,
                     "scope": intent.scope,
                     "interaction_mode": intent.interaction_mode,
-                    "metadata": dict(intent.metadata),
+                    "metadata": dict(intent.metadata) if isinstance(intent.metadata, dict) else {"_raw": intent.metadata},
                 },
                 plan_result=plan_result,
                 task_tree=tree,
@@ -2547,11 +2547,11 @@ class TurnRunner:
 
         domain = intent.domain or intent.analysis_type
         qa_responses = {
-            "single_cell": (
+            "single-cell-transcriptomics": (
                 "单细胞测序（scRNA-seq）是一种在单个细胞水平上分析基因表达的技术。"
                 "它可以揭示细胞异质性，发现稀有细胞类型，并追踪细胞发育轨迹。"
             ),
-            "spatial": (
+            "spatial-transcriptomics": (
                 "空间转录组学结合了基因表达分析和空间位置信息，"
                 "可以在组织切片上绘制基因表达图谱。"
             ),
@@ -2660,7 +2660,7 @@ class TurnRunner:
             return llm_response
 
         domain = intent.domain
-        if domain == "single_cell":
+        if domain == "single-cell-transcriptomics":
             return (
                 "单细胞转录组分析通常包括以下主要步骤：\n"
                 "1. 数据质控（QC）：过滤低质量细胞和基因；\n"
@@ -2672,7 +2672,7 @@ class TurnRunner:
                 "7. 通路富集与可视化。\n\n"
                 "您可以上传数据后，让我直接帮您跑完整流程或只做其中某一步。"
             )
-        if domain == "spatial":
+        if domain == "spatial-transcriptomics":
             return (
                 "空间转录组分析通常包括以下主要步骤：\n"
                 "1. 数据加载与质控；\n"

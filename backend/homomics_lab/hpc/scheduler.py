@@ -65,7 +65,7 @@ class BaseScheduler(ABC):
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         pubsub: Optional[ExecutionPubSub] = None,
     ):
-        self.working_dir = working_dir or Path.cwd()
+        self.working_dir = (working_dir or Path.cwd()).resolve()
         self.working_dir.mkdir(parents=True, exist_ok=True)
         self._pubsub = pubsub or get_default_pubsub()
         self._progress_callback = progress_callback

@@ -206,7 +206,7 @@ export function SkillManager() {
     }
   }
 
-  const allowedSources = new Set(['external', 'imported'])
+  const allowedSources = new Set(['external', 'imported', 'dropin'])
   const isHiddenSkill = (s: SkillDetail) =>
     !allowedSources.has(s.source) || s.category === 'agent_core' || s.id.startsWith('core_')
   const query = search.trim().toLowerCase()

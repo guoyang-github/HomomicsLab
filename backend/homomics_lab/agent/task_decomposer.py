@@ -38,6 +38,42 @@ SUB_INTENT_PHASE_MAP = {
     "umap": "visualization",
 }
 
+# Keywords (Chinese + English) used to infer sub-intents when the classifier
+# did not explicitly provide them. Order matters: longer/more specific terms
+# are checked first.
+_SUB_INTENT_KEYWORDS: List[Tuple[str, str]] = [
+    ("differential_expression", "差异表达"),
+    ("differential_expression", "差异分析"),
+    ("differential_expression", "differential expression"),
+    ("differential_expression", "differential"),
+    ("differential_expression", "deg"),
+    ("annotation", "细胞类型注释"),
+    ("annotation", "细胞注释"),
+    ("annotation", "cell type annotation"),
+    ("annotation", "cell annotation"),
+    ("annotation", "annotate"),
+    ("annotation", "注释"),
+    ("visualization", "可视化"),
+    ("visualization", "visualization"),
+    ("visualization", "plot"),
+    ("visualization", "umap"),
+    ("dim_reduction", "降维"),
+    ("dim_reduction", "dimensionality reduction"),
+    ("dim_reduction", "pca"),
+    ("clustering", "louvain"),
+    ("clustering", "leiden"),
+    ("clustering", "聚类"),
+    ("clustering", "clustering"),
+    ("clustering", "cluster"),
+    ("normalization", "归一化"),
+    ("normalization", "标准化"),
+    ("normalization", "normalization"),
+    ("normalization", "normalize"),
+    ("qc", "质控"),
+    ("qc", "quality control"),
+    ("qc", "qc"),
+]
+
 
 class TaskDecomposer:
     """Decomposes user intent into executable task trees.
@@ -91,6 +127,84 @@ class TaskDecomposer:
         store = self._analysis_template_store or AnalysisTemplateStore()
         return store.get_template(template_id)
 
+    @staticmethod
+    def _derive_sub_intents_from_message(message: str) -> List[UserIntent]:
+        """Infer sub-intents from explicit phase keywords in the user message.
+
+        This is a lightweight fallback when the intent classifier returns a
+        broad domain intent (e.g. ``single_cell_analysis``) without narrowing
+        it down to the specific phases the user actually asked for.
+        """
+        if not message:
+            return []
+        lowered = message.lower()
+        matched: set[str] = set()
+        for analysis_type, keyword in _SUB_INTENT_KEYWORDS:
+            if keyword in lowered:
+                matched.add(analysis_type)
+        return [UserIntent(analysis_type=t, complexity="single_step") for t in sorted(matched)]
+
+    def _merge_derived_sub_intents(self, intent: UserIntent) -> UserIntent:
+        """Merge message-derived phase sub-intents with the classifier's sub-intents.
+
+        Domain-level sub-intents (e.g. ``single_cell_analysis``) and
+        phase-level sub-intents (e.g. ``clustering``) are kept together so the
+        decomposer can both select the right domain strategy and filter to the
+        requested phases.
+        """
+        derived = self._derive_sub_intents_from_message(intent.original_message)
+        if not derived:
+            return intent
+        existing = {s.analysis_type for s in intent.sub_intents}
+        combined = list(intent.sub_intents) + [
+            s for s in derived if s.analysis_type not in existing
+        ]
+        if combined == intent.sub_intents:
+            return intent
+        return dataclasses.replace(intent, sub_intents=combined)
+
+    def _has_domain_strategy(self, analysis_type: str) -> bool:
+        """Return True if a non-generic strategy explicitly claims this intent."""
+        plan_engine = self._get_plan_engine()
+        for strategy in plan_engine.strategy_library.list_all():
+            if strategy.name == "generic":
+                continue
+            if analysis_type in strategy.applicable_intents:
+                return True
+        return False
+
+    async def _try_promote_domain_intent(
+        self,
+        intent: UserIntent,
+        plan: PlanResult,
+        project_id: Optional[str],
+        template: Optional[AnalysisTemplate],
+    ) -> Tuple[UserIntent, PlanResult]:
+        """Promote a domain sub-intent to primary when the current plan is fallback."""
+        if not plan.is_fallback or not intent.sub_intents:
+            return intent, plan
+        plan_engine = self._get_plan_engine()
+        seen: set[str] = {intent.analysis_type}
+        for sub in intent.sub_intents:
+            if sub.analysis_type in seen:
+                continue
+            seen.add(sub.analysis_type)
+            if not self._has_domain_strategy(sub.analysis_type):
+                continue
+            promoted = dataclasses.replace(
+                intent,
+                analysis_type=sub.analysis_type,
+                complexity=sub.complexity or intent.complexity,
+            )
+            new_plan = await plan_engine.plan(
+                promoted,
+                project_id=project_id,
+                template=template,
+            )
+            if not new_plan.is_fallback:
+                return promoted, new_plan
+        return intent, plan
+
     async def decompose(self, intent: UserIntent, context: Dict[str, Any]) -> TaskTree:
         """Decompose intent into a TaskTree.
 
@@ -140,10 +254,23 @@ class TaskDecomposer:
             template=template,
         )
 
-        # If sub-intents are present, filter the generated plan to the requested
-        # phases (keeping prerequisites) instead of running the full domain DAG.
-        if intent.sub_intents and not plan.is_fallback:
-            plan, tree = self._filter_plan_by_sub_intents(plan, intent)
+        # Derive explicit phase sub-intents from the user message regardless of
+        # whether the first plan was a domain strategy or a fallback. This lets
+        # messages like "Louvain clustering" narrow the workflow even when the
+        # classifier only returned a broad domain signal.
+        effective_intent = self._merge_derived_sub_intents(intent)
+
+        # If the primary intent is too broad/unknown and sub-intents name a domain
+        # (e.g. primary="builtin_analysis", sub_intent="single_cell_analysis"),
+        # promote that domain sub-intent to primary and replan so the domain
+        # strategy is selected.
+        if plan.is_fallback and effective_intent.sub_intents:
+            effective_intent, plan = await self._try_promote_domain_intent(
+                effective_intent, plan, project_id, template
+            )
+
+        if effective_intent.sub_intents and not plan.is_fallback:
+            plan, tree = self._filter_plan_by_sub_intents(plan, effective_intent)
             return plan, tree
 
         if plan.is_fallback and not plan.phases:

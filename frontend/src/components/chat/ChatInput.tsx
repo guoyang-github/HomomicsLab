@@ -275,7 +275,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
 
     noClick: true,
     accept: {
-      'application/octet-stream': ['.h5ad', '.mtx', '.fastq.gz', '.csv', '.tsv', '.gz'],
+      'application/octet-stream': ['.h5ad', '.mtx', '.fastq.gz', '.csv', '.tsv', '.gz', '.rds', '.RData', '.rda'],
       'text/csv': ['.csv'],
       'text/tab-separated-values': ['.tsv'],
     },

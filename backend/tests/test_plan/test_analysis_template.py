@@ -111,7 +111,7 @@ class TestPlanEngineTemplateIntegration:
         template = AnalysisTemplate(
             template_id="test_sc",
             name="Test scRNA-seq",
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
             applicable_intents=["single_cell_analysis"],
             preferred_skills={"qc": "custom_qc"},
             phase_defaults={"qc": {"min_genes": 200}},
@@ -161,7 +161,7 @@ class TestPlanEngineTemplateIntegration:
         template = AnalysisTemplate(
             template_id="sc_rna",
             name="Single-cell RNA-seq",
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
             data_type_rules={
                 "10x": {
                     "insert_phases": [

@@ -31,6 +31,16 @@ def test_local_put_get_delete(backend):
     assert not backend.exists(key)
 
 
+def test_local_put_accepts_file_like(backend, tmp_path):
+    key = StorageBackend.make_key("proj_abc", "results", "streamed.txt")
+    src = tmp_path / "source.txt"
+    src.write_bytes(b"streamed content")
+    with open(src, "rb") as fh:
+        uri = backend.put(key, fh)
+    assert uri.startswith("file://")
+    assert backend.get(key) == b"streamed content"
+
+
 def test_get_storage_backend_local(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "storage_backend", "local")

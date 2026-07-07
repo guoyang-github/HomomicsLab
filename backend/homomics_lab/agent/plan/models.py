@@ -218,6 +218,7 @@ class Phase:
     selected_skill: Optional[SkillDefinition] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
     candidate_skills: List[str] = field(default_factory=list)
+    default_skill: Optional[str] = None
     parameter_recommendations: Dict[str, str] = field(default_factory=dict)
     parameter_sources: Dict[str, str] = field(default_factory=dict)
     agent_code: Optional[str] = None  # Agent-generated bridging code

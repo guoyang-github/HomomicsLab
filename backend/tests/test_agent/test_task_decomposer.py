@@ -17,7 +17,7 @@ def decomposer():
 def _domain_skill_registry() -> SkillRegistry:
     """Build a registry containing every skill referenced by the single_cell domain."""
     registry = SkillRegistry()
-    domain_file = Path(__file__).parent.parent.parent / "homomics_lab" / "domains" / "single_cell" / "domain.yaml"
+    domain_file = Path(__file__).parent.parent.parent / "homomics_lab" / "domains" / "single-cell-transcriptomics" / "domain.yaml"
     with open(domain_file, "r", encoding="utf-8") as f:
         domain = yaml.safe_load(f)
     skill_ids = {
@@ -31,7 +31,7 @@ def _domain_skill_registry() -> SkillRegistry:
                 id=skill_id,
                 name=skill_id,
                 version="1.0",
-                category="single_cell",
+                category="single-cell-transcriptomics",
                 description=f"Domain skill {skill_id}",
                 input_schema=SkillInputSchema(),
             )
@@ -122,7 +122,7 @@ async def test_decompose_clarification(decomposer):
 
 @pytest.mark.asyncio
 async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
-    """When domain skills are present, the single_cell domain.yaml drives execution."""
+    """When domain skills are present, the single-cell-transcriptomics domain.yaml drives execution."""
     intent = UserIntent(
         analysis_type="single_cell_analysis",
         complexity="complex",
@@ -130,12 +130,10 @@ async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
 
     plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
 
-    assert plan.strategy_name == "single_cell"
+    assert plan.strategy_name == "single-cell-transcriptomics"
     task_names = [t.name for t in tree.tasks]
-    # Domain-specific phases that are not in the hard-coded fallback.
-    assert "fastq_processing" in task_names
+    # Core single-cell pipeline driven by the new domain template.
     assert "data_io" in task_names
-    assert "doublet_removal" in task_names
     assert "qc" in task_names
     assert "normalization" in task_names
     assert "dim_reduction" in task_names
@@ -165,7 +163,7 @@ async def test_decompose_sub_intents_uses_domain_template(domain_decomposer):
 
     plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
 
-    assert plan.strategy_name == "single_cell"
+    assert plan.strategy_name == "single-cell-transcriptomics"
     task_names = set(t.name for t in tree.tasks)
     assert "clustering" in task_names
     assert "dim_reduction" in task_names
@@ -174,3 +172,47 @@ async def test_decompose_sub_intents_uses_domain_template(domain_decomposer):
     # Optional downstream phases should be omitted.
     assert "annotation" not in task_names
     assert "differential_expression" not in task_names
+
+
+@pytest.mark.asyncio
+async def test_decompose_derives_sub_intents_from_message(domain_decomposer):
+    """When no sub-intents are provided but the message names a phase, the plan is narrowed."""
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="complex",
+        original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
+    )
+
+    plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.strategy_name == "single-cell-transcriptomics"
+    task_names = set(t.name for t in tree.tasks)
+    assert "clustering" in task_names
+    assert "dim_reduction" in task_names
+    assert "normalization" in task_names
+    assert "qc" in task_names
+    assert "data_io" in task_names
+    # Annotation should be omitted because the user only asked for clustering.
+    assert "annotation" not in task_names
+
+
+@pytest.mark.asyncio
+async def test_decompose_derives_sub_intents_when_classifier_returns_broad_intent(domain_decomposer):
+    """If the classifier returns a broad sub-intent like 'single_cell_analysis',
+    explicit phase keywords in the message still narrow the plan."""
+    intent = UserIntent(
+        analysis_type="builtin_analysis",
+        complexity="single_step",
+        original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
+        sub_intents=[
+            UserIntent(analysis_type="single_cell_analysis", complexity="single_step"),
+        ],
+    )
+
+    plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.strategy_name == "single-cell-transcriptomics"
+    task_names = set(t.name for t in tree.tasks)
+    assert "clustering" in task_names
+    assert "dim_reduction" in task_names
+    assert "annotation" not in task_names

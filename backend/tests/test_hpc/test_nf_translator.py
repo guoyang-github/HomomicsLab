@@ -27,7 +27,7 @@ class TestSimpleNFTranslator:
                 Phase(phase_type="normalize", required=True, selected_skill=skill),
                 Phase(phase_type="optional", required=False),
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 
@@ -85,7 +85,7 @@ class TestSimpleNFTranslator:
 
         plan = PlanResult(
             phases=[Phase(phase_type="qc", required=True, selected_skill=skill, parameters={"min_genes": 500})],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
 

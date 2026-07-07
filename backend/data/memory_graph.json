@@ -2973,6 +2973,2463 @@
         "project_id": null
       },
       "id": "tool:geo_search"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Spatial Transcriptomics Best Practice",
+        "description": "Spatial Transcriptomics Best Practice",
+        "category": "spatial",
+        "project_id": null
+      },
+      "id": "sop:spatial-transcriptomics-best-practice"
+    },
+    {
+      "labels": [
+        "Capability",
+        "Sop"
+      ],
+      "properties": {
+        "name": "Single-Cell RNA-seq Best Practice",
+        "description": "Single-Cell RNA-seq Best Practice",
+        "category": "single_cell",
+        "project_id": null
+      },
+      "id": "sop:scrnaseq-best-practice"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-03T08:59:24.881949+00:00"
+      },
+      "id": "f7faa215-df13-4378-be03-5d9fc7b7cdc2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-03T08:59:26.189315+00:00"
+      },
+      "id": "68e4b9d5-429d-4ac1-ba28-8592db889a31"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-03T08:59:27.473943+00:00"
+      },
+      "id": "0fe15d3f-6475-4038-9aa0-a605b27b719e"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-03T08:59:28.925236+00:00"
+      },
+      "id": "0599a085-1c3e-48a5-8420-651d0bb8c18c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-03T08:59:30.303197+00:00"
+      },
+      "id": "886afd51-ed15-4b10-b533-b48b58f8eac9"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-03T08:59:31.800197+00:00"
+      },
+      "id": "0bfded64-1d3c-4cf3-b381-e7c77d7ffe4d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-03T08:59:32.852944+00:00"
+      },
+      "id": "9c176f77-2dd6-4ac8-b58c-283958106964"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-03T08:59:35.201399+00:00"
+      },
+      "id": "1998805a-2928-4353-ab2b-31e8fce8bbd9"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-03T08:59:36.686649+00:00"
+      },
+      "id": "169a31d1-9eba-4419-bcbd-26e93d5c0057"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-03T10:15:49.883826+00:00"
+      },
+      "id": "244e1cbf-41a2-4dad-849a-6d96633325f2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-03T10:15:52.441084+00:00"
+      },
+      "id": "bac23f38-f411-440e-b87a-501f4bd6f305"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-03T08:59:26.189315+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock respon",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-03T10:15:52.507990+00:00"
+      },
+      "id": "1c050a94-f629-4c39-8697-33ca00c0ec19"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-03T10:15:55.114413+00:00"
+      },
+      "id": "6051fbab-1bd9-4101-b9f9-6df9cbe9bf6f"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-03T10:15:57.883577+00:00"
+      },
+      "id": "05a94a80-44e2-41a9-a7a3-11078ffd12de"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:28.925236+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_A",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-03T10:15:57.951216+00:00"
+      },
+      "id": "b48b2f61-d01e-406b-9062-aa24bf5bcb65"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-03T10:16:00.890873+00:00"
+      },
+      "id": "6ec11b97-8de3-4542-ad93-41c82b0fdc88"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-03T10:16:03.408008+00:00"
+      },
+      "id": "9b74b823-11b3-4661-94de-76b2da5ae6be"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-03T10:16:05.724520+00:00"
+      },
+      "id": "0ab2f373-44fc-40ea-99b7-f258d894dd86"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-03T10:16:13.521182+00:00"
+      },
+      "id": "41beb61f-108c-4557-b74f-3e172a26e67c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:51.516818+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:52.102668+00:00] Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:35.201399+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, gene",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-03T10:16:13.599837+00:00"
+      },
+      "id": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-03T10:16:16.492160+00:00"
+      },
+      "id": "7f663edc-9074-404b-8fbd-0efb09b75b1a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T08:59:18.694132+00:00"
+      },
+      "id": "b4cdd0f6-1a01-4998-9ec6-ee5fd1b330b9"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T08:59:20.266830+00:00"
+      },
+      "id": "bd61f79d-7079-45b7-8ac8-ae28bf8a0fff"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T08:59:21.831759+00:00"
+      },
+      "id": "4fa2901c-5a9d-4603-9fc4-4689d37ffeb3"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T08:59:23.476068+00:00"
+      },
+      "id": "da7ff058-0375-4ef6-9c69-df53a05dfe69"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T08:59:25.103080+00:00"
+      },
+      "id": "77765eeb-3fa1-4973-898c-2a9e8fa87dcd"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T08:59:26.695493+00:00"
+      },
+      "id": "b402488d-a43a-4248-8189-1b85b488f5ee"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T08:59:28.553239+00:00"
+      },
+      "id": "f8fecabb-ff17-430f-a28a-e879d883462d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T08:59:35.237072+00:00"
+      },
+      "id": "ae81af30-6900-4006-a82c-44b1c7e35603"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T08:59:36.867084+00:00"
+      },
+      "id": "42d4a920-b071-42b3-b3c2-1b7f3e6eddde"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T09:04:18.512029+00:00"
+      },
+      "id": "62b2a1f7-bb59-4479-a7b6-5b423ec993e2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:47.203158+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:24.881949+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T10:15:49.883826+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_A",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T09:04:18.569126+00:00"
+      },
+      "id": "488688b4-f66d-4ace-ac75-129f2f4e283a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T09:04:20.195297+00:00"
+      },
+      "id": "f0b660bf-9b08-4bb2-842f-e984290e2488"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-03T10:15:52.507990+00:00] [2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-03T08:59:26.189315+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPON",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T09:04:20.264785+00:00"
+      },
+      "id": "a6e92eda-206f-4f0f-a26d-b4e4a6634894"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T09:04:21.816234+00:00"
+      },
+      "id": "21c8a961-7628-4752-8724-539ac6a6e839"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T09:04:23.468455+00:00"
+      },
+      "id": "9d48f76f-8c41-4aec-a6f1-a5177769f619"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-03T10:15:57.951216+00:00] [2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:28.925236+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution ",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T09:04:23.528084+00:00"
+      },
+      "id": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T09:04:25.208003+00:00"
+      },
+      "id": "96628b81-d543-43a8-8dab-d1c82b5fbeb4"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T09:04:26.924882+00:00"
+      },
+      "id": "67c6e752-8dfe-4c0f-aad5-37eab0918329"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:49.371756+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:31.800197+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:03.408008+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-04T08",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T09:04:26.986589+00:00"
+      },
+      "id": "989bfc90-2855-4c17-b802-debae3736116"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T09:04:28.767271+00:00"
+      },
+      "id": "e3bb1194-d57b-487a-8bde-77ad64fa69fe"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-02T08:40:49.827232+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:32.852944+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:05.724520+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-04T08:59",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T09:04:28.827598+00:00"
+      },
+      "id": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T09:04:36.160669+00:00"
+      },
+      "id": "d1fc1290-2348-4a02-b818-ea70f04655cc"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-03T10:16:13.599837+00:00] [2026-07-02T08:40:51.516818+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:52.102668+00:00] Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:35.201399+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLA",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T09:04:36.234955+00:00"
+      },
+      "id": "27e1992c-5351-4434-8c5d-5ce5bac97e57"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T09:04:37.983557+00:00"
+      },
+      "id": "2fd0f952-352c-4d23-97f7-c5db1c97778d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T16:12:05.063105+00:00"
+      },
+      "id": "28edf0f9-50eb-487e-a4d6-ec9a0665e175"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T16:12:07.006014+00:00"
+      },
+      "id": "ad680af4-6b13-4b99-837e-4f65701ef962"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T16:12:08.318915+00:00"
+      },
+      "id": "ef18894b-174e-4540-8f29-0f958b234270"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T16:12:09.747044+00:00"
+      },
+      "id": "03d1f7d5-5695-449f-85a4-a6ea36debc8a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T16:12:11.154315+00:00"
+      },
+      "id": "a20c807e-97fb-4ca7-8395-fb813823eb6c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T16:12:12.571036+00:00"
+      },
+      "id": "b9677261-4366-464a-b8d5-2464a5bd1b8d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T16:12:14.054828+00:00"
+      },
+      "id": "5b59d120-51af-4059-91a8-c25e2dd48f74"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T16:12:20.413629+00:00"
+      },
+      "id": "dc0ace9e-6642-4590-a433-153d7894cfe8"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T16:12:21.969366+00:00"
+      },
+      "id": "bf057ff6-107a-4e08-afa1-3b37d9c2723b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:23:55.853206+00:00"
+      },
+      "id": "2fbeff52-9ecf-4750-965a-c961af3c4c6f"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T18:23:57.096723+00:00"
+      },
+      "id": "09276c4e-3348-48f3-83b9-e3bf56f998b3"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:20.264785+00:00] [2026-07-03T10:15:52.507990+00:00] [2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-03T08:59:26.189315+00:00] Project proj_1: user asked: '请帮我选择分析类型' Executio",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T18:23:57.163019+00:00"
+      },
+      "id": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T18:23:58.246396+00:00"
+      },
+      "id": "ac618b04-1c62-4253-b2ee-ac8b02e1ed7b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T18:23:59.424627+00:00"
+      },
+      "id": "afe4cefe-2793-4289-b714-c45e266eff04"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:23.528084+00:00] [2026-07-03T10:15:57.951216+00:00] [2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:28.925236+00:00] Project proj_1:",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T18:23:59.486138+00:00"
+      },
+      "id": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T18:24:00.653615+00:00"
+      },
+      "id": "d486f704-9337-4435-8428-bdca61108e54"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T18:24:01.801808+00:00"
+      },
+      "id": "0d81261c-628a-4e0c-9552-fd0fa7303c80"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T18:24:03.056979+00:00"
+      },
+      "id": "d49e4991-f93f-4d57-b9e0-2e448fbbe96d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T18:24:09.298627+00:00"
+      },
+      "id": "313fe1f4-099b-4a36-a484-79adbabca107"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:36.234955+00:00] [2026-07-03T10:16:13.599837+00:00] [2026-07-02T08:40:51.516818+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:52.102668+00:00] Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:35.201399+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Executi",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T18:24:09.365332+00:00"
+      },
+      "id": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T18:24:10.838829+00:00"
+      },
+      "id": "16c23a7f-b48d-4048-84aa-6034cc38cbe6"
+    },
+    {
+      "id": "category:single-cell-transcriptomics"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:29:09.779657+00:00"
+      },
+      "id": "ab4fbdae-bb1b-4fc5-9855-649f5078e314"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T18:29:11.019647+00:00"
+      },
+      "id": "66a164a0-560b-4b2b-bfd0-b8c096d782d0"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-04T18:29:12.017621+00:00"
+      },
+      "id": "f5ce6bf4-c27b-46f7-a993-8c9b4e4f0f64"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T18:29:13.234243+00:00"
+      },
+      "id": "856c4757-a171-4ae4-a2f0-520a7cd020cf"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-04T18:29:14.334004+00:00"
+      },
+      "id": "0047dc76-8482-4505-888b-79f27c9acf7c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-04T18:29:16.083153+00:00"
+      },
+      "id": "18d203ba-8871-4096-a1b2-24fceaf6a724"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-04T18:29:17.329522+00:00"
+      },
+      "id": "9f244c8f-b987-48de-b11a-c827e5a94aac"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T18:29:23.039650+00:00"
+      },
+      "id": "4a464c0a-9a96-4038-aec5-76c1640912a1"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '继续' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_persist_api",
+        "created_at": "2026-07-04T18:29:24.253843+00:00"
+      },
+      "id": "b6c994a1-f4ac-402f-9ba5-4baf38f2bb19"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project alpha session one",
+        "memory_type": "note",
+        "project_id": "proj_a",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:00.420774+00:00"
+      },
+      "id": "067f6479-cd99-4ef9-8dc4-9eaaaf6f88ca"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project beta session one",
+        "memory_type": "note",
+        "project_id": "proj_b",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:01.097366+00:00"
+      },
+      "id": "b3894d3c-105d-4629-83a0-9ff14465495f"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "project alpha session two",
+        "memory_type": "note",
+        "project_id": "proj_a",
+        "session_id": "sess_2",
+        "created_at": "2026-07-04T18:34:01.582603+00:00"
+      },
+      "id": "23a7acc7-823d-40a1-a8f9-acba480afd93"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "unique keyword xyz123 only appears here",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-04T18:34:02.985062+00:00"
+      },
+      "id": "9ed31d7b-c4e0-4867-840e-968ffece954c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "some other generic note",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-04T18:34:03.524896+00:00"
+      },
+      "id": "a900e95c-fe9b-4a5b-8942-221dc7f7eda7"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Note"
+      ],
+      "properties": {
+        "text": "unique keyword abc999",
+        "memory_type": "note",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-04T18:34:04.468299+00:00"
+      },
+      "id": "2dc65e44-dfc9-44af-be10-3254ee789df8"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User asked about PBMC QC filtering parameters.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:05.538842+00:00"
+      },
+      "id": "f29bfff9-ed90-4966-b8b1-4d1353fa0bd1"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User followed up on PBMC quality control thresholds.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:06.220144+00:00"
+      },
+      "id": "7fa8e19a-70b5-4677-99cf-402dedae7134"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "User asked about RNA velocity plotting.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:06.642776+00:00"
+      },
+      "id": "26535eb1-e339-4936-97bd-b69547a34772"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Concept"
+      ],
+      "properties": {
+        "text": "Summary of 3 conversation memories:\nUser asked about PBMC QC filtering parameters.\n---\nUser followed up on PBMC quality control thresholds.\n---\nUser asked about RNA velocity plotting.",
+        "memory_type": "concept",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-04T18:34:08.713964+00:00"
+      },
+      "id": "0e0343b9-d695-4a75-9c7b-d42171fa5baa"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "recent conversation about QC",
+        "memory_type": "conversation",
+        "project_id": null,
+        "session_id": null,
+        "created_at": "2026-07-04T18:34:09.320776+00:00"
+      },
+      "id": "5039989c-986e-41f8-9c50-370e6feaad9a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T06:38:20.513609+00:00"
+      },
+      "id": "38e74b4a-65d7-4001-a7ac-865c7463c220"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:18.569126+00:00] [2026-07-02T08:40:47.203158+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:24.881949+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T10:15:49.883826+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution ",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T06:38:20.572961+00:00"
+      },
+      "id": "fa443138-0eef-4de7-9ce8-34508c2f773d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T06:38:21.800824+00:00"
+      },
+      "id": "cb8cb1da-e941-441d-ab7c-a57946031f53"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T18:23:57.163019+00:00] [2026-07-04T09:04:20.264785+00:00] [2026-07-03T10:15:52.507990+00:00] [2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-03T08:59:26.189315+00:00] Project proj_",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T06:38:21.867122+00:00"
+      },
+      "id": "9d28be55-00d8-417e-a341-3191f3aba63d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T06:38:22.825579+00:00"
+      },
+      "id": "455f6f01-f694-4584-a56d-ea44ee6d52df"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T06:38:23.834271+00:00"
+      },
+      "id": "785713aa-2cff-4509-a1c9-4e7c721339ed"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T18:23:59.486138+00:00] [2026-07-04T09:04:23.528084+00:00] [2026-07-03T10:15:57.951216+00:00] [2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T06:38:23.892972+00:00"
+      },
+      "id": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T06:38:24.898404+00:00"
+      },
+      "id": "c55015f0-17d8-4576-a7fd-85936fcd677b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-06T06:38:25.890989+00:00"
+      },
+      "id": "d0ca3060-896e-458a-bd0e-c004aeec84f5"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:26.986589+00:00] [2026-07-02T08:40:49.371756+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:31.800197+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:03.408008+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Respons",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-06T06:38:25.942283+00:00"
+      },
+      "id": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-06T06:38:27.229566+00:00"
+      },
+      "id": "7091011f-8b6c-4813-9af2-35083523ae42"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-04T09:04:28.827598+00:00] [2026-07-02T08:40:49.827232+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:32.852944+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:05.724520+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: ",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-06T06:38:27.283527+00:00"
+      },
+      "id": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project default: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.ERROR. Response: 抱歉，处理您的请求时出现了问题：Intent analysis failed: dictionary update sequence element #0 has length 1; 2 is required 能否补充说明一下您的具体需求？",
+        "memory_type": "conversation",
+        "project_id": "default",
+        "session_id": "sess_local",
+        "created_at": "2026-07-06T07:14:24.162204+00:00"
+      },
+      "id": "102f31ef-1cba-46b9-9c45-9806ce404482"
+    },
+    {
+      "id": "default"
+    },
+    {
+      "id": "sess_local"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T07:41:22.862251+00:00"
+      },
+      "id": "c1990ba7-058f-4fce-a64b-134c5bb62c51"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T07:51:54.722566+00:00"
+      },
+      "id": "b60bf480-7bbc-4971-b542-76db6b5cb382"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T07:51:55.667464+00:00"
+      },
+      "id": "99686475-73a1-47d6-97c3-feb1801d5afa"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T07:51:56.451800+00:00"
+      },
+      "id": "5017f2b6-4f87-457d-9b36-bffed46432b7"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T07:51:57.299117+00:00"
+      },
+      "id": "d56b22fd-2b2a-4c44-9d91-254632dc87e6"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: single-cell, spatial-transcriptomics. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T07:51:58.138910+00:00"
+      },
+      "id": "72cc8a55-0c96-44e0-8ac3-23b260a8a92d"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-06T07:51:58.915311+00:00"
+      },
+      "id": "fd6d0bfc-75cb-40b6-97d3-c711ae228b0b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-06T07:51:59.801643+00:00"
+      },
+      "id": "98793cb4-5939-4f26-900d-f3f4b9827b02"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.ERROR. Response: 抱歉，处理您的请求时出现了问题：Intent analysis failed: dictionary update sequence element #0 has length 1; 2 is required 能否补充说明一下您的具体需求？",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test",
+        "session_id": "sess_chat_test",
+        "created_at": "2026-07-06T07:55:32.750147+00:00"
+      },
+      "id": "24cb4221-14ce-4673-bd13-437c5c231ac3"
+    },
+    {
+      "id": "proj_chat_test"
+    },
+    {
+      "id": "sess_chat_test"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project default: user asked: '请对PA12单细胞数据执行Louvain聚类,比较不同分辨率(0.4、0.8、1.2)下的聚类数目。' Execution mode: ExecutionMode.ERROR. Response: 抱歉，处理您的请求时出现了问题：Intent analysis failed: dictionary update sequence element #0 has length 1; 2 is required 能否补充说明一下您的具体需求？",
+        "memory_type": "conversation",
+        "project_id": "default",
+        "session_id": "sess_local",
+        "created_at": "2026-07-06T08:13:19.134608+00:00"
+      },
+      "id": "46c42ad2-65e3-4d5e-9fb4-91b7a4ffcb54"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.ERROR. Response: 抱歉，处理您的请求时出现了问题：Intent analysis failed: dictionary update sequence element #0 has length 1; 2 is required 能否补充说明一下您的具体需求？",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test",
+        "session_id": "sess_chat_test",
+        "created_at": "2026-07-06T08:19:22.493699+00:00"
+      },
+      "id": "f0d1dc10-13ee-4893-b57d-dbf4c8ffdf07"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test2: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.ERROR. Response: 抱歉，处理您的请求时出现了问题：Intent analysis failed: dictionary update sequence element #0 has length 1; 2 is required 能否补充说明一下您的具体需求？",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test2",
+        "session_id": "sess_chat_test2",
+        "created_at": "2026-07-06T08:23:46.624263+00:00"
+      },
+      "id": "fe415866-5993-4586-8bfa-5597fab8c5c1"
+    },
+    {
+      "id": "proj_chat_test2"
+    },
+    {
+      "id": "sess_chat_test2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test3: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test3",
+        "session_id": "sess_chat_test3",
+        "created_at": "2026-07-06T09:19:10.542781+00:00"
+      },
+      "id": "20996715-0405-4863-a988-e000c4d7cb93"
+    },
+    {
+      "id": "proj_chat_test3"
+    },
+    {
+      "id": "sess_chat_test3"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_chat_test4",
+        "created_at": "2026-07-06T09:23:42.152242+00:00"
+      },
+      "id": "117709bc-67ea-489c-aa76-c5a78b8dd772"
+    },
+    {
+      "id": "proj_chat_test4"
+    },
+    {
+      "id": "sess_chat_test4"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_chat_test4",
+        "created_at": "2026-07-06T09:25:28.180193+00:00"
+      },
+      "id": "3b2ce907-c9aa-4372-82cc-deae259098df"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test5: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test5",
+        "session_id": "sess_chat_test5",
+        "created_at": "2026-07-06T09:32:33.351096+00:00"
+      },
+      "id": "d4429ac8-4361-4280-b5e5-7818174df859"
+    },
+    {
+      "id": "proj_chat_test5"
+    },
+    {
+      "id": "sess_chat_test5"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test6: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test6",
+        "session_id": "sess_chat_test6",
+        "created_at": "2026-07-06T09:38:55.242202+00:00"
+      },
+      "id": "4c445bad-eb73-4444-a0bc-87ef4da62819"
+    },
+    {
+      "id": "proj_chat_test6"
+    },
+    {
+      "id": "sess_chat_test6"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test7: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test7",
+        "session_id": "sess_chat_test7",
+        "created_at": "2026-07-06T09:42:34.895611+00:00"
+      },
+      "id": "df9ab829-7b27-4486-888f-25169f9dc3d9"
+    },
+    {
+      "id": "proj_chat_test7"
+    },
+    {
+      "id": "sess_chat_test7"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test8: user asked: '请对 PA12 单细胞数据执行 Louvain 聚类，比较不同分辨率（0.4、0.8、1.2）下的聚类数目。' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test8",
+        "session_id": "sess_chat_test8",
+        "created_at": "2026-07-06T09:47:12.249034+00:00"
+      },
+      "id": "00ceeb27-2480-472e-b3a9-a9a8a8030015"
+    },
+    {
+      "id": "proj_chat_test8"
+    },
+    {
+      "id": "sess_chat_test8"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '对 PA12_sc.h5ad 进行 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_skill_test_1",
+        "created_at": "2026-07-06T09:58:10.033764+00:00"
+      },
+      "id": "1a6a8653-ee2b-4d75-9f20-0fbd383000ed"
+    },
+    {
+      "id": "sess_skill_test_1"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '对 PA12_sc.h5ad 做 Louvain 聚类并可视化 UMAP' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_e2e_pa12_1",
+        "created_at": "2026-07-06T10:14:26.113474+00:00"
+      },
+      "id": "c903e735-070c-4eae-8068-2b2bb2a94205"
+    },
+    {
+      "id": "sess_e2e_pa12_1"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '对 PA12_sc.h5ad 做 Louvain 聚类并可视化 UMAP' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_e2e_pa12_2",
+        "created_at": "2026-07-06T10:21:35.842270+00:00"
+      },
+      "id": "3feea614-e479-4b67-96ac-ca41545fc213"
+    },
+    {
+      "id": "sess_e2e_pa12_2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_chat_test4: user asked: '对 PA12_sc.h5ad 做 Louvain 聚类并可视化 UMAP' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_chat_test4",
+        "session_id": "sess_e2e_pa12_3",
+        "created_at": "2026-07-06T10:34:18.768205+00:00"
+      },
+      "id": "48594618-e7b9-4904-9714-8a5fa46a2473"
+    },
+    {
+      "id": "sess_e2e_pa12_3"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_da4ff818: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_da4ff818",
+        "session_id": "sess_pa12_001",
+        "created_at": "2026-07-06T10:37:04.424726+00:00"
+      },
+      "id": "694fc5ae-ae30-4d75-93fd-05555d9de505"
+    },
+    {
+      "id": "proj_da4ff818"
+    },
+    {
+      "id": "sess_pa12_001"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_da4ff818: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_da4ff818",
+        "session_id": "sess_pa12_001",
+        "created_at": "2026-07-06T10:37:18.732749+00:00"
+      },
+      "id": "9480f7dd-d617-4f3c-ba35-8ccac948cc16"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T11:16:47.525830+00:00"
+      },
+      "id": "dbcd7e07-41e8-4aa7-9e08-38daeb72e1ad"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T11:16:49.043053+00:00"
+      },
+      "id": "4e19424b-96d5-4a8f-806d-bab0c6bbbd2b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T10:11:20.862125+00:00] [2026-07-06T10:01:18.631540+00:00] [2026-07-06T06:38:21.867122+00:00] [2026-07-04T18:23:57.163019+00:00] [2026-07-04T09:04:20.264785+00:00] [2026-07-03T10:15:52.507990+00:00] [2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPO",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T11:16:49.125847+00:00"
+      },
+      "id": "46540d62-15f3-4142-9863-12225b0e92ef"
+    },
+    {
+      "id": "5b6b9857-6a43-41dc-aa07-17c37a86f010"
+    },
+    {
+      "id": "6e86d25c-ad45-40f5-8bb8-6739e5d8570d"
+    },
+    {
+      "id": "396159d2-0d68-4ade-8430-fca36ceb244b"
+    },
+    {
+      "id": "61bdb9de-5a37-4baf-8b78-23ddd9a91dfa"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T11:16:50.593948+00:00"
+      },
+      "id": "a41dd549-e250-465e-8128-1f246f88c308"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T11:16:52.069610+00:00"
+      },
+      "id": "dd3a15fe-627d-4f3c-a49d-d78f1bda1920"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T10:11:23.063665+00:00] [2026-07-06T10:01:20.659663+00:00] [2026-07-06T06:38:23.892972+00:00] [2026-07-04T18:23:59.486138+00:00] [2026-07-04T09:04:23.528084+00:00] [2026-07-03T10:15:57.951216+00:00] [2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: Execution",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T11:16:52.172214+00:00"
+      },
+      "id": "d5655480-4b77-4018-9fd3-169e1078464b"
+    },
+    {
+      "id": "96024b39-fcfd-4b07-8827-bcc212318256"
+    },
+    {
+      "id": "41ae3d5c-1e63-4f1c-81b0-7d5fb2118c7b"
+    },
+    {
+      "id": "5583778c-62df-420c-bab1-d82bd9464d39"
+    },
+    {
+      "id": "c1d8d66b-16c2-469e-8b33-2310b2f8c157"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T11:16:53.684335+00:00"
+      },
+      "id": "86c2b119-eda0-407c-8317-d76a3eb5e4ce"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-06T11:16:55.346372+00:00"
+      },
+      "id": "593b6e27-8735-4921-8d28-9a431aaf5981"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-06T11:16:56.615766+00:00"
+      },
+      "id": "7c9c8ca6-fcd5-429e-b3fc-523e753dccdd"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_da4ff818: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_da4ff818",
+        "session_id": "sess_pa12_002",
+        "created_at": "2026-07-06T11:30:08.710829+00:00"
+      },
+      "id": "17121852-fe1a-4a31-bf8c-6694ca688b89"
+    },
+    {
+      "id": "sess_pa12_002"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T11:35:50.462110+00:00"
+      },
+      "id": "67c14b3a-5ad5-4853-951d-ce0237f7d38f"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T10:08:20.532656+00:00] [2026-07-06T06:38:20.572961+00:00] [2026-07-04T09:04:18.569126+00:00] [2026-07-02T08:40:47.203158+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T08:59:24.881949+00:00] Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-03T10:",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-06T11:35:50.522543+00:00"
+      },
+      "id": "292b8c77-ca38-4cc4-85c8-a6edb650ea99"
+    },
+    {
+      "id": "935bb11c-a265-4e42-90b4-27a18306938e"
+    },
+    {
+      "id": "d84234fe-e545-4fa7-aa02-5632a2f3d989"
+    },
+    {
+      "id": "d27dcb42-945f-4a33-87a4-640f6095f1dd"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T11:35:51.402098+00:00"
+      },
+      "id": "6f7c26f6-28d1-464a-a40a-f0fdf65a67c4"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-06T11:35:52.859792+00:00"
+      },
+      "id": "530b8f2b-7a67-4277-8c4b-2942acecbd81"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T11:35:54.051969+00:00"
+      },
+      "id": "6ec89550-9ff9-407f-9d72-88d872886e27"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-06T11:35:55.589962+00:00"
+      },
+      "id": "3213ae89-81f6-45f6-ae2b-26c2c3447ba2"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-06T11:35:56.600783+00:00"
+      },
+      "id": "79f37660-c829-437d-bdb4-4344b91726b7"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-06T11:35:58.950020+00:00"
+      },
+      "id": "f26c91a0-38cc-4001-ab6b-9be6d9c95961"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-07T03:16:29.312020+00:00"
+      },
+      "id": "43fccd9d-6040-4537-ae3a-a8e1c76ae13b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-07T03:16:30.454406+00:00"
+      },
+      "id": "3668e5a4-c0b8-4553-ae4d-f9b2e2bea9bf"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T11:16:49.125847+00:00] [2026-07-06T10:11:20.862125+00:00] [2026-07-06T10:01:18.631540+00:00] [2026-07-06T06:38:21.867122+00:00] [2026-07-04T18:23:57.163019+00:00] [2026-07-04T09:04:20.264785+00:00] [2026-07-03T10:15:52.507990+00:00] [2026-07-02T08:40:47.632952+00:00] Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.\n\n[2026-07-02T08:40:47.960261+00:00] Project proj_1: user asked: '我选择 问题解答' Executi",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-07T03:16:30.595273+00:00"
+      },
+      "id": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-07T03:16:32.605143+00:00"
+      },
+      "id": "72581e3a-40c3-4cfc-944a-f4a1f716392a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-07T03:16:34.491485+00:00"
+      },
+      "id": "4b082d9d-1194-4131-b145-dc507a246598"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T11:16:52.172214+00:00] [2026-07-06T10:11:23.063665+00:00] [2026-07-06T10:01:20.659663+00:00] [2026-07-06T06:38:23.892972+00:00] [2026-07-04T18:23:59.486138+00:00] [2026-07-04T09:04:23.528084+00:00] [2026-07-03T10:15:57.951216+00:00] [2026-07-02T08:40:48.408588+00:00] Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general. Response: 我为您生成了一个分析计划，请确认后再执行。\n\n[2026-07-02T08:40:48.970139+00:00] Project proj_1: user asked: '什",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-07T03:16:34.620054+00:00"
+      },
+      "id": "1d987c00-b848-49f2-8235-00fd5f28cb8c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-07T03:16:36.678785+00:00"
+      },
+      "id": "27dc57a3-b0d2-4ac9-8bf8-29d529ad244c"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-07T03:16:37.859034+00:00"
+      },
+      "id": "a7452c86-9e6d-4f0d-b380-921d2e1eeb38"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T10:11:25.253000+00:00] [2026-07-06T06:38:25.942283+00:00] [2026-07-04T09:04:26.986589+00:00] [2026-07-02T08:40:49.371756+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:31.800197+00:00] Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:03.408008+00:00] Project proj_1: user asked: '列出我的会话'",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-07T03:16:37.968707+00:00"
+      },
+      "id": "585e9ec6-4463-4688-8621-4300bb741c13"
+    },
+    {
+      "id": "0da32df3-e38d-4842-b175-1c7e6cbf7144"
+    },
+    {
+      "id": "ed146c9d-bb8e-4554-9071-85c36fd91430"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-07T03:16:39.582298+00:00"
+      },
+      "id": "b184d39d-64fc-498b-8e95-49a68226953a"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "[2026-07-06T10:11:26.506136+00:00] [2026-07-06T06:38:27.283527+00:00] [2026-07-04T09:04:28.827598+00:00] [2026-07-02T08:40:49.827232+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T08:59:32.852944+00:00] Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。\n\n[2026-07-03T10:16:05.724520+00:00] Project proj_1: user asked: 'hello' Ex",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-07T03:16:39.697669+00:00"
+      },
+      "id": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb"
+    },
+    {
+      "id": "d2e8e7d9-f312-4038-90f6-8c6b099e3b6b"
+    },
+    {
+      "id": "6a84dd03-bc22-4001-9af8-7b7ee4c9ed87"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_da4ff818: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_da4ff818",
+        "session_id": "sess_pa12_003",
+        "created_at": "2026-07-07T03:23:44.487910+00:00"
+      },
+      "id": "68a44e42-fe00-4b46-ba17-2f7d048175ef"
+    },
+    {
+      "id": "sess_pa12_003"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '帮我分析单细胞数据' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_1",
+        "created_at": "2026-07-07T03:27:47.092096+00:00"
+      },
+      "id": "96fa8959-644d-44da-a9e8-5589e2d2a661"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '请帮我选择分析类型' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-07T03:27:48.907203+00:00"
+      },
+      "id": "476c0ea8-343f-45af-a026-eeb49197ebe6"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '我选择 问题解答' Execution mode: ExecutionMode.DIRECT_RESPONSE. Response: This is a mock response for API testing.",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_debate_api",
+        "created_at": "2026-07-07T03:27:49.808081+00:00"
+      },
+      "id": "5531f5dd-6fae-4c86-9b0c-abe3aeadc0a7"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-07T03:27:50.816391+00:00"
+      },
+      "id": "6870b6b5-4ad8-47ac-be9c-74dad457beb0"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '什么是单细胞测序？' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: agent_core, general, single-cell. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_regenerate_api",
+        "created_at": "2026-07-07T03:27:51.730114+00:00"
+      },
+      "id": "b5694f14-2acc-45ed-89f7-3a2646c925e0"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: '列出我的会话' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_list_api",
+        "created_at": "2026-07-07T03:27:52.804156+00:00"
+      },
+      "id": "cd332241-23cb-4fc6-a948-87e873e79bc6"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project proj_1: user asked: 'hello' Execution mode: ExecutionMode.QUEUED. Tasks: answer_question. Response: 已提交后台执行，完成后会通知您。",
+        "memory_type": "conversation",
+        "project_id": "proj_1",
+        "session_id": "sess_feedback_api",
+        "created_at": "2026-07-07T03:27:53.938952+00:00"
+      },
+      "id": "e2a020f8-56e5-4d38-be68-4868f046c1fa"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project test-project: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "test-project",
+        "session_id": "test-session-001",
+        "created_at": "2026-07-07T04:00:52.800929+00:00"
+      },
+      "id": "288b2791-4b50-4f13-ab3c-d56105fedd04"
+    },
+    {
+      "id": "test-project"
+    },
+    {
+      "id": "test-session-001"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project test-project: user asked: '对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "test-project",
+        "session_id": "test-session-001",
+        "created_at": "2026-07-07T04:01:22.532586+00:00"
+      },
+      "id": "d0abad45-e934-43b1-91ea-5ebb502070f4"
+    },
+    {
+      "labels": [
+        "Memory",
+        "Conversation"
+      ],
+      "properties": {
+        "text": "Project test-project: user asked: '对 PA12_sc.h5ad 做单细胞转录组全流程分析' Execution mode: ExecutionMode.AWAITING_PLAN_APPROVAL. Tasks: data_io, qc, normalization, dim_reduction, clustering, annotation, differential_expression, visualization. Response: 我为您生成了一个分析计划，请确认后再执行。",
+        "memory_type": "conversation",
+        "project_id": "test-project",
+        "session_id": "test-session-002",
+        "created_at": "2026-07-07T04:01:52.834327+00:00"
+      },
+      "id": "4df8e73b-d391-4a2b-9e9b-f9448ac6cf73"
+    },
+    {
+      "id": "test-session-002"
     }
   ],
   "edges": [
@@ -3651,8 +6108,20 @@
     {
       "type": "HAS_CAPABILITY",
       "properties": {},
+      "source": "category:spatial",
+      "target": "sop:spatial-transcriptomics-best-practice"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
       "source": "category:single_cell",
       "target": "sop:sop_single_cell_v3"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single_cell",
+      "target": "sop:scrnaseq-best-practice"
     },
     {
       "type": "HAS_CAPABILITY",
@@ -3765,6 +6234,810 @@
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "proj_1",
+      "target": "f7faa215-df13-4378-be03-5d9fc7b7cdc2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "68e4b9d5-429d-4ac1-ba28-8592db889a31"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0fe15d3f-6475-4038-9aa0-a605b27b719e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0599a085-1c3e-48a5-8420-651d0bb8c18c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "886afd51-ed15-4b10-b533-b48b58f8eac9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0bfded64-1d3c-4cf3-b381-e7c77d7ffe4d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9c176f77-2dd6-4ac8-b58c-283958106964"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "1998805a-2928-4353-ab2b-31e8fce8bbd9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "169a31d1-9eba-4419-bcbd-26e93d5c0057"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "244e1cbf-41a2-4dad-849a-6d96633325f2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "bac23f38-f411-440e-b87a-501f4bd6f305"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "1c050a94-f629-4c39-8697-33ca00c0ec19"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "6051fbab-1bd9-4101-b9f9-6df9cbe9bf6f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "05a94a80-44e2-41a9-a7a3-11078ffd12de"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b48b2f61-d01e-406b-9062-aa24bf5bcb65"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "6ec11b97-8de3-4542-ad93-41c82b0fdc88"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9b74b823-11b3-4661-94de-76b2da5ae6be"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0ab2f373-44fc-40ea-99b7-f258d894dd86"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "41beb61f-108c-4557-b74f-3e172a26e67c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "7f663edc-9074-404b-8fbd-0efb09b75b1a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b4cdd0f6-1a01-4998-9ec6-ee5fd1b330b9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "bd61f79d-7079-45b7-8ac8-ae28bf8a0fff"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "4fa2901c-5a9d-4603-9fc4-4689d37ffeb3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "da7ff058-0375-4ef6-9c69-df53a05dfe69"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "77765eeb-3fa1-4973-898c-2a9e8fa87dcd"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b402488d-a43a-4248-8189-1b85b488f5ee"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f8fecabb-ff17-430f-a28a-e879d883462d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ae81af30-6900-4006-a82c-44b1c7e35603"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "42d4a920-b071-42b3-b3c2-1b7f3e6eddde"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "62b2a1f7-bb59-4479-a7b6-5b423ec993e2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "488688b4-f66d-4ace-ac75-129f2f4e283a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f0b660bf-9b08-4bb2-842f-e984290e2488"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "a6e92eda-206f-4f0f-a26d-b4e4a6634894"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "21c8a961-7628-4752-8724-539ac6a6e839"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9d48f76f-8c41-4aec-a6f1-a5177769f619"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "96628b81-d543-43a8-8dab-d1c82b5fbeb4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "67c6e752-8dfe-4c0f-aad5-37eab0918329"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "989bfc90-2855-4c17-b802-debae3736116"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "e3bb1194-d57b-487a-8bde-77ad64fa69fe"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d1fc1290-2348-4a02-b818-ea70f04655cc"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "27e1992c-5351-4434-8c5d-5ce5bac97e57"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "2fd0f952-352c-4d23-97f7-c5db1c97778d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "28edf0f9-50eb-487e-a4d6-ec9a0665e175"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ad680af4-6b13-4b99-837e-4f65701ef962"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ef18894b-174e-4540-8f29-0f958b234270"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "03d1f7d5-5695-449f-85a4-a6ea36debc8a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "a20c807e-97fb-4ca7-8395-fb813823eb6c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b9677261-4366-464a-b8d5-2464a5bd1b8d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "5b59d120-51af-4059-91a8-c25e2dd48f74"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "dc0ace9e-6642-4590-a433-153d7894cfe8"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "bf057ff6-107a-4e08-afa1-3b37d9c2723b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "2fbeff52-9ecf-4750-965a-c961af3c4c6f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "09276c4e-3348-48f3-83b9-e3bf56f998b3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ac618b04-1c62-4253-b2ee-ac8b02e1ed7b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "afe4cefe-2793-4289-b714-c45e266eff04"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d486f704-9337-4435-8428-bdca61108e54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0d81261c-628a-4e0c-9552-fd0fa7303c80"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d49e4991-f93f-4d57-b9e0-2e448fbbe96d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "313fe1f4-099b-4a36-a484-79adbabca107"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "16c23a7f-b48d-4048-84aa-6034cc38cbe6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "ab4fbdae-bb1b-4fc5-9855-649f5078e314"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "66a164a0-560b-4b2b-bfd0-b8c096d782d0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f5ce6bf4-c27b-46f7-a993-8c9b4e4f0f64"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "856c4757-a171-4ae4-a2f0-520a7cd020cf"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0047dc76-8482-4505-888b-79f27c9acf7c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "18d203ba-8871-4096-a1b2-24fceaf6a724"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9f244c8f-b987-48de-b11a-c827e5a94aac"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "4a464c0a-9a96-4038-aec5-76c1640912a1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b6c994a1-f4ac-402f-9ba5-4baf38f2bb19"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f29bfff9-ed90-4966-b8b1-4d1353fa0bd1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "7fa8e19a-70b5-4677-99cf-402dedae7134"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "26535eb1-e339-4936-97bd-b69547a34772"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "0e0343b9-d695-4a75-9c7b-d42171fa5baa"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "38e74b4a-65d7-4001-a7ac-865c7463c220"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "fa443138-0eef-4de7-9ce8-34508c2f773d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "cb8cb1da-e941-441d-ab7c-a57946031f53"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9d28be55-00d8-417e-a341-3191f3aba63d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "455f6f01-f694-4584-a56d-ea44ee6d52df"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "785713aa-2cff-4509-a1c9-4e7c721339ed"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "c55015f0-17d8-4576-a7fd-85936fcd677b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d0ca3060-896e-458a-bd0e-c004aeec84f5"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "7091011f-8b6c-4813-9af2-35083523ae42"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "c1990ba7-058f-4fce-a64b-134c5bb62c51"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b60bf480-7bbc-4971-b542-76db6b5cb382"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "99686475-73a1-47d6-97c3-feb1801d5afa"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "5017f2b6-4f87-457d-9b36-bffed46432b7"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d56b22fd-2b2a-4c44-9d91-254632dc87e6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "72cc8a55-0c96-44e0-8ac3-23b260a8a92d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "fd6d0bfc-75cb-40b6-97d3-c711ae228b0b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "98793cb4-5939-4f26-900d-f3f4b9827b02"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "dbcd7e07-41e8-4aa7-9e08-38daeb72e1ad"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "4e19424b-96d5-4a8f-806d-bab0c6bbbd2b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "46540d62-15f3-4142-9863-12225b0e92ef"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "a41dd549-e250-465e-8128-1f246f88c308"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "dd3a15fe-627d-4f3c-a49d-d78f1bda1920"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "d5655480-4b77-4018-9fd3-169e1078464b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "86c2b119-eda0-407c-8317-d76a3eb5e4ce"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "593b6e27-8735-4921-8d28-9a431aaf5981"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "7c9c8ca6-fcd5-429e-b3fc-523e753dccdd"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "67c14b3a-5ad5-4853-951d-ce0237f7d38f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "292b8c77-ca38-4cc4-85c8-a6edb650ea99"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "6f7c26f6-28d1-464a-a40a-f0fdf65a67c4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "530b8f2b-7a67-4277-8c4b-2942acecbd81"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "6ec89550-9ff9-407f-9d72-88d872886e27"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "3213ae89-81f6-45f6-ae2b-26c2c3447ba2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "79f37660-c829-437d-bdb4-4344b91726b7"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "f26c91a0-38cc-4001-ab6b-9be6d9c95961"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "43fccd9d-6040-4537-ae3a-a8e1c76ae13b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "3668e5a4-c0b8-4553-ae4d-f9b2e2bea9bf"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "72581e3a-40c3-4cfc-944a-f4a1f716392a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "4b082d9d-1194-4131-b145-dc507a246598"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "1d987c00-b848-49f2-8235-00fd5f28cb8c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "27dc57a3-b0d2-4ac9-8bf8-29d529ad244c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "a7452c86-9e6d-4f0d-b380-921d2e1eeb38"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "585e9ec6-4463-4688-8621-4300bb741c13"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b184d39d-64fc-498b-8e95-49a68226953a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "96fa8959-644d-44da-a9e8-5589e2d2a661"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "476c0ea8-343f-45af-a026-eeb49197ebe6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "5531f5dd-6fae-4c86-9b0c-abe3aeadc0a7"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "6870b6b5-4ad8-47ac-be9c-74dad457beb0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "b5694f14-2acc-45ed-89f7-3a2646c925e0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "cd332241-23cb-4fc6-a948-87e873e79bc6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_1",
+      "target": "e2a020f8-56e5-4d38-be68-4868f046c1fa"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "sess_1",
       "target": "0de4d8ef-03d2-49e1-908d-f12a08af7ec2"
     },
@@ -3807,6 +7080,144 @@
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "sess_1",
+      "target": "f7faa215-df13-4378-be03-5d9fc7b7cdc2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "244e1cbf-41a2-4dad-849a-6d96633325f2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "b4cdd0f6-1a01-4998-9ec6-ee5fd1b330b9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "62b2a1f7-bb59-4479-a7b6-5b423ec993e2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "488688b4-f66d-4ace-ac75-129f2f4e283a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "28edf0f9-50eb-487e-a4d6-ec9a0665e175"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "2fbeff52-9ecf-4750-965a-c961af3c4c6f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "ab4fbdae-bb1b-4fc5-9855-649f5078e314"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "067f6479-cd99-4ef9-8dc4-9eaaaf6f88ca"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "b3894d3c-105d-4629-83a0-9ff14465495f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "f29bfff9-ed90-4966-b8b1-4d1353fa0bd1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "7fa8e19a-70b5-4677-99cf-402dedae7134"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "26535eb1-e339-4936-97bd-b69547a34772"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "0e0343b9-d695-4a75-9c7b-d42171fa5baa"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "38e74b4a-65d7-4001-a7ac-865c7463c220"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "fa443138-0eef-4de7-9ce8-34508c2f773d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "c1990ba7-058f-4fce-a64b-134c5bb62c51"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "b60bf480-7bbc-4971-b542-76db6b5cb382"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "dbcd7e07-41e8-4aa7-9e08-38daeb72e1ad"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "67c14b3a-5ad5-4853-951d-ce0237f7d38f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "292b8c77-ca38-4cc4-85c8-a6edb650ea99"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "43fccd9d-6040-4537-ae3a-a8e1c76ae13b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_1",
+      "target": "96fa8959-644d-44da-a9e8-5589e2d2a661"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "sess_debate_api",
       "target": "91b11b89-9176-4290-a523-82a8f9eef660"
     },
@@ -3815,6 +7226,198 @@
       "properties": {},
       "source": "sess_debate_api",
       "target": "fba74210-d222-4e28-a48e-85564b15f2ec"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "68e4b9d5-429d-4ac1-ba28-8592db889a31"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "0fe15d3f-6475-4038-9aa0-a605b27b719e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "bac23f38-f411-440e-b87a-501f4bd6f305"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "1c050a94-f629-4c39-8697-33ca00c0ec19"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "6051fbab-1bd9-4101-b9f9-6df9cbe9bf6f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "bd61f79d-7079-45b7-8ac8-ae28bf8a0fff"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "4fa2901c-5a9d-4603-9fc4-4689d37ffeb3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "f0b660bf-9b08-4bb2-842f-e984290e2488"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "a6e92eda-206f-4f0f-a26d-b4e4a6634894"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "21c8a961-7628-4752-8724-539ac6a6e839"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "ad680af4-6b13-4b99-837e-4f65701ef962"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "ef18894b-174e-4540-8f29-0f958b234270"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "09276c4e-3348-48f3-83b9-e3bf56f998b3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "ac618b04-1c62-4253-b2ee-ac8b02e1ed7b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "66a164a0-560b-4b2b-bfd0-b8c096d782d0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "f5ce6bf4-c27b-46f7-a993-8c9b4e4f0f64"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "cb8cb1da-e941-441d-ab7c-a57946031f53"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "9d28be55-00d8-417e-a341-3191f3aba63d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "455f6f01-f694-4584-a56d-ea44ee6d52df"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "99686475-73a1-47d6-97c3-feb1801d5afa"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "5017f2b6-4f87-457d-9b36-bffed46432b7"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "4e19424b-96d5-4a8f-806d-bab0c6bbbd2b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "46540d62-15f3-4142-9863-12225b0e92ef"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "a41dd549-e250-465e-8128-1f246f88c308"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "6f7c26f6-28d1-464a-a40a-f0fdf65a67c4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "530b8f2b-7a67-4277-8c4b-2942acecbd81"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "3668e5a4-c0b8-4553-ae4d-f9b2e2bea9bf"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "72581e3a-40c3-4cfc-944a-f4a1f716392a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "476c0ea8-343f-45af-a026-eeb49197ebe6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_debate_api",
+      "target": "5531f5dd-6fae-4c86-9b0c-abe3aeadc0a7"
     },
     {
       "type": "HAS_MEMORY",
@@ -3831,14 +7434,398 @@
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "0599a085-1c3e-48a5-8420-651d0bb8c18c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "886afd51-ed15-4b10-b533-b48b58f8eac9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "05a94a80-44e2-41a9-a7a3-11078ffd12de"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "b48b2f61-d01e-406b-9062-aa24bf5bcb65"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "6ec11b97-8de3-4542-ad93-41c82b0fdc88"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "da7ff058-0375-4ef6-9c69-df53a05dfe69"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "77765eeb-3fa1-4973-898c-2a9e8fa87dcd"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "9d48f76f-8c41-4aec-a6f1-a5177769f619"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "96628b81-d543-43a8-8dab-d1c82b5fbeb4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "03d1f7d5-5695-449f-85a4-a6ea36debc8a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "a20c807e-97fb-4ca7-8395-fb813823eb6c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "afe4cefe-2793-4289-b714-c45e266eff04"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "d486f704-9337-4435-8428-bdca61108e54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "856c4757-a171-4ae4-a2f0-520a7cd020cf"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "0047dc76-8482-4505-888b-79f27c9acf7c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "785713aa-2cff-4509-a1c9-4e7c721339ed"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "c55015f0-17d8-4576-a7fd-85936fcd677b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "d56b22fd-2b2a-4c44-9d91-254632dc87e6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "72cc8a55-0c96-44e0-8ac3-23b260a8a92d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "dd3a15fe-627d-4f3c-a49d-d78f1bda1920"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "d5655480-4b77-4018-9fd3-169e1078464b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "86c2b119-eda0-407c-8317-d76a3eb5e4ce"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "6ec89550-9ff9-407f-9d72-88d872886e27"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "3213ae89-81f6-45f6-ae2b-26c2c3447ba2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "4b082d9d-1194-4131-b145-dc507a246598"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "1d987c00-b848-49f2-8235-00fd5f28cb8c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "27dc57a3-b0d2-4ac9-8bf8-29d529ad244c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "6870b6b5-4ad8-47ac-be9c-74dad457beb0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_regenerate_api",
+      "target": "b5694f14-2acc-45ed-89f7-3a2646c925e0"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "sess_list_api",
       "target": "e0886897-da0c-4b2b-8ade-ccbc20e2403b"
     },
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "sess_list_api",
+      "target": "0bfded64-1d3c-4cf3-b381-e7c77d7ffe4d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "9b74b823-11b3-4661-94de-76b2da5ae6be"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "b402488d-a43a-4248-8189-1b85b488f5ee"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "67c6e752-8dfe-4c0f-aad5-37eab0918329"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "989bfc90-2855-4c17-b802-debae3736116"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "b9677261-4366-464a-b8d5-2464a5bd1b8d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "0d81261c-628a-4e0c-9552-fd0fa7303c80"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "18d203ba-8871-4096-a1b2-24fceaf6a724"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "d0ca3060-896e-458a-bd0e-c004aeec84f5"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "fd6d0bfc-75cb-40b6-97d3-c711ae228b0b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "593b6e27-8735-4921-8d28-9a431aaf5981"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "79f37660-c829-437d-bdb4-4344b91726b7"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "a7452c86-9e6d-4f0d-b380-921d2e1eeb38"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "585e9ec6-4463-4688-8621-4300bb741c13"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_list_api",
+      "target": "cd332241-23cb-4fc6-a948-87e873e79bc6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "sess_feedback_api",
       "target": "c88a9852-80c7-4676-bb12-5122ac01c516"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "9c176f77-2dd6-4ac8-b58c-283958106964"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "0ab2f373-44fc-40ea-99b7-f258d894dd86"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "f8fecabb-ff17-430f-a28a-e879d883462d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "e3bb1194-d57b-487a-8bde-77ad64fa69fe"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "5b59d120-51af-4059-91a8-c25e2dd48f74"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "d49e4991-f93f-4d57-b9e0-2e448fbbe96d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "9f244c8f-b987-48de-b11a-c827e5a94aac"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "7091011f-8b6c-4813-9af2-35083523ae42"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "98793cb4-5939-4f26-900d-f3f4b9827b02"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "7c9c8ca6-fcd5-429e-b3fc-523e753dccdd"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "f26c91a0-38cc-4001-ab6b-9be6d9c95961"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "b184d39d-64fc-498b-8e95-49a68226953a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_feedback_api",
+      "target": "e2a020f8-56e5-4d38-be68-4868f046c1fa"
     },
     {
       "type": "HAS_MEMORY",
@@ -3851,6 +7838,108 @@
       "properties": {},
       "source": "sess_persist_api",
       "target": "dfb56f2c-c6d4-479b-8bbc-95f3f6cc2e24"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "1998805a-2928-4353-ab2b-31e8fce8bbd9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "169a31d1-9eba-4419-bcbd-26e93d5c0057"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "41beb61f-108c-4557-b74f-3e172a26e67c"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "7f663edc-9074-404b-8fbd-0efb09b75b1a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "ae81af30-6900-4006-a82c-44b1c7e35603"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "42d4a920-b071-42b3-b3c2-1b7f3e6eddde"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "d1fc1290-2348-4a02-b818-ea70f04655cc"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "27e1992c-5351-4434-8c5d-5ce5bac97e57"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "2fd0f952-352c-4d23-97f7-c5db1c97778d"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "dc0ace9e-6642-4590-a433-153d7894cfe8"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "bf057ff6-107a-4e08-afa1-3b37d9c2723b"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "313fe1f4-099b-4a36-a484-79adbabca107"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "16c23a7f-b48d-4048-84aa-6034cc38cbe6"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "4a464c0a-9a96-4038-aec5-76c1640912a1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_persist_api",
+      "target": "b6c994a1-f4ac-402f-9ba5-4baf38f2bb19"
     },
     {
       "type": "HAS_CAPABILITY",
@@ -3873,14 +7962,38 @@
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "proj_a",
+      "target": "067f6479-cd99-4ef9-8dc4-9eaaaf6f88ca"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_a",
+      "target": "23a7acc7-823d-40a1-a8f9-acba480afd93"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "proj_b",
       "target": "ff4228b7-a9d4-49da-a53c-4b6a63512128"
     },
     {
       "type": "HAS_MEMORY",
       "properties": {},
+      "source": "proj_b",
+      "target": "b3894d3c-105d-4629-83a0-9ff14465495f"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
       "source": "sess_2",
       "target": "1418ddf1-94a1-4118-a91b-6080094801d4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_2",
+      "target": "23a7acc7-823d-40a1-a8f9-acba480afd93"
     },
     {
       "type": "HAS_CAPABILITY",
@@ -4317,6 +8430,12 @@
     {
       "type": "HAS_CAPABILITY",
       "properties": {},
+      "source": "category:spatial-transcriptomics",
+      "target": "sop:spatial-transcriptomics-best-practice"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
       "source": "category:workflows",
       "target": "skill:bio-workflows-scrnaseq-pipeline"
     },
@@ -4373,6 +8492,1008 @@
       "properties": {},
       "source": "category:mcp",
       "target": "tool:geo_search"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1c050a94-f629-4c39-8697-33ca00c0ec19",
+      "target": "91b11b89-9176-4290-a523-82a8f9eef660"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1c050a94-f629-4c39-8697-33ca00c0ec19",
+      "target": "fba74210-d222-4e28-a48e-85564b15f2ec"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1c050a94-f629-4c39-8697-33ca00c0ec19",
+      "target": "68e4b9d5-429d-4ac1-ba28-8592db889a31"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1c050a94-f629-4c39-8697-33ca00c0ec19",
+      "target": "0fe15d3f-6475-4038-9aa0-a605b27b719e"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1c050a94-f629-4c39-8697-33ca00c0ec19",
+      "target": "bac23f38-f411-440e-b87a-501f4bd6f305"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b48b2f61-d01e-406b-9062-aa24bf5bcb65",
+      "target": "ae63cc41-84ec-459e-bb59-030b93082a54"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b48b2f61-d01e-406b-9062-aa24bf5bcb65",
+      "target": "1704e049-a95f-457b-bdd1-211b34863b60"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b48b2f61-d01e-406b-9062-aa24bf5bcb65",
+      "target": "0599a085-1c3e-48a5-8420-651d0bb8c18c"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b48b2f61-d01e-406b-9062-aa24bf5bcb65",
+      "target": "886afd51-ed15-4b10-b533-b48b58f8eac9"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b48b2f61-d01e-406b-9062-aa24bf5bcb65",
+      "target": "05a94a80-44e2-41a9-a7a3-11078ffd12de"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2",
+      "target": "e0135fea-ce93-4ec3-8189-b1e22f9bd9e8"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2",
+      "target": "dfb56f2c-c6d4-479b-8bbc-95f3f6cc2e24"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2",
+      "target": "1998805a-2928-4353-ab2b-31e8fce8bbd9"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2",
+      "target": "169a31d1-9eba-4419-bcbd-26e93d5c0057"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2",
+      "target": "41beb61f-108c-4557-b74f-3e172a26e67c"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "488688b4-f66d-4ace-ac75-129f2f4e283a",
+      "target": "0de4d8ef-03d2-49e1-908d-f12a08af7ec2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "488688b4-f66d-4ace-ac75-129f2f4e283a",
+      "target": "f7faa215-df13-4378-be03-5d9fc7b7cdc2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "488688b4-f66d-4ace-ac75-129f2f4e283a",
+      "target": "244e1cbf-41a2-4dad-849a-6d96633325f2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "488688b4-f66d-4ace-ac75-129f2f4e283a",
+      "target": "b4cdd0f6-1a01-4998-9ec6-ee5fd1b330b9"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "488688b4-f66d-4ace-ac75-129f2f4e283a",
+      "target": "62b2a1f7-bb59-4479-a7b6-5b423ec993e2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "a6e92eda-206f-4f0f-a26d-b4e4a6634894",
+      "target": "1c050a94-f629-4c39-8697-33ca00c0ec19"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "a6e92eda-206f-4f0f-a26d-b4e4a6634894",
+      "target": "6051fbab-1bd9-4101-b9f9-6df9cbe9bf6f"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "a6e92eda-206f-4f0f-a26d-b4e4a6634894",
+      "target": "bd61f79d-7079-45b7-8ac8-ae28bf8a0fff"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "a6e92eda-206f-4f0f-a26d-b4e4a6634894",
+      "target": "4fa2901c-5a9d-4603-9fc4-4689d37ffeb3"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "a6e92eda-206f-4f0f-a26d-b4e4a6634894",
+      "target": "f0b660bf-9b08-4bb2-842f-e984290e2488"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb",
+      "target": "b48b2f61-d01e-406b-9062-aa24bf5bcb65"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb",
+      "target": "6ec11b97-8de3-4542-ad93-41c82b0fdc88"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb",
+      "target": "da7ff058-0375-4ef6-9c69-df53a05dfe69"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb",
+      "target": "77765eeb-3fa1-4973-898c-2a9e8fa87dcd"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb",
+      "target": "9d48f76f-8c41-4aec-a6f1-a5177769f619"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "989bfc90-2855-4c17-b802-debae3736116",
+      "target": "e0886897-da0c-4b2b-8ade-ccbc20e2403b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "989bfc90-2855-4c17-b802-debae3736116",
+      "target": "0bfded64-1d3c-4cf3-b381-e7c77d7ffe4d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "989bfc90-2855-4c17-b802-debae3736116",
+      "target": "9b74b823-11b3-4661-94de-76b2da5ae6be"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "989bfc90-2855-4c17-b802-debae3736116",
+      "target": "b402488d-a43a-4248-8189-1b85b488f5ee"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "989bfc90-2855-4c17-b802-debae3736116",
+      "target": "67c6e752-8dfe-4c0f-aad5-37eab0918329"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d",
+      "target": "c88a9852-80c7-4676-bb12-5122ac01c516"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d",
+      "target": "9c176f77-2dd6-4ac8-b58c-283958106964"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d",
+      "target": "0ab2f373-44fc-40ea-99b7-f258d894dd86"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d",
+      "target": "f8fecabb-ff17-430f-a28a-e879d883462d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d",
+      "target": "e3bb1194-d57b-487a-8bde-77ad64fa69fe"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "27e1992c-5351-4434-8c5d-5ce5bac97e57",
+      "target": "46f48279-81bf-4ba9-8b8c-7599b8bc08a2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "27e1992c-5351-4434-8c5d-5ce5bac97e57",
+      "target": "7f663edc-9074-404b-8fbd-0efb09b75b1a"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "27e1992c-5351-4434-8c5d-5ce5bac97e57",
+      "target": "ae81af30-6900-4006-a82c-44b1c7e35603"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "27e1992c-5351-4434-8c5d-5ce5bac97e57",
+      "target": "42d4a920-b071-42b3-b3c2-1b7f3e6eddde"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "27e1992c-5351-4434-8c5d-5ce5bac97e57",
+      "target": "d1fc1290-2348-4a02-b818-ea70f04655cc"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e",
+      "target": "a6e92eda-206f-4f0f-a26d-b4e4a6634894"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e",
+      "target": "21c8a961-7628-4752-8724-539ac6a6e839"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e",
+      "target": "ad680af4-6b13-4b99-837e-4f65701ef962"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e",
+      "target": "ef18894b-174e-4540-8f29-0f958b234270"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e",
+      "target": "09276c4e-3348-48f3-83b9-e3bf56f998b3"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e",
+      "target": "98d70eaf-1a4c-45fd-9e46-c8909a0be2eb"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e",
+      "target": "96628b81-d543-43a8-8dab-d1c82b5fbeb4"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e",
+      "target": "03d1f7d5-5695-449f-85a4-a6ea36debc8a"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e",
+      "target": "a20c807e-97fb-4ca7-8395-fb813823eb6c"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e",
+      "target": "afe4cefe-2793-4289-b714-c45e266eff04"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11",
+      "target": "27e1992c-5351-4434-8c5d-5ce5bac97e57"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11",
+      "target": "2fd0f952-352c-4d23-97f7-c5db1c97778d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11",
+      "target": "dc0ace9e-6642-4590-a433-153d7894cfe8"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11",
+      "target": "bf057ff6-107a-4e08-afa1-3b37d9c2723b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "f7e4d2ef-6c30-4214-9051-618b3f4f6b11",
+      "target": "313fe1f4-099b-4a36-a484-79adbabca107"
+    },
+    {
+      "type": "HAS_CAPABILITY",
+      "properties": {},
+      "source": "category:single-cell-transcriptomics",
+      "target": "sop:scrnaseq-best-practice"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "fa443138-0eef-4de7-9ce8-34508c2f773d",
+      "target": "488688b4-f66d-4ace-ac75-129f2f4e283a"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "fa443138-0eef-4de7-9ce8-34508c2f773d",
+      "target": "28edf0f9-50eb-487e-a4d6-ec9a0665e175"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "fa443138-0eef-4de7-9ce8-34508c2f773d",
+      "target": "2fbeff52-9ecf-4750-965a-c961af3c4c6f"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "fa443138-0eef-4de7-9ce8-34508c2f773d",
+      "target": "ab4fbdae-bb1b-4fc5-9855-649f5078e314"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "fa443138-0eef-4de7-9ce8-34508c2f773d",
+      "target": "38e74b4a-65d7-4001-a7ac-865c7463c220"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d28be55-00d8-417e-a341-3191f3aba63d",
+      "target": "da756a59-4ac5-4a55-ad61-7c24c9c0ec3e"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d28be55-00d8-417e-a341-3191f3aba63d",
+      "target": "ac618b04-1c62-4253-b2ee-ac8b02e1ed7b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d28be55-00d8-417e-a341-3191f3aba63d",
+      "target": "66a164a0-560b-4b2b-bfd0-b8c096d782d0"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d28be55-00d8-417e-a341-3191f3aba63d",
+      "target": "f5ce6bf4-c27b-46f7-a993-8c9b4e4f0f64"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d28be55-00d8-417e-a341-3191f3aba63d",
+      "target": "cb8cb1da-e941-441d-ab7c-a57946031f53"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74",
+      "target": "ff6e484e-3dda-4fcd-a1b8-ff05795a966e"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74",
+      "target": "d486f704-9337-4435-8428-bdca61108e54"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74",
+      "target": "856c4757-a171-4ae4-a2f0-520a7cd020cf"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74",
+      "target": "0047dc76-8482-4505-888b-79f27c9acf7c"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "c0e1358b-a3a7-4e0d-879f-c8f40b88be74",
+      "target": "785713aa-2cff-4509-a1c9-4e7c721339ed"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4",
+      "target": "989bfc90-2855-4c17-b802-debae3736116"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4",
+      "target": "b9677261-4366-464a-b8d5-2464a5bd1b8d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4",
+      "target": "0d81261c-628a-4e0c-9552-fd0fa7303c80"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4",
+      "target": "18d203ba-8871-4096-a1b2-24fceaf6a724"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "e30bf25e-8bc0-4b98-a667-eab95f2dd2b4",
+      "target": "d0ca3060-896e-458a-bd0e-c004aeec84f5"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94",
+      "target": "57da8f3f-2208-4de0-9bd7-0eb0f01cf40d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94",
+      "target": "5b59d120-51af-4059-91a8-c25e2dd48f74"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94",
+      "target": "d49e4991-f93f-4d57-b9e0-2e448fbbe96d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94",
+      "target": "9f244c8f-b987-48de-b11a-c827e5a94aac"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "8efb4f57-cc5d-40e2-bcbe-f9d18816fd94",
+      "target": "7091011f-8b6c-4813-9af2-35083523ae42"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "default",
+      "target": "102f31ef-1cba-46b9-9c45-9806ce404482"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "default",
+      "target": "46c42ad2-65e3-4d5e-9fb4-91b7a4ffcb54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_local",
+      "target": "102f31ef-1cba-46b9-9c45-9806ce404482"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_local",
+      "target": "46c42ad2-65e3-4d5e-9fb4-91b7a4ffcb54"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test",
+      "target": "24cb4221-14ce-4673-bd13-437c5c231ac3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test",
+      "target": "f0d1dc10-13ee-4893-b57d-dbf4c8ffdf07"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test",
+      "target": "24cb4221-14ce-4673-bd13-437c5c231ac3"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test",
+      "target": "f0d1dc10-13ee-4893-b57d-dbf4c8ffdf07"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test2",
+      "target": "fe415866-5993-4586-8bfa-5597fab8c5c1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test2",
+      "target": "fe415866-5993-4586-8bfa-5597fab8c5c1"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test3",
+      "target": "20996715-0405-4863-a988-e000c4d7cb93"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test3",
+      "target": "20996715-0405-4863-a988-e000c4d7cb93"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "117709bc-67ea-489c-aa76-c5a78b8dd772"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "3b2ce907-c9aa-4372-82cc-deae259098df"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "1a6a8653-ee2b-4d75-9f20-0fbd383000ed"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "c903e735-070c-4eae-8068-2b2bb2a94205"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "3feea614-e479-4b67-96ac-ca41545fc213"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test4",
+      "target": "48594618-e7b9-4904-9714-8a5fa46a2473"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test4",
+      "target": "117709bc-67ea-489c-aa76-c5a78b8dd772"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test4",
+      "target": "3b2ce907-c9aa-4372-82cc-deae259098df"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test5",
+      "target": "d4429ac8-4361-4280-b5e5-7818174df859"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test5",
+      "target": "d4429ac8-4361-4280-b5e5-7818174df859"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test6",
+      "target": "4c445bad-eb73-4444-a0bc-87ef4da62819"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test6",
+      "target": "4c445bad-eb73-4444-a0bc-87ef4da62819"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test7",
+      "target": "df9ab829-7b27-4486-888f-25169f9dc3d9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test7",
+      "target": "df9ab829-7b27-4486-888f-25169f9dc3d9"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_chat_test8",
+      "target": "00ceeb27-2480-472e-b3a9-a9a8a8030015"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_chat_test8",
+      "target": "00ceeb27-2480-472e-b3a9-a9a8a8030015"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_skill_test_1",
+      "target": "1a6a8653-ee2b-4d75-9f20-0fbd383000ed"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_e2e_pa12_1",
+      "target": "c903e735-070c-4eae-8068-2b2bb2a94205"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_e2e_pa12_2",
+      "target": "3feea614-e479-4b67-96ac-ca41545fc213"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_e2e_pa12_3",
+      "target": "48594618-e7b9-4904-9714-8a5fa46a2473"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_da4ff818",
+      "target": "694fc5ae-ae30-4d75-93fd-05555d9de505"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_da4ff818",
+      "target": "9480f7dd-d617-4f3c-ba35-8ccac948cc16"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_da4ff818",
+      "target": "17121852-fe1a-4a31-bf8c-6694ca688b89"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "proj_da4ff818",
+      "target": "68a44e42-fe00-4b46-ba17-2f7d048175ef"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_pa12_001",
+      "target": "694fc5ae-ae30-4d75-93fd-05555d9de505"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_pa12_001",
+      "target": "9480f7dd-d617-4f3c-ba35-8ccac948cc16"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46540d62-15f3-4142-9863-12225b0e92ef",
+      "target": "5b6b9857-6a43-41dc-aa07-17c37a86f010"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46540d62-15f3-4142-9863-12225b0e92ef",
+      "target": "6e86d25c-ad45-40f5-8bb8-6739e5d8570d"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46540d62-15f3-4142-9863-12225b0e92ef",
+      "target": "396159d2-0d68-4ade-8430-fca36ceb244b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46540d62-15f3-4142-9863-12225b0e92ef",
+      "target": "61bdb9de-5a37-4baf-8b78-23ddd9a91dfa"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "46540d62-15f3-4142-9863-12225b0e92ef",
+      "target": "4e19424b-96d5-4a8f-806d-bab0c6bbbd2b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "d5655480-4b77-4018-9fd3-169e1078464b",
+      "target": "96024b39-fcfd-4b07-8827-bcc212318256"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "d5655480-4b77-4018-9fd3-169e1078464b",
+      "target": "41ae3d5c-1e63-4f1c-81b0-7d5fb2118c7b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "d5655480-4b77-4018-9fd3-169e1078464b",
+      "target": "5583778c-62df-420c-bab1-d82bd9464d39"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "d5655480-4b77-4018-9fd3-169e1078464b",
+      "target": "c1d8d66b-16c2-469e-8b33-2310b2f8c157"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "d5655480-4b77-4018-9fd3-169e1078464b",
+      "target": "dd3a15fe-627d-4f3c-a49d-d78f1bda1920"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_pa12_002",
+      "target": "17121852-fe1a-4a31-bf8c-6694ca688b89"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "292b8c77-ca38-4cc4-85c8-a6edb650ea99",
+      "target": "935bb11c-a265-4e42-90b4-27a18306938e"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "292b8c77-ca38-4cc4-85c8-a6edb650ea99",
+      "target": "d84234fe-e545-4fa7-aa02-5632a2f3d989"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "292b8c77-ca38-4cc4-85c8-a6edb650ea99",
+      "target": "d27dcb42-945f-4a33-87a4-640f6095f1dd"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "292b8c77-ca38-4cc4-85c8-a6edb650ea99",
+      "target": "dbcd7e07-41e8-4aa7-9e08-38daeb72e1ad"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "292b8c77-ca38-4cc4-85c8-a6edb650ea99",
+      "target": "67c14b3a-5ad5-4853-951d-ce0237f7d38f"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b",
+      "target": "46540d62-15f3-4142-9863-12225b0e92ef"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b",
+      "target": "a41dd549-e250-465e-8128-1f246f88c308"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b",
+      "target": "6f7c26f6-28d1-464a-a40a-f0fdf65a67c4"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b",
+      "target": "530b8f2b-7a67-4277-8c4b-2942acecbd81"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "9d3dbee8-ebf4-4037-bf0c-554c248cac5b",
+      "target": "3668e5a4-c0b8-4553-ae4d-f9b2e2bea9bf"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1d987c00-b848-49f2-8235-00fd5f28cb8c",
+      "target": "d5655480-4b77-4018-9fd3-169e1078464b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1d987c00-b848-49f2-8235-00fd5f28cb8c",
+      "target": "86c2b119-eda0-407c-8317-d76a3eb5e4ce"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1d987c00-b848-49f2-8235-00fd5f28cb8c",
+      "target": "6ec89550-9ff9-407f-9d72-88d872886e27"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1d987c00-b848-49f2-8235-00fd5f28cb8c",
+      "target": "3213ae89-81f6-45f6-ae2b-26c2c3447ba2"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "1d987c00-b848-49f2-8235-00fd5f28cb8c",
+      "target": "4b082d9d-1194-4131-b145-dc507a246598"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "585e9ec6-4463-4688-8621-4300bb741c13",
+      "target": "0da32df3-e38d-4842-b175-1c7e6cbf7144"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "585e9ec6-4463-4688-8621-4300bb741c13",
+      "target": "ed146c9d-bb8e-4554-9071-85c36fd91430"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "585e9ec6-4463-4688-8621-4300bb741c13",
+      "target": "593b6e27-8735-4921-8d28-9a431aaf5981"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "585e9ec6-4463-4688-8621-4300bb741c13",
+      "target": "79f37660-c829-437d-bdb4-4344b91726b7"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "585e9ec6-4463-4688-8621-4300bb741c13",
+      "target": "a7452c86-9e6d-4f0d-b380-921d2e1eeb38"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb",
+      "target": "d2e8e7d9-f312-4038-90f6-8c6b099e3b6b"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb",
+      "target": "6a84dd03-bc22-4001-9af8-7b7ee4c9ed87"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb",
+      "target": "7c9c8ca6-fcd5-429e-b3fc-523e753dccdd"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb",
+      "target": "f26c91a0-38cc-4001-ab6b-9be6d9c95961"
+    },
+    {
+      "type": "CONSOLIDATES",
+      "properties": {},
+      "source": "b116abec-e0eb-4a6d-aae9-ec8d5c930bcb",
+      "target": "b184d39d-64fc-498b-8e95-49a68226953a"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "sess_pa12_003",
+      "target": "68a44e42-fe00-4b46-ba17-2f7d048175ef"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-project",
+      "target": "288b2791-4b50-4f13-ab3c-d56105fedd04"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-project",
+      "target": "d0abad45-e934-43b1-91ea-5ebb502070f4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-project",
+      "target": "4df8e73b-d391-4a2b-9e9b-f9448ac6cf73"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-session-001",
+      "target": "288b2791-4b50-4f13-ab3c-d56105fedd04"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-session-001",
+      "target": "d0abad45-e934-43b1-91ea-5ebb502070f4"
+    },
+    {
+      "type": "HAS_MEMORY",
+      "properties": {},
+      "source": "test-session-002",
+      "target": "4df8e73b-d391-4a2b-9e9b-f9448ac6cf73"
     }
   ]
 }

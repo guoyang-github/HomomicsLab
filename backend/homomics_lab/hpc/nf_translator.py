@@ -189,16 +189,23 @@ class SimpleNFTranslator:
 
     def _emit_params(self, inputs: Dict[str, Any]) -> List[str]:
         """Emit Nextflow params for top-level inputs."""
-        lines = ["params {"]
+        lines: List[str] = []
         for key, value in inputs.items():
-            if isinstance(value, str):
-                lines.append(f'    {key} = "{value}"')
-            elif isinstance(value, (list, dict, bool)):
-                # Keep it simple: serialize JSON-style for complex values
-                lines.append(f"    {key} = {value!r}")
+            if isinstance(value, bool):
+                lines.append(f"params.{key} = {str(value).lower()}")
+            elif isinstance(value, str):
+                escaped = value.replace('"', '\\"')
+                lines.append(f'params.{key} = "{escaped}"')
+            elif isinstance(value, (list, tuple)):
+                lines.append(f"params.{key} = {json.dumps(value)}")
+            elif isinstance(value, dict):
+                # Groovy map syntax: [k: v, ...]
+                items = ", ".join(
+                    f"{k}: {json.dumps(v)}" for k, v in value.items()
+                )
+                lines.append(f"params.{key} = [{items}]")
             else:
-                lines.append(f"    {key} = {value}")
-        lines.append("}")
+                lines.append(f"params.{key} = {value}")
         return lines
 
     def _emit_process(self, phase: Phase, idx: int, phase_dir: Path) -> List[str]:

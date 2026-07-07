@@ -506,6 +506,19 @@ class MemoryBackend:
             await self._touch([r["id"] for r in results])
         return results
 
+    @staticmethod
+    def _escape_fts5(query: str) -> str:
+        """Escape a raw query string for SQLite FTS5 MATCH.
+
+        FTS5 treats characters such as '.', '*', '(', ')' and operators
+        (AND/OR/NOT) as query syntax. Wrapping the whole phrase in double
+        quotes makes them literal. Internal quotes are doubled.
+        """
+        escaped = query.replace('"', '""').strip()
+        if not escaped:
+            return ""
+        return f'"{escaped}"'
+
     async def _local_keyword_search(
         self,
         query: str,
@@ -515,6 +528,10 @@ class MemoryBackend:
         session_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """SQLite FTS5 fallback when the vector store cannot be queried."""
+        safe_query = self._escape_fts5(query)
+        if not safe_query:
+            return []
+
         where, params = self._build_where(memory_type, project_id, session_id)
         # The MATCH parameter must come after the structured filters.
         if where:
@@ -527,7 +544,7 @@ class MemoryBackend:
                 ORDER BY rank
                 LIMIT ?
             """
-            params.append(query)
+            params.append(safe_query)
         else:
             sql = """
                 SELECT memories.id
@@ -537,7 +554,7 @@ class MemoryBackend:
                 ORDER BY rank
                 LIMIT ?
             """
-            params = [query]
+            params = [safe_query]
         params.append(limit)
 
         def _query() -> List[sqlite3.Row]:

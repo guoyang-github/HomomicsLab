@@ -1,0 +1,17 @@
+nextflow.trace/v2
+realtime=18220
+%cpu=399
+cpu_model=Intel(R) Core(TM) Ultra 9 285H
+rchar=812251595
+wchar=758901584
+syscr=19111
+syscw=12627
+read_bytes=159744
+write_bytes=0
+%mem=120
+vmem=3745716
+rss=1929668
+peak_vmem=3745748
+peak_rss=2098792
+vol_ctxt=26834
+inv_ctxt=1417

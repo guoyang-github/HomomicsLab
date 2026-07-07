@@ -31,7 +31,7 @@ class TestPlanQualityEvaluator:
                     parameters={"min_genes": 200},
                 ),
             ],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
         evaluator = PlanQualityEvaluator(PlanValidator(reg))
@@ -43,7 +43,7 @@ class TestPlanQualityEvaluator:
         reg = SkillRegistry()
         plan = PlanResult(
             phases=[Phase(phase_type="qc")],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
         evaluator = PlanQualityEvaluator(PlanValidator(reg))
@@ -56,13 +56,13 @@ class TestPlanQualityEvaluator:
         cbkb = CBKB(tmp_path)
         cbkb.record_plan_outcome(
             plan_id=None,
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             success=True,
             template_id=None,
         )
         cbkb.record_plan_outcome(
             plan_id=None,
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             success=False,
             template_id=None,
         )
@@ -79,7 +79,7 @@ class TestPlanQualityEvaluator:
         reg.register(skill)
         plan = PlanResult(
             phases=[Phase(phase_type="qc", selected_skill=skill)],
-            strategy_name="single_cell",
+            strategy_name="single-cell-transcriptomics",
             data_state=DataState(),
         )
         evaluator = PlanQualityEvaluator(PlanValidator(reg), cbkb=cbkb)

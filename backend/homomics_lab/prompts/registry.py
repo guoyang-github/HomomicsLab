@@ -7,7 +7,7 @@ base template of the same name.
 
 from typing import Any, Dict, Optional
 
-from jinja2 import BaseLoader, Environment, TemplateNotFound
+from jinja2 import BaseLoader, Environment
 
 
 class PromptRegistry:

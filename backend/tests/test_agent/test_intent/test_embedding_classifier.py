@@ -13,13 +13,13 @@ def definitions():
             analysis_type="single_cell_analysis",
             keywords=["单细胞", "single cell"],
             examples=["帮我分析这组单细胞数据", "run scRNA-seq QC and clustering"],
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
         ),
         IntentDefinition(
             analysis_type="spatial_analysis",
             keywords=["空间", "spatial"],
             examples=["分析空间转录组数据", "run spatial transcriptomics analysis"],
-            domain="spatial",
+            domain="spatial-transcriptomics",
         ),
     ]
 

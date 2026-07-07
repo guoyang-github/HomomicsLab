@@ -211,7 +211,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'dataUploader.uploadFailed': 'Failed to upload {{filename}}',
     'dataUploader.dropToUpload': 'Drop files to upload',
     'dataUploader.dragOrClick': 'Drag or click to upload data',
-    'dataUploader.supportedFormats': 'Supports .h5ad, .mtx, .csv, .tsv, .fastq.gz',
+    'dataUploader.supportedFormats': 'Supports .h5ad, .mtx, .csv, .tsv, .fastq.gz, .rds, .RData',
 
     // Reports
     'reports.loadFailed': 'Failed to load reports',
@@ -734,7 +734,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'dataUploader.uploadFailed': '{{filename}} 上传失败',
     'dataUploader.dropToUpload': '释放文件以上传',
     'dataUploader.dragOrClick': '拖拽或点击上传数据',
-    'dataUploader.supportedFormats': '支持 .h5ad, .mtx, .csv, .tsv, .fastq.gz',
+    'dataUploader.supportedFormats': '支持 .h5ad, .mtx, .csv, .tsv, .fastq.gz, .rds, .RData',
 
     // Reports
     'reports.loadFailed': '加载报告失败',

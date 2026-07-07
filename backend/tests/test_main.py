@@ -6,7 +6,12 @@ client = TestClient(app)
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "0.5.0"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["version"] == "0.5.0"
+    assert "llm_configured" in data
+    assert "llm_provider" in data
+    assert "llm_model" in data
 
 def test_app_info():
     response = client.get("/")

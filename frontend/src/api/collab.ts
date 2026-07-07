@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 import { useAuthStore } from '@/stores/authStore'
+import { getRuntimeConfig } from '@/config'
 
 export interface PresenceUser {
   user_id: string
@@ -17,6 +18,21 @@ interface PresenceMessage {
 }
 
 const USER_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
+
+function getWsBaseFromApiBase(apiBaseUrl: string): string {
+  if (!apiBaseUrl || apiBaseUrl === '/api') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}`
+  }
+  try {
+    const url = new URL(apiBaseUrl)
+    const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProtocol}//${url.host}`
+  } catch {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}`
+  }
+}
 
 function pickColor(userId: string): string {
   let hash = 0
@@ -51,12 +67,12 @@ export function usePresence(projectId: string | null, userId: string) {
     }
 
     const token = useAuthStore.getState().token
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const params = new URLSearchParams({ user_id: userId })
     if (token) {
       params.set('token', token)
     }
-    const wsUrl = `${protocol}//${window.location.host}/api/collab/${projectId}/ws?${params.toString()}`
+    const wsBase = getRuntimeConfig().wsUrl || getWsBaseFromApiBase(getRuntimeConfig().apiBaseUrl)
+    const wsUrl = `${wsBase}/collab/${projectId}/ws?${params.toString()}`
     const socket = new WebSocket(wsUrl)
     socketRef.current = socket
 

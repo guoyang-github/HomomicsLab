@@ -2,16 +2,14 @@
 
 nextflow.enable.dsl = 2
 
-params {
-    samplesheet = "samplesheet.csv"
-    outdir = "results"
-    salmon_index = ""
-    fasta = ""
-    gtf = ""
-    skip_qc = false
-    skip_quant = false
-    threads = 4
-}
+params.samplesheet = "samplesheet.csv"
+params.outdir = "results"
+params.salmon_index = ""
+params.fasta = ""
+params.gtf = ""
+params.skip_qc = false
+params.skip_quant = false
+params.threads = 4
 
 process FASTP {
     tag "$sample"

@@ -93,6 +93,12 @@ class WorkflowExecutionService:
                             exc_info=True,
                         )
                         result = await self._execute_local(plan, project_id, context=context)
+                    if result is not None and not result.success:
+                        logger.warning(
+                            "Nextflow returned failure for plan %s; falling back to local execution.",
+                            plan.plan_id,
+                        )
+                        result = await self._execute_local(plan, project_id, context=context)
                 else:
                     logger.info("Nextflow selected but not installed; falling back to local.")
                     result = await self._execute_local(plan, project_id, context=context)
@@ -173,7 +179,7 @@ class WorkflowExecutionService:
     ) -> WorkflowResult:
         """Execute the plan as a Nextflow workflow."""
         timeout = timeout_seconds or settings.default_job_timeout_seconds
-        working_dir = self._nextflow_working_dir(project_id, plan.plan_id)
+        working_dir = self._nextflow_working_dir(project_id, plan.plan_id).resolve()
 
         builder = NextflowInputBuilder(settings.data_dir, project_id)
         template_name = self._resolve_template_name(plan)

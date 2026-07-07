@@ -31,6 +31,14 @@ from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.context.working_memory import WorkingMemory
 
 
+# Bare analysis verbs with no domain/data type/target are ambiguous and should
+# trigger clarification instead of a generic direct answer.
+BARE_ANALYSIS_PATTERN = re.compile(
+    r"^\s*(分析|analyze|run|do|做个)\s*(数据|data|analysis|analyses)?\s*$",
+    re.IGNORECASE,
+)
+
+
 # Optional CBKB import; avoid hard dependency at module load.
 try:
     from homomics_lab.knowledge.cbkb import CBKB
@@ -579,6 +587,31 @@ class CascadeIntentAnalyzer:
         if primary is None and embedding:
             primary = embedding[0]
 
+        # Fallback: bare analysis verbs (e.g. "分析数据", "analyze data") with no
+        # domain, data type, or target are ambiguous and should ask for clarification
+        # instead of silently falling back to a generic answer.
+        if BARE_ANALYSIS_PATTERN.match(message.strip()):
+            return IntentClassificationResult(
+                primary=IntentMatch(
+                    analysis_type="clarification",
+                    confidence=0.0,
+                    source="fallback",
+                    reason="bare analysis verb without domain or target",
+                    structured=StructuredIntent(
+                        intent_type="clarification",
+                        interaction_mode="clarify",
+                        scope="single_step",
+                        confidence=0.0,
+                        reason="bare analysis verb without domain or target",
+                    ),
+                ),
+                needs_clarification=True,
+                clarification_question=(
+                    "您希望进行哪类分析？例如单细胞分析、空间转录组分析等。"
+                    "请补充数据类型或分析目标。"
+                ),
+            )
+
         if primary is None:
             return IntentClassificationResult(
                 primary=IntentMatch(
@@ -653,6 +686,26 @@ class CascadeIntentAnalyzer:
                     seen_steps.add(m.analysis_type)
                     sub_intents.append(m)
 
+        # If the fused primary is a generic/non-domain signal but a clear domain
+        # signal exists among sub-intents or alternatives, promote the strongest
+        # domain signal to primary. This prevents requests like "Louvain clustering"
+        # from falling back to a generic plan when the classifier only tagged the
+        # message with a broad builtin domain intent.
+        generic_primary_types = {"general", "analysis", "builtin_analysis", "unknown"}
+        if primary.analysis_type in generic_primary_types:
+            domain_candidates = [
+                m for m in sub_intents + alternatives
+                if m.analysis_type not in generic_primary_types
+                and m.analysis_type not in {"qa", "information_request", "general_help", "greeting", "clarification", "file_conversion"}
+                and m.confidence >= 0.35
+            ]
+            if domain_candidates:
+                best = max(domain_candidates, key=lambda m: m.confidence)
+                # Move the old generic primary into alternatives for transparency.
+                if primary.analysis_type not in {a.analysis_type for a in alternatives}:
+                    alternatives.insert(0, primary)
+                primary = best
+
         # --- Clarification logic ---
         needs_clarification = False
         clarification_question = None
@@ -685,6 +738,26 @@ class CascadeIntentAnalyzer:
                     "我不太确定您的需求，您是想要：\n"
                     + "\n".join(option_lines)
                     + "\n\n请告诉我更具体一些。"
+                )
+
+        # Fallback: bare analysis verbs (e.g. "分析数据", "analyze data") with no
+        # domain, data type, or target are ambiguous and should ask for clarification
+        # instead of silently falling back to a generic answer.
+        if not needs_clarification:
+            primary_weighted = (primary.confidence * primary.weight) if primary else 0.0
+            if (
+                BARE_ANALYSIS_PATTERN.match(message.strip())
+                or (
+                    primary
+                    and primary.analysis_type in {"general", "unknown"}
+                    and primary_weighted < self.clarification_threshold
+                    and not alternatives
+                )
+            ):
+                needs_clarification = True
+                clarification_question = (
+                    "您希望进行哪类分析？例如单细胞分析、空间转录组分析等。"
+                    "请补充数据类型或分析目标。"
                 )
 
         return IntentClassificationResult(

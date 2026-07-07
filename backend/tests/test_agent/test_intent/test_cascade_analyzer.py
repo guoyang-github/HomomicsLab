@@ -14,7 +14,7 @@ def definitions():
             keywords=["单细胞", "single cell"],
             examples=["帮我分析这组单细胞数据", "run scRNA-seq QC and clustering"],
             complexity_indicators=["分析", "流程"],
-            domain="single_cell",
+            domain="single-cell-transcriptomics",
         ),
         IntentDefinition(
             analysis_type="file_conversion",
@@ -39,7 +39,7 @@ async def test_analyze_single_cell(analyzer):
     intent = await analyzer.analyze("帮我分析单细胞数据")
     assert intent.analysis_type == "single_cell_analysis"
     assert intent.confidence > 0
-    assert intent.domain_knowledge == ["single_cell"]
+    assert intent.domain_knowledge == ["single-cell-transcriptomics"]
 
 
 @pytest.mark.asyncio

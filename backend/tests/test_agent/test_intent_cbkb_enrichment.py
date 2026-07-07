@@ -17,7 +17,7 @@ async def test_intent_enriched_with_sops_and_anomalies(cbkb):
         LabSOP(
             id="sop_sc",
             name="Standard PBMC QC",
-            category="single_cell",
+            category="single-cell-transcriptomics",
             template={"min_genes": 200},
             derived_from_bundle_ids=["b1"],
             version="1.0",
