@@ -70,6 +70,15 @@ class EnvironmentManager:
         scripts_dir: Path,
     ) -> EnvironmentInfo:
         """Return a Python environment for the skill, creating a venv or conda env if needed."""
+        # Local sandbox reuses the host project venv; skip isolated venv creation.
+        if settings.skill_sandbox_backend == "local":
+            return EnvironmentInfo(
+                language="python",
+                python_path=sys.executable,
+                dependency_files=[],
+                installed_packages={},
+            )
+
         skill_dir = scripts_dir.parent.parent
         req_file = scripts_dir / "requirements.txt"
         if not req_file.exists():

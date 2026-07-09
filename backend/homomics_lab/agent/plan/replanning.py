@@ -41,6 +41,8 @@ class PlanDelta:
     phases_to_remove: List[int] = field(default_factory=list)
     phases_to_modify: List[Tuple[int, Dict[str, Any]]] = field(default_factory=list)
     reason: str = ""
+    severity: str = "minor"
+    reasons: List[str] = field(default_factory=list)
 
 
 class DynamicReplanningEngine:
@@ -75,6 +77,15 @@ class DynamicReplanningEngine:
             data_state=data_state,
             gaps=list(current_plan.gaps),
             reproducibility_context=dict(current_plan.reproducibility_context),
+            phase_transitions=list(current_plan.phase_transitions),
+            risks=list(current_plan.risks),
+            is_fallback=current_plan.is_fallback,
+            is_information_request=current_plan.is_information_request,
+            suggestion_text=current_plan.suggestion_text,
+            strategy_trace=current_plan.strategy_trace,
+            derivation=current_plan.derivation,
+            risk_level=current_plan.risk_level,
+            approval_required=current_plan.approval_required,
         )
 
         delta = PlanDelta()
@@ -107,14 +118,30 @@ class DynamicReplanningEngine:
 
     @staticmethod
     def _copy_phase(phase: Phase) -> Phase:
-        """Create a deep copy of a phase."""
+        """Create a deep copy of a phase, preserving provenance metadata."""
         return Phase(
             phase_type=phase.phase_type,
             required=phase.required,
             description=phase.description,
             selected_skill=phase.selected_skill,
+            candidate_skills=list(phase.candidate_skills),
+            default_skill=phase.default_skill,
             parameters=dict(phase.parameters),
+            parameter_recommendations=dict(phase.parameter_recommendations),
+            parameter_sources=dict(phase.parameter_sources),
             agent_code=phase.agent_code,
+            readonly=phase.readonly,
+            success_criteria=list(phase.success_criteria),
+            snapshot_policy=phase.snapshot_policy,
+            derivation=phase.derivation,
+            risk_level=phase.risk_level,
+            merged_from_domains=list(phase.merged_from_domains),
+            estimated_cost_usd=phase.estimated_cost_usd,
+            estimated_duration_seconds=phase.estimated_duration_seconds,
+            estimated_input_tokens=phase.estimated_input_tokens,
+            estimated_output_tokens=phase.estimated_output_tokens,
+            estimated_cpu_cores=phase.estimated_cpu_cores,
+            estimated_memory_gb=phase.estimated_memory_gb,
         )
 
     @staticmethod

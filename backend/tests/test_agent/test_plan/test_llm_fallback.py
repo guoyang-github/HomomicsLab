@@ -24,6 +24,7 @@ def registry_with_skills():
             version="1.0",
             category="single_cell",
             description="Filter low quality cells and genes",
+            domains=["single-cell-transcriptomics"],
             input_schema=SkillInputSchema(),
         )
     )
@@ -34,6 +35,7 @@ def registry_with_skills():
             version="1.0",
             category="single_cell",
             description="Principal component analysis",
+            domains=["single-cell-transcriptomics"],
             input_schema=SkillInputSchema(),
         )
     )
@@ -44,6 +46,7 @@ def registry_with_skills():
             version="1.0",
             category="visualization",
             description="Generate UMAP plot",
+            domains=["single-cell-transcriptomics"],
             input_schema=SkillInputSchema(),
         )
     )
@@ -91,6 +94,12 @@ async def test_fallback_triggered_for_unknown_intent(registry_with_skills, fake_
     assert plan.phases[0].selected_skill.id == "scanpy_qc"
     assert plan.phases[1].selected_skill.id == "scanpy_pca"
     assert plan.phases[1].parameters == {"n_pcs": 30}
+    # Anti-hallucination metadata.
+    assert plan.derivation == "llm-fallback"
+    assert plan.risk_level == "high"
+    assert plan.approval_required is True
+    assert plan.phases[0].derivation == "llm-fallback"
+    assert plan.phases[0].risk_level == "high"
 
 
 @pytest.mark.asyncio
@@ -175,6 +184,9 @@ async def test_task_decomposer_uses_fallback_plan(registry_with_skills, fake_llm
     assert tree.tasks[1].skills_required == ["scanpy_pca"]
     # Fallback plans get HITL checkpoints for safety.
     assert tree.tasks[0].hitl_checkpoints
+    # Anti-hallucination metadata is propagated to tasks.
+    assert tree.tasks[0].derivation == "llm-fallback"
+    assert tree.tasks[0].risk_level == "high"
 
 
 @pytest.fixture

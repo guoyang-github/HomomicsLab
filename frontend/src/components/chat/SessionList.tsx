@@ -12,7 +12,7 @@ export function SessionList() {
   const sessions = useChatStore((state) => state.sessions)
   const sessionsLoading = useChatStore((state) => state.sessionsLoading)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
-  const setSessionId = useChatStore((state) => state.setSessionId)
+  const selectSession = useChatStore((state) => state.selectSession)
   const createSession = useChatStore((state) => state.createSession)
   const renameSession = useChatStore((state) => state.renameSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
@@ -63,16 +63,14 @@ export function SessionList() {
       return
     }
     if (!projectSessions.some((s) => s.id === currentSessionId)) {
-      setSessionId(projectSessions[0].id)
-      clearMessages()
+      selectSession(projectSessions[0].id)
     }
   }, [
     currentProjectId,
     sessions,
     currentSessionId,
     createSession,
-    setSessionId,
-    clearMessages,
+    selectSession,
     t,
     sessionsLoading,
   ])
@@ -209,7 +207,7 @@ export function SessionList() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => setSessionId(session.id)}
+                      onClick={() => selectSession(session.id)}
                       className="flex flex-1 flex-col overflow-hidden text-left"
                     >
                       <span className={clsx('truncate text-sm', isActive ? 'font-medium text-primary' : 'text-foreground')}>

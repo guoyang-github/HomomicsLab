@@ -63,6 +63,7 @@ class ExecutionRecord:
     memory_mb: Optional[float] = None
     gpu_percent: Optional[float] = None
     estimated_cost_usd: Optional[float] = None
+    cache_hit: bool = False
 
 
 @dataclass
@@ -193,7 +194,8 @@ class SkillPerformanceTracker:
                     cpu_percent REAL,
                     memory_mb REAL,
                     gpu_percent REAL,
-                    estimated_cost_usd REAL
+                    estimated_cost_usd REAL,
+                    cache_hit INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
@@ -213,6 +215,7 @@ class SkillPerformanceTracker:
             self._migrate_add_column(conn, "memory_mb", "REAL")
             self._migrate_add_column(conn, "gpu_percent", "REAL")
             self._migrate_add_column(conn, "estimated_cost_usd", "REAL")
+            self._migrate_add_column(conn, "cache_hit", "INTEGER")
 
             conn.commit()
 
@@ -270,6 +273,7 @@ class SkillPerformanceTracker:
         cpu_percent: Optional[float] = None,
         memory_mb: Optional[float] = None,
         gpu_percent: Optional[float] = None,
+        cache_hit: bool = False,
     ) -> None:
         """Record a skill execution with resource metrics."""
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -280,8 +284,8 @@ class SkillPerformanceTracker:
                 """
                 INSERT INTO skill_executions
                 (skill_id, timestamp, duration_ms, success, output_size, executor_type,
-                 error_message, metadata, cpu_percent, memory_mb, gpu_percent, estimated_cost_usd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 error_message, metadata, cpu_percent, memory_mb, gpu_percent, estimated_cost_usd, cache_hit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     skill_id,
@@ -296,6 +300,7 @@ class SkillPerformanceTracker:
                     memory_mb,
                     gpu_percent,
                     cost,
+                    1 if cache_hit else 0,
                 ),
             )
             conn.commit()
@@ -364,7 +369,7 @@ class SkillPerformanceTracker:
                     """
                     SELECT skill_id, timestamp, duration_ms, success, output_size,
                            executor_type, error_message, metadata,
-                           cpu_percent, memory_mb, gpu_percent, estimated_cost_usd
+                           cpu_percent, memory_mb, gpu_percent, estimated_cost_usd, cache_hit
                     FROM skill_executions
                     WHERE skill_id = ?
                     ORDER BY timestamp DESC
@@ -377,7 +382,7 @@ class SkillPerformanceTracker:
                     """
                     SELECT skill_id, timestamp, duration_ms, success, output_size,
                            executor_type, error_message, metadata,
-                           cpu_percent, memory_mb, gpu_percent, estimated_cost_usd
+                           cpu_percent, memory_mb, gpu_percent, estimated_cost_usd, cache_hit
                     FROM skill_executions
                     ORDER BY timestamp DESC
                     LIMIT ?
@@ -399,6 +404,7 @@ class SkillPerformanceTracker:
                 memory_mb=r[9],
                 gpu_percent=r[10],
                 estimated_cost_usd=r[11],
+                cache_hit=bool(r[12]) if len(r) > 12 and r[12] is not None else False,
             )
             for r in rows
         ]

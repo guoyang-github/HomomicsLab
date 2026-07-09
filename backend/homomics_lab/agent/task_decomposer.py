@@ -4,8 +4,12 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.plan.capability_assembler import CapabilityAssembler
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
+from homomics_lab.agent.open_agent.planner import OpenAgentPlanner
+from homomics_lab.agent.plan.cross_domain_planner import CrossDomainPlanner
+from homomics_lab.agent.plan.standalone_planner import StandaloneSkillPlanner
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
 from homomics_lab.config import settings
@@ -88,15 +92,33 @@ class TaskDecomposer:
         self,
         plan_engine: Optional[PlanEngine] = None,
         skill_registry: Optional[SkillRegistry] = None,
+        standalone_planner: Optional[StandaloneSkillPlanner] = None,
+        cross_domain_planner: Optional[CrossDomainPlanner] = None,
+        open_agent_planner: Optional[OpenAgentPlanner] = None,
         cbkb=None,
         capability_index=None,
         analysis_template_store: Optional[AnalysisTemplateStore] = None,
+        capability_assembler: Optional[CapabilityAssembler] = None,
     ):
         self._plan_engine = plan_engine
         self._skill_registry = skill_registry or get_default_registry()
+        self._standalone_planner = standalone_planner
+        self._cross_domain_planner = cross_domain_planner
+        self._open_agent_planner = open_agent_planner
         self._cbkb = cbkb
         self._capability_index = capability_index
         self._analysis_template_store = analysis_template_store
+        self._capability_assembler = capability_assembler
+
+    def _get_capability_assembler(self) -> CapabilityAssembler:
+        """Lazy initialize the capability-first routing assembler."""
+        if self._capability_assembler is None:
+            self._capability_assembler = CapabilityAssembler(
+                capability_index=self._capability_index,
+                template_store=self._analysis_template_store,
+                skill_registry=self._skill_registry,
+            )
+        return self._capability_assembler
 
     def _get_plan_engine(self) -> PlanEngine:
         """Lazy initialize PlanEngine with the skill registry."""
@@ -126,6 +148,111 @@ class TaskDecomposer:
             return None
         store = self._analysis_template_store or AnalysisTemplateStore()
         return store.get_template(template_id)
+
+    def _get_standalone_planner(self) -> StandaloneSkillPlanner:
+        """Lazy initialize the standalone skill planner."""
+        if self._standalone_planner is None:
+            self._standalone_planner = StandaloneSkillPlanner(
+                skill_registry=self._skill_registry
+            )
+        return self._standalone_planner
+
+    def _get_open_agent_planner(self) -> OpenAgentPlanner:
+        """Lazy initialize the open agent planner."""
+        if self._open_agent_planner is None:
+            self._open_agent_planner = OpenAgentPlanner(
+                skill_registry=self._skill_registry,
+                capability_index=self._capability_index,
+            )
+        return self._open_agent_planner
+
+    def _should_use_open_agent_planner(self, intent: UserIntent) -> bool:
+        """Return True when the request is open-ended, exploratory, or cross-domain.
+
+        Open agent handles requests that do not fit cleanly into a domain
+        template or standalone skill, such as literature exploration,
+        method comparisons, diagnostic reasoning, and open-ended analysis.
+        """
+        if intent.interaction_mode == "explore":
+            return True
+
+        open_types = {
+            "explore",
+            "diagnose",
+            "compare",
+            "open_ended",
+            "cross_domain_analysis",
+            "general_scientific",
+        }
+        if intent.analysis_type in open_types:
+            return True
+
+        message = (intent.original_message or "").lower()
+        diagnostic_keywords = [
+            "为什么",
+            "怎么回事",
+            "诊断",
+            "比较",
+            "compare",
+            "difference between",
+            "why is",
+            "diagnose",
+        ]
+        if any(kw in message for kw in diagnostic_keywords):
+            return True
+
+        # No domain signal and broad analysis type: let open agent try before fallback.
+        if intent.domain is None and intent.analysis_type in {"general", "analysis", "unknown"}:
+            return True
+
+        return False
+
+    def _get_cross_domain_planner(self) -> CrossDomainPlanner:
+        """Lazy initialize the cross-domain planner."""
+        if self._cross_domain_planner is None:
+            self._cross_domain_planner = CrossDomainPlanner(
+                plan_engine=self._get_plan_engine()
+            )
+        return self._cross_domain_planner
+
+    @staticmethod
+    def _should_use_cross_domain_planner(intent: UserIntent) -> bool:
+        """Return True when the intent references multiple domains."""
+        if intent.domain is None:
+            return False
+        domains = {intent.domain}
+        for sub in intent.sub_intents:
+            if sub.domain:
+                domains.add(sub.domain)
+        structured = getattr(intent, "structured_intent", None)
+        if structured is not None:
+            if getattr(structured, "domain", None):
+                domains.add(structured.domain)
+            for sub in getattr(structured, "sub_intents", []) or []:
+                if getattr(sub, "domain", None):
+                    domains.add(sub.domain)
+        return len(domains) >= 2
+
+    @staticmethod
+    def _should_use_standalone_planner(intent: UserIntent) -> bool:
+        """Return True when the intent is a generic, domain-agnostic request.
+
+        Standalone skills are used only for the broad catch-all intent types
+        produced by the classifier when it cannot map the request to a specific
+        domain. Requests that already name a domain or a concrete analysis type
+        are routed through the domain planner or LLM fallback so that domain
+        knowledge and safety checkpoints (e.g., HITL for fallback plans) are
+        preserved.
+        """
+        if intent.analysis_type in ("clarification", "file_conversion", "qa"):
+            return False
+        if intent.domain is not None:
+            return False
+        # Broad / unknown analysis types are good candidates for standalone routing.
+        broad_types = {"general", "builtin_analysis", "analysis", "unknown"}
+        if intent.analysis_type in broad_types:
+            return True
+        return False
 
     @staticmethod
     def _derive_sub_intents_from_message(message: str) -> List[UserIntent]:
@@ -205,6 +332,69 @@ class TaskDecomposer:
                 return promoted, new_plan
         return intent, plan
 
+    async def _route_via_capability_assembler(
+        self,
+        intent: UserIntent,
+        context: Dict[str, Any],
+    ) -> Optional[Tuple[PlanResult, TaskTree]]:
+        """Dispatch ``intent`` using the unified CapabilityAssembler.
+
+        Returns a plan/task-tree pair when a route produces an executable plan,
+        or ``None`` to fall through to the general PlanEngine path.
+        """
+        data_state = context.get("data_state") or DataState()
+        assembly = await self._get_capability_assembler().assemble(
+            intent, data_state=data_state
+        )
+
+        if assembly.route == "cross_domain":
+            cross_domain_plan = await self._get_cross_domain_planner().plan(intent)
+            if cross_domain_plan is not None:
+                return cross_domain_plan, self._plan_result_to_task_tree(cross_domain_plan)
+            return None
+
+        if assembly.route == "domain_template":
+            project_id = context.get("project_id")
+            template = assembly.template or self._load_project_template(project_id)
+            plan = await self._get_plan_engine().plan(
+                intent,
+                data_state=data_state,
+                project_id=project_id,
+                template=template,
+            )
+            # Apply the same sub-intent narrowing/post-processing used by the
+            # general domain-strategy path.
+            effective_intent = self._merge_derived_sub_intents(intent)
+            if plan.is_fallback and effective_intent.sub_intents:
+                effective_intent, plan = await self._try_promote_domain_intent(
+                    effective_intent, plan, project_id, template
+                )
+            if effective_intent.sub_intents and not plan.is_fallback:
+                plan, tree = self._filter_plan_by_sub_intents(plan, effective_intent)
+                return plan, tree
+            if plan.is_fallback and not plan.phases:
+                return plan, self._build_suggestion_task(plan)
+            return plan, self._plan_result_to_task_tree(plan)
+
+        if assembly.route == "standalone_skill":
+            if assembly.prebuilt_skills:
+                standalone_plan = self._plan_from_prebuilt_skills(
+                    assembly.prebuilt_skills, intent
+                )
+            else:
+                standalone_plan = self._get_standalone_planner().plan(intent)
+            if standalone_plan is not None:
+                return standalone_plan, self._plan_result_to_task_tree(standalone_plan)
+            return None
+
+        if assembly.route == "open_agent":
+            open_plan = await self._get_open_agent_planner().plan(intent)
+            if open_plan is not None:
+                return open_plan, self._plan_result_to_task_tree(open_plan)
+            return None
+
+        return None
+
     async def decompose(self, intent: UserIntent, context: Dict[str, Any]) -> TaskTree:
         """Decompose intent into a TaskTree.
 
@@ -243,6 +433,32 @@ class TaskDecomposer:
             return self._task_tree_to_plan_result(
                 tree, intent, strategy_name="qa"
             ), tree
+
+        # Capability-first routing (P3): unified decision via CapabilityAssembler.
+        # When disabled, fall back to the legacy _should_use_* rule set below.
+        if settings.capability_first_routing_enabled:
+            routed = await self._route_via_capability_assembler(intent, context)
+            if routed is not None:
+                return routed
+        else:
+            # Legacy routing rules (kept for backward compatibility).
+            # Cross-domain path: compose a plan when the intent spans multiple domains.
+            if self._should_use_cross_domain_planner(intent):
+                cross_domain_plan = await self._get_cross_domain_planner().plan(intent)
+                if cross_domain_plan is not None:
+                    return cross_domain_plan, self._plan_result_to_task_tree(cross_domain_plan)
+
+            # Standalone skill path: try standalone skills when no strong domain signal.
+            if self._should_use_standalone_planner(intent):
+                standalone_plan = self._get_standalone_planner().plan(intent)
+                if standalone_plan is not None:
+                    return standalone_plan, self._plan_result_to_task_tree(standalone_plan)
+
+            # Open agent path: exploratory, cross-domain, diagnostic, or open-ended.
+            if self._should_use_open_agent_planner(intent):
+                open_plan = await self._get_open_agent_planner().plan(intent)
+                if open_plan is not None:
+                    return open_plan, self._plan_result_to_task_tree(open_plan)
 
         # General path: use PlanEngine (domain strategy or LLM fallback).
         plan_engine = self._get_plan_engine()
@@ -295,6 +511,42 @@ class TaskDecomposer:
             skills_required=skills,
         )
         return TaskTree([task])
+
+    def _plan_from_prebuilt_skills(
+        self,
+        skills: List[SkillDefinition],
+        intent: UserIntent,
+    ) -> PlanResult:
+        """Build a linear plan directly from explicitly selected skills.
+
+        This avoids re-running semantic search when the assembler has already
+        resolved the user's request to one or more concrete skills.
+        """
+        from homomics_lab.agent.plan.standalone_planner import (
+            StandaloneSkillPlanner,
+        )
+
+        phases: List[Phase] = []
+        for skill in skills:
+            phases.append(
+                Phase(
+                    phase_type=skill.id,
+                    description=skill.description or f"Execute skill {skill.name}",
+                    required=True,
+                    selected_skill=skill,
+                    derivation=StandaloneSkillPlanner.DERIVATION,
+                    risk_level=StandaloneSkillPlanner.RISK_LEVEL,
+                )
+            )
+
+        return PlanResult(
+            phases=phases,
+            strategy_name="standalone-skill-planner",
+            data_state=DataState(),
+            derivation=StandaloneSkillPlanner.DERIVATION,
+            risk_level=StandaloneSkillPlanner.RISK_LEVEL,
+            approval_required=False,
+        )
 
     def _plan_result_to_task_tree(self, plan: PlanResult) -> TaskTree:
         """Convert a PlanResult into an executable TaskTree.
@@ -353,6 +605,8 @@ class TaskDecomposer:
                 estimated_cost_usd=phase.estimated_cost_usd,
                 estimated_input_tokens=phase.estimated_input_tokens,
                 estimated_output_tokens=phase.estimated_output_tokens,
+                derivation=phase.derivation or plan.derivation,
+                risk_level=phase.risk_level or plan.risk_level,
             )
             tasks.append(task)
 
@@ -422,6 +676,9 @@ class TaskDecomposer:
                 "intent": intent.analysis_type,
             },
             is_fallback=is_fallback,
+            derivation="hardcoded",
+            risk_level="low",
+            approval_required=False,
         )
 
     def _build_clarification_task(self, intent: UserIntent) -> TaskTree:

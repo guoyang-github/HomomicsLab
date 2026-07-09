@@ -119,6 +119,8 @@ class LLMFallbackPlanner:
                 readonly=is_code_act_skill,
                 estimated_duration_seconds=item.get("estimated_duration_seconds"),
                 estimated_cost_usd=item.get("estimated_cost_usd"),
+                derivation="llm-fallback",
+                risk_level="high",
             )
             estimate_phase(phase, self.tracker)
             phases.append(phase)
@@ -160,6 +162,9 @@ class LLMFallbackPlanner:
             },
             is_fallback=True,
             suggestion_text=suggestion_text,
+            derivation="llm-fallback",
+            risk_level="high",
+            approval_required=True,
         )
 
     def _is_code_or_data_request(self, intent: UserIntent) -> bool:
@@ -331,6 +336,9 @@ Generate the JSON plan now."""
             },
             is_fallback=True,
             suggestion_text=message,
+            derivation="llm-fallback",
+            risk_level="high",
+            approval_required=True,
         )
 
     @staticmethod

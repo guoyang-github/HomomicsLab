@@ -77,3 +77,65 @@ class TestPlanSummary:
         plan = _make_plan(is_fallback=False, phase_count=2)
         summary = await PlanPresenter.to_summary(plan, language="en", llm_client=BrokenLLM())
         assert "2" in summary
+
+
+class TestPlanPayload:
+    def test_payload_includes_derivation_and_risk_level(self):
+        plan = _make_plan(is_fallback=True, phase_count=1)
+        plan.plan_result.derivation = "llm-fallback"
+        plan.plan_result.risk_level = "high"
+        plan.plan_result.approval_required = True
+        plan.plan_result.phases[0].derivation = "llm-fallback"
+        plan.plan_result.phases[0].risk_level = "high"
+
+        payload = PlanPresenter.to_user_payload(plan)
+
+        assert payload["derivation"] == "llm-fallback"
+        assert payload["risk_level"] == "high"
+        assert payload["approval_required"] is True
+        assert payload["phases"][0]["derivation"] == "llm-fallback"
+        assert payload["phases"][0]["risk_level"] == "high"
+
+    def test_payload_includes_derivation_summary(self):
+        plan = _make_plan(is_fallback=False, phase_count=1)
+        plan.plan_result.phases[0].derivation = "domain-strategy"
+
+        payload = PlanPresenter.to_user_payload(plan)
+
+        assert payload["phases"][0]["derivation_summary"] == "来自领域策略模板"
+
+    def test_payload_includes_anti_hallucination_meta(self):
+        plan = _make_plan(is_fallback=False, phase_count=1)
+        plan.plan_result.phases[0].derivation = "standalone-skill"
+        plan.plan_result.phases[0].risk_level = "medium"
+        plan.plan_result.phases[0].parameter_sources = {"resolution": "skill_default"}
+        plan.plan_result.phases[0].parameters = {"resolution": 1.0}
+
+        payload = PlanPresenter.to_user_payload(plan)
+
+        meta = payload["phases"][0]["anti_hallucination_meta"]
+        assert meta["skill_id"] == "scanpy_qc"
+        assert meta["derivation"] == "standalone-skill"
+        assert meta["risk_level"] == "medium"
+        assert meta["parameter_sources"] == {"resolution": "skill_default"}
+        assert meta["missing_required_inputs"] == []
+
+    def test_payload_reports_missing_required_inputs(self):
+        skill = SkillDefinition(
+            id="gap_filling",
+            name="Gap Filling",
+            version="1.0",
+            category="test",
+            input_schema=SkillInputSchema(
+                properties={"input_file": {"type": "string"}},
+                required=["input_file"],
+            ),
+        )
+        plan = _make_plan(is_fallback=False, phase_count=1)
+        plan.plan_result.phases[0].selected_skill = skill
+        plan.plan_result.phases[0].parameters = {}
+
+        payload = PlanPresenter.to_user_payload(plan)
+
+        meta = payload["phases"][0]["anti_hallucination_meta"]
+        assert meta["missing_required_inputs"] == ["input_file"]

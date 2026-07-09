@@ -30,6 +30,7 @@ from homomics_lab.context.graph.factory import get_graph_backend, reset_graph_ba
 from homomics_lab.context.vector_store.base import VectorStoreBackend
 from homomics_lab.context.vector_store.factory import get_vector_store, reset_vector_store
 from homomics_lab.embeddings.base import EmbeddingProvider
+from homomics_lab.agent.intent import UserIntent
 from homomics_lab.embeddings.factory import get_embedding_provider, reset_embedding_provider
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ class CapabilityType(str, Enum):
     SOP = "sop"
     EXPERIMENT = "experiment"
     DATA_SOURCE = "data_source"
+    TEMPLATE = "template"
+    PARAMETER_LORE = "parameter_lore"
 
 
 @dataclass
@@ -79,6 +82,10 @@ class CapabilityIndex:
         self._owns_vector_store = vector_store is None
         self._owns_graph_backend = graph_backend is None
         self._owns_feedback_store = feedback_store is None
+
+        # Lightweight in-memory cache of indexed items for keyword fallback
+        # and structured filtering when embeddings are unavailable.
+        self._source_cache: Dict[str, Dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Lazy accessors
@@ -154,6 +161,19 @@ class CapabilityIndex:
             "name": name,
             "description": description,
             "category": category,
+            "project_id": project_id,
+        }
+
+        # Keep a lightweight cache for structured/keyword fallback.
+        self._source_cache[doc_id] = {
+            "type": item_type.value,
+            "id": item_id,
+            "name": name,
+            "description": description,
+            "category": category,
+            "text": text,
+            "metadata": metadata,
+            "payload": payload,
             "project_id": project_id,
         }
 
@@ -334,6 +354,65 @@ class CapabilityIndex:
             payload,
         )
 
+    async def index_analysis_template(self, template) -> None:
+        """Index an ``AnalysisTemplate`` scenario preset."""
+        from homomics_lab.agent.plan.template import AnalysisTemplate
+
+        if not isinstance(template, AnalysisTemplate):
+            raise TypeError("Expected AnalysisTemplate")
+
+        description = (
+            f"{template.description} Domain: {template.domain}. "
+            f"Intents: {', '.join(template.applicable_intents)}. "
+            f"Tags: {', '.join(template.tags)}."
+        )
+        payload = template.to_dict()
+        await self._index(
+            CapabilityType.TEMPLATE,
+            template.template_id,
+            template.name,
+            description,
+            template.domain or "template",
+            payload,
+        )
+
+    async def index_parameter_lore(
+        self,
+        skill_id: str,
+        param_name: str,
+        lore: Dict[str, Any],
+    ) -> None:
+        """Index parameter best-practice lore for a skill.
+
+        ``lore`` should include keys like ``range``, ``source``, ``rationale``,
+        and optionally ``default`` / ``example``.
+        """
+        lore_id = f"{skill_id}:{param_name}"
+        description = (
+            f"Parameter '{param_name}' for skill '{skill_id}'. "
+            f"Range: {lore.get('range', 'unspecified')}. "
+            f"Rationale: {lore.get('rationale', '')}"
+        )
+        payload = {
+            "skill_id": skill_id,
+            "param_name": param_name,
+            "lore": lore,
+        }
+        await self._index(
+            CapabilityType.PARAMETER_LORE,
+            lore_id,
+            param_name,
+            description,
+            lore.get("source", "parameter_lore"),
+            payload,
+        )
+        # Link the lore to its skill in the graph.
+        await self._link(
+            from_id=self._doc_id(CapabilityType.SKILL, skill_id),
+            to_id=self._doc_id(CapabilityType.PARAMETER_LORE, lore_id),
+            edge_type="HAS_PARAMETER_LORE",
+        )
+
     # ------------------------------------------------------------------
     # Search
     # ------------------------------------------------------------------
@@ -344,52 +423,227 @@ class CapabilityIndex:
         item_types: Optional[List[CapabilityType]] = None,
         project_id: Optional[str] = None,
         min_score: float = 0.0,
+        *,
+        intent: Optional[UserIntent] = None,
+        data_type: Optional[str] = None,
+        domains: Optional[List[str]] = None,
+        categories: Optional[List[str]] = None,
     ) -> List[CapabilityCandidate]:
-        """Dense semantic search over capabilities."""
+        """Search capabilities using dense embeddings, with keyword fallback.
+
+        Structured filters (``item_types``, ``data_type``, ``domains``,
+        ``categories``) are applied to metadata whenever the underlying store
+        supports it; otherwise they are applied after retrieval.
+        """
         if not query.strip():
             return []
 
-        query_embedding = await self._embed([query])
-        if query_embedding is None:
-            return []
+        filters = self._build_filters(
+            item_types=item_types,
+            project_id=project_id,
+            data_type=data_type,
+            domains=domains,
+            categories=categories,
+        )
 
+        results: List[Any] = []
+        query_embedding = await self._embed([query])
+
+        if query_embedding is not None:
+            try:
+                results = await self._get_vector_store().search(
+                    collection=_COLLECTION,
+                    query_embedding=query_embedding[0],
+                    top_k=top_k * 4,
+                    filters=filters or None,
+                )
+            except Exception as exc:
+                logger.warning("Capability vector search failed: %s", exc)
+                results = []
+
+        # Fallback to keyword search if dense search failed or returned nothing.
+        if not results:
+            try:
+                results = await self._get_vector_store().keyword_search(
+                    collection=_COLLECTION,
+                    query=query,
+                    top_k=top_k * 4,
+                    filters=filters or None,
+                )
+            except Exception as exc:
+                logger.warning("Capability keyword search failed: %s", exc)
+                results = []
+
+        # Final fallback: scan the lightweight source cache.
+        if not results:
+            results = self._cache_keyword_fallback(query, filters, top_k=top_k * 4)
+
+        candidates = self._results_to_candidates(results, item_types=item_types)
+        candidates = await self._apply_feedback(candidates)
+        candidates.sort(key=lambda c: c.score, reverse=True)
+        return candidates[:top_k]
+
+    @staticmethod
+    def _build_filters(
+        item_types: Optional[List[CapabilityType]] = None,
+        project_id: Optional[str] = None,
+        data_type: Optional[str] = None,
+        domains: Optional[List[str]] = None,
+        categories: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         filters: Dict[str, Any] = {}
+        if item_types:
+            filters["type"] = [t.value for t in item_types]
         if project_id is not None:
             filters["project_id"] = project_id
+        if data_type:
+            filters["data_type"] = data_type
+        if domains:
+            filters["domain"] = domains
+        if categories:
+            filters["category"] = categories
+        return filters
 
-        try:
-            results = await self._get_vector_store().search(
-                collection=_COLLECTION,
-                query_embedding=query_embedding[0],
-                top_k=top_k * 2,
-                filters=filters or None,
-            )
-        except Exception as exc:
-            logger.warning("Capability vector search failed: %s", exc)
-            return []
+    def _cache_keyword_fallback(
+        self,
+        query: str,
+        filters: Dict[str, Any],
+        top_k: int,
+    ) -> List[Any]:
+        """Match indexed items by keyword when vector/keyword store is empty."""
+        from dataclasses import dataclass
 
+        @dataclass
+        class _CachedResult:
+            id: str
+            score: float
+            metadata: Dict[str, Any]
+
+        query_tokens = set(query.lower().split())
+        results: List[_CachedResult] = []
+        for doc_id, cached in self._source_cache.items():
+            meta = cached.get("metadata", {})
+            if not self._matches_filters(meta, filters):
+                continue
+            text = cached.get("text", "").lower()
+            hits = sum(1 for token in query_tokens if len(token) > 2 and token in text)
+            if hits == 0:
+                continue
+            score = min(0.3 + hits * 0.05, 0.9)
+            results.append(_CachedResult(id=doc_id, score=score, metadata=meta))
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results[:top_k]
+
+    @staticmethod
+    def _matches_filters(metadata: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+        """Apply structured filters to cached metadata."""
+        for key, value in filters.items():
+            if key == "type" and isinstance(value, list):
+                if metadata.get("type") not in value:
+                    return False
+            elif key == "category" and isinstance(value, list):
+                if metadata.get("category") not in value:
+                    return False
+            elif key == "domain" and isinstance(value, list):
+                # Templates store domain in metadata if indexed that way.
+                if metadata.get("domain") not in value:
+                    return False
+            elif key == "data_type":
+                if metadata.get("data_type") != value:
+                    return False
+            elif key == "project_id":
+                if metadata.get("project_id") != value:
+                    return False
+        return True
+
+    def _results_to_candidates(
+        self,
+        results: List[Any],
+        item_types: Optional[List[CapabilityType]] = None,
+    ) -> List[CapabilityCandidate]:
+        """Convert vector/keyword search results to CapabilityCandidates."""
         candidates: List[CapabilityCandidate] = []
+        seen: set = set()
         for r in results:
-            meta = r.metadata or {}
+            meta = getattr(r, "metadata", None) or {}
             item_type = CapabilityType(meta.get("type", "skill"))
             if item_types and item_type not in item_types:
                 continue
-            if r.score < min_score:
+            item_id = meta.get("id", getattr(r, "id", ""))
+            key = (item_type.value, item_id)
+            if key in seen:
                 continue
+            seen.add(key)
+            cached = self._source_cache.get(f"{item_type.value}:{item_id}", {})
             candidates.append(
                 CapabilityCandidate(
-                    id=meta.get("id", r.id),
+                    id=item_id,
                     type=item_type,
                     name=meta.get("name", ""),
                     description=meta.get("description", ""),
                     category=meta.get("category", ""),
-                    score=r.score,
-                    payload=meta,
+                    score=getattr(r, "score", 0.0),
+                    payload=cached.get("payload", meta),
                 )
             )
-        candidates = await self._apply_feedback(candidates)
-        candidates.sort(key=lambda c: c.score, reverse=True)
-        return candidates[:top_k]
+        return candidates
+
+    async def search_by_intent(
+        self,
+        intent: UserIntent,
+        data_state: Optional[Any] = None,
+        item_types: Optional[List[CapabilityType]] = None,
+        top_k: int = 10,
+    ) -> List[CapabilityCandidate]:
+        """Search capabilities by combining intent fields and data state.
+
+        The query is assembled from the user's original message, analysis type,
+        target, domain and any extracted keywords.  ``data_state`` supplies
+        ``data_type`` and ``domain_state`` for structured filtering.
+        """
+        parts: List[str] = [
+            intent.original_message or "",
+            intent.analysis_type or "",
+        ]
+        if intent.target:
+            parts.append(intent.target)
+        if intent.domain:
+            parts.append(intent.domain)
+
+        keywords: List[str] = []
+        if intent.domain_knowledge:
+            keywords.extend(intent.domain_knowledge)
+        if intent.metadata and isinstance(intent.metadata, dict):
+            meta_keywords = intent.metadata.get("keywords")
+            if isinstance(meta_keywords, list):
+                keywords.extend(str(k) for k in meta_keywords)
+            elif isinstance(meta_keywords, str):
+                keywords.append(meta_keywords)
+        if keywords:
+            parts.append(" ".join(keywords))
+
+        query = " ".join(p for p in parts if p).strip()
+        if not query:
+            return []
+
+        data_type: Optional[str] = None
+        domains: Optional[List[str]] = None
+        if data_state is not None:
+            data_type = getattr(data_state, "data_type", None)
+            domain_state = getattr(data_state, "domain_state", None)
+            if isinstance(domain_state, dict) and domain_state:
+                domains = [d for d in domain_state.keys() if not d.startswith("_")]
+            if intent.domain and (not domains or intent.domain not in domains):
+                domains = (domains or []) + [intent.domain]
+
+        return await self.search(
+            query=query,
+            top_k=top_k,
+            item_types=item_types,
+            data_type=data_type,
+            domains=domains,
+            intent=intent,
+        )
 
     async def _apply_feedback(
         self, candidates: List[CapabilityCandidate]

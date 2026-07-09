@@ -7,14 +7,17 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 
 from homomics_lab.config import settings
+from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
 from homomics_lab.metrics import set_active_jobs
+from homomics_lab.models.common import MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
 from homomics_lab.reproducibility.engine import ReproducibilityEngine
+from homomics_lab.workspace.context import workspace_context
 from homomics_lab.workspace.manager import WorkspaceManager
 
 from .checkpoint import CheckpointRepository
@@ -36,10 +39,14 @@ class BackgroundJobRunner:
         poll_timeout: float = 1.0,
         worker_id: Optional[str] = None,
         heartbeat_interval: float = 10.0,
+        skill_executor: Optional[Any] = None,
+        memory_manager: Optional[MemoryManager] = None,
     ):
         self._queue = queue
         self._repository = repository
         self._pubsub = pubsub
+        self._skill_executor = skill_executor
+        self._memory_manager = memory_manager
         self._runner_factory = runner_factory or self._default_runner_factory
         self._poll_timeout = poll_timeout
         self._worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
@@ -131,7 +138,7 @@ class BackgroundJobRunner:
             await self._update_active_jobs()
 
             progress_callback = self._make_progress_callback(job_id)
-            runner = self._runner_factory(progress_callback)
+            runner = self._runner_factory(progress_callback, self._skill_executor)
 
             # Start reproducibility tracking for this job.
             repro_engine = self._create_repro_engine(job)
@@ -187,7 +194,12 @@ class BackgroundJobRunner:
                     )
 
                 if not cognify_handled:
-                    result = await asyncio.wait_for(coro, timeout=timeout)
+                    project_id = job.project_id or "default"
+                    workspace = WorkspaceManager(settings.data_dir, project_id)
+                    if self._skill_executor is not None and hasattr(self._skill_executor, "set_workspace"):
+                        self._skill_executor.set_workspace(workspace)
+                    with workspace_context(workspace):
+                        result = await asyncio.wait_for(coro, timeout=timeout)
 
                     # Persist mutated state
                     job.task_tree = result.task_tree
@@ -196,6 +208,10 @@ class BackgroundJobRunner:
                     job.status = self._mode_to_status(result.mode)
                     job.error_message = result.error
                     job.updated_at = datetime.now(timezone.utc)
+
+                    # Update the original TODO_LIST chat message with the final
+                    # result so that reloading the session still shows the outcome.
+                    await self._update_queued_todo_message(job, result)
 
                     # Update plan status before persisting the job so that callers
                     # observing a completed job also see a completed plan.
@@ -217,7 +233,21 @@ class BackgroundJobRunner:
                         )
                         await trace_store.finish_trace(job_id, "running")
                     else:
-                        self._publish_state(job_id, job.status, "Job finished")
+                        task_result = job.result.get("task_result") if job.result else None
+                        # The task result wrapper contains metadata and a nested
+                        # "result" key with the actual skill output.
+                        skill_result = (
+                            task_result.get("result")
+                            if isinstance(task_result, dict) and "result" in task_result
+                            else task_result
+                        )
+                        self._publish_state(
+                            job_id,
+                            job.status,
+                            "Job finished",
+                            result=skill_result,
+                            logs=["Job finished"],
+                        )
                         await trace_store.finish_trace(
                             job_id,
                             "completed" if job.status == JobStatus.COMPLETED else "failed",
@@ -233,7 +263,7 @@ class BackgroundJobRunner:
                 await self._ingest_to_cbkb(job)
                 if job.plan_id:
                     await self._update_plan_status(job.plan_id, PlanStatus.FAILED)
-                self._publish_state(job_id, JobStatus.FAILED, job.error_message)
+                self._publish_state(job_id, JobStatus.FAILED, job.error_message, result=job.result)
                 await trace_store.finish_trace(job_id, "failed", job.error_message)
             except Exception as exc:
                 logger.exception("Job %s failed", job_id)
@@ -244,7 +274,7 @@ class BackgroundJobRunner:
                 await self._ingest_to_cbkb(job)
                 if job.plan_id:
                     await self._update_plan_status(job.plan_id, PlanStatus.FAILED)
-                self._publish_state(job_id, JobStatus.FAILED, str(exc))
+                self._publish_state(job_id, JobStatus.FAILED, str(exc), result=job.result)
                 await trace_store.finish_trace(job_id, "failed", str(exc))
             finally:
                 # Finalize reproducibility bundle regardless of outcome.
@@ -258,12 +288,108 @@ class BackgroundJobRunner:
             await self._update_active_jobs()
             await self._release_lock(job_id)
 
+    async def _update_queued_todo_message(self, job: Job, result) -> None:
+        """Embed the final skill result into the queued TODO_LIST message.
+
+        Mutates both the in-job working memory (for the current process) and the
+        persisted session state so that reloading the conversation shows the
+        outcome.
+        """
+        try:
+            task_result = None
+            if job.result and isinstance(job.result, dict):
+                task_result = job.result.get("task_result")
+                if isinstance(task_result, dict) and "result" in task_result:
+                    task_result = task_result["result"]
+            if not task_result:
+                tree = getattr(result, "task_tree", None)
+                if tree:
+                    for task in getattr(tree, "tasks", []):
+                        if getattr(task, "status", None) == "completed" and getattr(task, "result", None):
+                            task_result = task.result
+                            break
+            if not task_result:
+                return
+
+            summary_text = self._format_result_summary(task_result, job.status)
+            todo_type = {MessageType.TODO_LIST, MessageType.TODO_LIST.value, "todo_list"}
+
+            def _apply_update(messages):
+                for msg in reversed(messages):
+                    msg_type = getattr(msg, "type", None)
+                    if isinstance(msg_type, str):
+                        msg_type = msg_type.lower()
+                    content = getattr(msg, "content", None)
+                    if (
+                        msg_type in todo_type
+                        and isinstance(content, dict)
+                        and content.get("job_id") == job.job_id
+                    ):
+                        content["result"] = task_result
+                        content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
+                        content["text"] = summary_text
+                        return True
+                return False
+
+            # Update the in-memory copy carried by the job.
+            _apply_update(getattr(job.working_memory, "messages", []))
+
+            # Persist the update so reloads / other processes see the summary.
+            if self._memory_manager is not None and job.session_id:
+                try:
+                    working_memory, task_tree = await self._memory_manager.load_session(
+                        job.session_id, job.project_id or "default"
+                    )
+                    if _apply_update(working_memory.messages):
+                        await self._memory_manager._save_session(
+                            job.session_id,
+                            job.project_id or "default",
+                            working_memory,
+                            task_tree,
+                        )
+                except Exception:
+                    logger.warning("Failed to persist TODO summary", exc_info=True)
+        except Exception:
+            logger.warning("Failed to update queued TODO message", exc_info=True)
+
+    @staticmethod
+    def _format_result_summary(task_result: Dict[str, Any], status: JobStatus) -> str:
+        """Build a concise, human-readable summary for the chat message."""
+        if status != JobStatus.COMPLETED:
+            return "执行结束，结果概要如下。"
+        if not isinstance(task_result, dict):
+            return "分析已完成。"
+        parts = ["分析已完成"]
+        cells = task_result.get("cells")
+        genes = task_result.get("genes")
+        if cells is not None and genes is not None:
+            parts.append(f"：共 {cells} 个细胞、{genes} 个基因")
+        model = task_result.get("model")
+        if model:
+            parts.append(f"，使用模型 {model}")
+        comparison = task_result.get("comparison")
+        if isinstance(comparison, dict):
+            ari = comparison.get("adjusted_rand_index")
+            acc = comparison.get("accuracy")
+            if ari is not None:
+                parts.append(f"；与现有标签的 Adjusted Rand Index 为 {ari:.3f}")
+            elif acc is not None:
+                parts.append(f"；与现有标签的准确率为 {acc:.3f}")
+        output_csv = task_result.get("output_csv")
+        if output_csv:
+            parts.append("。详细结果已保存到输出文件，可点击下方链接查看。")
+        else:
+            parts.append("。")
+        return "".join(parts)
+
     def _publish_state(
         self,
         job_id: str,
         status: JobStatus,
         message: str,
         hitl_checkpoint: Optional[dict] = None,
+        result: Optional[Dict[str, Any]] = None,
+        logs: Optional[list] = None,
     ) -> None:
         state = ExecutionState(
             job_id=job_id,
@@ -272,6 +398,8 @@ class BackgroundJobRunner:
             progress_pct=_status_to_progress(status),
             scheduler_type="agent",
             error_message=message if status == JobStatus.FAILED else None,
+            result=result,
+            logs=logs or [],
         )
         if hitl_checkpoint:
             state.error_message = None  # not an error
@@ -312,7 +440,8 @@ class BackgroundJobRunner:
 
     @staticmethod
     def _default_runner_factory(
-        progress_callback: Callable[[ExecutionState], None]
+        progress_callback: Callable[[ExecutionState], None],
+        skill_executor: Optional[Any] = None,
     ):
         # Local import to avoid a circular dependency between jobs.runner
         # and agent.turn_runner at module load time.
@@ -323,12 +452,23 @@ class BackgroundJobRunner:
 
         cbkb = CBKB(settings.data_dir)
         analysis_template_store = AnalysisTemplateStore(settings.data_dir)
-        workflow_service = WorkflowExecutionService(progress_callback=progress_callback)
+        # Wire the job-level progress publisher into the shared skill executor
+        # so agentic skills stream live state updates to the frontend.
+        if skill_executor is not None:
+            skill_executor.set_progress_callback(progress_callback)
+
+        workflow_service = WorkflowExecutionService(
+            progress_callback=progress_callback,
+            skill_registry=skill_executor.registry if skill_executor is not None else None,
+            tool_registry=skill_executor.tool_registry if skill_executor is not None else None,
+            llm_client=skill_executor.llm_client if skill_executor is not None else None,
+        )
         return TurnRunner(
             progress_callback=progress_callback,
             cbkb=cbkb,
             analysis_template_store=analysis_template_store,
             workflow_execution_service=workflow_service,
+            skill_executor=skill_executor,
         )
 
     @staticmethod
@@ -372,13 +512,24 @@ class BackgroundJobRunner:
 
     @staticmethod
     def _result_to_dict(result) -> dict:
-        return {
+        data = {
             "mode": str(result.mode),
             "response_text": result.response_text,
             "progress": result.progress,
             "hitl_task_id": result.hitl_task_id,
             "error": result.error,
         }
+        # Surface the first successful task result so clients can render
+        # a concise result summary without walking the whole task tree.
+        task_result = None
+        tree = getattr(result, "task_tree", None)
+        if tree and getattr(tree, "tasks", None):
+            for task in tree.tasks:
+                if getattr(task, "status", None) == "completed" and getattr(task, "result", None):
+                    task_result = task.result
+                    break
+        data["task_result"] = task_result
+        return data
 
     async def _acquire_lock(self, job_id: str) -> bool:
         """Acquire a distributed lock for this job when using Redis."""

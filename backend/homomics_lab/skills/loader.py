@@ -160,6 +160,29 @@ def _extract_category_from_keywords(keywords: List[str], skill_name: str) -> str
     return "general"
 
 
+def _parse_string_list(value: Any) -> List[str]:
+    """Normalize a frontmatter value to a list of non-empty strings.
+
+    Handles: None, single string, list of strings, comma-separated string.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        if not value.strip():
+            return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        result: List[str] = []
+        for item in value:
+            if isinstance(item, str):
+                for part in item.split(","):
+                    part = part.strip()
+                    if part:
+                        result.append(part)
+        return result
+    return []
+
+
 class SkillLoader:
     """Load skills from external NanoResearch-Skills compatible directories.
 
@@ -276,6 +299,8 @@ class SkillLoader:
         skill.runtime = activated.runtime
         skill.quality = activated.quality
         skill.metadata = activated.metadata
+        skill.domains = activated.domains
+        skill.categories = activated.categories
         skill.id = original_id
         skill.metadata.update(preserved_meta)
         return skill
@@ -397,6 +422,16 @@ class SkillLoader:
         if not category:
             category = _extract_category_from_keywords(metadata["keywords"], name)
 
+        # Parse optional domain/category affiliations. Skills can belong to zero
+        # or more domains; empty domains means the skill is standalone.
+        domains = _parse_string_list(frontmatter.get("domains", []))
+        categories = _parse_string_list(frontmatter.get("categories", []))
+        # For backward compatibility, if ``domain`` (singular) is present and
+        # ``domains`` is not, migrate it.
+        legacy_domain = frontmatter.get("domain")
+        if legacy_domain and not domains:
+            domains = _parse_string_list(legacy_domain)
+
         return SkillDefinition(
             id=name,
             name=name,
@@ -408,6 +443,8 @@ class SkillLoader:
             output_schema=output_schema,
             runtime=runtime,
             metadata=metadata,
+            domains=domains,
+            categories=categories,
         )
 
     def _find_scripts_dir(self, skill_dir: Path, tool_type: str, primary_tool: str) -> Optional[Path]:

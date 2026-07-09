@@ -67,11 +67,13 @@ async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
     ctx = await bootstrap_worker_context(enable_hot_reload=False)
 
     # JobService uses the configured queue backend (Redis when enabled).
-    job_service = JobService()
+    memory_manager = ctx.get("memory_manager")
+    job_service = JobService(memory_manager=memory_manager)
     runner = BackgroundJobRunner(
         queue=job_service.queue,
         repository=job_service.repository,
         pubsub=job_service.pubsub,
+        memory_manager=memory_manager,
     )
     runner.start()
     logger.info("Worker started (backend=%s)", settings.queue_backend)

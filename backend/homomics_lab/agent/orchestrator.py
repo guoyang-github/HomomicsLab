@@ -25,6 +25,7 @@ from homomics_lab.tasks.task_tree import TaskTree
 from homomics_lab.hitl.detector import HITLDetector
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.observability.trace_store import TraceStore
+from homomics_lab.workspace.context import workspace_context
 from homomics_lab.workflow.cache import WorkflowCache
 
 
@@ -230,6 +231,10 @@ class Orchestrator:
     async def run_tree(self, tree: TaskTree, context: Dict[str, Any] = None) -> Dict[str, Any]:
         context = context or {}
         self._ensure_workspace_manager(context)
+        with workspace_context(self.workspace_manager):
+            return await self._run_tree_inner(tree, context)
+
+    async def _run_tree_inner(self, tree: TaskTree, context: Dict[str, Any]) -> Dict[str, Any]:
         results: Dict[str, Any] = {}
         hitl_triggered = False
 

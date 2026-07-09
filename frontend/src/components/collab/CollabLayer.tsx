@@ -28,12 +28,19 @@ export function CollabLayer() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [sendCursor])
 
+  // Only show the collaboration badge when actually connected or when other
+  // users are present. Hiding it avoids the distracting "Offline" label in
+  // normal single-user usage.
+  const showBadge = isConnected || users.length > 0
+
   return (
     <>
       <PresenceCursors users={users} />
-      <div className="fixed bottom-4 right-4 z-40 rounded-full bg-white/80 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/80">
-        <ActiveUsers users={users} isConnected={isConnected} />
-      </div>
+      {showBadge && (
+        <div className="fixed bottom-4 right-4 z-40 rounded-full bg-white/80 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/80">
+          <ActiveUsers users={users} isConnected={isConnected} />
+        </div>
+      )}
     </>
   )
 }

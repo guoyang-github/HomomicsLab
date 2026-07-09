@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from homomics_lab.config import settings
+from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends import create_backends
@@ -24,11 +25,15 @@ class JobService:
         queue: Optional[QueueBackend] = None,
         repository: Optional[JobRepository] = None,
         pubsub: Optional[PubSubBackend] = None,
+        skill_executor: Optional[Any] = None,
+        memory_manager: Optional[MemoryManager] = None,
     ):
         queue_backend, pubsub_backend = create_backends()
         self._queue = queue or queue_backend
         self._repository = repository or JobRepository()
         self._pubsub = pubsub or pubsub_backend
+        self._skill_executor = skill_executor
+        self._memory_manager = memory_manager
         self._runner: Optional[BackgroundJobRunner] = None
 
     @property
@@ -196,6 +201,8 @@ class JobService:
                 queue=self._queue,
                 repository=self._repository,
                 pubsub=self._pubsub,
+                skill_executor=self._skill_executor,
+                memory_manager=self._memory_manager,
             )
         await self._recover_queued_jobs()
         self._runner.start()

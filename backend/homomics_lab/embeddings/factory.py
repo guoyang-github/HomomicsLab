@@ -1,6 +1,7 @@
 """Factory for creating embedding providers from settings."""
 
 import logging
+import time
 from typing import Optional
 
 from homomics_lab.config import Settings, settings as default_settings
@@ -46,6 +47,25 @@ def get_embedding_provider(settings: Optional[Settings] = None) -> EmbeddingProv
         )
 
     return _provider_instance
+
+
+def warmup_embedding_provider(provider: Optional[EmbeddingProvider]) -> None:
+    """Force local embedding models to load so first-request latency is avoided.
+
+    API-backed providers are skipped to avoid unnecessary token/call costs.
+    """
+    if provider is None:
+        return
+    if isinstance(provider, SentenceTransformersProvider):
+        start = time.perf_counter()
+        try:
+            provider.encode(["warmup"])
+            logger.info(
+                "Sentence-transformers embedding provider warmed up in %.2fs",
+                time.perf_counter() - start,
+            )
+        except Exception:
+            logger.exception("Failed to warm up sentence-transformers embedding provider")
 
 
 def reset_embedding_provider() -> None:

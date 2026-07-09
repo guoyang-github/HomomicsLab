@@ -298,6 +298,12 @@ class Settings(BaseSettings):
     llm_response_cache_max_entries: int = 1000
     llm_complexity_routing_enabled: bool = True
 
+    # Capability-first routing (P3): when True, TaskDecomposer uses the unified
+    # CapabilityAssembler to decide between cross-domain, template, standalone
+    # skill and open-agent planners.  This is now the default and recommended
+    # mode; set to False to restore the legacy _should_use_* rule set.
+    capability_first_routing_enabled: bool = True
+
     @field_validator("llm_response_cache_backend")
     @classmethod
     def _validate_llm_response_cache_backend(cls, v: str) -> str:

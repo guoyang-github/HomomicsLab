@@ -30,11 +30,13 @@ interface ChatState {
   setMessages: (messages: ChatMessage[]) => void
   setIsTyping: (typing: boolean) => void
   setSessionId: (id: string) => void
+  selectSession: (id: string) => Promise<void>
   setProjectId: (id: string) => void
   setDraftInput: (value: string) => void
   clearMessages: () => void
 
   fetchSessions: (projectId?: string) => Promise<void>
+  loadSessionMessages: (sessionId: string) => Promise<void>
   createSession: (name?: string, projectId?: string) => string
   renameSession: (id: string, name: string) => void
   deleteSession: (id: string) => void
@@ -81,6 +83,19 @@ export const useChatStore = create<ChatState>()(
       setMessages: (messages) => set({ messages }),
       setIsTyping: (isTyping) => set({ isTyping }),
       setSessionId: (currentSessionId) => set({ currentSessionId }),
+      selectSession: async (id) => {
+        set({ currentSessionId: id, messages: [] })
+        await get().loadSessionMessages(id)
+      },
+      loadSessionMessages: async (sessionId) => {
+        try {
+          const response = await chatApi.getMessages(sessionId)
+          set({ messages: response.data })
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load session messages', err)
+        }
+      },
       setProjectId: (currentProjectId) => set({ currentProjectId }),
       setDraftInput: (draftInput) => set({ draftInput }),
       clearMessages: () => set({ messages: [] }),

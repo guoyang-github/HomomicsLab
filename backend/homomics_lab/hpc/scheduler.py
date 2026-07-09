@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import shutil
+import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,7 +22,7 @@ from homomics_lab.hpc.pubsub import ExecutionPubSub, get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.skills.environment_manager import EnvironmentManager
 from homomics_lab.skills.models import SkillDefinition
-from homomics_lab.skills.sandbox import Sandbox
+from homomics_lab.skills.sandbox import LocalSandbox, Sandbox
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,11 @@ class LocalScheduler(BaseScheduler):
         scripts_dir = Path(skill.metadata.get("scripts_dir", self.working_dir))
         env_info = self._env_manager.prepare(skill.id, scripts_dir, exec_type)
         sandbox = self._get_sandbox(exec_type)
+        # In local-dev mode the host project venv already contains the packages
+        # installed by the user (e.g. via uv add / pip install). Reuse it so
+        # skills work without waiting for per-skill venv creation.
+        if isinstance(sandbox, LocalSandbox):
+            env_info.python_path = sys.executable
         sandbox_metadata = sandbox.get_metadata()
 
         # Static safety scan for Python/R code.

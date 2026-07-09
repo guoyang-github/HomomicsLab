@@ -7,6 +7,16 @@ dist/
 build/
 *.pkl
 *.h5ad
+bak/
+docs/
+.claude/
+.*_cache
+*_cache
+.metadata
+results/
+.gitignore
+AGENTS.md
+
 
 # Virtual environments
 .venv/

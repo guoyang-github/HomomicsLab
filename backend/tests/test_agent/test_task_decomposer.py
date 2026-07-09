@@ -216,3 +216,155 @@ async def test_decompose_derives_sub_intents_when_classifier_returns_broad_inten
     assert "clustering" in task_names
     assert "dim_reduction" in task_names
     assert "annotation" not in task_names
+
+
+@pytest.fixture
+def standalone_decomposer():
+    """Decomposer backed by a registry with standalone skills."""
+    registry = SkillRegistry()
+    registry.register(
+        SkillDefinition(
+            id="text_summarizer",
+            name="Text Summarizer",
+            version="1.0",
+            category="nlp",
+            description="Summarize text passages",
+            input_schema=SkillInputSchema(),
+        )
+    )
+    registry.register(
+        SkillDefinition(
+            id="single_cell_qc",
+            name="Single Cell QC",
+            version="1.0",
+            category="single-cell-transcriptomics",
+            description="QC for single-cell data",
+            domains=["single-cell-transcriptomics"],
+            input_schema=SkillInputSchema(),
+        )
+    )
+    return TaskDecomposer(skill_registry=registry)
+
+
+@pytest.mark.asyncio
+async def test_decompose_routes_to_standalone_planner(standalone_decomposer):
+    """A generic request with no domain signal should use standalone skills."""
+    intent = UserIntent(
+        analysis_type="general",
+        complexity="single_step",
+        original_message="summarize this text",
+    )
+
+    plan, tree = await standalone_decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.derivation == "standalone-skill"
+    assert plan.risk_level == "low"
+    assert len(tree.tasks) == 1
+    assert tree.tasks[0].name == "text_summarizer"
+    assert tree.tasks[0].derivation == "standalone-skill"
+
+
+@pytest.mark.asyncio
+async def test_decompose_does_not_route_domain_request_to_standalone(standalone_decomposer):
+    """A request carrying a domain signal should not be hijacked by standalone skills."""
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="complex",
+        domain="single-cell-transcriptomics",
+        original_message="run single cell qc",
+    )
+
+    plan, tree = await standalone_decomposer.decompose_with_plan(intent, context={})
+
+    # No domain strategy is loaded in this fixture, so PlanEngine will fallback.
+    # The key assertion is that the standalone planner was not used.
+    assert plan.derivation != "standalone-skill"
+    task_names = {t.name for t in tree.tasks}
+    assert "text_summarizer" not in task_names
+
+
+@pytest.mark.asyncio
+async def test_decompose_explicit_skill_target_avoids_full_pipeline(monkeypatch):
+    """When the user names a concrete skill, the plan contains only that skill."""
+    from homomics_lab.config import settings
+
+    monkeypatch.setattr(settings, "capability_first_routing_enabled", True)
+
+    registry = SkillRegistry()
+    registry.register(
+        SkillDefinition(
+            id="bio-single-cell-annotation-celltypist",
+            name="bio-single-cell-annotation-celltypist",
+            version="1.0",
+            category="single-cell-transcriptomics",
+            description="CellTypist cell type annotation",
+            domains=["single-cell-transcriptomics"],
+            input_schema=SkillInputSchema(),
+        )
+    )
+    registry.register(
+        SkillDefinition(
+            id="text_summarizer",
+            name="Text Summarizer",
+            version="1.0",
+            category="nlp",
+            description="Summarize text passages",
+            input_schema=SkillInputSchema(),
+        )
+    )
+
+    decomposer = TaskDecomposer(skill_registry=registry)
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="single_step",
+        domain="single-cell-transcriptomics",
+        target="bio-single-cell-annotation-celltypist",
+        original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释",
+    )
+
+    plan, tree = await decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.derivation == "standalone-skill"
+    assert len(tree.tasks) == 1
+    assert tree.tasks[0].name == "bio-single-cell-annotation-celltypist"
+    task_names = {t.name for t in tree.tasks}
+    assert "qc" not in task_names
+    assert "clustering" not in task_names
+    assert "normalization" not in task_names
+
+
+def test_attach_uploaded_files_to_tree():
+    """Bare filenames in the message are resolved to uploaded project files."""
+    from homomics_lab.agent.turn_runner import TurnRunner
+    from homomics_lab.tasks.models import TaskNode
+    from homomics_lab.tasks.task_tree import TaskTree
+
+    project_id = "test_attach"
+    raw_dir = settings.data_dir / "raw" / project_id
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    uploaded = raw_dir / "sample.h5ad"
+    uploaded.write_text("fake")
+
+    runner = TurnRunner()
+    tree = TaskTree(
+        [
+            TaskNode(
+                id="t1",
+                name="annotation",
+                description="annotate",
+                phase="annotation",
+                skills_required=["bio-single-cell-annotation-celltypist"],
+                parameters={},
+            )
+        ]
+    )
+    runner._attach_uploaded_files_to_tree(
+        tree,
+        "使用 CellTypist 对 sample.h5ad 进行注释",
+        project_id,
+    )
+
+    assert tree.tasks[0].parameters["input_file"] == str(uploaded.resolve())
+    assert tree.tasks[0].parameters["uploaded_files"] == [
+        {"filename": "sample.h5ad", "path": str(uploaded.resolve())}
+    ]

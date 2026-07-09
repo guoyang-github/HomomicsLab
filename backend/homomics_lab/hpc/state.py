@@ -22,6 +22,8 @@ class ExecutionState:
     # Optional per-task snapshot for agent-driven workflows.
     tasks: Optional[List[Dict[str, Any]]] = None
     active_task_id: Optional[str] = None
+    # Optional result summary for terminal states.
+    result: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
@@ -42,6 +44,7 @@ class ExecutionState:
             scheduler_type=data.get("scheduler_type", "unknown"),
             tasks=data.get("tasks"),
             active_task_id=data.get("active_task_id"),
+            result=data.get("result"),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -63,4 +66,5 @@ class ExecutionState:
             "scheduler_type": self.scheduler_type,
             "tasks": self.tasks,
             "active_task_id": self.active_task_id,
+            "result": self.result,
         }

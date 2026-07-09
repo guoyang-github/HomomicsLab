@@ -98,7 +98,7 @@ def file_edit(path: str, old_string: str, new_string: str) -> Dict[str, Any]:
     return {"path": str(file_path), "replaced": True}
 
 
-def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60) -> Dict[str, Any]:
+async def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60) -> Dict[str, Any]:
     """Execute a shell command inside the configured sandbox.
 
     WARNING: This tool is high-risk. In production ``force_sandbox`` is enabled
@@ -111,8 +111,6 @@ def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60) -> Di
         cwd: Working directory for the command (workspace-relative).
         timeout: Timeout in seconds.
     """
-    import asyncio
-
     if not command or not isinstance(command, str):
         raise ValueError("command must be a non-empty string")
 
@@ -136,7 +134,7 @@ def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60) -> Di
                 "sandbox (bubblewrap/container) is available."
             )
         sandbox = Sandbox.create(backend, workdir, container_image=settings.skill_container_image)
-        output = asyncio.run(sandbox.run_command(command, cwd=workdir, timeout_seconds=timeout))
+        output = await sandbox.run_command(command, cwd=workdir, timeout_seconds=timeout)
         return {
             "returncode": 0,
             "stdout": output,

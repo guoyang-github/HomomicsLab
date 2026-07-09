@@ -19,7 +19,8 @@ import re
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
+from pathlib import Path
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homomics_lab.agent.agent_loop import AgentLoop, ToolCallRecord, TurnBudget
@@ -30,12 +31,18 @@ from homomics_lab.agent.errors import (
     TurnError,
 )
 from homomics_lab.agent.factory import create_default_agents
+from homomics_lab.agent.general_agent import GeneralScientificAgent
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
+from homomics_lab.agent.open_agent.executor import OpenAgentExecutor
 from homomics_lab.agent.intent.models import IntentMatch
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.phase_gate import PhaseGateEvaluator
-from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
+from homomics_lab.agent.plan.replanning import DynamicReplanningEngine, ReplanningTrigger
+from homomics_lab.agent.plan.self_correction import (
+    SelfCorrectionAction,
+    SelfCorrectionEngine,
+)
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.config import settings
 from homomics_lab.metrics import record_plan_created
@@ -52,6 +59,8 @@ from homomics_lab.context.relevance_filter import ContextItem
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.constants import JobMode
+from homomics_lab.workspace.context import current_workspace, workspace_context
+from homomics_lab.workspace.manager import WorkspaceManager
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import (
     ChatMessage,
@@ -161,6 +170,8 @@ class TurnRunner:
         workspace_manager=None,
         phase_gate_evaluator: Optional[PhaseGateEvaluator] = None,
         replanning_engine: Optional[DynamicReplanningEngine] = None,
+        self_correction_engine: Optional[SelfCorrectionEngine] = None,
+        general_agent: Optional[GeneralScientificAgent] = None,
         supervisor=None,
         reviewer=None,
         message_bus: Optional[AgentMessageBus] = None,
@@ -179,8 +190,10 @@ class TurnRunner:
         memory_backend: Optional[MemoryBackend] = None,
         analysis_template_store: Optional[Any] = None,
         workflow_execution_service: Optional[WorkflowExecutionService] = None,
+        skill_executor: Optional[Any] = None,
     ):
         self._cbkb = cbkb
+        self._skill_executor = skill_executor
         self._llm_client = llm_client
         self._trace_store = trace_store
         self._approval_store = approval_store
@@ -190,9 +203,12 @@ class TurnRunner:
         self._workspace_manager = workspace_manager
         self._phase_gate_evaluator = phase_gate_evaluator
         self._replanning_engine = replanning_engine
+        self._self_correction_engine = self_correction_engine
+        self._general_agent = general_agent
         self._supervisor = supervisor
         self._reviewer = reviewer
         self._message_bus = message_bus
+        self._open_agent_executor: Optional[OpenAgentExecutor] = None
         self._tool_registry = tool_registry
         self.memory_manager = memory_manager
         self.memory_backend = memory_backend
@@ -232,7 +248,11 @@ class TurnRunner:
         if self._orchestrator is None:
             registry = self._registry or get_default_registry()
             # Always ensure default agents are registered; the factory is idempotent.
-            create_default_agents()
+            # Pass the shared skill executor so agents can actually run skills.
+            create_default_agents(
+                skill_executor=self._skill_executor,
+                tool_registry=self._tool_registry,
+            )
             phase_gate_evaluator = self._phase_gate_evaluator or PhaseGateEvaluator()
             replanning_engine = self._replanning_engine
             if replanning_engine is None:
@@ -267,8 +287,50 @@ class TurnRunner:
                 reviewer=reviewer,
                 message_bus=message_bus,
                 cbkb=self._cbkb,
+                skill_registry=(
+                    self._skill_executor.registry
+                    if self._skill_executor is not None
+                    else None
+                ),
             )
         return self._orchestrator
+
+    def _get_self_correction_engine(self) -> SelfCorrectionEngine:
+        """Lazy initialize the self-correction engine."""
+        if self._self_correction_engine is None:
+            replanning_engine = self._replanning_engine
+            if replanning_engine is None:
+                plan_engine = self.task_decomposer._get_plan_engine()
+                replanning_engine = DynamicReplanningEngine(plan_engine=plan_engine)
+            self._self_correction_engine = SelfCorrectionEngine(
+                replanning_engine=replanning_engine
+            )
+        return self._self_correction_engine
+
+    def _get_general_agent(self) -> GeneralScientificAgent:
+        """Lazy initialize the general scientific agent."""
+        if self._general_agent is None:
+            if self._llm_client is None:
+                self._llm_client = LLMClient()
+            self._general_agent = GeneralScientificAgent(
+                llm_client=self._llm_client,
+                tool_registry=self._tool_registry,
+                skill_registry=getattr(self, "registry", None),
+                prompter=self.prompter,
+            )
+        return self._general_agent
+
+    def _get_open_agent_executor(self) -> OpenAgentExecutor:
+        """Lazy initialize the open agent executor."""
+        if self._open_agent_executor is None:
+            if self._llm_client is None:
+                self._llm_client = LLMClient()
+            self._open_agent_executor = OpenAgentExecutor(
+                llm_client=self._llm_client,
+                tool_registry=self._tool_registry,
+                trace_store=self._trace_store,
+            )
+        return self._open_agent_executor
 
     def _get_workflow_execution_service(self) -> Optional[WorkflowExecutionService]:
         """Lazy init the workflow execution service."""
@@ -462,6 +524,10 @@ class TurnRunner:
     ) -> TurnResult:
         """Run the turn pipeline once and persist state."""
         turn_result: Optional[TurnResult] = None
+        workspace_token = None
+        if project_id:
+            workspace = WorkspaceManager(settings.data_dir, project_id)
+            workspace_token = current_workspace.set(workspace)
         try:
             turn_result = await self._run_turn_once(
                 session_id=session_id,
@@ -517,6 +583,9 @@ class TurnRunner:
                 ),
                 working_memory,
             )
+        finally:
+            if workspace_token is not None:
+                current_workspace.reset(workspace_token)
 
         # 5. Persist turn to long-term memory (best-effort)
         if self.memory_manager is not None and turn_result is not None:
@@ -714,41 +783,33 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
     ) -> TurnResult:
-        """Handle questions and general help requests that need no skill execution."""
-        if intent.analysis_type == "greeting":
-            response_text = await self._generate_greeting_response(
-                user_message, working_memory, project_id
-            )
-        elif intent.analysis_type == "general_help":
-            response_text = await self._generate_general_help_response(
-                user_message, working_memory
-            )
-        elif intent.analysis_type == "information_request":
-            response_text = await self._generate_information_request_response(
-                intent, working_memory, project_id
-            )
-        else:
-            response_text = await self._generate_qa_response(
-                intent, user_message, working_memory, project_id
-            )
+        """Handle questions and general help requests that need no skill execution.
 
-        # Never store or return a completely empty assistant text bubble.
-        if not response_text or not str(response_text).strip():
-            response_text = "我暂时无法生成回答，请稍后再试，或换一种方式描述您的问题。"
+        Delegates to the general scientific agent, which can answer directly,
+        generate code, or call lightweight tools without assembling a rigid
+        domain workflow.
+        """
+        context = {"project_id": project_id, "project_path": None}
+        if project_id:
+            from homomics_lab.config import settings
 
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TEXT,
-            content=response_text,
-            sender="agent",
+            context["project_path"] = str(settings.data_dir / "workspaces" / project_id)
+
+        result = await self._get_general_agent().answer(
+            intent=intent,
+            working_memory=working_memory,
+            context=context,
         )
-        working_memory.add_message(agent_msg)
 
-        return TurnResult(
-            mode=ExecutionMode.DIRECT_RESPONSE,
-            response_text=response_text,
-            agent_message=agent_msg,
-        )
+        # Ensure we never return a completely empty assistant text bubble.
+        if not result.response_text or not str(result.response_text).strip():
+            result.response_text = (
+                "我暂时无法生成回答，请稍后再试，或换一种方式描述您的问题。"
+            )
+            if result.agent_message is not None:
+                result.agent_message.content = result.response_text
+
+        return result
 
     async def _handle_mcp_tool(
         self,
@@ -1381,6 +1442,38 @@ class TurnRunner:
             intent, context={"project_id": project_id}
         )
 
+        # Open agent plans are executed by the open agent executor.
+        if plan_result.derivation == "open-agent":
+            executor = self._get_open_agent_executor()
+            exec_context = {
+                "session_id": session_id,
+                "project_id": project_id,
+                "project_path": str(settings.data_dir / "workspaces" / project_id)
+                if project_id
+                else None,
+                "trace_id": getattr(self, "_trace_id", None),
+            }
+            exec_result = await executor.execute(
+                plan_result=plan_result,
+                user_message=user_message,
+                working_memory=working_memory,
+                context=exec_context,
+            )
+            # Convert OpenAgentExecutionResult to TurnResult.
+            from homomics_lab.models.common import HITLCheckpoint
+
+            hitl_checkpoint = None
+            if exec_result.hitl_checkpoint is not None and isinstance(
+                exec_result.hitl_checkpoint, HITLCheckpoint
+            ):
+                hitl_checkpoint = exec_result.hitl_checkpoint
+            return TurnResult(
+                mode=ExecutionMode(exec_result.mode),
+                response_text=exec_result.response_text,
+                agent_message=exec_result.agent_message,
+                hitl_checkpoint=hitl_checkpoint,
+            )
+
         plan: Optional[Plan] = None
         if plan_store is not None:
             plan = Plan(
@@ -1443,10 +1536,23 @@ class TurnRunner:
             plan=plan,
         )
 
-    @staticmethod
-    def _is_domain_template_analysis(intent: UserIntent) -> bool:
-        """Return True for domain-specific analysis workflows that belong on canvas."""
-        return intent.domain is not None
+    # Domain values used by the domain registry for real analysis workflows.
+    # Builtin intent definitions use placeholder domains such as "builtin" or
+    # "general"; those should not trigger the domain canvas / approval path.
+    _REAL_DOMAIN_VALUES = {
+        "single-cell-transcriptomics",
+        "spatial-transcriptomics",
+        "metagenomics",
+        "genomics",
+        "transcriptomics",
+        "proteomics",
+        "epigenomics",
+    }
+
+    @classmethod
+    def _is_domain_template_analysis(cls, intent: UserIntent) -> bool:
+        """Return True for real domain-specific analysis workflows."""
+        return intent.domain in cls._REAL_DOMAIN_VALUES
 
     async def _enqueue_execution(
         self,
@@ -1462,7 +1568,32 @@ class TurnRunner:
     ) -> TurnResult:
         """Submit a task tree to the background job queue or request approval."""
         is_domain = self._is_domain_template_analysis(intent)
-        needs_approval = plan_mode or is_domain or intent.complexity == "complex"
+        plan_result = plan.plan_result if plan is not None else None
+        is_high_risk = (
+            plan_result is not None
+            and (plan_result.is_fallback or plan_result.risk_level == "high")
+        )
+        is_single_step = intent.scope == "single_step" or intent.complexity == "single_step"
+        # A concrete single-task execution (e.g. "use CellTypist on sample.h5ad")
+        # should execute immediately even when the LLM labelled the overall intent
+        # as complex.  We trust the decomposed task tree over the noisy structured
+        # complexity score when there is exactly one low-risk, dependency-free task.
+        is_single_task_tree = (
+            tree is not None
+            and len(tree.tasks) == 1
+            and not tree.tasks[0].dependencies
+            and tree.tasks[0].risk_level != "high"
+        )
+        # Require approval for explicit plan mode, complex/multi-step workflows,
+        # fallback/high-risk plans, and broad domain-strategy requests.  A concrete
+        # single-step skill request (e.g. "use CellTypist on sample.h5ad") should
+        # execute immediately because the user named the exact capability.
+        needs_approval = (
+            plan_mode
+            or (is_domain and not is_single_step and not is_single_task_tree)
+            or (intent.complexity == "complex" and not is_single_task_tree)
+            or is_high_risk
+        )
 
         if plan is not None and needs_approval:
             if is_domain:
@@ -1509,7 +1640,9 @@ class TurnRunner:
 
         mode = (
             JobMode.SINGLE_STEP
-            if intent.scope == "single_step" or intent.complexity == "single_step"
+            if intent.scope == "single_step"
+            or intent.complexity == "single_step"
+            or is_single_task_tree
             else JobMode.WORKFLOW
         )
         job = await job_service.create_job(
@@ -1534,6 +1667,7 @@ class TurnRunner:
                 "tasks": [t.model_dump() for t in tree.tasks],
                 "progress": self._build_initial_progress(tree),
                 "job_id": job.job_id,
+                "project_id": project_id,
             },
             sender="agent",
         )
@@ -1715,6 +1849,73 @@ class TurnRunner:
 
         return context
 
+    def _resolve_uploaded_file_references(
+        self,
+        user_message: Optional[str],
+        project_id: str,
+    ) -> List[Tuple[str, str]]:
+        """Find bare filenames in the message that exist as uploaded project files.
+
+        Returns a list of ``(filename, resolved_path)`` tuples. Both the project
+        raw directory and the workspace data directory are checked so files
+        uploaded via the file API are discoverable without explicit ``@file:``
+        references.
+        """
+        if not user_message:
+            return []
+
+        candidates = re.findall(r"[\w\-\.]+\.\w{2,8}", user_message)
+        seen: set[str] = set()
+        resolved: List[Tuple[str, str]] = []
+
+        for candidate in candidates:
+            filename = Path(candidate).name
+            if filename in seen or not filename:
+                continue
+            seen.add(filename)
+
+            for base in (
+                settings.data_dir / "raw" / project_id,
+                settings.data_dir / "workspaces" / project_id / "data",
+            ):
+                candidate_path = base / filename
+                if candidate_path.is_file():
+                    resolved.append((filename, str(candidate_path.resolve())))
+                    break
+
+        return resolved
+
+    def _attach_uploaded_files_to_tree(
+        self,
+        tree: TaskTree,
+        user_message: Optional[str],
+        project_id: str,
+    ) -> None:
+        """Inject discovered uploaded file paths into task parameters.
+
+        This lets skills/agents know which concrete files the user is referring
+        to, even when the message only mentions a filename without an ``@file:``
+        reference. For single-step skills this is usually the primary input; for
+        workflows it is added as a fallback when a task does not already specify
+        an input file.
+        """
+        files = self._resolve_uploaded_file_references(user_message, project_id)
+        if not files:
+            return
+
+        # Prefer the first mentioned file as the primary input.
+        primary_path = files[0][1]
+        for task in tree.tasks:
+            if task.parameters is None:
+                task.parameters = {}
+            if "input_file" not in task.parameters:
+                task.parameters["input_file"] = primary_path
+            # Also expose the full list for multi-file tasks.
+            if "uploaded_files" not in task.parameters:
+                task.parameters["uploaded_files"] = [
+                    {"filename": name, "path": path} for name, path in files
+                ]
+
     async def _record_execution_feedback(
         self,
         tree: TaskTree,
@@ -1799,13 +2000,27 @@ class TurnRunner:
             return self._build_fallback_result(tree, working_memory)
 
         orchestrator = self._get_orchestrator()
+        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
         context = await self._build_orchestrator_context(
             project_id,
             intent=intent,
             user_message=user_message,
             working_memory=working_memory,
         )
-        results = await orchestrator.run_tree(tree, context=context)
+        try:
+            results = await orchestrator.run_tree(tree, context=context)
+        except ExecutionError as exc:
+            corrected = await self._apply_self_correction(
+                tree,
+                working_memory,
+                project_id,
+                exc,
+                intent=intent,
+                user_message=user_message,
+            )
+            if corrected is not None:
+                return corrected
+            raise
 
         # Check for HITL
         hitl_info = self._extract_hitl(results)
@@ -1828,6 +2043,7 @@ class TurnRunner:
                 "text": response_text,
                 "tasks": [t.model_dump() for t in tree.tasks],
                 "progress": orchestrator.get_progress(tree),
+                "project_id": project_id,
             },
             sender="agent",
         )
@@ -1966,13 +2182,27 @@ class TurnRunner:
                     )
 
         orchestrator = self._get_orchestrator()
+        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
         context = await self._build_orchestrator_context(
             project_id,
             intent=intent,
             user_message=user_message,
             working_memory=working_memory,
         )
-        results = await orchestrator.run_tree(tree, context=context)
+        try:
+            results = await orchestrator.run_tree(tree, context=context)
+        except ExecutionError as exc:
+            corrected = await self._apply_self_correction(
+                tree,
+                working_memory,
+                project_id,
+                exc,
+                intent=intent,
+                user_message=user_message,
+            )
+            if corrected is not None:
+                return corrected
+            raise
 
         # Check for HITL
         hitl_info = self._extract_hitl(results)
@@ -2008,6 +2238,115 @@ class TurnRunner:
             agent_message=agent_msg,
             attachments=plot_messages,
         )
+
+    async def _apply_self_correction(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+        project_id: str,
+        error: Exception,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
+    ) -> Optional[TurnResult]:
+        """Try to self-correct a failed execution.
+
+        Returns a TurnResult if a correction decision was made, or None if the
+        engine decided to stop or no failed tasks were found.
+        """
+        failed_tasks = [
+            t for t in tree.tasks if str(t.status.value) == "failed"
+        ]
+        if not failed_tasks:
+            return None
+
+        # Respect per-task replan limits to avoid infinite loops.
+        for task in failed_tasks:
+            if task.replan_attempt_count >= task.max_replan_attempts:
+                return None
+            task.replan_attempt_count += 1
+
+        triggers: List[ReplanningTrigger] = []
+        for task in failed_tasks:
+            error_msg = task.error_message or str(error)
+            severity = "major" if "validation" in error_msg.lower() else "minor"
+            triggers.append(
+                ReplanningTrigger(
+                    trigger_type="skill_failure",
+                    severity=severity,
+                    context={
+                        "phase_type": task.phase,
+                        "task_id": task.id,
+                        "skill_id": task.skills_required[0] if task.skills_required else None,
+                        "error": error_msg,
+                        "reason": f"Skill execution failed for {task.name}: {error_msg}",
+                    },
+                )
+            )
+
+        # Build a PlanResult from the current task tree so the replanning engine
+        # has a plan to mutate.
+        placeholder_intent = intent or UserIntent(
+            analysis_type="runtime_replan",
+            complexity="single_step",
+        )
+        current_plan = self.task_decomposer._task_tree_to_plan_result(
+            tree,
+            placeholder_intent,
+            strategy_name="runtime-replan",
+        )
+
+        decision = self._get_self_correction_engine().evaluate(
+            current_plan=current_plan,
+            triggers=triggers,
+        )
+
+        if decision.action == SelfCorrectionAction.STOP:
+            return None
+
+        if decision.action == SelfCorrectionAction.HITL_REPLAN:
+            response_text = (
+                f"执行中遇到问题，我计划调整方案：{decision.delta_summary}"
+                "请确认是否继续。"
+            )
+            agent_msg = ChatMessage(
+                id=f"msg_{len(working_memory.messages)}",
+                type=MessageType.EXECUTION_PLAN,
+                content={
+                    "response_text": response_text,
+                    "tasks": [t.model_dump() for t in tree.tasks],
+                    "delta_summary": decision.delta_summary,
+                    "replanned": True,
+                },
+                sender="agent",
+            )
+            working_memory.add_message(agent_msg)
+            return TurnResult(
+                mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
+                response_text=response_text,
+                task_tree=tree,
+                agent_message=agent_msg,
+            )
+
+        # AUTO_REPLAN: rebuild the task tree from the new plan and re-execute.
+        if decision.new_plan is not None:
+            new_tree = self.task_decomposer._plan_result_to_task_tree(decision.new_plan)
+            if len(new_tree.tasks) == 1:
+                return await self._handle_single_step(
+                    new_tree,
+                    working_memory,
+                    project_id,
+                    intent=intent,
+                    user_message=user_message,
+                )
+            return await self._handle_workflow(
+                new_tree,
+                working_memory,
+                project_id,
+                intent=intent,
+                user_message=user_message,
+            )
+
+        return None
 
     async def resume_hitl(
         self,

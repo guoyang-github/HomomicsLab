@@ -9,6 +9,17 @@ from .models import Plan
 class PlanPresenter:
     """Build human-readable plan previews for the frontend."""
 
+    _DERIVATION_SUMMARY = {
+        "domain-strategy": "来自领域策略模板",
+        "standalone-skill": "来自独立技能匹配",
+        "cross-domain-composition": "来自跨领域组合",
+        "open-agent": "来自开放智能体规划",
+        "llm-fallback": "来自 LLM 兜底生成",
+        "hardcoded": "来自系统内置快捷路径",
+        "information-gathering": "来自信息收集建议",
+        "generic": "来自通用兜底规划",
+    }
+
     _SUMMARY_TEMPLATES = {
         "zh": {
             "fallback": "LLM 生成的分析计划，包含 {phase_count} 个步骤，需要您确认。",
@@ -28,13 +39,21 @@ class PlanPresenter:
 
         for phase in plan.plan_result.phases:
             skill_id = None
+            required_inputs: List[str] = []
             if phase.selected_skill is not None:
                 skill_id = phase.selected_skill.id
+                required_inputs = list(phase.selected_skill.input_schema.required or [])
             else:
                 # Fall back to the corresponding task's skills if available.
                 task = task_lookup.get(phase.phase_type)
                 if task is not None and task.skills_required:
                     skill_id = task.skills_required[0]
+
+            missing_required_inputs = [
+                name
+                for name in required_inputs
+                if phase.parameters.get(name) is None
+            ]
 
             phases.append(
                 {
@@ -50,6 +69,18 @@ class PlanPresenter:
                     "estimated_duration_seconds": phase.estimated_duration_seconds,
                     "estimated_input_tokens": phase.estimated_input_tokens,
                     "estimated_output_tokens": phase.estimated_output_tokens,
+                    "derivation": phase.derivation,
+                    "derivation_summary": PlanPresenter._DERIVATION_SUMMARY.get(
+                        phase.derivation or "", "未记录来源"
+                    ),
+                    "risk_level": phase.risk_level,
+                    "anti_hallucination_meta": {
+                        "skill_id": skill_id,
+                        "derivation": phase.derivation,
+                        "risk_level": phase.risk_level,
+                        "parameter_sources": phase.parameter_sources,
+                        "missing_required_inputs": missing_required_inputs,
+                    },
                 }
             )
 
@@ -105,6 +136,11 @@ class PlanPresenter:
             "version": plan.version,
             "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
             "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
+            "derivation": plan.plan_result.derivation,
+            "risk_level": plan.plan_result.risk_level,
+            "approval_required": plan.plan_result.approval_required,
+            "replanned": plan.plan_result.reproducibility_context.get("replanned", False),
+            "replanning_delta": plan.plan_result.reproducibility_context.get("replanning_delta", {}),
         }
 
     @staticmethod

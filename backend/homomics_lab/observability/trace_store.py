@@ -72,7 +72,17 @@ class TraceStore:
         project_id: Optional[str] = None,
         root_name: str = "job",
     ) -> ExecutionTrace:
-        """Create a new trace and return it."""
+        """Create a new trace and return it.
+
+        If a trace with ``trace_id`` already exists (e.g. the chat endpoint
+        already started one and a downstream executor tries to start another),
+        return the existing trace instead of raising a uniqueness error.
+        """
+        async with self._session_factory() as session:
+            existing = await session.get(TraceRecord, trace_id)
+            if existing is not None:
+                return self._record_to_trace(existing)
+
         trace = ExecutionTrace(
             trace_id=trace_id,
             session_id=session_id,

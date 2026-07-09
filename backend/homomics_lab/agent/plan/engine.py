@@ -26,6 +26,7 @@ from homomics_lab.agent.plan.models import (
     PlanResult,
     StrategyTrace,
 )
+from homomics_lab.agent.plan.parameter_enricher import ParameterEnricher
 from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.plan.template import AnalysisTemplate
@@ -65,6 +66,7 @@ class PlanEngine:
         tracker: Optional[Any] = None,
         capability_index: Optional[CapabilityIndex] = None,
         strategy_library: Optional[StrategyLibrary] = None,
+        parameter_enricher: Optional[ParameterEnricher] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
@@ -80,7 +82,13 @@ class PlanEngine:
             literature_retriever=literature_retriever,
             capability_index=capability_index,
         )
-        self.plan_validator = PlanValidator(skill_registry=skill_registry)
+        self.parameter_enricher = parameter_enricher or ParameterEnricher(
+            capability_index=capability_index
+        )
+        self.plan_validator = PlanValidator(
+            skill_registry=skill_registry,
+            parameter_enricher=self.parameter_enricher,
+        )
         self.quality_evaluator = PlanQualityEvaluator(
             plan_validator=self.plan_validator,
             cbkb=cbkb,
@@ -148,6 +156,9 @@ class PlanEngine:
                     f"so I can build an accurate plan:\n{probe_list}"
                 ),
                 reproducibility_context={"probes": [self._probe_to_dict(p) for p in probes]},
+                derivation="information-gathering",
+                risk_level="low",
+                approval_required=False,
             )
 
         # 2. Select strategy based on intent (or explicit override).
@@ -259,8 +270,13 @@ class PlanEngine:
                 phase.selected_skill = self._select_skill_for_phase(
                     phase, data_state, retrieval_context
                 )
+            # Fill parameter defaults, recommendations and provenance from the
+            # skill's input schema before CBKB-learned defaults are applied.
+            self.parameter_enricher.enrich_phase(phase)
             estimate_phase(phase, self.tracker)
             injected = self._apply_learned_defaults(phase)
+            for injected_param in injected:
+                phase.parameter_sources[injected_param["param_name"]] = "learned"
             learned_defaults.extend(injected)
 
         gaps = self._detect_gaps(phases)
@@ -283,6 +299,9 @@ class PlanEngine:
             gaps=gaps,
             reproducibility_context=reproducibility_context,
             phase_transitions=strategy.phase_transitions,
+            derivation="domain-strategy",
+            risk_level="low",
+            approval_required=False,
         )
 
     @staticmethod

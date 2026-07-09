@@ -66,6 +66,24 @@ class SkillRegistry:
     def list_by_category(self, category: str) -> List[SkillDefinition]:
         return [s for s in self._skills.values() if s.category == category]
 
+    def list_by_categories(self, categories: List[str]) -> List[SkillDefinition]:
+        """Return skills whose primary category or category tags match."""
+        cat_set = {c.lower() for c in categories}
+        return [
+            s
+            for s in self._skills.values()
+            if s.category.lower() in cat_set
+            or any(c.lower() in cat_set for c in s.categories)
+        ]
+
+    def list_standalone(self) -> List[SkillDefinition]:
+        """Return skills that are not tied to any specific domain.
+
+        Standalone skills can be used by the standalone planner without a
+        domain strategy.
+        """
+        return [s for s in self._skills.values() if s.is_standalone]
+
     def search(self, query: str) -> List[SkillDefinition]:
         """Search skills by keyword (legacy) or semantic similarity.
 

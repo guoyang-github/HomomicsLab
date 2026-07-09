@@ -19,7 +19,7 @@ from homomics_lab.prompts import initialize_prompt_registry
 from homomics_lab.context.graph.factory import get_graph_backend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.vector_store.factory import get_vector_store
-from homomics_lab.embeddings.factory import get_embedding_provider
+from homomics_lab.embeddings.factory import get_embedding_provider, warmup_embedding_provider
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import create_semantic_memory
 from homomics_lab.context.session_store import create_session_store_from_settings
@@ -142,8 +142,6 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # Load global prompt templates before agents/domains render system prompts.
     initialize_prompt_registry()
 
-    create_default_agents()
-
     # Analysis templates: seed built-in scenario presets on first boot.
     analysis_template_store = AnalysisTemplateStore(data_dir=settings.data_dir)
     imported_count = analysis_template_store.import_builtin_templates()
@@ -244,6 +242,11 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 namespace="user",
                 enable=True,
             )
+            # User drop-in skills live in the project's canonical skills_dir and are
+            # treated as locally administered, so we trust them by default.
+            skill = skill_store.trust_skill(
+                skill.id, namespace="user", trusted=True
+            )
             skill_executor.register_skill(skill)
             print(f"Registered user skill: {skill.id}")
         except Exception as exc:
@@ -288,6 +291,13 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     if mcp_client is not None:
         register_mcp_skills(skill_executor, tool_registry)
 
+    # Register default agents now that the skill runtime and tool registry are ready.
+    # This ensures analysts/supervisors can actually invoke skills at runtime.
+    create_default_agents(
+        skill_executor=skill_executor,
+        tool_registry=tool_registry,
+    )
+
     # SkillDAG — self-evolving skill relationship graph
     skill_dag = SkillDAG(
         registry=skill_executor.registry,
@@ -319,6 +329,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # KnowledgeIndex do not duplicate or double-close resources.
     try:
         shared_embedding_provider = get_embedding_provider(settings)
+        warmup_embedding_provider(shared_embedding_provider)
     except Exception:
         shared_embedding_provider = None
     try:

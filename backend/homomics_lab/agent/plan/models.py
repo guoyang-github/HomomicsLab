@@ -226,6 +226,13 @@ class Phase:
     success_criteria: List[SuccessCriterion] = field(default_factory=list)
     snapshot_policy: str = "auto"  # "auto" | "always" | "never"
 
+    # Provenance / anti-hallucination metadata.
+    derivation: Optional[str] = None  # e.g. "domain-strategy", "standalone-skill", "llm-fallback"
+    risk_level: str = "low"  # "low" | "medium" | "high"
+
+    # Cross-domain composition metadata.
+    merged_from_domains: List[str] = field(default_factory=list)
+
     # Execution estimates (best-effort; populated by the plan engine).
     estimated_cost_usd: Optional[float] = None
     estimated_duration_seconds: Optional[float] = None
@@ -276,6 +283,11 @@ class PlanResult:
     risks: List[Dict[str, Any]] = field(default_factory=list)
     strategy_trace: Optional[StrategyTrace] = None
 
+    # Anti-hallucination / governance fields.
+    derivation: Optional[str] = None  # highest-level provenance label
+    risk_level: str = "low"  # aggregated from phases; "low" | "medium" | "high"
+    approval_required: bool = False  # when True, execution must be explicitly approved
+
     @property
     def skill_sequence(self) -> List[str]:
         """Extract the sequence of selected skill IDs."""
@@ -312,6 +324,9 @@ class PlanResult:
             "risks": self.risks,
             "total_estimated_cost_usd": self.total_estimated_cost_usd,
             "total_estimated_duration_seconds": self.total_estimated_duration_seconds,
+            "derivation": self.derivation,
+            "risk_level": self.risk_level,
+            "approval_required": self.approval_required,
         }
         if self.strategy_trace is not None:
             result["strategy_trace"] = self.strategy_trace.to_dict()
@@ -333,4 +348,7 @@ class PlanResult:
             phase_transitions=data.get("phase_transitions", []),
             risks=data.get("risks", []),
             strategy_trace=StrategyTrace.from_dict(trace_data) if trace_data else None,
+            derivation=data.get("derivation"),
+            risk_level=data.get("risk_level", "low"),
+            approval_required=data.get("approval_required", False),
         )

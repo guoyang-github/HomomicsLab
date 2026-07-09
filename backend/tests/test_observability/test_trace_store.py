@@ -42,6 +42,16 @@ async def test_start_and_get_trace(store):
 
 
 @pytest.mark.asyncio
+async def test_start_trace_is_idempotent(store):
+    """Starting a trace twice with the same id returns the existing trace."""
+    first = await store.start_trace(trace_id="job_123", root_name="first")
+    second = await store.start_trace(trace_id="job_123", root_name="second")
+
+    assert first.trace_id == second.trace_id == "job_123"
+    assert second.nodes[0].name == "first"
+
+
+@pytest.mark.asyncio
 async def test_add_and_update_node(store):
     await store.start_trace(trace_id="job_123", root_name="test_job")
 

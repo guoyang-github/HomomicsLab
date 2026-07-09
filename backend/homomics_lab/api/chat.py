@@ -144,6 +144,7 @@ async def send_message(
         capability_index=getattr(http_request.app.state, "capability_index", None),
         analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
+        skill_executor=skill_executor,
     )
     result = await runner.run_turn(
         session_id=request.session_id,

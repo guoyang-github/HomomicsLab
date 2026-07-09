@@ -14,12 +14,14 @@ interface ExecutionState {
   logs: LogEntry[]
   status: 'idle' | 'running' | 'completed' | 'failed' | 'aborted'
   percent: number
+  result: Record<string, any> | null
 
   setJobId: (id: string | null) => void
   setConnected: (connected: boolean) => void
   setStatus: (status: ExecutionState['status'], percent?: number) => void
   addLog: (entry: Omit<LogEntry, 'id'>) => void
   clearLogs: () => void
+  setResult: (result: Record<string, any> | null) => void
   reset: () => void
 }
 
@@ -31,6 +33,7 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
   logs: [],
   status: 'idle',
   percent: 0,
+  result: null,
 
   setJobId: (jobId) => set({ jobId }),
   setConnected: (isConnected) => set({ isConnected }),
@@ -46,5 +49,6 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       ],
     })),
   clearLogs: () => set({ logs: [] }),
-  reset: () => set({ jobId: null, isConnected: false, logs: [], status: 'idle', percent: 0 }),
+  setResult: (result) => set({ result }),
+  reset: () => set({ jobId: null, isConnected: false, logs: [], status: 'idle', percent: 0, result: null }),
 }))

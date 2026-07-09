@@ -69,6 +69,10 @@ class RuntimeSettings(BaseModel):
         default=None,
         description="Watch sibling skill repos and domain files at startup.",
     )
+    auto_install_dependencies: Optional[bool] = Field(
+        default=None,
+        description="Automatically install skill requirements into isolated venvs.",
+    )
 
     @field_validator("skill_sandbox_backend")
     @classmethod

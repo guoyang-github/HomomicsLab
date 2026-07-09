@@ -43,8 +43,13 @@ class PlanValidationReport:
 class PlanValidator:
     """Validate generated plans before execution."""
 
-    def __init__(self, skill_registry: SkillRegistry):
+    def __init__(
+        self,
+        skill_registry: SkillRegistry,
+        parameter_enricher: Optional[Any] = None,
+    ):
         self.skill_registry = skill_registry
+        self.parameter_enricher = parameter_enricher
 
     def validate(
         self,
@@ -132,6 +137,20 @@ class PlanValidator:
                 report.add_warning(
                     f"Schema gap between '{gap.from_phase}' and '{gap.to_phase}': {gap.gap_type}",
                     phase=gap.to_phase,
+                )
+
+        # 5. Parameter-level schema validation (range, enum, pattern, ...).
+        if self.parameter_enricher is not None:
+            try:
+                parameter_report = self.parameter_enricher.validate_plan_parameters(
+                    plan, data_state=data_state
+                )
+                report = self.parameter_enricher.merge_validation_reports(
+                    report, parameter_report
+                )
+            except Exception as exc:
+                report.add_warning(
+                    f"Parameter validation failed: {exc}",
                 )
 
         return report

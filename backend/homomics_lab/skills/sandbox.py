@@ -176,9 +176,9 @@ class LocalSandbox(Sandbox):
             "container_image": None,
             "container_digest": None,
             "resource_limits": {
-                "memory_mb": 2048,
-                "cpu_time_seconds": 120,
-                "file_size_mb": 100,
+                "memory_mb": 8192,
+                "cpu_time_seconds": 3600,
+                "file_size_mb": 1024,
             },
         }
 
@@ -272,15 +272,15 @@ class LocalSandbox(Sandbox):
             if _resource_module is None:
                 return
             try:
-                # 2048 MB memory limit
+                # 8192 MB memory limit for real single-cell datasets.
                 _resource_module.setrlimit(
-                    _resource_module.RLIMIT_AS, (2048 * 1024 * 1024, 2048 * 1024 * 1024)
+                    _resource_module.RLIMIT_AS, (8192 * 1024 * 1024, 8192 * 1024 * 1024)
                 )
-                # 120 seconds CPU time limit
-                _resource_module.setrlimit(_resource_module.RLIMIT_CPU, (120, 120))
-                # 100 MB file size limit
+                # 3600 seconds CPU time limit for analysis skills.
+                _resource_module.setrlimit(_resource_module.RLIMIT_CPU, (3600, 3600))
+                # 1 GB file size limit for output artifacts.
                 _resource_module.setrlimit(
-                    _resource_module.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024)
+                    _resource_module.RLIMIT_FSIZE, (1024 * 1024 * 1024, 1024 * 1024 * 1024)
                 )
             except (OSError, ValueError):
                 pass
@@ -431,12 +431,13 @@ class LocalSandbox(Sandbox):
     _RESOURCE_LIMITS_SNIPPET = """\
 try:
     import resource
-    # 2048 MB memory limit (statsmodels/patsy imports need >512 MB)
-    resource.setrlimit(resource.RLIMIT_AS, (2048 * 1024 * 1024, 2048 * 1024 * 1024))
-    # 120 seconds CPU time limit
-    resource.setrlimit(resource.RLIMIT_CPU, (120, 120))
-    # 100 MB file size limit
-    resource.setrlimit(resource.RLIMIT_FSIZE, (100 * 1024 * 1024, 100 * 1024 * 1024))
+    # 8192 MB memory limit — single-cell H5AD files decompress to multiple
+    # gigabytes in memory; 2 GB is too restrictive for real datasets.
+    resource.setrlimit(resource.RLIMIT_AS, (8192 * 1024 * 1024, 8192 * 1024 * 1024))
+    # 3600 seconds CPU time limit — analysis skills often run for minutes.
+    resource.setrlimit(resource.RLIMIT_CPU, (3600, 3600))
+    # 1 GB file size limit for output artifacts.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024 * 1024, 1024 * 1024 * 1024))
 except Exception:
     pass
 """

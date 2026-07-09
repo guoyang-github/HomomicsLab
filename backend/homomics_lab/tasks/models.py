@@ -40,6 +40,10 @@ class TaskNode(BaseModel):
     completed_at: Optional[datetime] = None
     attempt_count: int = 0
 
+    # Provenance / anti-hallucination metadata.
+    derivation: Optional[str] = None  # "domain-strategy" | "standalone-skill" | "llm-fallback" | "hardcoded"
+    risk_level: str = "low"  # "low" | "medium" | "high"
+
     # Incremental execution / caching metadata
     input_hash: Optional[str] = None
     output_hash: Optional[str] = None

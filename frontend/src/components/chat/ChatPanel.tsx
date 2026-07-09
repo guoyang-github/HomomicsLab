@@ -7,6 +7,7 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { SessionList } from './SessionList'
 import { CommandPalette } from '@/components/ui/CommandPalette'
+import { ExecutionSSEConnector } from '@/components/workspace/ExecutionSSEConnector'
 
 export function ChatPanel() {
   const { t } = useTranslation()
@@ -45,6 +46,7 @@ export function ChatPanel() {
           )}
         </div>
 
+        <ExecutionSSEConnector />
         <MessageList />
         <ChatInput onOpenCommandPalette={() => setCommandOpen(true)} />
 

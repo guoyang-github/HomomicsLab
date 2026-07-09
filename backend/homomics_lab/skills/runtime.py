@@ -30,6 +30,7 @@ from homomics_lab.llm_client import LLMClient
 from homomics_lab.stability.schema_validator import SchemaValidator
 from homomics_lab.tools.approval import ToolApprovalRequired
 from homomics_lab.tools.registry import ToolRegistry, get_default_tool_registry
+from homomics_lab.workspace.context import current_workspace
 
 
 class UntrustedSkillError(ValueError):
@@ -78,12 +79,21 @@ class SkillRuntimeExecutor:
             else None
         )
 
+    def set_progress_callback(
+        self, progress_callback: Optional[Callable[[Any], None]]
+    ) -> None:
+        """Update the progress callback used by this executor and its agent."""
+        self.progress_callback = progress_callback
+        if self._agent_executor is not None:
+            self._agent_executor.progress_callback = progress_callback
+
     def _get_agent_executor(self) -> AgentSkillExecutor:
         """Lazy initialization of the declarative skill agent executor."""
         if self._agent_executor is None:
             self._agent_executor = AgentSkillExecutor(
                 tool_registry=self.tool_registry,
                 llm_client=self.llm_client,
+                progress_callback=self.progress_callback,
             )
         return self._agent_executor
 
@@ -352,6 +362,7 @@ class SkillRuntimeExecutor:
                 break
 
         start_time = time.time()
+        workspace = self._bind_workspace()
         fingerprint = skill.metadata.get("sha256") or skill.metadata.get("version") or ""
         if self._is_cacheable(skill) and self.cache is not None:
             cached = self.cache.get(skill_id, validated, fingerprint=fingerprint)
@@ -390,6 +401,8 @@ class SkillRuntimeExecutor:
                 task_id=f"{skill_id}_{uuid.uuid4().hex[:8]}",
                 data=result,
             )
+            if workspace is not None:
+                self._register_result_artifacts(workspace, skill_id, result)
             if self._is_cacheable(skill) and self.cache is not None:
                 self.cache.put(skill_id, validated, stored, fingerprint=fingerprint)
             return self._unwrap_reference(stored, skill_id=skill_id)
@@ -426,6 +439,53 @@ class SkillRuntimeExecutor:
                     error_message=error_msg,
                 )
             record_skill_execution(skill_id, self._executor_type, success)
+
+    def set_workspace(self, workspace) -> None:
+        """Explicitly route skill I/O into a project workspace.
+
+        Used by background workers where context-variable propagation may not
+        be reliable across job serialization boundaries.
+        """
+        ws_dir = workspace.workspace_dir
+        if self.working_dir != ws_dir:
+            self.working_dir = ws_dir
+            self.data_store = DataStore(
+                ws_dir,
+                inline_size_limit=settings.result_inline_size_limit_bytes,
+            )
+            self._scheduler = None
+
+    def _bind_workspace(self):
+        """Route skill I/O into the active project workspace if one is set."""
+        workspace = current_workspace.get()
+        if workspace is None:
+            return None
+        self.set_workspace(workspace)
+        return workspace
+
+    @staticmethod
+    def _register_result_artifacts(
+        workspace, skill_id: str, result: Dict[str, Any]
+    ) -> None:
+        """Track output files produced by a skill in the workspace registry."""
+        for value in result.values():
+            if not isinstance(value, (str, Path)):
+                continue
+            path = Path(value)
+            if not path.is_file():
+                continue
+            try:
+                rel = path.relative_to(workspace.workspace_dir)
+                artifact_type = "output" if "output" in str(rel) else "intermediate"
+                workspace.register_artifact(
+                    task_id=skill_id,
+                    artifact_type=artifact_type,
+                    filename=rel.name,
+                    metadata={"relative_path": str(rel)},
+                )
+            except ValueError:
+                # Path lives outside the workspace; ignore.
+                pass
 
     async def _dispatch_execute(
         self,
@@ -766,8 +826,14 @@ class SkillRuntimeExecutor:
             # For Python entrypoints that expose a ``main(skill_inputs)`` function,
             # call it with the injected inputs dict and publish ``result``.
             if exec_type != "r":
+                # Ensure sibling helper modules (e.g. core_analysis.py) are on
+                # sys.path when the script is executed in a different working dir.
+                path_prefix = (
+                    "import sys\n"
+                    f"sys.path.insert(0, {repr(str(scripts_dir))})\n\n"
+                )
                 code = (
-                    f"{code}\n\n"
+                    f"{path_prefix}{code}\n\n"
                     "# Skill entrypoint wrapper\n"
                     "if 'main' in dir() and callable(main):\n"
                     "    result = main(__inputs__)\n"

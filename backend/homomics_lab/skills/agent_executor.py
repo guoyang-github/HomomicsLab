@@ -12,9 +12,10 @@ retrieval or manual execution.
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.config import settings
+from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.tools.approval import ToolApprovalRequired, get_default_approval_store
@@ -46,11 +47,13 @@ class AgentSkillExecutor:
         llm_client: Optional[LLMClient] = None,
         max_iterations: int = 10,
         max_tool_retries: int = 2,
+        progress_callback: Optional[Callable[[ExecutionState], None]] = None,
     ):
         self.tool_registry = tool_registry
         self.llm_client = llm_client
         self.max_iterations = max(max_iterations, 1)
         self.max_tool_retries = max(max_tool_retries, 0)
+        self.progress_callback = progress_callback
 
     async def execute(
         self,
@@ -106,6 +109,13 @@ class AgentSkillExecutor:
 
         tool_outputs: List[Dict[str, Any]] = []
         consecutive_tool_errors = 0
+
+        self._publish_progress(
+            status="RUNNING",
+            phase=f"Executing skill {skill.id}",
+            progress_pct=5.0,
+            active_task_id=skill.id,
+        )
 
         for iteration in range(self.max_iterations):
             try:
@@ -195,10 +205,25 @@ class AgentSkillExecutor:
                     risk_level=tool_def.risk_level,
                 )
 
+            progress_pct = min(95.0, 10.0 + (iteration + 1) * (85.0 / max(self.max_iterations, 1)))
+            self._publish_progress(
+                status="RUNNING",
+                phase=f"Calling tool {tool_name}",
+                progress_pct=progress_pct,
+                active_task_id=skill.id,
+            )
+
             tool_output = await self._invoke_tool_with_logging(
                 canonical_tool_name, tool_name, arguments
             )
             tool_outputs.append(tool_output)
+
+            self._publish_progress(
+                status="RUNNING",
+                phase=f"Tool {tool_name} returned",
+                progress_pct=progress_pct,
+                active_task_id=skill.id,
+            )
 
             if tool_output.get("success") is False:
                 consecutive_tool_errors += 1
@@ -234,6 +259,30 @@ class AgentSkillExecutor:
             "error": "Agent skill exceeded maximum iterations without producing a final result.",
             "tool_outputs": tool_outputs,
         }
+
+    def _publish_progress(
+        self,
+        status: str,
+        phase: str,
+        progress_pct: float,
+        active_task_id: Optional[str] = None,
+    ) -> None:
+        """Emit a best-effort progress update when a callback is configured."""
+        if self.progress_callback is None:
+            return
+        try:
+            self.progress_callback(
+                ExecutionState(
+                    job_id="",
+                    status=status,
+                    current_phase=phase,
+                    progress_pct=progress_pct,
+                    scheduler_type="agent",
+                    active_task_id=active_task_id,
+                )
+            )
+        except Exception:
+            pass
 
     def _available_tools(self, skill: SkillDefinition) -> Dict[str, Any]:
         """Return the tool schemas available to this skill.

@@ -96,7 +96,10 @@ async def lifespan(app: FastAPI):
 
     # Start background job worker only when worker_mode is enabled.
     # Queued jobs persisted before a restart are recovered into the queue.
-    app.state.job_service = JobService()
+    app.state.job_service = JobService(
+        skill_executor=app.state.skill_executor,
+        memory_manager=app.state.memory_manager,
+    )
     app.state.execution_pubsub = app.state.job_service.pubsub
     await app.state.job_service.start_worker()
 

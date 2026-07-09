@@ -609,6 +609,28 @@ wheels = [
 ]
 
 [[package]]
+name = "celltypist"
+version = "1.7.1"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
+dependencies = [
+    { name = "click" },
+    { name = "leidenalg" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.11'" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "requests" },
+    { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.12'" },
+    { name = "scanpy", version = "1.12.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.12'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.11'" },
+    { name = "scikit-learn", version = "1.9.0", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d9/4d/947ca18ecfd80fb2d7ce18d6f6bb2c23f5a45e09a6e7579a7fa69c782315/celltypist-1.7.1.tar.gz", hash = "sha256:6ffaebc0f296d24785ffce25951ad70a00553bd8d06aff2f55f98251b739ce00", size = 6676736, upload-time = "2025-06-25T21:14:58.406Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/92/6c/12f14d20ccd49bfe8709cebd1b77a244f019e44a8702d3962021b618812e/celltypist-1.7.1-py3-none-any.whl", hash = "sha256:3953f96a4476ed1dd2807446d97d3945e8905bbdac6bfef0d20b84a9a00d1101", size = 7331762, upload-time = "2025-06-25T21:14:56.669Z" },
+]
+
+[[package]]
 name = "certifi"
 version = "2026.5.20"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
@@ -1204,6 +1226,15 @@ wheels = [
 ]
 
 [[package]]
+name = "et-xmlfile"
+version = "2.0.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d3/38/af70d7ab1ae9d4da450eeec1fa3918940a5fafb9055e934af8d6eb0c2313/et_xmlfile-2.0.0.tar.gz", hash = "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54", size = 17234, upload-time = "2024-10-25T17:25:40.039Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa", size = 18059, upload-time = "2024-10-25T17:25:39.051Z" },
+]
+
+[[package]]
 name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
@@ -1710,6 +1741,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "bleach" },
     { name = "boto3" },
+    { name = "celltypist" },
     { name = "cryptography" },
     { name = "ddgs" },
     { name = "fastapi" },
@@ -1739,6 +1771,8 @@ dependencies = [
     { name = "scanpy", version = "1.12.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.12'" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.11'" },
     { name = "scikit-learn", version = "1.9.0", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }, marker = "python_full_version >= '3.11'" },
     { name = "sentence-transformers" },
     { name = "sqlalchemy" },
     { name = "sqlite-vec" },
@@ -1793,6 +1827,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "bleach", specifier = ">=6.4.0" },
     { name = "boto3", specifier = ">=1.34.0" },
+    { name = "celltypist", specifier = ">=1.7.1" },
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "ddgs", specifier = ">=9.14.4" },
     { name = "fakeredis", marker = "extra == 'test'", specifier = ">=2.36.1" },
@@ -1831,6 +1866,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scanpy", specifier = ">=1.9.0" },
     { name = "scikit-learn", specifier = ">=1.0.0" },
+    { name = "scipy", specifier = ">=1.15.3" },
     { name = "sentence-transformers", specifier = ">=2.2.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "sqlite-vec", specifier = ">=0.1.0" },
@@ -3346,6 +3382,18 @@ dependencies = [
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/49/f5/7c7cb955305cb41f7f3c5fd7e0e38bf6bbf2658468863d4b7b868a5cb8df/openai-2.44.0.tar.gz", hash = "sha256:68a5a5ffad82b8ff7d451c437529fb64f7c3b8123aaf0c021966a882d9e3947d", size = 988753, upload-time = "2026-06-24T20:56:02.293Z" }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/ae/f4/561ed79fd94876160018a5e75254cfcb9b0e62d4dded9dcb20072e86d623/openai-2.44.0-py3-none-any.whl", hash = "sha256:0a2a3ab2e29aeda368700f662ff9ba0f9df17ba4c54577a64e08b8115a3cc0ad", size = 1366216, upload-time = "2026-06-24T20:55:58.882Z" },
+]
+
+[[package]]
+name = "openpyxl"
+version = "3.1.5"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple/" }
+dependencies = [
+    { name = "et-xmlfile" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
 ]
 
 [[package]]
