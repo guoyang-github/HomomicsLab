@@ -1,0 +1,27 @@
+Cells x Genes: 2000 x 29057
+Model: Immune_All_Low.pkl
+Gene overlap (model features vs data genes): 6023
+Mode: best match
+p_thres: 0.5
+Majority voting: True
+Preprocessing: raw counts taken from layer "counts", then normalize_total(target_sum=1e4) + log1p
+Unassigned rate: 0.000
+ARI vs all_celltype: 0.349
+NMI vs all_celltype: 0.550
+Per-label agreement:
+                     top_celltypist_label  agreement  n_cells
+all_celltype                                                 
+Acinar          Tem/Trm cytotoxic T cells      1.000        1
+B                           Naive B cells      0.565      207
+CAF                           Fibroblasts      1.000        3
+CD4T             Tcm/Naive helper T cells      0.505      438
+CD8T          Tem/Temra cytotoxic T cells      0.450      786
+Ductal                   Epithelial cells      1.000       32
+Endocrine        Tcm/Naive helper T cells      1.000        1
+Endothelial             Endothelial cells      0.846       26
+Myeloid               Classical monocytes      0.453       64
+NK                         CD16+ NK cells      0.671      417
+Plasma                     Memory B cells      1.000        1
+Platelet      Tem/Temra cytotoxic T cells      1.000        9
+Schwann                        MAIT cells      1.000        1
+Stellate                      Fibroblasts      1.000       14

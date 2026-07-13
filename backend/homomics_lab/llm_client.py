@@ -37,7 +37,7 @@ class LLMClient:
         model: Optional[str] = None,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        timeout: float = 60.0,
+        timeout: float = 240.0,
         router: Optional[LLMRouter] = None,
         cache: Optional[BaseLLMResponseCache] = None,
     ):
@@ -121,7 +121,15 @@ class LLMClient:
                 "openai package is required for LLM calls. Install it with: pip install openai"
             ) from e
 
-        kwargs: Dict[str, Any] = {"api_key": api_key, "timeout": self.timeout}
+        kwargs: Dict[str, Any] = {
+            "api_key": api_key,
+            "timeout": self.timeout,
+            # Disable the OpenAI client's internal retry loop. The agent layer
+            # already implements its own retry/backoff policy with explicit
+            # timeouts, and internal retries can hang a job for many minutes
+            # when the provider is slow or rate-limiting.
+            "max_retries": 0,
+        }
         base_url = self._legacy_base_url or provider.resolved_base_url
         if base_url:
             kwargs["base_url"] = base_url
@@ -143,6 +151,8 @@ class LLMClient:
         model: Optional[str] = None,
         prefer_cheap: bool = False,
         intent_type: Optional[str] = None,
+        task_type: Optional[str] = None,
+        required_capabilities: Optional[List[str]] = None,
         return_usage: bool = False,
         session_id: Optional[str] = None,
         project_id: Optional[str] = None,
@@ -158,6 +168,8 @@ class LLMClient:
             model: Explicit model override.
             prefer_cheap: If True, pick the cheapest configured model.
             intent_type: Optional intent classification for complexity-based routing.
+            task_type: Optional task classification for catalog-based routing.
+            required_capabilities: Optional capability tags that the model must have.
             return_usage: If True, return a tuple (content, usage_metadata).
             session_id: Optional session identifier for cost attribution.
             project_id: Optional project identifier for cost attribution.
@@ -171,6 +183,8 @@ class LLMClient:
             model=model,
             prefer_cheap=prefer_cheap,
             intent_type=intent_type,
+            task_type=task_type,
+            required_capabilities=required_capabilities,
             session_id=session_id,
             project_id=project_id,
             request_id=request_id,
@@ -179,6 +193,21 @@ class LLMClient:
         if return_usage:
             return content, usage
         return content
+
+    async def chat_completion_for_task(
+        self,
+        messages: List[Dict[str, Any]],
+        task_type: str,
+        required_capabilities: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> str:
+        """Convenience wrapper that routes via the model catalog for ``task_type``."""
+        return await self.chat_completion(
+            messages=messages,
+            task_type=task_type,
+            required_capabilities=required_capabilities,
+            **kwargs,
+        )
 
     async def chat_completion_message(
         self,
@@ -189,6 +218,8 @@ class LLMClient:
         model: Optional[str] = None,
         prefer_cheap: bool = False,
         intent_type: Optional[str] = None,
+        task_type: Optional[str] = None,
+        required_capabilities: Optional[List[str]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         session_id: Optional[str] = None,
         project_id: Optional[str] = None,
@@ -204,6 +235,8 @@ class LLMClient:
             requested_model=requested_model,
             prefer_cheap=prefer_cheap,
             intent_type=intent_type,
+            task_type=task_type,
+            required_capabilities=required_capabilities,
             messages=messages,
         )
 
@@ -277,6 +310,8 @@ class LLMClient:
                     model=requested_model,
                     prefer_cheap=prefer_cheap,
                     skip=tried_models,
+                    task_type=task_type,
+                    required_capabilities=required_capabilities,
                 )
                 tried_models.add(route.model)
             except RuntimeError:
@@ -446,11 +481,20 @@ class LLMClient:
         requested_model: str,
         prefer_cheap: bool,
         intent_type: Optional[str],
+        task_type: Optional[str],
+        required_capabilities: Optional[List[str]],
         messages: List[Dict[str, str]],
     ) -> Any:
-        """Choose an initial route, optionally using complexity routing."""
+        """Choose an initial route, optionally using complexity or catalog routing."""
         from homomics_lab.config import settings
 
+        if task_type:
+            return self._router.select(
+                model=requested_model,
+                prefer_cheap=prefer_cheap,
+                task_type=task_type,
+                required_capabilities=required_capabilities,
+            )
         if intent_type and getattr(settings, "llm_complexity_routing_enabled", False):
             input_tokens = sum(len(m.get("content", "")) for m in messages) // 4
             return self._router.select_by_complexity(
@@ -661,5 +705,8 @@ class FakeLLMClient(LLMClient):
         model: Optional[str] = None,
         prefer_cheap: bool = False,
         intent_type: Optional[str] = None,
+        task_type: Optional[str] = None,
+        required_capabilities: Optional[List[str]] = None,
+        **kwargs: Any,
     ) -> str:
         return self._response

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
+from homomics_lab.config import settings
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.skills.models import SkillDefinition
@@ -136,7 +137,11 @@ class SkillRetriever:
     ):
         self.registry = skill_registry
         self.skill_dag = skill_dag
-        self.cbkb = cbkb or CBKB(base_dir=Path("."))
+        # Anchor CBKB to the configured data dir (absolute). ``Path(".")`` breaks
+        # as soon as the worker chdir's into a project workspace: the lazy
+        # SkillRetriever/PlanEngine build then tried to create cbkb.db inside the
+        # workspace and failed with "unable to open database file".
+        self.cbkb = cbkb or CBKB(base_dir=Path(settings.data_dir))
         self.tool_registry = tool_registry
         self.data_sources = data_sources or []
         self.literature_retriever = literature_retriever

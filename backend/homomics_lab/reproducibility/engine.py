@@ -1,10 +1,14 @@
 """ReproducibilityEngine — builds and manages ReproducibilityBundles."""
 
+import json
 import platform
 import subprocess
 import sys
+import zipfile
+from pathlib import Path
 from typing import Any, Dict, Optional
 
+from homomics_lab.provenance.env_snapshot import store_env_snapshot
 from homomics_lab.reproducibility.bundle import (
     CodeSnippet,
     EnvironmentLock,
@@ -136,6 +140,38 @@ class ReproducibilityEngine:
 
         bundle = self._bundle
 
+        # Capture environment snapshot hash and store the env file.
+        metadata_dir = self.workspace.get_path(".metadata")
+        bundle.env_snapshot_hash = store_env_snapshot(metadata_dir)
+
+        # Capture latest git snapshot reference.
+        try:
+            git_snapshots = self.workspace.list_git_snapshots()
+            if git_snapshots:
+                bundle.git_snapshot = git_snapshots[0]
+        except Exception:
+            pass
+
+        # Include provenance and runs JSONL files when present.
+        metadata_dir = self.workspace.get_path(".metadata")
+        for name in ("provenance.jsonl", "runs.jsonl"):
+            file_path = metadata_dir / name
+            if file_path.exists():
+                try:
+                    bundle.provenance_files[name] = file_path.read_text(encoding="utf-8")
+                except Exception:
+                    pass
+
+        # Include version.lock if present.
+        version_lock_path = metadata_dir / "version.lock"
+        if version_lock_path.exists():
+            try:
+                bundle.version_lock = json.loads(
+                    version_lock_path.read_text(encoding="utf-8")
+                )
+            except Exception:
+                pass
+
         # Save to workspace. When a job_id is provided, use a job-scoped filename
         # so multiple jobs in the same project do not overwrite each other.
         if job_id:
@@ -150,6 +186,59 @@ class ReproducibilityEngine:
             self._index_into_cbkb(bundle, cbkb)
 
         return bundle
+
+    def export_zip(
+        self,
+        output_path: Path,
+        cbkb=None,
+        job_id: Optional[str] = None,
+    ) -> Path:
+        """Export the finalized bundle and supporting files as a zip archive.
+
+        Args:
+            output_path: Destination zip file path.
+            cbkb: Optional CBKB instance passed to ``finalize``.
+            job_id: Optional job identifier used to locate the bundle.
+
+        Returns:
+            The path to the created zip archive.
+        """
+        bundle = self.finalize(cbkb=cbkb, job_id=job_id)
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        metadata_dir = self.workspace.get_path(".metadata")
+
+        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Bundle JSON
+            bundle_bytes = bundle.to_json().encode("utf-8")
+            zf.writestr("reproducibility_bundle.json", bundle_bytes)
+
+            # Provenance and runs JSONL
+            for name in ("provenance.jsonl", "runs.jsonl"):
+                file_path = metadata_dir / name
+                if file_path.exists():
+                    zf.write(file_path, arcname=name)
+
+            # Environment snapshot
+            if bundle.env_snapshot_hash:
+                env_file = metadata_dir / "env" / f"{bundle.env_snapshot_hash}.json"
+                if env_file.exists():
+                    zf.write(env_file, arcname=f"env/{bundle.env_snapshot_hash}.json")
+
+            # version.lock
+            version_lock_path = metadata_dir / "version.lock"
+            if version_lock_path.exists():
+                zf.write(version_lock_path, arcname="version.lock")
+
+            # Git snapshot metadata
+            if bundle.git_snapshot:
+                zf.writestr(
+                    "git_snapshot.json",
+                    json.dumps(bundle.git_snapshot, ensure_ascii=False, indent=2).encode("utf-8"),
+                )
+
+        return output_path
 
     def _index_into_cbkb(self, bundle, cbkb) -> None:
         """Extract knowledge from bundle and inject into CBKB."""

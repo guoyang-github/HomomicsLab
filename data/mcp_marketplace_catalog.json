@@ -1,0 +1,13 @@
+[
+  {
+    "id": "homomics-bio",
+    "name": "Homomics Bio",
+    "description": "Built-in bioinformatics MCP tools (PubMed, UniProt, GEO).",
+    "transport": "embedded",
+    "category": "bioinformatics",
+    "enabled": true,
+    "installed": true,
+    "trusted": true,
+    "builtin": true
+  }
+]

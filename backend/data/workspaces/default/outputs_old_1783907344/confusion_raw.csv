@@ -1,0 +1,7 @@
+all_celltype,Alveolar macrophages,CD16+ NK cells,Classical monocytes,DC2,Germinal center B cells,ILC3,MAIT cells,Macrophages,Mast cells,Memory B cells,NK cells,Naive B cells,Non-classical monocytes,Regulatory T cells,Tcm/Naive cytotoxic T cells,Tcm/Naive helper T cells,Tem/Effector helper T cells,Tem/Temra cytotoxic T cells,Tem/Trm cytotoxic T cells,Type 1 helper T cells
+B,0,0,2,0,39,0,0,0,0,631,0,768,0,0,0,0,0,3,2,0
+CD4T,0,10,4,0,0,5,25,0,3,9,0,0,0,174,5,1727,254,909,409,105
+CD8T,0,149,5,1,0,0,212,0,1,2,0,0,0,3,44,417,30,2866,1929,24
+Myeloid,114,0,100,59,0,0,0,47,103,0,0,0,21,0,0,0,0,1,0,0
+NK,1,2608,0,0,0,58,0,0,0,1,16,0,0,0,0,4,0,432,46,0
+Plasma,0,0,0,0,0,0,0,0,0,15,0,0,0,0,0,0,0,0,1,0

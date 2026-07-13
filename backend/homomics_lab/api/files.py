@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from homomics_lab.config import settings
 from homomics_lab.projects.permissions import require_project_read, require_project_write
@@ -50,11 +50,76 @@ class FileUploadResponse(BaseModel):
 
 
 _MAX_READ_BYTES = 5 * 1024 * 1024  # 5 MB preview limit
+_MAX_PREVIEW_BYTES = 100 * 1024 * 1024  # 100 MB preview limit for full streams
 _CHUNK_SIZE = 1024 * 1024  # 1 MB upload chunk size
+_STREAM_CHUNK_SIZE = 64 * 1024  # 64 KB streaming chunks
 
 
 def _project_root(project_id: str) -> Path:
-    return (settings.data_dir / "raw" / project_id).resolve()
+    # Use the unified project workspace as the file-browser root so outputs,
+    # logs, and data live under one tree instead of being scattered under raw/.
+    return (settings.data_dir / "workspaces" / project_id).resolve()
+
+
+def _range_stream(path: Path, start: int, end: int, chunk_size: int = _STREAM_CHUNK_SIZE):
+    """Yield bytes from ``start`` to ``end`` (inclusive) without loading the whole file."""
+    remaining = end - start + 1
+    with open(path, "rb") as f:
+        f.seek(start)
+        while remaining > 0:
+            chunk = f.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+            yield chunk
+            remaining -= len(chunk)
+
+
+def _full_stream(path: Path, chunk_size: int = _STREAM_CHUNK_SIZE):
+    """Yield the entire file in chunks."""
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+
+def _parse_range(range_header: str, file_size: int) -> Optional[tuple[int, int]]:
+    """Parse a single ``bytes=start-end`` Range header.
+
+    Returns ``(start, end)`` inclusive, or ``None`` if the range is unsatisfiable
+    or uses syntax we do not support (e.g. multiple ranges).
+    """
+    if not range_header.startswith("bytes="):
+        return None
+    spec = range_header[len("bytes="):].strip()
+    if "," in spec:
+        # Multiple ranges are not implemented; let the client retry without Range.
+        return None
+    if "-" not in spec:
+        return None
+    start_str, end_str = spec.split("-", 1)
+    try:
+        if start_str == "":
+            # Suffix range: bytes=-500 means last 500 bytes.
+            suffix = int(end_str)
+            if suffix <= 0:
+                return None
+            start = max(0, file_size - suffix)
+            end = file_size - 1
+        else:
+            start = int(start_str)
+            if end_str == "":
+                end = file_size - 1
+            else:
+                end = int(end_str)
+    except ValueError:
+        return None
+
+    if start < 0 or start >= file_size or end < start:
+        return None
+    end = min(end, file_size - 1)
+    return start, end
 
 
 @router.get("/list", dependencies=[Depends(require_project_read)], response_model=FileListResponse)
@@ -154,6 +219,73 @@ async def read_file(project_id: str, path: str):
         "encoding": "base64",
         "content": content,
     }
+
+
+@router.get("/preview", dependencies=[Depends(require_project_read)])
+async def preview_file(request: Request, project_id: str, path: str):
+    """Stream a project file with optional HTTP Range support.
+
+    For requests without a ``Range`` header the full file is streamed up to
+    ``_MAX_PREVIEW_BYTES``. For ``bytes=start-end`` Range requests a ``206 Partial
+    Content`` response is returned with the correct ``Content-Range`` header.
+    """
+    try:
+        project_id = validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    root = _project_root(project_id)
+
+    try:
+        target = safe_path(path, root=root, must_exist=True)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    size = target.stat().st_size
+    mime_type, _ = mimetypes.guess_type(target.name)
+    mime_type = mime_type or "application/octet-stream"
+    common_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": mime_type,
+    }
+
+    range_header = request.headers.get("range")
+    if range_header:
+        parsed = _parse_range(range_header, size)
+        if parsed is None:
+            return Response(
+                status_code=416,
+                headers={"Content-Range": f"bytes */{size}"},
+            )
+        start, end = parsed
+        content_length = end - start + 1
+        headers = {
+            **common_headers,
+            "Content-Range": f"bytes {start}-{end}/{size}",
+            "Content-Length": str(content_length),
+        }
+        return StreamingResponse(
+            _range_stream(target, start, end),
+            status_code=206,
+            headers=headers,
+        )
+
+    if size > _MAX_PREVIEW_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds preview size limit of {_MAX_PREVIEW_BYTES} bytes",
+        )
+
+    return StreamingResponse(
+        _full_stream(target),
+        headers={
+            **common_headers,
+            "Content-Length": str(size),
+        },
+    )
 
 
 @router.post("/upload", dependencies=[Depends(require_project_write)], response_model=FileUploadResponse)

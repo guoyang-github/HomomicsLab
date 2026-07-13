@@ -43,8 +43,15 @@ from homomics_lab.agent.plan.self_correction import (
     SelfCorrectionAction,
     SelfCorrectionEngine,
 )
+from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
+from homomics_lab.agent.permission_ruleset import (
+    PermissionRegistry,
+    get_permission_registry,
+)
 from homomics_lab.config import settings
+from homomics_lab.domain.registry import get_domain_registry
 from homomics_lab.metrics import record_plan_created
 from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
@@ -59,7 +66,7 @@ from homomics_lab.context.relevance_filter import ContextItem
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.constants import JobMode
-from homomics_lab.workspace.context import current_workspace, workspace_context
+from homomics_lab.workspace.context import current_workspace
 from homomics_lab.workspace.manager import WorkspaceManager
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import (
@@ -191,12 +198,14 @@ class TurnRunner:
         analysis_template_store: Optional[Any] = None,
         workflow_execution_service: Optional[WorkflowExecutionService] = None,
         skill_executor: Optional[Any] = None,
+        permission_registry: Optional[PermissionRegistry] = None,
     ):
         self._cbkb = cbkb
         self._skill_executor = skill_executor
         self._llm_client = llm_client
         self._trace_store = trace_store
         self._approval_store = approval_store
+        self._permission_registry = permission_registry or get_permission_registry()
         self._orchestrator = orchestrator
         self._registry = registry
         self._progress_callback = progress_callback
@@ -852,6 +861,7 @@ class TurnRunner:
         user_message: str,
         working_memory: WorkingMemory,
         allowed_tools: Optional[List[str]] = None,
+        intent: Optional[UserIntent] = None,
     ) -> TurnResult:
         """Run the LLM-driven tool-calling loop for MCP tool intents."""
         if self._llm_client is None or self._tool_registry is None:
@@ -875,6 +885,20 @@ class TurnRunner:
         )
 
         if result.awaiting_approval and result.approval_request:
+            tool_name = result.approval_request.get("tool_name", "")
+            risk_level = result.approval_request.get("risk_level", "high")
+            if self._permission_registry.can_auto_approve_tool(
+                role_id=None,
+                domain=intent.domain if intent else None,
+                tool_name=tool_name,
+                risk_level=risk_level,
+            ):
+                return await self.respond_to_tool_approval(
+                    call_id=result.approval_request["call_id"],
+                    approved=True,
+                    working_memory=working_memory,
+                    project_id=getattr(self, "_project_id", "default"),
+                )
             return await self._create_tool_approval_hitl(
                 result, working_memory, user_message
             )
@@ -1224,6 +1248,10 @@ class TurnRunner:
             return TurnRunner._format_pubmed_search(output, tool_inputs)
         if tool_name == "pubmed_fetch":
             return TurnRunner._format_pubmed_fetch(output, tool_inputs)
+        if tool_name == "science_search":
+            return TurnRunner._format_science_search(output, tool_inputs)
+        if tool_name == "science_list_dbs":
+            return TurnRunner._format_science_dbs(output)
 
         count = output.get("count")
         if count is not None:
@@ -1286,6 +1314,74 @@ class TurnRunner:
             lines.append(f"{idx}. **{title}**  \n   {meta}{pmid_part}{doi_part}")
 
         lines.append(f"\n[在 PubMed 中查看全部结果]({pubmed_url})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_science_dbs(output: Dict[str, Any]) -> str:
+        """Format the science database catalog into a readable list."""
+        databases = output.get("databases", []) or []
+        if not databases:
+            return "当前没有可用的科学数据库连接器。"
+        lines = ["可查询的科学数据库：\n"]
+        for db in databases:
+            if not isinstance(db, dict):
+                continue
+            name = db.get("name", "?")
+            desc = db.get("description", "") or ""
+            available = db.get("available", True)
+            badge = "可用" if available else "不可用（缺少依赖或密钥）"
+            suffix = f" — {desc}" if desc else ""
+            lines.append(f"- **{name}** [{badge}]{suffix}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_science_search(
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Format merged science_search results into a readable Markdown list."""
+        query = ""
+        if isinstance(tool_inputs, dict):
+            query = tool_inputs.get("query", "") or ""
+        results = output.get("results", []) or []
+        databases = output.get("databases", []) or []
+        errors = output.get("errors", {}) or {}
+
+        if not results:
+            hint = "、".join(databases) or "科学数据库"
+            msg = f"在 {hint} 中未找到与“{query}”相关的结果。"
+            if errors:
+                msg += "\n\n部分来源返回错误：" + "; ".join(
+                    f"{k}: {v}" for k, v in errors.items() if k != "_"
+                )
+            return msg
+
+        lines = [
+            f"检索到 {len(results)} 条结果（来源：{', '.join(databases) or '多库'}）：\n"
+        ]
+        for idx, hit in enumerate(results, start=1):
+            if not isinstance(hit, dict):
+                continue
+            title = hit.get("title") or "Untitled"
+            source = hit.get("source") or ""
+            url = hit.get("url") or ""
+            snippet = (hit.get("snippet") or "").strip().replace("\n", " ")
+            if len(snippet) > 240:
+                snippet = snippet[:240] + "…"
+            published = hit.get("published") or ""
+            meta = " · ".join(x for x in [source, published] if x)
+            head = f"{idx}. **{title}**"
+            if meta:
+                head += f"  _{meta}_"
+            lines.append(head)
+            if snippet:
+                lines.append(f"   {snippet}")
+            if url:
+                lines.append(f"   {url}")
+        if errors:
+            failed = [k for k in errors if k != "_"]
+            if failed:
+                lines.append("\n_部分来源失败： " + ", ".join(failed) + "_")
         return "\n".join(lines)
 
     @staticmethod
@@ -1424,6 +1520,7 @@ class TurnRunner:
                     allowed_tools=[
                         t.name for t in self._tool_registry.list_by_source("mcp")
                     ],
+                    intent=intent,
                 )
             except Exception as exc:
                 logger.warning(
@@ -1508,6 +1605,7 @@ class TurnRunner:
         if enqueue_skills and job_service is not None:
             return await self._enqueue_execution(
                 intent=intent,
+                user_message=user_message,
                 tree=tree,
                 plan=plan,
                 working_memory=working_memory,
@@ -1554,9 +1652,33 @@ class TurnRunner:
         """Return True for real domain-specific analysis workflows."""
         return intent.domain in cls._REAL_DOMAIN_VALUES
 
+    def _plan_is_auto_approved(
+        self,
+        tree: TaskTree,
+        domain: Optional[str],
+        role_id: Optional[str] = None,
+    ) -> bool:
+        """Return True when every task skill is auto-approved for the domain/role."""
+        if not tree.tasks:
+            return False
+        registry = self._permission_registry
+        for task in tree.tasks:
+            skills = task.skills_required or []
+            if not skills:
+                return False
+            for skill_id in skills:
+                if registry.is_denied_skill(role_id, domain, skill_id):
+                    return False
+                if not registry.can_auto_approve_skill(
+                    role_id, domain, skill_id, risk_level=task.risk_level
+                ):
+                    return False
+        return True
+
     async def _enqueue_execution(
         self,
         intent: UserIntent,
+        user_message: str,
         tree: TaskTree,
         plan: Optional[Plan],
         working_memory: WorkingMemory,
@@ -1573,7 +1695,6 @@ class TurnRunner:
             plan_result is not None
             and (plan_result.is_fallback or plan_result.risk_level == "high")
         )
-        is_single_step = intent.scope == "single_step" or intent.complexity == "single_step"
         # A concrete single-task execution (e.g. "use CellTypist on sample.h5ad")
         # should execute immediately even when the LLM labelled the overall intent
         # as complex.  We trust the decomposed task tree over the noisy structured
@@ -1584,20 +1705,80 @@ class TurnRunner:
             and not tree.tasks[0].dependencies
             and tree.tasks[0].risk_level != "high"
         )
-        # Require approval for explicit plan mode, complex/multi-step workflows,
-        # fallback/high-risk plans, and broad domain-strategy requests.  A concrete
-        # single-step skill request (e.g. "use CellTypist on sample.h5ad") should
-        # execute immediately because the user named the exact capability.
-        needs_approval = (
-            plan_mode
-            or (is_domain and not is_single_step and not is_single_task_tree)
-            or (intent.complexity == "complex" and not is_single_task_tree)
-            or is_high_risk
+        # Plan approval is governed by a configurable strategy resolved as
+        # role -> domain -> global (default: risky_only). Explicit plan_mode and
+        # fallback/high-risk plans always gate; a single concrete low-risk task
+        # runs directly under every strategy.
+        domain_def = get_domain_registry().get(intent.domain) if intent.domain else None
+        strategy = resolve_strategy(domain_def=domain_def, role_id=None, settings=settings)
+        signature_cache = getattr(self, "_approved_plan_signatures", None)
+        if signature_cache is None:
+            signature_cache = {}
+            self._approved_plan_signatures = signature_cache
+        seen_signatures = signature_cache.setdefault(session_id, set())
+        needs_approval = should_require_approval(
+            strategy=strategy,
+            plan=plan,
+            tree=tree,
+            is_high_risk=is_high_risk,
+            is_single_task_tree=is_single_task_tree,
+            plan_mode=plan_mode,
+            seen_signatures=seen_signatures,
         )
 
+        # Permission rulesets can auto-approve plans that only use allowed
+        # tools/skills for the current role/domain.  Invariants (plan_mode,
+        # high-risk, fallback) still gate regardless of rules.
+        if (
+            needs_approval
+            and not plan_mode
+            and not is_high_risk
+            and tree is not None
+            and self._plan_is_auto_approved(tree, domain=intent.domain)
+        ):
+            needs_approval = False
+
+        # Optional specialist + critic review for complex / high-risk plans.
+        review: Optional[Dict[str, Any]] = None
+        if (
+            settings.subagent_review_enabled
+            and plan is not None
+            and self._llm_client is not None
+            and self._tool_registry is not None
+            and (is_high_risk or len(tree.tasks) > 1 or intent.complexity in ("complex", "multi_step"))
+        ):
+            try:
+                review = await self._review_plan_with_subagents(
+                    request=user_message,
+                    plan=plan,
+                    intent=intent,
+                    domain_def=domain_def,
+                    working_memory=working_memory,
+                )
+                plan.metadata["critic_review"] = review
+                if plan_store is not None:
+                    await plan_store.update(plan)
+            except Exception:
+                logger.warning("Sub-agent review failed; continuing without it", exc_info=True)
+
         if plan is not None and needs_approval:
+            review_note = ""
+            if review:
+                summary = review.get("summary", "")
+                concerns = review.get("concerns", [])
+                suggestions = review.get("suggestions", [])
+                parts = []
+                if summary:
+                    parts.append(f"复核结论：{summary}")
+                if concerns:
+                    parts.append(f"关注点：{'; '.join(concerns)}")
+                if suggestions:
+                    parts.append(f"建议：{'; '.join(suggestions)}")
+                if parts:
+                    review_note = "\n\n" + "\n".join(parts)
+
             if is_domain:
-                response_text = "我为您生成了一个分析计划，请确认后再执行。"
+                response_text = "我为您生成了一个分析计划，请确认后再执行。" + review_note
                 plan_payload = PlanPresenter.to_user_payload(plan)
                 agent_msg = ChatMessage(
                     id=f"msg_{len(working_memory.messages)}",
@@ -1606,11 +1787,12 @@ class TurnRunner:
                         "plan_id": plan.plan_id,
                         "plan": plan_payload,
                         "response_text": response_text,
+                        "critic_review": review,
                     },
                     sender="agent",
                 )
             else:
-                response_text = "我为您规划了以下执行步骤，请确认后再执行。"
+                response_text = "我为您规划了以下执行步骤，请确认后再执行。" + review_note
                 estimates = {}
                 if plan is not None:
                     estimates = {
@@ -1626,6 +1808,7 @@ class TurnRunner:
                         "tasks": [t.model_dump() for t in tree.tasks],
                         "progress": self._build_initial_progress(tree),
                         "estimates": estimates,
+                        "critic_review": review,
                     },
                     sender="agent",
                 )
@@ -1638,6 +1821,7 @@ class TurnRunner:
                 plan_id=plan.plan_id,
             )
 
+        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
         mode = (
             JobMode.SINGLE_STEP
             if intent.scope == "single_step"
@@ -1680,6 +1864,32 @@ class TurnRunner:
             job_id=job.job_id,
             plan_id=plan.plan_id if plan is not None else None,
         )
+
+    async def _review_plan_with_subagents(
+        self,
+        request: str,
+        plan: Plan,
+        intent: UserIntent,
+        domain_def: Any,
+        working_memory: WorkingMemory,
+    ) -> Dict[str, Any]:
+        """Run a domain specialist + critic review on a plan before approval.
+
+        The review is best-effort: failures are logged and do not block execution.
+        """
+        role = None
+        if domain_def is not None and getattr(domain_def, "roles", None):
+            role = domain_def.roles[0]
+
+        orchestrator = SpecialistCriticOrchestrator(
+            llm_client=self._llm_client,
+            tool_registry=self._tool_registry,
+            role=role,
+            domain=intent.domain,
+        )
+        history = self._working_memory_to_history(working_memory)
+        review = await orchestrator.review(request, plan, history=history)
+        return review.to_dict()
 
     @staticmethod
     def _build_initial_progress(tree: TaskTree) -> Dict[str, Any]:
@@ -1891,27 +2101,25 @@ class TurnRunner:
         user_message: Optional[str],
         project_id: str,
     ) -> None:
-        """Inject discovered uploaded file paths into task parameters.
+        """Inject request context and uploaded file paths into task parameters.
 
-        This lets skills/agents know which concrete files the user is referring
-        to, even when the message only mentions a filename without an ``@file:``
-        reference. For single-step skills this is usually the primary input; for
-        workflows it is added as a fallback when a task does not already specify
-        an input file.
+        This lets skills/agents know the concrete user objective and which files
+        it refers to, even when the message only mentions a filename without an
+        ``@file:`` reference. For single-step skills the file is usually the
+        primary input; for workflows it is added as a fallback when a task does
+        not already specify an input file.
         """
         files = self._resolve_uploaded_file_references(user_message, project_id)
-        if not files:
-            return
-
-        # Prefer the first mentioned file as the primary input.
-        primary_path = files[0][1]
+        primary_path = files[0][1] if files else None
         for task in tree.tasks:
             if task.parameters is None:
                 task.parameters = {}
-            if "input_file" not in task.parameters:
+            if user_message and "user_request" not in task.parameters:
+                task.parameters["user_request"] = user_message
+            if primary_path and "input_file" not in task.parameters:
                 task.parameters["input_file"] = primary_path
             # Also expose the full list for multi-file tasks.
-            if "uploaded_files" not in task.parameters:
+            if files and "uploaded_files" not in task.parameters:
                 task.parameters["uploaded_files"] = [
                     {"filename": name, "path": path} for name, path in files
                 ]
@@ -2058,6 +2266,99 @@ class TurnRunner:
             attachments=plot_messages,
         )
 
+    @staticmethod
+    def _envelopes_from_artifacts(artifacts: Optional[List[Any]]) -> List[Dict[str, Any]]:
+        """Normalize any artifact collection into frontend-ready envelopes.
+
+        Accepts rich envelopes (dicts with ``path``), ``Artifact`` model objects
+        (``.path``/``.artifact_type``), or plain paths. Always returns full
+        ``{kind, mime, name, path, size}`` envelopes so the frontend renderer
+        registry can pick an inline renderer (image/table/...) instead of the
+        generic file-link fallback.
+        """
+        from homomics_lab.artifacts import build_artifact
+
+        envelopes: List[Dict[str, Any]] = []
+        seen: set = set()
+        for a in artifacts or []:
+            path: Optional[str] = None
+            extra: Dict[str, Any] = {}
+            if isinstance(a, dict):
+                path = a.get("path")
+                extra = {
+                    k: a[k]
+                    for k in ("kind", "mime", "name", "size", "url", "preview_url")
+                    if a.get(k) is not None
+                }
+            else:
+                path = getattr(a, "path", None)
+                task_id = getattr(a, "task_id", None)
+                atype = getattr(a, "artifact_type", None)
+                if task_id is not None:
+                    extra["task_id"] = task_id
+                if atype is not None:
+                    extra["type"] = atype
+            if not path:
+                continue
+            key = str(path)
+            if key in seen:
+                continue
+            seen.add(key)
+            env = build_artifact(Path(key)) or {"kind": "file", "mime": "application/octet-stream", "name": Path(key).name, "path": key}
+            env.update(extra)
+            env.setdefault("path", key)
+            envelopes.append(env)
+        return envelopes
+
+    @staticmethod
+    def _envelopes_from_results(results: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Harvest artifact envelopes from an orchestrator ``run_tree`` result map."""
+        if not results:
+            return []
+        collected: List[Dict[str, Any]] = []
+        for raw in results.values():
+            if not isinstance(raw, dict):
+                continue
+            arts = raw.get("artifacts")
+            if isinstance(arts, list) and arts:
+                collected.extend(TurnRunner._envelopes_from_artifacts(arts))
+                continue
+            paths: List[Any] = []
+            for key in ("output_files", "output_paths"):
+                val = raw.get(key)
+                if isinstance(val, (list, tuple)):
+                    paths.extend(val)
+                elif isinstance(val, (str, Path)):
+                    paths.append(val)
+            if paths:
+                collected.extend(TurnRunner._envelopes_from_artifacts(paths))
+        # de-dup by path
+        seen: set = set()
+        out: List[Dict[str, Any]] = []
+        for env in collected:
+            p = env.get("path")
+            if p and p not in seen:
+                seen.add(p)
+                out.append(env)
+        return out
+
+    @staticmethod
+    def _summarize(envelopes: List[Dict[str, Any]], user_message: str, skill_id: Optional[str]) -> str:
+        """Return a sourced markdown summary, or '' when there is nothing to say."""
+        if not envelopes:
+            return ""
+        try:
+            from homomics_lab.result_summary import summarize_artifacts
+
+            summary = summarize_artifacts(
+                envelopes, skill_id=skill_id, user_message=user_message or ""
+            )
+            md = summary.to_markdown()
+            return md if md else ""
+        except Exception:  # never let summarization break the turn
+            logger.debug("result summarization failed", exc_info=True)
+            return ""
+
     def _build_workflow_result(
         self,
         tree: TaskTree,
@@ -2065,15 +2366,19 @@ class TurnRunner:
         backend: str,
         artifacts: Optional[List[Any]] = None,
         error: Optional[str] = None,
+        user_message: str = "",
     ) -> TurnResult:
         """Build a TurnResult from a WorkflowResult."""
-        artifacts = artifacts or []
+        envelopes = self._envelopes_from_artifacts(artifacts)
         if error:
             response_text = f"工作流执行失败（{backend}）：{error}"
         else:
             response_text = (
                 f"已完成 {len(tree.tasks)} 个分析步骤（执行后端：{backend}）。"
             )
+        summary_md = self._summarize(envelopes, user_message, self._single_skill_id(tree))
+        if summary_md:
+            response_text = f"{response_text}\n\n{summary_md}"
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -2083,14 +2388,7 @@ class TurnRunner:
                 "tasks": [t.model_dump() for t in tree.tasks],
                 "progress": self._tree_progress(tree),
                 "backend": backend,
-                "artifacts": [
-                    {
-                        "path": a.path,
-                        "type": a.artifact_type,
-                        "task_id": a.task_id,
-                    }
-                    for a in artifacts
-                ],
+                "artifacts": envelopes,
             },
             sender="agent",
         )
@@ -2104,6 +2402,11 @@ class TurnRunner:
             agent_message=agent_msg,
             error=error,
         )
+
+    @staticmethod
+    def _single_skill_id(tree: TaskTree) -> Optional[str]:
+        ids = [t.skills_required[0] for t in tree.tasks if t.skills_required]
+        return ids[0] if len(ids) == 1 else None
 
     @staticmethod
     def _tree_progress(tree: TaskTree) -> Dict[str, Any]:
@@ -2173,6 +2476,7 @@ class TurnRunner:
                         backend=wf_result.backend,
                         artifacts=wf_result.artifacts,
                         error=wf_result.error_message,
+                        user_message=user_message or "",
                     )
                 except Exception as exc:
                     logger.warning(
@@ -2213,6 +2517,16 @@ class TurnRunner:
 
         response_text = f"已为您规划 {len(tree.tasks)} 个分析步骤。"
 
+        # Collect rich artifact envelopes + a data-driven findings summary so the
+        # chat renders tables/figures inline (not just file links) and explains
+        # what the numbers mean with provenance.
+        envelopes = self._envelopes_from_results(results)
+        summary_md = self._summarize(
+            envelopes, user_message or "", self._single_skill_id(tree)
+        )
+        if summary_md:
+            response_text = f"{response_text}\n\n{summary_md}"
+
         # Extract any plots produced during the workflow
         plot_messages = self._extract_plot_messages(results, tree, working_memory)
         for msg in plot_messages:
@@ -2225,6 +2539,7 @@ class TurnRunner:
                 "text": response_text,
                 "tasks": [t.model_dump() for t in tree.tasks],
                 "progress": orchestrator.get_progress(tree),
+                "artifacts": envelopes,
             },
             sender="agent",
         )

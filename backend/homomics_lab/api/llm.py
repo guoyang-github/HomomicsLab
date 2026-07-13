@@ -8,19 +8,31 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from homomics_lab.api.auth import require_auth
-from homomics_lab.llm.router import LLMRouter
+from homomics_lab.llm.model_catalog import ModelCatalog
 
 router = APIRouter(dependencies=[Depends(require_auth)])
 
 
-class ModelInfo(BaseModel):
+class LegacyModelInfo(BaseModel):
     provider: str
     model: str
     display_name: str
 
 
+class CatalogModelOut(BaseModel):
+    id: str
+    provider: str
+    name: str
+    capabilities: List[str]
+    context_window: int
+    cost_per_1k_input_usd: float
+    cost_per_1k_output_usd: float
+    supports_temperature: bool
+    enabled: bool
+
+
 class ModelsResponse(BaseModel):
-    models: List[ModelInfo]
+    models: List[CatalogModelOut]
 
 
 class PricingEntry(BaseModel):
@@ -29,10 +41,25 @@ class PricingEntry(BaseModel):
 
 
 @router.get("/llm/models", response_model=ModelsResponse)
-async def list_available_models() -> Dict[str, List[Dict[str, str]]]:
-    """Return all LLM models whose providers are currently configured."""
-    router = LLMRouter()
-    return {"models": router.list_available_models()}
+async def list_available_models() -> Dict[str, List[Dict[str, object]]]:
+    """Return the full LLM model catalog (API keys are never included)."""
+    catalog = ModelCatalog()
+    return {
+        "models": [
+            {
+                "id": m.id,
+                "provider": m.provider,
+                "name": m.name,
+                "capabilities": list(m.capabilities),
+                "context_window": m.context_window,
+                "cost_per_1k_input_usd": m.cost_per_1k_input_usd,
+                "cost_per_1k_output_usd": m.cost_per_1k_output_usd,
+                "supports_temperature": m.supports_temperature,
+                "enabled": m.enabled,
+            }
+            for m in catalog.list_enabled()
+        ]
+    }
 
 
 @router.get("/llm/pricing", response_model=Dict[str, PricingEntry])

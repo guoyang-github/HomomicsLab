@@ -10,6 +10,7 @@ import { SkillSearch } from '@/components/skills/SkillSearch'
 import { SkillManager } from '@/components/skills/SkillManager'
 import { SkillGenerator } from '@/components/skills/SkillGenerator'
 import { DomainMarketplace } from '@/components/domains/DomainMarketplace'
+import { MCPMarketplace } from '@/components/mcp/MCPMarketplace'
 import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui'
 import { useTranslation } from '@/i18n'
@@ -57,6 +58,8 @@ function App() {
         )
       case 'domains':
         return <DomainMarketplace />
+      case 'mcp':
+        return <MCPMarketplace />
       case 'settings':
         return <SettingsPanel />
       default:

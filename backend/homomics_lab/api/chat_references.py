@@ -13,7 +13,40 @@ from homomics_lab.config import settings
 from homomics_lab.security import safe_path, validate_project_id
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 
-_MAX_FILE_BYTES = 200_000  # ~50k tokens ceiling for a single file reference
+_MAX_INLINE_BYTES = 200_000  # ceiling for inlining a *text* file's content into the prompt
+
+# Binary / large formats that must never be inlined into the prompt. They are
+# passed to skills by resolved path instead.
+_BINARY_EXTS = frozenset(
+    {
+        ".h5ad",
+        ".h5",
+        ".hdf5",
+        ".rds",
+        ".rdata",
+        ".rda",
+        ".loom",
+        ".zarr",
+        ".parquet",
+        ".mtx",
+        ".npy",
+        ".npz",
+        ".bam",
+        ".cram",
+        ".sam",
+        ".fastq",
+        ".fq",
+        ".gz",
+        ".zip",
+        ".tar",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".pdf",
+        ".tif",
+        ".tiff",
+    }
+)
 
 _SKILL_REF_RE = re.compile(r"@skill:([A-Za-z0-9_\-]+)")
 _FILE_REF_RE = re.compile(r"@file:([^\s]+)")
@@ -88,9 +121,13 @@ async def resolve_chat_references(
                 continue
 
             size = target.stat().st_size
-            if size > _MAX_FILE_BYTES:
+            suffix = target.suffix.lower()
+            if size > _MAX_INLINE_BYTES or suffix in _BINARY_EXTS:
+                kind = "binary" if suffix in _BINARY_EXTS else "large"
                 appendix_parts.append(
-                    f"<file path=\"{path}\">[File too large: {size} bytes; limit is {_MAX_FILE_BYTES}]</file>"
+                    f"<file path=\"{path}\" resolved=\"{target}\">"
+                    f"[{kind} file, {size} bytes; pass the resolved path to the skill, "
+                    f"do not inline]</file>"
                 )
                 continue
 
@@ -98,7 +135,9 @@ async def resolve_chat_references(
                 content = target.read_text(encoding="utf-8", errors="replace")
             except UnicodeDecodeError:
                 appendix_parts.append(
-                    f"<file path=\"{path}\">[Binary file, content not shown]</file>"
+                    f"<file path=\"{path}\" resolved=\"{target}\">"
+                    f"[binary file, {size} bytes; pass the resolved path to the skill, "
+                    f"do not inline]</file>"
                 )
                 continue
 

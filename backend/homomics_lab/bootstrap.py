@@ -19,7 +19,7 @@ from homomics_lab.prompts import initialize_prompt_registry
 from homomics_lab.context.graph.factory import get_graph_backend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.vector_store.factory import get_vector_store
-from homomics_lab.embeddings.factory import get_embedding_provider, warmup_embedding_provider
+from homomics_lab.embeddings.factory import get_embedding_provider
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.semantic_memory import create_semantic_memory
 from homomics_lab.context.session_store import create_session_store_from_settings
@@ -34,7 +34,8 @@ from homomics_lab.llm.runtime_config import (
     load_llm_runtime_config,
 )
 from homomics_lab.llm_client import LLMClient
-from homomics_lab.mcp.integration import register_mcp_skills, register_mcp_tools
+from homomics_lab.mcp.integration import register_mcp_skills
+from homomics_lab.mcp.marketplace import MCPMarketplace
 from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.skills.builtin import register_builtin_skills
 from homomics_lab.knowledge.ingestion import KnowledgeIndex
@@ -167,7 +168,21 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # Tools
     tool_registry = ToolRegistry()
     register_all_builtin_tools(tool_registry)
-    mcp_client = await register_mcp_tools(tool_registry)
+
+    # MCP server marketplace: load catalog, install/enable user servers.
+    mcp_marketplace = MCPMarketplace()
+    if settings.mcp_marketplace_enabled:
+        try:
+            await mcp_marketplace.register_enabled_servers(tool_registry)
+        except Exception as exc:
+            logger.warning("Failed to register enabled MCP servers: %s", exc)
+    if settings.science_connectors_enabled:
+        try:
+            from homomics_lab.tools.science import register_science_tools
+
+            register_science_tools(tool_registry)
+        except Exception as exc:
+            logger.warning("Failed to register science connectors: %s", exc)
 
     # Schema validation
     schema_validator = SchemaValidator()
@@ -180,7 +195,9 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
 
     print("[bootstrap] creating skill runtime...")
     # Skills runtime
-    tracker = SkillPerformanceTracker()
+    tracker = SkillPerformanceTracker(
+        db_path=Path(settings.data_dir) / ".metadata" / "homomics_lab_metrics.db"
+    )
     llm_client = LLMClient(cache=llm_cache)
     await llm_client.reload_config()
     skill_executor = SkillRuntimeExecutor(
@@ -288,7 +305,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 print(f"Warning: Failed to import skill from {skill_path}: {exc}")
 
     # Wrap MCP tools as skills so the planner can orchestrate them
-    if mcp_client is not None:
+    if settings.mcp_marketplace_enabled:
         register_mcp_skills(skill_executor, tool_registry)
 
     # Register default agents now that the skill runtime and tool registry are ready.
@@ -327,9 +344,12 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
 
     # Shared embedding/vector/graph backends so that CapabilityIndex and
     # KnowledgeIndex do not duplicate or double-close resources.
+    # Synchronous warmup of local embedding models is intentionally skipped here;
+    # it can add 30-60s to startup and block the API from serving requests.
+    # Local providers lazy-load on first encode; a background warmup can be added
+    # later if first-request latency becomes a problem.
     try:
         shared_embedding_provider = get_embedding_provider(settings)
-        warmup_embedding_provider(shared_embedding_provider)
     except Exception:
         shared_embedding_provider = None
     try:
@@ -465,7 +485,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "strategy_library": strategy_library,
         "domain_reloader": domain_reloader,
         "skill_reloader": skill_reloader,
-        "mcp_client": mcp_client,
+        "mcp_marketplace": mcp_marketplace,
         "llm_client": llm_client,
         "memory_manager": memory_manager,
         "capability_index": capability_index,
@@ -517,7 +537,7 @@ async def close_worker_context(ctx: Dict[str, Any]) -> None:
         "provenance_recorder",
         "workflow_execution_service",
         "skill_store",
-        "mcp_client",
+        "mcp_marketplace",
         "domain_reloader",
         "skill_reloader",
     ):

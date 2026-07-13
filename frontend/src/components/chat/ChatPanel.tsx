@@ -2,18 +2,21 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useTranslation } from '@/i18n'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { SessionList } from './SessionList'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 import { ExecutionSSEConnector } from '@/components/workspace/ExecutionSSEConnector'
+import { Badge } from '@/components/ui'
 
 export function ChatPanel() {
   const { t } = useTranslation()
   const [showSessions, setShowSessions] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
   const isTyping = useChatStore((state) => state.isTyping)
+  const openExplorationMode = useSettingsStore((state) => state.openExplorationMode)
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -37,6 +40,11 @@ export function ChatPanel() {
               <MessageSquare className="h-5 w-5" />
             </button>
             <h2 className="text-sm font-semibold text-foreground">{t('nav.chat')}</h2>
+            {openExplorationMode && (
+              <Badge variant="secondary" size="sm">
+                {t('chat.openExplorationActive')}
+              </Badge>
+            )}
           </div>
           {isTyping && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -1,0 +1,15 @@
+all_celltype,B,Myeloid,Other,Plasma,Platelet
+Acinar,0,1,3,2,0
+B,1445,0,0,0,0
+CAF,3,4,39,0,0
+CD4T,0,0,3632,7,0
+CD8T,2,0,5681,0,0
+Ductal,3,4,221,0,0
+Endocrine,0,0,1,0,0
+Endothelial,0,0,164,0,0
+Myeloid,3,429,11,2,0
+NK,0,0,3166,0,0
+Plasma,0,1,0,15,0
+Platelet,0,0,37,0,31
+Schwann,0,0,7,0,0
+Stellate,3,3,70,0,0

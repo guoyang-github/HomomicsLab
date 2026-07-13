@@ -19,6 +19,7 @@ from homomics_lab.llm.providers import (
     get_provider_registry,
     register_custom_provider,
 )
+from homomics_lab.llm.model_catalog import ModelCatalog
 from homomics_lab.llm.runtime_config import DEFAULT_FALLBACK_MODELS, LLMRuntimeConfig
 
 
@@ -69,6 +70,7 @@ class LLMRouter:
             fallback_models=fallback_models,
         )
         self.max_budget_usd = max_budget_usd
+        self.catalog = ModelCatalog()
 
     def _resolve_fallback_models(
         self,
@@ -140,6 +142,8 @@ class LLMRouter:
         expected_input_tokens: int = 1000,
         expected_output_tokens: int = 500,
             skip: Optional[set] = None,
+        task_type: Optional[str] = None,
+        required_capabilities: Optional[List[str]] = None,
     ) -> RouteDecision:
         """Select the best provider/model for the current request.
 
@@ -149,8 +153,21 @@ class LLMRouter:
             expected_input_tokens: Used for budget estimation.
             expected_output_tokens: Used for budget estimation.
             skip: Set of model names to exclude (used after a failure).
+            task_type: Optional task classification for catalog-based routing.
+            required_capabilities: Optional capability tags that the model must have.
         """
+        catalog_model: Optional[str] = None
+        catalog_reason: str = ""
+        if task_type:
+            catalog_model, catalog_reason = self.catalog.match(
+                task_type,
+                prefer_cheap=prefer_cheap,
+                required_capabilities=required_capabilities,
+            )
+
         candidates: List[str] = []
+        if catalog_model:
+            candidates.append(catalog_model)
         if model:
             candidates.append(model)
         if prefer_cheap:
@@ -186,9 +203,16 @@ class LLMRouter:
                 last_error = exc
                 continue
 
-            reason = "explicit" if candidate == model else ("cheap" if prefer_cheap else "fallback")
-            if candidate == self.primary_model and not model:
+            if candidate == catalog_model:
+                reason = f"catalog:{task_type}:{catalog_reason}" if task_type else catalog_reason
+            elif candidate == model:
+                reason = "explicit"
+            elif prefer_cheap:
+                reason = "cheap"
+            elif candidate == self.primary_model:
                 reason = "primary"
+            else:
+                reason = "fallback"
             return RouteDecision(provider=provider, model=candidate, estimated_input_cost_usd=estimated, reason=reason)
 
         if last_error:

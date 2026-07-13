@@ -23,6 +23,7 @@ from homomics_lab.api.audit import AuditLogger
 from homomics_lab.config import settings
 from homomics_lab.provenance.recorder import ProvenanceRecorder
 from homomics_lab.provenance.rocrate import ROCrateExporter
+from homomics_lab.reproducibility.engine import ReproducibilityEngine
 from homomics_lab.security import validate_project_id
 from homomics_lab.workspace.manager import WorkspaceManager
 
@@ -402,3 +403,137 @@ async def delete_project_figure(
         raise HTTPException(status_code=404, detail="Figure not found")
 
     return FigureDeleteResponse(success=True, deleted_files=deleted)
+
+
+class SnapshotListResponse(BaseModel):
+    project_id: str
+    snapshots: List[Dict[str, Any]]
+
+
+class SnapshotRestoreResponse(BaseModel):
+    project_id: str
+    commit_id: str
+    restored: bool
+
+
+class SnapshotDiffResponse(BaseModel):
+    project_id: str
+    commit_a: str
+    commit_b: str
+    diff: str
+
+
+@router.get("/{project_id}/snapshots", response_model=SnapshotListResponse)
+async def list_git_snapshots(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """List git-based workspace snapshots for a project."""
+    try:
+        validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
+
+    result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    snapshots = ws.list_git_snapshots()
+    return SnapshotListResponse(project_id=project_id, snapshots=snapshots)
+
+
+@router.post("/{project_id}/snapshots/{commit_id}/restore", response_model=SnapshotRestoreResponse)
+async def restore_git_snapshot(
+    project_id: str,
+    commit_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Restore a workspace to a git snapshot commit."""
+    try:
+        validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "write", db, user_id)
+
+    result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    restored = ws.restore_git_snapshot(commit_id)
+    if not restored:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to restore snapshot {commit_id}",
+        )
+
+    return SnapshotRestoreResponse(project_id=project_id, commit_id=commit_id, restored=True)
+
+
+@router.get("/{project_id}/snapshots/{a}/diff/{b}", response_model=SnapshotDiffResponse)
+async def diff_git_snapshots(
+    project_id: str,
+    a: str,
+    b: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Return a diff stat between two git workspace snapshots."""
+    try:
+        validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
+
+    result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    diff = ws.git_snapshot.diff(a, b)
+    return SnapshotDiffResponse(project_id=project_id, commit_a=a, commit_b=b, diff=diff)
+
+
+@router.post("/{project_id}/reproducibility/export")
+async def export_reproducibility_bundle(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Export the project's reproducibility bundle as a zip archive."""
+    try:
+        validate_project_id(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await require_project_permission(project_id, "read", db, user_id)
+
+    result = await db.execute(select(ProjectRecord).where(ProjectRecord.project_id == project_id))
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    ws = WorkspaceManager(settings.data_dir, project_id)
+    export_dir = Path(settings.data_dir) / "exports" / project_id
+    export_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = export_dir / "reproducibility_bundle.zip"
+
+    engine = ReproducibilityEngine(ws)
+    engine.start_analysis(project_id=project_id)
+    engine.export_zip(zip_path)
+
+    return FileResponse(
+        path=zip_path,
+        media_type="application/zip",
+        filename=f"{project_id}_reproducibility_bundle.zip",
+    )

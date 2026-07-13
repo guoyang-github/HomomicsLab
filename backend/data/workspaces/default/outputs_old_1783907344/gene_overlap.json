@@ -1,0 +1,30 @@
+{
+  "n_adata_genes": 29057,
+  "n_model_genes": 6639,
+  "n_overlap": 6023,
+  "overlap_fraction": 0.9072149420093387,
+  "adata_only_genes": [
+    "C5orf67",
+    "ARMC8",
+    "GAS2L2",
+    "AGAP5",
+    "AC093827.4",
+    "AC012368.1",
+    "SCAF4",
+    "DDB1",
+    "A2ML1",
+    "AC012378.2"
+  ],
+  "model_only_genes": [
+    "RP11-733O18.1",
+    "RANP6",
+    "RPL34P31",
+    "IGHV3OR16-13",
+    "MTND6P4",
+    "RPL27A",
+    "HEPACAM",
+    "RNVU1-6",
+    "RPS4Y1",
+    "RPS2P5"
+  ]
+}

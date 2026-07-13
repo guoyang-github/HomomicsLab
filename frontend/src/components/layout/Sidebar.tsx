@@ -10,9 +10,11 @@ import {
   Settings,
   Command,
   Image,
+  Plug,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
+import { healthApi } from '@/sdk'
 
 export type NavItem =
   | 'chat'
@@ -22,6 +24,7 @@ export type NavItem =
   | 'figures'
   | 'skills'
   | 'domains'
+  | 'mcp'
   | 'settings'
 
 interface SidebarItem {
@@ -39,6 +42,7 @@ const navItems: SidebarItem[] = [
   { id: 'figures', labelKey: 'nav.figures', icon: Image, shortcut: '⌘7' },
   { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘5' },
   { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘6' },
+  { id: 'mcp', labelKey: 'nav.mcp', icon: Plug, shortcut: '⌘8' },
   { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘,' },
 ]
 
@@ -57,9 +61,10 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false }: SidebarPr
 
   useEffect(() => {
     const fetchHealth = () => {
-      fetch('/api/health/live')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
+      healthApi
+        .getLive()
+        .then((res) => {
+          const data = res.data
           if (data?.version) {
             setVersion(data.version)
           }

@@ -6,6 +6,7 @@ description: |
   dimensionality reduction, clustering, cell-type annotation, differential analysis,
   trajectory, cell-cell communication, and functional enrichment.
 version: "4.0.0"
+plan_approval_strategy: risky_only
 
 orchestrator_skills:
   - bio-workflows-scrnaseq-pipeline

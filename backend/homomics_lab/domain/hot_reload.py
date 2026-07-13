@@ -47,9 +47,10 @@ class FileWatcher:
         path = Path(path).resolve()
         if path not in self._callbacks:
             self._callbacks[path] = []
-            # Defer mtime computation to the first async check to avoid blocking
-            # the caller during startup on directories that may contain large data files.
-            self._watched_files[path] = 0.0
+            # Use -1.0 as a sentinel: the first check will capture the current
+            # mtime without firing callbacks, preventing a startup flood of
+            # "changed" events for every watched skill/domain.
+            self._watched_files[path] = -1.0
         self._callbacks[path].append(callback)
 
     def unwatch(self, path: Path) -> None:
@@ -133,6 +134,11 @@ class FileWatcher:
             old_mtime = self._watched_files.get(path, 0.0)
             await self._update_mtime(path)
             new_mtime = self._watched_files.get(path, 0.0)
+
+            # Sentinel value: first check seeds the baseline without firing
+            # callbacks so we don't treat every existing file as "changed".
+            if old_mtime < 0:
+                continue
 
             if new_mtime > old_mtime:
                 for callback in callbacks:

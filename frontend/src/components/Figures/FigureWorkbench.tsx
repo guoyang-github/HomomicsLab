@@ -4,7 +4,7 @@ import { Upload, Loader2, ImageIcon, Wand2, Play, BarChart3, BoxSelect, Activity
 import { useDropzone } from 'react-dropzone'
 import { useProjectStore } from '@/stores/projectStore'
 import { useTranslation } from '@/i18n'
-import { fileApi, vizApi } from '@/services/api'
+import { fileApi, vizApi } from '@/sdk'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import { FigureGallery } from './FigureGallery'
@@ -42,13 +42,13 @@ function resolvePreviewUrl(projectId: string, result: { outputs?: Record<string,
   }
   const imageArtifact = result.artifacts?.find((a) => a.mime?.startsWith('image/'))
   if (imageArtifact?.path) {
-    return `/api/files/${projectId}/${encodeURIComponent(imageArtifact.path)}`
+    return fileApi.fileUrl(projectId, imageArtifact.path)
   }
   const formats = result.outputs?.formats
   if (formats && typeof formats === 'object') {
     const firstPath = Object.values(formats as Record<string, string>)[0]
     if (firstPath) {
-      return `/api/files/${projectId}/${encodeURIComponent(firstPath)}`
+      return fileApi.fileUrl(projectId, firstPath)
     }
   }
   return null

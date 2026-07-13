@@ -46,6 +46,7 @@ export interface SettingsState {
   dataRetentionDays: number
   autoApprovePlans: boolean
   enableNotifications: boolean
+  openExplorationMode: boolean
   isSaving: boolean
   saveError: string | null
   isTesting: boolean
@@ -59,6 +60,7 @@ export interface SettingsState {
   setDataRetentionDays: (days: number) => void
   setAutoApprovePlans: (value: boolean) => void
   setEnableNotifications: (value: boolean) => void
+  setOpenExplorationMode: (value: boolean) => void
   loadSettings: () => Promise<void>
   saveSettings: () => Promise<boolean>
   testConnection: () => Promise<void>
@@ -121,6 +123,7 @@ const systemSettingsToPartialState = (
     monthlyBudget: server.monthly_budget_usd ?? state.budget.monthlyBudget,
   },
   dataRetentionDays: server.session_ttl_days,
+  openExplorationMode: server.open_exploration_mode_enabled,
 })
 
 const stateToSystemSettingsUpdate = (state: SettingsState): SystemSettingsUpdate => ({
@@ -130,6 +133,7 @@ const stateToSystemSettingsUpdate = (state: SettingsState): SystemSettingsUpdate
   max_llm_cost_per_request_usd: state.budget.perRequestBudget,
   monthly_budget_usd: state.budget.monthlyBudget,
   session_ttl_days: state.dataRetentionDays,
+  open_exploration_mode_enabled: state.openExplorationMode,
 })
 
 export const useSettingsStore = create<SettingsState>()(
@@ -143,6 +147,7 @@ export const useSettingsStore = create<SettingsState>()(
       dataRetentionDays: 0,
       autoApprovePlans: false,
       enableNotifications: true,
+      openExplorationMode: false,
       isSaving: false,
       saveError: null,
       isTesting: false,
@@ -157,6 +162,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDataRetentionDays: (days) => set({ dataRetentionDays: days }),
       setAutoApprovePlans: (value) => set({ autoApprovePlans: value }),
       setEnableNotifications: (value) => set({ enableNotifications: value }),
+      setOpenExplorationMode: (value) => set({ openExplorationMode: value }),
 
       loadSettings: async () => {
         try {
@@ -272,6 +278,7 @@ export const useSettingsStore = create<SettingsState>()(
           dataRetentionDays: 0,
           autoApprovePlans: false,
           enableNotifications: true,
+          openExplorationMode: false,
           isSaving: false,
           saveError: null,
           isTesting: false,
@@ -298,6 +305,7 @@ export const useSettingsStore = create<SettingsState>()(
         dataRetentionDays: state.dataRetentionDays,
         autoApprovePlans: state.autoApprovePlans,
         enableNotifications: state.enableNotifications,
+        openExplorationMode: state.openExplorationMode,
       }),
     }
   )

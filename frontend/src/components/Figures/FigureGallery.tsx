@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { ImageIcon, RefreshCw, Download, Trash2, GitCompare } from 'lucide-react'
-import { vizApi } from '@/services/api'
+import { vizApi, fileApi } from '@/sdk'
 import { useTranslation } from '@/i18n'
 import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Modal } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
@@ -33,7 +33,7 @@ export function FigureGallery({ projectId }: FigureGalleryProps) {
   }
 
   const handleDownload = (path: string) => {
-    const url = `/api/files/${projectId}/${encodeURIComponent(path)}`
+    const url = fileApi.fileUrl(projectId, path)
     window.open(url, '_blank')
   }
 

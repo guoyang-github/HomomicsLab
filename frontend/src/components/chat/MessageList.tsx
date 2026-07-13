@@ -46,7 +46,7 @@ export function MessageList() {
   const setIsTyping = useChatStore((state) => state.setIsTyping)
   const { setTaskTree, setProgress } = useTaskStore()
   const { loadPlan, discardDraft } = usePlanStore()
-  const { setJobId, reset: resetExecution } = useExecutionStore()
+  const { startJob } = useExecutionStore()
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -83,8 +83,7 @@ export function MessageList() {
       setMessages(response.data.messages)
 
       if (response.data.job_id) {
-        resetExecution()
-        setJobId(response.data.job_id)
+        startJob(response.data.job_id, currentSessionId)
         setTaskTree(tasks)
         setProgress(_extractProgress(tasks))
       }

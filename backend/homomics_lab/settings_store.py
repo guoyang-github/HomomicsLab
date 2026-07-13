@@ -69,6 +69,10 @@ class RuntimeSettings(BaseModel):
         default=None,
         description="Watch sibling skill repos and domain files at startup.",
     )
+    open_exploration_mode_enabled: Optional[bool] = Field(
+        default=None,
+        description="Allow weak-domain requests to be routed to the open agent.",
+    )
     auto_install_dependencies: Optional[bool] = Field(
         default=None,
         description="Automatically install skill requirements into isolated venvs.",

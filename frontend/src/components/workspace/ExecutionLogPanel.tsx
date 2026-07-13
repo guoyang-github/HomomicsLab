@@ -109,7 +109,9 @@ export function ExecutionLogPanel() {
                       log.level === 'stdout' && 'text-foreground',
                       log.level === 'success' && 'text-success',
                       log.level === 'info' && 'text-primary',
-                      log.level === 'warning' && 'text-warning'
+                      log.level === 'warning' && 'text-warning',
+                      log.level === 'tool' && 'text-primary',
+                      log.level === 'artifact' && 'text-success'
                     )}
                   >
                     {log.level}

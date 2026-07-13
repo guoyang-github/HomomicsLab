@@ -16,10 +16,19 @@ from typing import Any, Dict, List, Optional
 from homomics_lab.config import settings
 from homomics_lab.security import safe_open_path, safe_write_path
 from homomics_lab.skills.sandbox import Sandbox
+from homomics_lab.workspace.context import get_current_workspace
 
 
 def _workspace_root() -> Path:
-    """Return the configured workspace root (lazy so tests can monkeypatch it)."""
+    """Return the active project workspace root.
+
+    Background jobs set ``current_workspace`` for the duration of a run. Falling
+    back to ``settings.data_dir`` keeps direct tool/test calls working when no
+    workspace context is active.
+    """
+    workspace = get_current_workspace()
+    if workspace is not None:
+        return Path(workspace.workspace_dir).resolve()
     return Path(settings.data_dir).resolve()
 
 
@@ -98,6 +107,38 @@ def file_edit(path: str, old_string: str, new_string: str) -> Dict[str, Any]:
     return {"path": str(file_path), "replaced": True}
 
 
+def _run_local_subprocess(command: str, workdir: Path, timeout: int) -> Dict[str, Any]:
+    """Run a shell command directly in the workspace and capture its exit code."""
+    import subprocess
+
+    result = subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        cwd=str(workdir),
+        timeout=timeout,
+    )
+    return {
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
+
+
+def _is_sandbox_infra_error(output: str) -> bool:
+    """Detect sandbox/container startup failures rather than command failures."""
+    text = (output or "").strip().lower()
+    markers = (
+        "bwrap: can't mkdir /work",
+        "bwrap: can't create file",
+        "unable to find image",
+        "docker: error getting credentials",
+        "failed to start sandbox",
+    )
+    return any(marker in text for marker in markers)
+
+
 async def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60) -> Dict[str, Any]:
     """Execute a shell command inside the configured sandbox.
 
@@ -134,31 +175,35 @@ async def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60)
                 "sandbox (bubblewrap/container) is available."
             )
         sandbox = Sandbox.create(backend, workdir, container_image=settings.skill_container_image)
+        detected_backend = backend if backend != "auto" else _detected_sandbox_name(sandbox)
         output = await sandbox.run_command(command, cwd=workdir, timeout_seconds=timeout)
+        if backend == "auto" and _is_sandbox_infra_error(output):
+            # Sandbox.create already probes backends, but some failures only show
+            # up on the real command (missing container image, WSL bwrap mount
+            # limits). Fall back to a local subprocess so dev runs keep working.
+            local = _run_local_subprocess(command, workdir, timeout)
+            local["sandbox_backend"] = f"{detected_backend}_failed_local_fallback"
+            local["sandbox_warning"] = output.strip()
+            return local
+        if _is_sandbox_infra_error(output):
+            return {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": output,
+                "sandbox_backend": detected_backend,
+            }
         return {
             "returncode": 0,
             "stdout": output,
             "stderr": "",
-            "sandbox_backend": backend if backend != "auto" else _detected_sandbox_name(sandbox),
+            "sandbox_backend": detected_backend,
         }
 
     # Legacy unsandboxed local-dev path.
     if not settings.interactive_mode:
-        import subprocess
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            cwd=str(workdir),
-            timeout=timeout,
-        )
-        return {
-            "returncode": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "sandbox_backend": "local_unsandboxed_legacy",
-        }
+        local = _run_local_subprocess(command, workdir, timeout)
+        local["sandbox_backend"] = "local_unsandboxed_legacy"
+        return local
 
     raise RuntimeError(
         "shell_exec is disabled: enable an isolated sandbox or explicitly disable "

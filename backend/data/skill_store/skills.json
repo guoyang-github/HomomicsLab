@@ -10,8 +10,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.422003+00:00",
-    "updated_at": "2026-07-09T04:22:31.422039+00:00"
+    "imported_at": "2026-07-13T04:12:00.479850+00:00",
+    "updated_at": "2026-07-13T04:12:00.479868+00:00"
   },
   "builtin:core_hitl": {
     "id": "core_hitl",
@@ -24,8 +24,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.428154+00:00",
-    "updated_at": "2026-07-09T04:22:31.428171+00:00"
+    "imported_at": "2026-07-13T04:12:00.489165+00:00",
+    "updated_at": "2026-07-13T04:12:00.489184+00:00"
   },
   "builtin:core_interpretation": {
     "id": "core_interpretation",
@@ -38,8 +38,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.433575+00:00",
-    "updated_at": "2026-07-09T04:22:31.433587+00:00"
+    "imported_at": "2026-07-13T04:12:00.496214+00:00",
+    "updated_at": "2026-07-13T04:12:00.496230+00:00"
   },
   "builtin:core_planning": {
     "id": "core_planning",
@@ -52,8 +52,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.438647+00:00",
-    "updated_at": "2026-07-09T04:22:31.438662+00:00"
+    "imported_at": "2026-07-13T04:12:00.504008+00:00",
+    "updated_at": "2026-07-13T04:12:00.504027+00:00"
   },
   "builtin:core_reproducibility": {
     "id": "core_reproducibility",
@@ -66,8 +66,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.444014+00:00",
-    "updated_at": "2026-07-09T04:22:31.444024+00:00"
+    "imported_at": "2026-07-13T04:12:00.511994+00:00",
+    "updated_at": "2026-07-13T04:12:00.512006+00:00"
   },
   "builtin:core_skill_router": {
     "id": "core_skill_router",
@@ -80,8 +80,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.449698+00:00",
-    "updated_at": "2026-07-09T04:22:31.449726+00:00"
+    "imported_at": "2026-07-13T04:12:00.519970+00:00",
+    "updated_at": "2026-07-13T04:12:00.519988+00:00"
   },
   "builtin:utils_workflow_management_nextflow": {
     "id": "utils_workflow_management_nextflow",
@@ -94,8 +94,8 @@
     "enabled": true,
     "trusted": false,
     "sha256": null,
-    "imported_at": "2026-07-09T04:22:31.454993+00:00",
-    "updated_at": "2026-07-09T04:22:31.455007+00:00"
+    "imported_at": "2026-07-13T04:12:00.527051+00:00",
+    "updated_at": "2026-07-13T04:12:00.527062+00:00"
   },
   "builtin:data_loader": {
     "id": "data_loader",
@@ -249,7 +249,7 @@
     "trusted": true,
     "sha256": "b0e1d2373996810c54ca8efa24ee65ed6ab3bf07554922e6a23d81b52e08135a",
     "imported_at": "2026-07-03T04:42:32.066239+00:00",
-    "updated_at": "2026-07-09T04:28:00.050752+00:00"
+    "updated_at": "2026-07-11T08:56:46.395995+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -263,7 +263,7 @@
     "trusted": true,
     "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
     "imported_at": "2026-07-03T04:42:32.163340+00:00",
-    "updated_at": "2026-07-09T04:24:06.386454+00:00"
+    "updated_at": "2026-07-11T08:56:46.944455+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -277,7 +277,7 @@
     "trusted": true,
     "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
     "imported_at": "2026-07-03T04:42:32.888744+00:00",
-    "updated_at": "2026-07-09T04:24:06.604159+00:00"
+    "updated_at": "2026-07-11T08:56:47.221440+00:00"
   },
   "nanoresearch:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -291,7 +291,7 @@
     "trusted": true,
     "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
     "imported_at": "2026-07-03T04:42:33.211830+00:00",
-    "updated_at": "2026-07-09T04:24:07.056816+00:00"
+    "updated_at": "2026-07-11T08:56:47.655501+00:00"
   },
   "nanoresearch:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -305,7 +305,7 @@
     "trusted": true,
     "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
     "imported_at": "2026-07-03T04:42:33.585598+00:00",
-    "updated_at": "2026-07-09T04:24:07.369773+00:00"
+    "updated_at": "2026-07-11T08:56:48.222309+00:00"
   },
   "nanoresearch:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -319,7 +319,7 @@
     "trusted": true,
     "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
     "imported_at": "2026-07-03T04:42:33.970106+00:00",
-    "updated_at": "2026-07-09T04:24:07.996697+00:00"
+    "updated_at": "2026-07-11T08:56:48.553159+00:00"
   },
   "nanoresearch:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -333,7 +333,7 @@
     "trusted": true,
     "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
     "imported_at": "2026-07-03T04:42:34.287923+00:00",
-    "updated_at": "2026-07-09T04:24:08.311979+00:00"
+    "updated_at": "2026-07-11T08:56:48.890943+00:00"
   },
   "nanoresearch:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -347,7 +347,7 @@
     "trusted": true,
     "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
     "imported_at": "2026-07-03T04:42:35.257004+00:00",
-    "updated_at": "2026-07-09T04:24:08.883040+00:00"
+    "updated_at": "2026-07-11T08:56:49.311158+00:00"
   },
   "nanoresearch:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -361,7 +361,7 @@
     "trusted": true,
     "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
     "imported_at": "2026-07-03T04:42:35.490585+00:00",
-    "updated_at": "2026-07-09T04:24:09.388458+00:00"
+    "updated_at": "2026-07-11T08:56:49.599887+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -375,7 +375,7 @@
     "trusted": true,
     "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
     "imported_at": "2026-07-03T04:42:35.774814+00:00",
-    "updated_at": "2026-07-09T04:24:09.635304+00:00"
+    "updated_at": "2026-07-11T08:56:49.886640+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -389,7 +389,7 @@
     "trusted": true,
     "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
     "imported_at": "2026-07-03T04:42:36.047773+00:00",
-    "updated_at": "2026-07-09T04:24:09.903504+00:00"
+    "updated_at": "2026-07-11T08:56:50.214570+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -403,7 +403,7 @@
     "trusted": true,
     "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
     "imported_at": "2026-07-03T04:42:36.826576+00:00",
-    "updated_at": "2026-07-09T04:24:10.215660+00:00"
+    "updated_at": "2026-07-11T08:56:50.601530+00:00"
   },
   "nanoresearch:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -417,7 +417,7 @@
     "trusted": true,
     "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
     "imported_at": "2026-07-03T04:42:37.124169+00:00",
-    "updated_at": "2026-07-09T04:24:10.693663+00:00"
+    "updated_at": "2026-07-11T08:56:51.107972+00:00"
   },
   "nanoresearch:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -431,7 +431,7 @@
     "trusted": true,
     "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
     "imported_at": "2026-07-03T04:42:37.439342+00:00",
-    "updated_at": "2026-07-09T04:24:10.950037+00:00"
+    "updated_at": "2026-07-11T08:56:51.417356+00:00"
   },
   "nanoresearch:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -445,7 +445,7 @@
     "trusted": true,
     "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
     "imported_at": "2026-07-03T04:42:37.848982+00:00",
-    "updated_at": "2026-07-09T04:24:11.252513+00:00"
+    "updated_at": "2026-07-11T08:56:51.778253+00:00"
   },
   "nanoresearch:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -459,7 +459,7 @@
     "trusted": true,
     "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
     "imported_at": "2026-07-03T04:42:38.615691+00:00",
-    "updated_at": "2026-07-09T04:24:11.670962+00:00"
+    "updated_at": "2026-07-11T08:56:52.158939+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -473,7 +473,7 @@
     "trusted": true,
     "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
     "imported_at": "2026-07-03T04:42:39.188809+00:00",
-    "updated_at": "2026-07-09T04:24:12.180979+00:00"
+    "updated_at": "2026-07-11T08:56:52.513607+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -487,7 +487,7 @@
     "trusted": true,
     "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
     "imported_at": "2026-07-03T04:42:39.612763+00:00",
-    "updated_at": "2026-07-09T04:24:12.537772+00:00"
+    "updated_at": "2026-07-11T08:56:52.852786+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -501,7 +501,7 @@
     "trusted": true,
     "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
     "imported_at": "2026-07-03T04:42:40.079998+00:00",
-    "updated_at": "2026-07-09T04:24:12.844869+00:00"
+    "updated_at": "2026-07-11T08:56:53.144064+00:00"
   },
   "nanoresearch:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -515,7 +515,7 @@
     "trusted": true,
     "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
     "imported_at": "2026-07-03T04:42:41.021692+00:00",
-    "updated_at": "2026-07-09T04:24:13.241153+00:00"
+    "updated_at": "2026-07-11T08:56:54.286748+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -529,7 +529,7 @@
     "trusted": true,
     "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
     "imported_at": "2026-07-03T04:42:41.399667+00:00",
-    "updated_at": "2026-07-09T04:24:13.847610+00:00"
+    "updated_at": "2026-07-11T08:56:55.667061+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -543,7 +543,7 @@
     "trusted": true,
     "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
     "imported_at": "2026-07-03T04:42:41.851916+00:00",
-    "updated_at": "2026-07-09T04:24:14.176537+00:00"
+    "updated_at": "2026-07-11T08:56:56.589785+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -557,7 +557,7 @@
     "trusted": true,
     "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
     "imported_at": "2026-07-03T04:42:42.710093+00:00",
-    "updated_at": "2026-07-09T04:24:14.545945+00:00"
+    "updated_at": "2026-07-11T08:56:57.181048+00:00"
   },
   "nanoresearch:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -571,7 +571,7 @@
     "trusted": true,
     "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
     "imported_at": "2026-07-03T04:42:43.735934+00:00",
-    "updated_at": "2026-07-09T04:24:15.160609+00:00"
+    "updated_at": "2026-07-11T08:56:58.082919+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -585,7 +585,7 @@
     "trusted": true,
     "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
     "imported_at": "2026-07-03T04:42:44.041161+00:00",
-    "updated_at": "2026-07-09T04:24:15.799848+00:00"
+    "updated_at": "2026-07-11T08:56:59.370105+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -599,7 +599,7 @@
     "trusted": true,
     "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
     "imported_at": "2026-07-03T04:42:44.474873+00:00",
-    "updated_at": "2026-07-09T04:24:16.104556+00:00"
+    "updated_at": "2026-07-11T08:56:59.675036+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -613,7 +613,7 @@
     "trusted": true,
     "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
     "imported_at": "2026-07-03T04:42:44.968960+00:00",
-    "updated_at": "2026-07-09T04:24:16.456284+00:00"
+    "updated_at": "2026-07-11T08:56:59.971690+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -627,7 +627,7 @@
     "trusted": true,
     "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
     "imported_at": "2026-07-03T04:42:45.841254+00:00",
-    "updated_at": "2026-07-09T04:24:16.844079+00:00"
+    "updated_at": "2026-07-11T08:57:00.492316+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -641,7 +641,7 @@
     "trusted": true,
     "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
     "imported_at": "2026-07-03T04:42:46.216502+00:00",
-    "updated_at": "2026-07-09T04:24:17.345784+00:00"
+    "updated_at": "2026-07-11T08:57:01.112546+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -655,7 +655,7 @@
     "trusted": true,
     "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
     "imported_at": "2026-07-03T04:42:46.665015+00:00",
-    "updated_at": "2026-07-09T04:24:17.662966+00:00"
+    "updated_at": "2026-07-11T08:57:01.415943+00:00"
   },
   "nanoresearch:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -669,7 +669,7 @@
     "trusted": true,
     "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
     "imported_at": "2026-07-03T04:42:46.949702+00:00",
-    "updated_at": "2026-07-09T04:24:17.930617+00:00"
+    "updated_at": "2026-07-11T08:57:01.732962+00:00"
   },
   "nanoresearch:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -683,7 +683,7 @@
     "trusted": true,
     "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
     "imported_at": "2026-07-03T04:42:47.334539+00:00",
-    "updated_at": "2026-07-09T04:24:18.209934+00:00"
+    "updated_at": "2026-07-11T08:57:02.039855+00:00"
   },
   "nanoresearch:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -697,7 +697,7 @@
     "trusted": true,
     "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
     "imported_at": "2026-07-03T04:42:47.729658+00:00",
-    "updated_at": "2026-07-09T04:24:18.553521+00:00"
+    "updated_at": "2026-07-11T08:57:02.368005+00:00"
   },
   "nanoresearch:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -711,7 +711,7 @@
     "trusted": true,
     "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
     "imported_at": "2026-07-03T04:42:48.492829+00:00",
-    "updated_at": "2026-07-09T04:24:18.955580+00:00"
+    "updated_at": "2026-07-11T08:57:03.006003+00:00"
   },
   "nanoresearch:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -725,7 +725,7 @@
     "trusted": true,
     "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
     "imported_at": "2026-07-03T04:42:48.841368+00:00",
-    "updated_at": "2026-07-09T04:24:19.508009+00:00"
+    "updated_at": "2026-07-11T08:57:03.428300+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -739,7 +739,7 @@
     "trusted": true,
     "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
     "imported_at": "2026-07-03T04:42:49.190533+00:00",
-    "updated_at": "2026-07-09T04:24:19.875249+00:00"
+    "updated_at": "2026-07-11T08:57:03.749182+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -753,7 +753,7 @@
     "trusted": true,
     "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
     "imported_at": "2026-07-03T04:42:50.213069+00:00",
-    "updated_at": "2026-07-09T04:24:20.215449+00:00"
+    "updated_at": "2026-07-11T08:57:04.137476+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -767,7 +767,7 @@
     "trusted": true,
     "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
     "imported_at": "2026-07-03T04:42:51.282815+00:00",
-    "updated_at": "2026-07-09T04:24:20.874043+00:00"
+    "updated_at": "2026-07-11T08:57:04.689276+00:00"
   },
   "nanoresearch:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -781,7 +781,7 @@
     "trusted": true,
     "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
     "imported_at": "2026-07-03T04:42:51.709093+00:00",
-    "updated_at": "2026-07-09T04:24:21.452815+00:00"
+    "updated_at": "2026-07-11T08:57:05.166244+00:00"
   },
   "nanoresearch:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -795,7 +795,7 @@
     "trusted": true,
     "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
     "imported_at": "2026-07-03T04:42:51.952557+00:00",
-    "updated_at": "2026-07-09T04:24:21.698978+00:00"
+    "updated_at": "2026-07-11T08:57:05.449681+00:00"
   },
   "nanoresearch:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -809,7 +809,7 @@
     "trusted": true,
     "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
     "imported_at": "2026-07-03T04:42:52.935591+00:00",
-    "updated_at": "2026-07-09T04:24:22.074272+00:00"
+    "updated_at": "2026-07-11T08:57:05.784019+00:00"
   },
   "nanoresearch:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -823,7 +823,7 @@
     "trusted": true,
     "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
     "imported_at": "2026-07-03T04:42:53.242003+00:00",
-    "updated_at": "2026-07-09T04:24:22.682316+00:00"
+    "updated_at": "2026-07-11T08:57:06.241952+00:00"
   },
   "nanoresearch:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -837,7 +837,7 @@
     "trusted": true,
     "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
     "imported_at": "2026-07-03T04:42:54.245507+00:00",
-    "updated_at": "2026-07-09T04:24:23.010754+00:00"
+    "updated_at": "2026-07-11T08:57:06.603862+00:00"
   },
   "nanoresearch:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -851,7 +851,7 @@
     "trusted": true,
     "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
     "imported_at": "2026-07-03T04:42:54.665005+00:00",
-    "updated_at": "2026-07-09T04:24:23.525036+00:00"
+    "updated_at": "2026-07-11T08:57:06.998033+00:00"
   },
   "nanoresearch:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -865,7 +865,7 @@
     "trusted": true,
     "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
     "imported_at": "2026-07-03T04:42:55.050970+00:00",
-    "updated_at": "2026-07-09T04:24:23.819830+00:00"
+    "updated_at": "2026-07-11T08:57:07.318726+00:00"
   },
   "nanoresearch:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -879,7 +879,7 @@
     "trusted": true,
     "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
     "imported_at": "2026-07-03T04:42:56.029730+00:00",
-    "updated_at": "2026-07-09T04:24:24.192616+00:00"
+    "updated_at": "2026-07-11T08:57:07.714494+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -893,7 +893,7 @@
     "trusted": true,
     "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
     "imported_at": "2026-07-03T04:42:56.862521+00:00",
-    "updated_at": "2026-07-09T04:24:24.681430+00:00"
+    "updated_at": "2026-07-11T08:57:08.137744+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -907,7 +907,7 @@
     "trusted": true,
     "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
     "imported_at": "2026-07-03T04:42:57.201129+00:00",
-    "updated_at": "2026-07-09T04:24:24.922773+00:00"
+    "updated_at": "2026-07-11T08:57:08.412455+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -921,7 +921,7 @@
     "trusted": true,
     "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
     "imported_at": "2026-07-03T04:42:57.424935+00:00",
-    "updated_at": "2026-07-09T04:24:25.139916+00:00"
+    "updated_at": "2026-07-11T08:57:08.636401+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -935,7 +935,7 @@
     "trusted": true,
     "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
     "imported_at": "2026-07-03T04:42:57.782157+00:00",
-    "updated_at": "2026-07-09T04:24:25.374170+00:00"
+    "updated_at": "2026-07-11T08:57:08.916111+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -949,7 +949,7 @@
     "trusted": true,
     "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
     "imported_at": "2026-07-03T04:42:58.911270+00:00",
-    "updated_at": "2026-07-09T04:24:25.773471+00:00"
+    "updated_at": "2026-07-11T08:57:09.308078+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -963,7 +963,7 @@
     "trusted": true,
     "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
     "imported_at": "2026-07-03T04:43:00.039118+00:00",
-    "updated_at": "2026-07-09T04:24:26.682919+00:00"
+    "updated_at": "2026-07-11T08:57:09.887803+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -977,7 +977,7 @@
     "trusted": true,
     "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
     "imported_at": "2026-07-03T04:43:00.939131+00:00",
-    "updated_at": "2026-07-09T04:24:27.213796+00:00"
+    "updated_at": "2026-07-11T08:57:10.437280+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -991,7 +991,7 @@
     "trusted": true,
     "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
     "imported_at": "2026-07-03T04:43:01.650949+00:00",
-    "updated_at": "2026-07-09T04:24:27.691056+00:00"
+    "updated_at": "2026-07-11T08:57:10.945734+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -1005,7 +1005,7 @@
     "trusted": true,
     "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
     "imported_at": "2026-07-03T04:43:02.156644+00:00",
-    "updated_at": "2026-07-09T04:24:28.153281+00:00"
+    "updated_at": "2026-07-11T08:57:11.360123+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -1019,7 +1019,7 @@
     "trusted": true,
     "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
     "imported_at": "2026-07-03T04:43:03.469076+00:00",
-    "updated_at": "2026-07-09T04:24:28.531375+00:00"
+    "updated_at": "2026-07-11T08:57:11.795343+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -1033,7 +1033,7 @@
     "trusted": true,
     "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
     "imported_at": "2026-07-03T04:43:03.920009+00:00",
-    "updated_at": "2026-07-09T04:24:29.232816+00:00"
+    "updated_at": "2026-07-11T08:57:12.254064+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -1047,7 +1047,7 @@
     "trusted": true,
     "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
     "imported_at": "2026-07-03T04:43:04.338979+00:00",
-    "updated_at": "2026-07-09T04:24:29.515884+00:00"
+    "updated_at": "2026-07-11T08:57:12.555082+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -1061,7 +1061,7 @@
     "trusted": true,
     "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
     "imported_at": "2026-07-03T04:43:05.613710+00:00",
-    "updated_at": "2026-07-09T04:24:29.858856+00:00"
+    "updated_at": "2026-07-11T08:57:12.828665+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -1075,7 +1075,7 @@
     "trusted": true,
     "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
     "imported_at": "2026-07-03T04:43:06.064629+00:00",
-    "updated_at": "2026-07-09T04:24:30.423621+00:00"
+    "updated_at": "2026-07-11T08:57:13.243518+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -1089,7 +1089,7 @@
     "trusted": true,
     "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
     "imported_at": "2026-07-03T04:43:06.435842+00:00",
-    "updated_at": "2026-07-09T04:24:30.733708+00:00"
+    "updated_at": "2026-07-11T08:57:13.491800+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -1103,7 +1103,7 @@
     "trusted": true,
     "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
     "imported_at": "2026-07-03T04:43:07.677594+00:00",
-    "updated_at": "2026-07-09T04:24:31.027116+00:00"
+    "updated_at": "2026-07-11T08:57:13.763429+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -1117,7 +1117,7 @@
     "trusted": true,
     "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
     "imported_at": "2026-07-03T04:43:08.944612+00:00",
-    "updated_at": "2026-07-09T04:24:31.742923+00:00"
+    "updated_at": "2026-07-11T08:57:14.221364+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -1131,7 +1131,7 @@
     "trusted": true,
     "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
     "imported_at": "2026-07-03T04:43:10.311702+00:00",
-    "updated_at": "2026-07-09T04:24:32.462141+00:00"
+    "updated_at": "2026-07-11T08:57:14.729118+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -1145,7 +1145,7 @@
     "trusted": true,
     "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
     "imported_at": "2026-07-03T04:43:10.741537+00:00",
-    "updated_at": "2026-07-09T04:24:33.087473+00:00"
+    "updated_at": "2026-07-11T08:57:15.129948+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -1159,7 +1159,7 @@
     "trusted": true,
     "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
     "imported_at": "2026-07-03T04:43:11.997980+00:00",
-    "updated_at": "2026-07-09T04:24:33.426370+00:00"
+    "updated_at": "2026-07-11T08:57:15.417000+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -1173,7 +1173,7 @@
     "trusted": true,
     "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
     "imported_at": "2026-07-03T04:43:12.508686+00:00",
-    "updated_at": "2026-07-09T04:24:34.036966+00:00"
+    "updated_at": "2026-07-11T08:57:15.740441+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -1187,7 +1187,7 @@
     "trusted": true,
     "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
     "imported_at": "2026-07-03T04:43:13.021487+00:00",
-    "updated_at": "2026-07-09T04:24:34.372833+00:00"
+    "updated_at": "2026-07-11T08:57:16.013582+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -1201,7 +1201,7 @@
     "trusted": true,
     "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
     "imported_at": "2026-07-03T04:43:13.524309+00:00",
-    "updated_at": "2026-07-09T04:24:34.731872+00:00"
+    "updated_at": "2026-07-11T08:57:16.311555+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -1215,7 +1215,7 @@
     "trusted": true,
     "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
     "imported_at": "2026-07-03T04:43:13.818211+00:00",
-    "updated_at": "2026-07-09T04:24:35.028999+00:00"
+    "updated_at": "2026-07-11T08:57:16.526679+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -1229,7 +1229,7 @@
     "trusted": true,
     "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
     "imported_at": "2026-07-03T04:43:14.036817+00:00",
-    "updated_at": "2026-07-09T04:24:35.245369+00:00"
+    "updated_at": "2026-07-11T08:57:16.695069+00:00"
   },
   "nanoresearch:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -1243,7 +1243,7 @@
     "trusted": true,
     "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
     "imported_at": "2026-07-03T04:43:15.794843+00:00",
-    "updated_at": "2026-07-09T04:24:35.583939+00:00"
+    "updated_at": "2026-07-11T08:57:17.077557+00:00"
   },
   "nanoresearch:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -1257,7 +1257,7 @@
     "trusted": true,
     "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
     "imported_at": "2026-07-03T04:43:17.658478+00:00",
-    "updated_at": "2026-07-09T04:24:36.582061+00:00"
+    "updated_at": "2026-07-11T08:57:17.782697+00:00"
   },
   "nanoresearch:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -1271,7 +1271,7 @@
     "trusted": true,
     "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
     "imported_at": "2026-07-03T04:43:19.000399+00:00",
-    "updated_at": "2026-07-09T04:24:37.558126+00:00"
+    "updated_at": "2026-07-11T08:57:18.459722+00:00"
   },
   "genomics:bio-genomics-alignment": {
     "id": "bio-genomics-alignment",
@@ -2613,9 +2613,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-celltypist",
     "enabled": true,
     "trusted": false,
-    "sha256": "175a6aefd4efd451a6cdb7d1bef3a31ecb97e1efb528f2c1b7b002b3ae9f14aa",
-    "imported_at": "2026-07-07T10:07:40.775591+00:00",
-    "updated_at": "2026-07-09T04:24:05.868597+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.926871+00:00",
+    "updated_at": "2026-07-13T02:39:45.926891+00:00"
   },
   "builtin:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -2627,9 +2627,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-markers",
     "enabled": true,
     "trusted": false,
-    "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
-    "imported_at": "2026-07-07T10:07:40.781553+00:00",
-    "updated_at": "2026-07-09T04:24:06.395131+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.935554+00:00",
+    "updated_at": "2026-07-13T02:39:45.935574+00:00"
   },
   "builtin:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -2641,9 +2641,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-sctype-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
-    "imported_at": "2026-07-07T10:07:40.787666+00:00",
-    "updated_at": "2026-07-09T04:24:06.733613+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.943647+00:00",
+    "updated_at": "2026-07-13T02:39:45.943666+00:00"
   },
   "builtin:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -2655,9 +2655,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-singler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
-    "imported_at": "2026-07-07T10:07:40.794315+00:00",
-    "updated_at": "2026-07-09T04:24:07.137533+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.951942+00:00",
+    "updated_at": "2026-07-13T02:39:45.951962+00:00"
   },
   "builtin:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -2669,9 +2669,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-archr-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
-    "imported_at": "2026-07-07T10:07:40.800010+00:00",
-    "updated_at": "2026-07-09T04:24:07.441777+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.959392+00:00",
+    "updated_at": "2026-07-13T02:39:45.959412+00:00"
   },
   "builtin:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -2683,9 +2683,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-chromvar-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
-    "imported_at": "2026-07-07T10:07:40.806184+00:00",
-    "updated_at": "2026-07-09T04:24:08.076092+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.967774+00:00",
+    "updated_at": "2026-07-13T02:39:45.967795+00:00"
   },
   "builtin:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -2697,9 +2697,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-atac-signac-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
-    "imported_at": "2026-07-07T10:07:40.812869+00:00",
-    "updated_at": "2026-07-09T04:24:08.394288+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.975112+00:00",
+    "updated_at": "2026-07-13T02:39:45.975131+00:00"
   },
   "builtin:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -2711,9 +2711,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-batch-integration",
     "enabled": true,
     "trusted": false,
-    "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
-    "imported_at": "2026-07-07T10:07:40.819033+00:00",
-    "updated_at": "2026-07-09T04:24:09.068827+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.982672+00:00",
+    "updated_at": "2026-07-13T02:39:45.982693+00:00"
   },
   "builtin:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -2725,9 +2725,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-clustering",
     "enabled": true,
     "trusted": false,
-    "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
-    "imported_at": "2026-07-07T10:07:40.826631+00:00",
-    "updated_at": "2026-07-09T04:24:09.446415+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.991207+00:00",
+    "updated_at": "2026-07-13T02:39:45.991230+00:00"
   },
   "builtin:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -2739,9 +2739,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
-    "imported_at": "2026-07-07T10:07:40.833296+00:00",
-    "updated_at": "2026-07-09T04:24:09.695660+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:45.998944+00:00",
+    "updated_at": "2026-07-13T02:39:45.998997+00:00"
   },
   "builtin:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -2753,9 +2753,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
-    "imported_at": "2026-07-07T10:07:40.839697+00:00",
-    "updated_at": "2026-07-09T04:24:09.953740+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.007548+00:00",
+    "updated_at": "2026-07-13T02:39:46.007572+00:00"
   },
   "builtin:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -2767,9 +2767,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnvpy",
     "enabled": true,
     "trusted": false,
-    "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
-    "imported_at": "2026-07-07T10:07:40.846206+00:00",
-    "updated_at": "2026-07-09T04:24:10.383484+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.015896+00:00",
+    "updated_at": "2026-07-13T02:39:46.015917+00:00"
   },
   "builtin:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -2781,9 +2781,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-scevan-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
-    "imported_at": "2026-07-07T10:07:40.852784+00:00",
-    "updated_at": "2026-07-09T04:24:10.743096+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.023939+00:00",
+    "updated_at": "2026-07-13T02:39:46.023964+00:00"
   },
   "builtin:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -2795,9 +2795,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
-    "imported_at": "2026-07-07T10:07:40.859244+00:00",
-    "updated_at": "2026-07-09T04:24:11.005034+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.042441+00:00",
+    "updated_at": "2026-07-13T02:39:46.042466+00:00"
   },
   "builtin:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -2809,9 +2809,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-nichenet-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
-    "imported_at": "2026-07-07T10:07:40.866236+00:00",
-    "updated_at": "2026-07-09T04:24:11.347923+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.051006+00:00",
+    "updated_at": "2026-07-13T02:39:46.051026+00:00"
   },
   "builtin:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -2823,9 +2823,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-data-io",
     "enabled": true,
     "trusted": false,
-    "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
-    "imported_at": "2026-07-07T10:07:40.873340+00:00",
-    "updated_at": "2026-07-09T04:24:11.810950+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.058770+00:00",
+    "updated_at": "2026-07-13T02:39:46.058791+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -2837,9 +2837,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-diffcyt-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
-    "imported_at": "2026-07-07T10:07:40.879668+00:00",
-    "updated_at": "2026-07-09T04:24:12.271986+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.066650+00:00",
+    "updated_at": "2026-07-13T02:39:46.066674+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -2851,9 +2851,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-milor-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
-    "imported_at": "2026-07-07T10:07:40.885907+00:00",
-    "updated_at": "2026-07-09T04:24:12.600980+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.074558+00:00",
+    "updated_at": "2026-07-13T02:39:46.074579+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -2865,9 +2865,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
-    "imported_at": "2026-07-07T10:07:40.892018+00:00",
-    "updated_at": "2026-07-09T04:24:12.910746+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.083456+00:00",
+    "updated_at": "2026-07-13T02:39:46.083478+00:00"
   },
   "builtin:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -2879,9 +2879,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-sccoda",
     "enabled": true,
     "trusted": false,
-    "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
-    "imported_at": "2026-07-07T10:07:40.898709+00:00",
-    "updated_at": "2026-07-09T04:24:13.436414+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.091274+00:00",
+    "updated_at": "2026-07-13T02:39:46.091294+00:00"
   },
   "builtin:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -2893,9 +2893,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-doubletfinder-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
-    "imported_at": "2026-07-07T10:07:40.905534+00:00",
-    "updated_at": "2026-07-09T04:24:13.919776+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.099109+00:00",
+    "updated_at": "2026-07-13T02:39:46.099131+00:00"
   },
   "builtin:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -2907,9 +2907,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scdblfinder-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
-    "imported_at": "2026-07-07T10:07:40.912171+00:00",
-    "updated_at": "2026-07-09T04:24:14.244412+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.107514+00:00",
+    "updated_at": "2026-07-13T02:39:46.107542+00:00"
   },
   "builtin:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -2921,9 +2921,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scrublet",
     "enabled": true,
     "trusted": false,
-    "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
-    "imported_at": "2026-07-07T10:07:40.918306+00:00",
-    "updated_at": "2026-07-09T04:24:14.728066+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.115645+00:00",
+    "updated_at": "2026-07-13T02:39:46.115669+00:00"
   },
   "builtin:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -2935,9 +2935,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-solo",
     "enabled": true,
     "trusted": false,
-    "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
-    "imported_at": "2026-07-07T10:07:40.923955+00:00",
-    "updated_at": "2026-07-09T04:24:15.379773+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.123278+00:00",
+    "updated_at": "2026-07-13T02:39:46.123297+00:00"
   },
   "builtin:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -2949,9 +2949,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-aucell-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
-    "imported_at": "2026-07-07T10:07:40.930550+00:00",
-    "updated_at": "2026-07-09T04:24:15.855508+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.130536+00:00",
+    "updated_at": "2026-07-13T02:39:46.130554+00:00"
   },
   "builtin:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -2963,9 +2963,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-clusterprofiler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
-    "imported_at": "2026-07-07T10:07:40.937084+00:00",
-    "updated_at": "2026-07-09T04:24:16.190680+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.138539+00:00",
+    "updated_at": "2026-07-13T02:39:46.138559+00:00"
   },
   "builtin:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -2977,9 +2977,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-decoupler-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
-    "imported_at": "2026-07-07T10:07:40.942902+00:00",
-    "updated_at": "2026-07-09T04:24:16.531871+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.147387+00:00",
+    "updated_at": "2026-07-13T02:39:46.147405+00:00"
   },
   "builtin:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -2991,9 +2991,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-gseapy",
     "enabled": true,
     "trusted": false,
-    "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
-    "imported_at": "2026-07-07T10:07:40.949686+00:00",
-    "updated_at": "2026-07-09T04:24:17.015284+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.156043+00:00",
+    "updated_at": "2026-07-13T02:39:46.156079+00:00"
   },
   "builtin:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -3005,9 +3005,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-irgsea-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
-    "imported_at": "2026-07-07T10:07:40.956560+00:00",
-    "updated_at": "2026-07-09T04:24:17.407516+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.163093+00:00",
+    "updated_at": "2026-07-13T02:39:46.163112+00:00"
   },
   "builtin:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -3019,9 +3019,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-progeny-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
-    "imported_at": "2026-07-07T10:07:40.964155+00:00",
-    "updated_at": "2026-07-09T04:24:17.738656+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.170681+00:00",
+    "updated_at": "2026-07-13T02:39:46.170701+00:00"
   },
   "builtin:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -3033,9 +3033,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-ucell-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
-    "imported_at": "2026-07-07T10:07:40.970710+00:00",
-    "updated_at": "2026-07-09T04:24:17.969461+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.178998+00:00",
+    "updated_at": "2026-07-13T02:39:46.179019+00:00"
   },
   "builtin:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -3047,9 +3047,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-fastq2mtx",
     "enabled": true,
     "trusted": false,
-    "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
-    "imported_at": "2026-07-07T10:07:40.977336+00:00",
-    "updated_at": "2026-07-09T04:24:18.267716+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.187503+00:00",
+    "updated_at": "2026-07-13T02:39:46.187524+00:00"
   },
   "builtin:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -3061,9 +3061,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-markers",
     "enabled": true,
     "trusted": false,
-    "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
-    "imported_at": "2026-07-07T10:07:40.983690+00:00",
-    "updated_at": "2026-07-09T04:24:18.622424+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.194780+00:00",
+    "updated_at": "2026-07-13T02:39:46.194804+00:00"
   },
   "builtin:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -3075,9 +3075,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-compass",
     "enabled": true,
     "trusted": false,
-    "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
-    "imported_at": "2026-07-07T10:07:40.990746+00:00",
-    "updated_at": "2026-07-09T04:24:19.148915+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.203224+00:00",
+    "updated_at": "2026-07-13T02:39:46.203245+00:00"
   },
   "builtin:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -3089,9 +3089,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-scmetabolism-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
-    "imported_at": "2026-07-07T10:07:40.997770+00:00",
-    "updated_at": "2026-07-09T04:24:19.566783+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.211000+00:00",
+    "updated_at": "2026-07-13T02:39:46.211027+00:00"
   },
   "builtin:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -3103,9 +3103,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-augur-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
-    "imported_at": "2026-07-07T10:07:41.004554+00:00",
-    "updated_at": "2026-07-09T04:24:19.936926+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.219501+00:00",
+    "updated_at": "2026-07-13T02:39:46.219530+00:00"
   },
   "builtin:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -3117,9 +3117,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-pertpy",
     "enabled": true,
     "trusted": false,
-    "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
-    "imported_at": "2026-07-07T10:07:41.012076+00:00",
-    "updated_at": "2026-07-09T04:24:20.423223+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.227964+00:00",
+    "updated_at": "2026-07-13T02:39:46.227984+00:00"
   },
   "builtin:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -3131,9 +3131,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-scgen",
     "enabled": true,
     "trusted": false,
-    "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
-    "imported_at": "2026-07-07T10:07:41.018926+00:00",
-    "updated_at": "2026-07-09T04:24:21.083447+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.236246+00:00",
+    "updated_at": "2026-07-13T02:39:46.236267+00:00"
   },
   "builtin:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -3145,9 +3145,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-sctenifoldknk-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
-    "imported_at": "2026-07-07T10:07:41.026452+00:00",
-    "updated_at": "2026-07-09T04:24:21.518360+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.245427+00:00",
+    "updated_at": "2026-07-13T02:39:46.245451+00:00"
   },
   "builtin:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -3159,9 +3159,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-preprocessing",
     "enabled": true,
     "trusted": false,
-    "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
-    "imported_at": "2026-07-07T10:07:41.033536+00:00",
-    "updated_at": "2026-07-09T04:24:21.749647+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.253350+00:00",
+    "updated_at": "2026-07-13T02:39:46.253381+00:00"
   },
   "builtin:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -3173,9 +3173,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-pyscenic",
     "enabled": true,
     "trusted": false,
-    "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
-    "imported_at": "2026-07-07T10:07:41.040009+00:00",
-    "updated_at": "2026-07-09T04:24:22.319764+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.262102+00:00",
+    "updated_at": "2026-07-13T02:39:46.262123+00:00"
   },
   "builtin:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -3187,9 +3187,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-scenic-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
-    "imported_at": "2026-07-07T10:07:41.046364+00:00",
-    "updated_at": "2026-07-09T04:24:22.738173+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.270451+00:00",
+    "updated_at": "2026-07-13T02:39:46.270472+00:00"
   },
   "builtin:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -3201,9 +3201,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-splicing-brie2",
     "enabled": true,
     "trusted": false,
-    "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
-    "imported_at": "2026-07-07T10:07:41.052608+00:00",
-    "updated_at": "2026-07-09T04:24:23.202309+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.278638+00:00",
+    "updated_at": "2026-07-13T02:39:46.278663+00:00"
   },
   "builtin:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -3215,9 +3215,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-tcr-startrac-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
-    "imported_at": "2026-07-07T10:07:41.059303+00:00",
-    "updated_at": "2026-07-09T04:24:23.596209+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.288249+00:00",
+    "updated_at": "2026-07-13T02:39:46.288270+00:00"
   },
   "builtin:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -3229,9 +3229,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-monocle3-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
-    "imported_at": "2026-07-07T10:07:41.065483+00:00",
-    "updated_at": "2026-07-09T04:24:23.881038+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.295771+00:00",
+    "updated_at": "2026-07-13T02:39:46.295793+00:00"
   },
   "builtin:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -3243,9 +3243,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-scvelo",
     "enabled": true,
     "trusted": false,
-    "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
-    "imported_at": "2026-07-07T10:07:41.071735+00:00",
-    "updated_at": "2026-07-09T04:24:24.381522+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.303521+00:00",
+    "updated_at": "2026-07-13T02:39:46.303545+00:00"
   },
   "builtin:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -3257,9 +3257,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-batch-integration",
     "enabled": true,
     "trusted": false,
-    "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
-    "imported_at": "2026-07-07T10:07:41.078295+00:00",
-    "updated_at": "2026-07-09T04:24:24.718106+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.312411+00:00",
+    "updated_at": "2026-07-13T02:39:46.312437+00:00"
   },
   "builtin:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -3271,9 +3271,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-fastcnv-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
-    "imported_at": "2026-07-07T10:07:41.084821+00:00",
-    "updated_at": "2026-07-09T04:24:24.976839+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.320731+00:00",
+    "updated_at": "2026-07-13T02:39:46.320751+00:00"
   },
   "builtin:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -3285,9 +3285,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-cnv-numbat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
-    "imported_at": "2026-07-07T10:07:41.091748+00:00",
-    "updated_at": "2026-07-09T04:24:25.172205+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.328066+00:00",
+    "updated_at": "2026-07-13T02:39:46.328088+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -3299,9 +3299,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-cellchat-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
-    "imported_at": "2026-07-07T10:07:41.098325+00:00",
-    "updated_at": "2026-07-09T04:24:25.426742+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.335885+00:00",
+    "updated_at": "2026-07-13T02:39:46.335910+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -3313,9 +3313,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-commot",
     "enabled": true,
     "trusted": false,
-    "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
-    "imported_at": "2026-07-07T10:07:41.105105+00:00",
-    "updated_at": "2026-07-09T04:24:26.041351+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.345044+00:00",
+    "updated_at": "2026-07-13T02:39:46.345068+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -3327,9 +3327,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-fastccc",
     "enabled": true,
     "trusted": false,
-    "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
-    "imported_at": "2026-07-07T10:07:41.112270+00:00",
-    "updated_at": "2026-07-09T04:24:26.885973+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.353057+00:00",
+    "updated_at": "2026-07-13T02:39:46.353076+00:00"
   },
   "builtin:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -3341,9 +3341,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-liana",
     "enabled": true,
     "trusted": false,
-    "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
-    "imported_at": "2026-07-07T10:07:41.118737+00:00",
-    "updated_at": "2026-07-09T04:24:27.380378+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.361492+00:00",
+    "updated_at": "2026-07-13T02:39:46.361514+00:00"
   },
   "builtin:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -3355,9 +3355,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-data-io",
     "enabled": true,
     "trusted": false,
-    "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
-    "imported_at": "2026-07-07T10:07:41.125646+00:00",
-    "updated_at": "2026-07-09T04:24:27.847795+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.371055+00:00",
+    "updated_at": "2026-07-13T02:39:46.371075+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -3369,9 +3369,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-card-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
-    "imported_at": "2026-07-07T10:07:41.132142+00:00",
-    "updated_at": "2026-07-09T04:24:28.245096+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.379502+00:00",
+    "updated_at": "2026-07-13T02:39:46.379532+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -3383,9 +3383,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-cell2location",
     "enabled": true,
     "trusted": false,
-    "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
-    "imported_at": "2026-07-07T10:07:41.138977+00:00",
-    "updated_at": "2026-07-09T04:24:28.813878+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.387992+00:00",
+    "updated_at": "2026-07-13T02:39:46.388009+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -3397,9 +3397,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-rctd-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
-    "imported_at": "2026-07-07T10:07:41.146422+00:00",
-    "updated_at": "2026-07-09T04:24:29.295548+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.396054+00:00",
+    "updated_at": "2026-07-13T02:39:46.396075+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -3411,9 +3411,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-spotlight-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
-    "imported_at": "2026-07-07T10:07:41.153029+00:00",
-    "updated_at": "2026-07-09T04:24:29.585331+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.403941+00:00",
+    "updated_at": "2026-07-13T02:39:46.403961+00:00"
   },
   "builtin:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -3425,9 +3425,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-tangram",
     "enabled": true,
     "trusted": false,
-    "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
-    "imported_at": "2026-07-07T10:07:41.159665+00:00",
-    "updated_at": "2026-07-09T04:24:30.088213+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.411381+00:00",
+    "updated_at": "2026-07-13T02:39:46.411403+00:00"
   },
   "builtin:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -3439,9 +3439,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-differential-abundance-roe-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
-    "imported_at": "2026-07-07T10:07:41.166589+00:00",
-    "updated_at": "2026-07-09T04:24:30.518845+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.418925+00:00",
+    "updated_at": "2026-07-13T02:39:46.418944+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -3453,9 +3453,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-bayesspace-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
-    "imported_at": "2026-07-07T10:07:41.173042+00:00",
-    "updated_at": "2026-07-09T04:24:30.794693+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.425501+00:00",
+    "updated_at": "2026-07-13T02:39:46.425523+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -3467,9 +3467,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-graphst",
     "enabled": true,
     "trusted": false,
-    "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
-    "imported_at": "2026-07-07T10:07:41.180186+00:00",
-    "updated_at": "2026-07-09T04:24:31.290379+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.433257+00:00",
+    "updated_at": "2026-07-13T02:39:46.433278+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -3481,9 +3481,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-spagcn",
     "enabled": true,
     "trusted": false,
-    "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
-    "imported_at": "2026-07-07T10:07:41.186569+00:00",
-    "updated_at": "2026-07-09T04:24:32.024174+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.440469+00:00",
+    "updated_at": "2026-07-13T02:39:46.440492+00:00"
   },
   "builtin:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -3495,9 +3495,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-stagate",
     "enabled": true,
     "trusted": false,
-    "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
-    "imported_at": "2026-07-07T10:07:41.193761+00:00",
-    "updated_at": "2026-07-09T04:24:32.721529+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.447747+00:00",
+    "updated_at": "2026-07-13T02:39:46.447765+00:00"
   },
   "builtin:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -3509,9 +3509,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-fastq2spatial",
     "enabled": true,
     "trusted": false,
-    "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
-    "imported_at": "2026-07-07T10:07:41.200823+00:00",
-    "updated_at": "2026-07-09T04:24:33.152439+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.454320+00:00",
+    "updated_at": "2026-07-13T02:39:46.454338+00:00"
   },
   "builtin:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -3523,9 +3523,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-integration-spclue",
     "enabled": true,
     "trusted": false,
-    "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
-    "imported_at": "2026-07-07T10:07:41.206796+00:00",
-    "updated_at": "2026-07-09T04:24:33.678281+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.462366+00:00",
+    "updated_at": "2026-07-13T02:39:46.462388+00:00"
   },
   "builtin:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -3537,9 +3537,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-layers",
     "enabled": true,
     "trusted": false,
-    "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
-    "imported_at": "2026-07-07T10:07:41.212771+00:00",
-    "updated_at": "2026-07-09T04:24:34.135384+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.469768+00:00",
+    "updated_at": "2026-07-13T02:39:46.469786+00:00"
   },
   "builtin:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -3551,9 +3551,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-microenvironment-misty-r",
     "enabled": true,
     "trusted": false,
-    "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
-    "imported_at": "2026-07-07T10:07:41.219113+00:00",
-    "updated_at": "2026-07-09T04:24:34.485730+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.477012+00:00",
+    "updated_at": "2026-07-13T02:39:46.477036+00:00"
   },
   "builtin:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -3565,9 +3565,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-neighbors",
     "enabled": true,
     "trusted": false,
-    "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
-    "imported_at": "2026-07-07T10:07:41.225659+00:00",
-    "updated_at": "2026-07-09T04:24:34.818868+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.484896+00:00",
+    "updated_at": "2026-07-13T02:39:46.484916+00:00"
   },
   "builtin:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -3579,9 +3579,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-niches",
     "enabled": true,
     "trusted": false,
-    "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
-    "imported_at": "2026-07-07T10:07:41.232146+00:00",
-    "updated_at": "2026-07-09T04:24:35.110906+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.493268+00:00",
+    "updated_at": "2026-07-13T02:39:46.493291+00:00"
   },
   "builtin:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -3593,9 +3593,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-preprocessing",
     "enabled": true,
     "trusted": false,
-    "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
-    "imported_at": "2026-07-07T10:07:41.238695+00:00",
-    "updated_at": "2026-07-09T04:24:35.284584+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.500326+00:00",
+    "updated_at": "2026-07-13T02:39:46.500345+00:00"
   },
   "builtin:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -3607,9 +3607,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-statistics",
     "enabled": true,
     "trusted": false,
-    "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
-    "imported_at": "2026-07-07T10:07:41.245394+00:00",
-    "updated_at": "2026-07-09T04:24:35.939500+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.507304+00:00",
+    "updated_at": "2026-07-13T02:39:46.507322+00:00"
   },
   "builtin:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -3621,9 +3621,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-scrnaseq-pipeline",
     "enabled": true,
     "trusted": false,
-    "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
-    "imported_at": "2026-07-07T10:07:41.251871+00:00",
-    "updated_at": "2026-07-09T04:24:36.952540+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.514427+00:00",
+    "updated_at": "2026-07-13T02:39:46.514447+00:00"
   },
   "builtin:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -3635,9 +3635,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-spatial-pipeline",
     "enabled": true,
     "trusted": false,
-    "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
-    "imported_at": "2026-07-07T10:07:41.258254+00:00",
-    "updated_at": "2026-07-09T04:24:37.820141+00:00"
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.521856+00:00",
+    "updated_at": "2026-07-13T02:39:46.521876+00:00"
   },
   "builtin:bio-genomics-alignment": {
     "id": "bio-genomics-alignment",
@@ -5959,9 +5959,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-celltypist",
     "enabled": true,
     "trusted": true,
-    "sha256": "175a6aefd4efd451a6cdb7d1bef3a31ecb97e1efb528f2c1b7b002b3ae9f14aa",
-    "imported_at": "2026-07-09T04:22:31.784049+00:00",
-    "updated_at": "2026-07-09T04:24:06.188571+00:00"
+    "sha256": "22509279224affa10ad9a3bf7b48a456527f5472b94f3cc626b435efc8ab0e19",
+    "imported_at": "2026-07-13T04:12:00.800152+00:00",
+    "updated_at": "2026-07-13T04:12:00.805960+00:00"
   },
   "user:bio-single-cell-annotation-markers": {
     "id": "bio-single-cell-annotation-markers",
@@ -5973,9 +5973,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-markers",
     "enabled": true,
     "trusted": true,
-    "sha256": "993dea635b2bfd99c4fa3892b838b1a4328c218bd75ec2241a040d35375f3e7e",
-    "imported_at": "2026-07-09T04:22:31.827376+00:00",
-    "updated_at": "2026-07-09T04:24:06.404585+00:00"
+    "sha256": "3b1d4040b20080608ce0177d8ae525314fa2e9a981f5c8418ee01b5821a12144",
+    "imported_at": "2026-07-13T04:12:00.846797+00:00",
+    "updated_at": "2026-07-13T04:12:00.852994+00:00"
   },
   "user:bio-single-cell-annotation-sctype-r": {
     "id": "bio-single-cell-annotation-sctype-r",
@@ -5988,8 +5988,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "e9a716e4d1b8fe70c75d9ed94f978cb5b69088874b204c6580e2ac02c7c7d33f",
-    "imported_at": "2026-07-09T04:22:32.085721+00:00",
-    "updated_at": "2026-07-09T04:24:06.869984+00:00"
+    "imported_at": "2026-07-13T04:12:01.070321+00:00",
+    "updated_at": "2026-07-13T04:12:01.076532+00:00"
   },
   "user:bio-single-cell-annotation-singler-r": {
     "id": "bio-single-cell-annotation-singler-r",
@@ -6002,8 +6002,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "8a5b52fc7c285e2dd7efa4419b0446283134edb69e665baf103d69a8260a2d8d",
-    "imported_at": "2026-07-09T04:22:32.226581+00:00",
-    "updated_at": "2026-07-09T04:24:07.206404+00:00"
+    "imported_at": "2026-07-13T04:12:01.174541+00:00",
+    "updated_at": "2026-07-13T04:12:01.180587+00:00"
   },
   "user:bio-single-cell-atac-archr-r": {
     "id": "bio-single-cell-atac-archr-r",
@@ -6016,8 +6016,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "b8d12d125303122fbfabf461cba04758647a09a3803183eb8d63f2cbcb3ef253",
-    "imported_at": "2026-07-09T04:22:32.354157+00:00",
-    "updated_at": "2026-07-09T04:24:07.511864+00:00"
+    "imported_at": "2026-07-13T04:12:01.298728+00:00",
+    "updated_at": "2026-07-13T04:12:01.305081+00:00"
   },
   "user:bio-single-cell-atac-chromvar-r": {
     "id": "bio-single-cell-atac-chromvar-r",
@@ -6030,8 +6030,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "6158785d2cbb8702a8754e43247170593fafab15de8030da1e92af1a250f8240",
-    "imported_at": "2026-07-09T04:22:32.471860+00:00",
-    "updated_at": "2026-07-09T04:24:08.148924+00:00"
+    "imported_at": "2026-07-13T04:12:01.423427+00:00",
+    "updated_at": "2026-07-13T04:12:01.429346+00:00"
   },
   "user:bio-single-cell-atac-signac-r": {
     "id": "bio-single-cell-atac-signac-r",
@@ -6044,8 +6044,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "226e6e6376ce21c9bd9d2b863cfa93079c185c2dcf46c7f3788d0b5e351c0b71",
-    "imported_at": "2026-07-09T04:22:32.599116+00:00",
-    "updated_at": "2026-07-09T04:24:08.467532+00:00"
+    "imported_at": "2026-07-13T04:12:01.527952+00:00",
+    "updated_at": "2026-07-13T04:12:01.533215+00:00"
   },
   "user:bio-single-cell-batch-integration": {
     "id": "bio-single-cell-batch-integration",
@@ -6057,9 +6057,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-batch-integration",
     "enabled": true,
     "trusted": true,
-    "sha256": "f9f447b43a4c83d2c86a6679a1cf232e51293d5eb649eb4d5b54ffbed560ea47",
-    "imported_at": "2026-07-09T04:22:32.905885+00:00",
-    "updated_at": "2026-07-09T04:24:09.277554+00:00"
+    "sha256": "82c37d94c58c6843f014c32e64d6cf2a71c87fa7b3f824b12e64b1dbda92baef",
+    "imported_at": "2026-07-13T04:12:01.758984+00:00",
+    "updated_at": "2026-07-13T04:12:01.765881+00:00"
   },
   "user:bio-single-cell-clustering": {
     "id": "bio-single-cell-clustering",
@@ -6071,9 +6071,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-clustering",
     "enabled": true,
     "trusted": true,
-    "sha256": "21e43c520556f64cdf013ad7681d6f71b9cd73583a633222171faa5b4c129389",
-    "imported_at": "2026-07-09T04:22:32.993501+00:00",
-    "updated_at": "2026-07-09T04:24:09.497111+00:00"
+    "sha256": "a894d4ec03d7eba6c2d84144d0e94957b7a9043d5d6ff724c74b4cf0078610f1",
+    "imported_at": "2026-07-13T04:12:01.823936+00:00",
+    "updated_at": "2026-07-13T04:12:01.830492+00:00"
   },
   "user:bio-single-cell-cnv-fastcnv-r": {
     "id": "bio-single-cell-cnv-fastcnv-r",
@@ -6086,8 +6086,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "be3ccbd560bf2f9fe1d10c1aca2ddd49bdeb1b826a66ac486ca25054c6d32019",
-    "imported_at": "2026-07-09T04:22:33.122036+00:00",
-    "updated_at": "2026-07-09T04:24:09.756487+00:00"
+    "imported_at": "2026-07-13T04:12:01.938140+00:00",
+    "updated_at": "2026-07-13T04:12:01.944431+00:00"
   },
   "user:bio-single-cell-cnv-infercnv-r": {
     "id": "bio-single-cell-cnv-infercnv-r",
@@ -6100,8 +6100,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "956e7f8e5cd9d5540a15bb4e443b4b0d25097f326e31e908d1cf9a3a380d2d49",
-    "imported_at": "2026-07-09T04:22:33.208863+00:00",
-    "updated_at": "2026-07-09T04:24:10.002166+00:00"
+    "imported_at": "2026-07-13T04:12:02.024772+00:00",
+    "updated_at": "2026-07-13T04:12:02.030511+00:00"
   },
   "user:bio-single-cell-cnv-infercnvpy": {
     "id": "bio-single-cell-cnv-infercnvpy",
@@ -6113,9 +6113,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-infercnvpy",
     "enabled": true,
     "trusted": true,
-    "sha256": "e6d612860d3b638c6f6fb9b354ae53f046366d028a840de29c57e08b1c807fb7",
-    "imported_at": "2026-07-09T04:22:33.465384+00:00",
-    "updated_at": "2026-07-09T04:24:10.533488+00:00"
+    "sha256": "ae81dd2ad26504a1d5282c7f1064ee4bef5fcc834878bc05c975144796355974",
+    "imported_at": "2026-07-13T04:12:02.227143+00:00",
+    "updated_at": "2026-07-13T04:12:02.232890+00:00"
   },
   "user:bio-single-cell-cnv-scevan-r": {
     "id": "bio-single-cell-cnv-scevan-r",
@@ -6127,9 +6127,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-cnv-scevan-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "87000fe89695a8c45cb402ecdc60bf8ba6616ca32544ae0656fcc839d1bdd57b",
-    "imported_at": "2026-07-09T04:22:33.575800+00:00",
-    "updated_at": "2026-07-09T04:24:10.792671+00:00"
+    "sha256": "6a58b354ad754b0d73dacb163299c77ffd06a264115042c7e830ed031b99de66",
+    "imported_at": "2026-07-13T04:12:02.307410+00:00",
+    "updated_at": "2026-07-13T04:12:02.314036+00:00"
   },
   "user:bio-single-cell-communication-cellchat-r": {
     "id": "bio-single-cell-communication-cellchat-r",
@@ -6141,9 +6141,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-cellchat-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "d9924123b094d91d381ab69f2b267820848483043136917f9089011555c773b0",
-    "imported_at": "2026-07-09T04:22:33.696779+00:00",
-    "updated_at": "2026-07-09T04:24:11.050953+00:00"
+    "sha256": "9417a674004bf402219acd2610739fac696a4c457924204de1237571ef71be33",
+    "imported_at": "2026-07-13T04:12:02.393573+00:00",
+    "updated_at": "2026-07-13T04:12:02.398570+00:00"
   },
   "user:bio-single-cell-communication-nichenet-r": {
     "id": "bio-single-cell-communication-nichenet-r",
@@ -6155,9 +6155,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-communication-nichenet-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "148ae129b1532f4c030619d2a6b9ddcde0a59e7a6fe0004c7c3d2f75ecc2afac",
-    "imported_at": "2026-07-09T04:22:33.821089+00:00",
-    "updated_at": "2026-07-09T04:24:11.437340+00:00"
+    "sha256": "5a759365acf429f9f74a10e73c3da9c688f480032081a48bcd197e2ad3b62fb3",
+    "imported_at": "2026-07-13T04:12:02.512886+00:00",
+    "updated_at": "2026-07-13T04:12:02.518605+00:00"
   },
   "user:bio-single-cell-data-io": {
     "id": "bio-single-cell-data-io",
@@ -6169,9 +6169,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-data-io",
     "enabled": true,
     "trusted": true,
-    "sha256": "1d1c88807141936dd495b41d1d22c859f9bc31b61e5675a8d4767d058276da69",
-    "imported_at": "2026-07-09T04:22:33.991535+00:00",
-    "updated_at": "2026-07-09T04:24:12.008632+00:00"
+    "sha256": "de32d0cf3592e213f4adc374cf75322e287fdfa4a089ed993a4798e87839680e",
+    "imported_at": "2026-07-13T04:12:02.697071+00:00",
+    "updated_at": "2026-07-13T04:12:02.703098+00:00"
   },
   "user:bio-single-cell-differential-abundance-diffcyt-r": {
     "id": "bio-single-cell-differential-abundance-diffcyt-r",
@@ -6184,8 +6184,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "92b1efe2616ea986fb147c0ebb0208fc8ff214410d67cf0bbf0440d5923263f8",
-    "imported_at": "2026-07-09T04:22:34.124601+00:00",
-    "updated_at": "2026-07-09T04:24:12.356883+00:00"
+    "imported_at": "2026-07-13T04:12:02.820377+00:00",
+    "updated_at": "2026-07-13T04:12:02.827052+00:00"
   },
   "user:bio-single-cell-differential-abundance-milor-r": {
     "id": "bio-single-cell-differential-abundance-milor-r",
@@ -6197,9 +6197,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-milor-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "faab13ce5ef5bbd8ae24a05a581685fd43a42668beb8390e75fa3a61480105aa",
-    "imported_at": "2026-07-09T04:22:34.240103+00:00",
-    "updated_at": "2026-07-09T04:24:12.674971+00:00"
+    "sha256": "6081e356ed458fbfc0d7458a21d500c2b173b19ec276ba78ce1011cd42f4c973",
+    "imported_at": "2026-07-13T04:12:02.958763+00:00",
+    "updated_at": "2026-07-13T04:12:02.964521+00:00"
   },
   "user:bio-single-cell-differential-abundance-roe-r": {
     "id": "bio-single-cell-differential-abundance-roe-r",
@@ -6211,9 +6211,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-roe-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "6ecd32466d0cedea0ade8395d2614570680aa11ffa783e4e2c028a6d12730022",
-    "imported_at": "2026-07-09T04:22:34.328612+00:00",
-    "updated_at": "2026-07-09T04:24:13.005558+00:00"
+    "sha256": "0a3f8df15c5b5b189deb33a5a6353d565517a808183a266bf18e708bcdf19e2b",
+    "imported_at": "2026-07-13T04:12:03.091755+00:00",
+    "updated_at": "2026-07-13T04:12:03.097846+00:00"
   },
   "user:bio-single-cell-differential-abundance-sccoda": {
     "id": "bio-single-cell-differential-abundance-sccoda",
@@ -6225,9 +6225,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-differential-abundance-sccoda",
     "enabled": true,
     "trusted": true,
-    "sha256": "0dabe2619122757d794335c8b6e1b93898030ec5fe65cbbbfa91d2dda6721381",
-    "imported_at": "2026-07-09T04:22:34.537992+00:00",
-    "updated_at": "2026-07-09T04:24:13.657949+00:00"
+    "sha256": "f85e1f7aebfbaa79cac3a4e12457f58c9cb52528719330094ecdc37367a65bc2",
+    "imported_at": "2026-07-13T04:12:03.383626+00:00",
+    "updated_at": "2026-07-13T04:12:03.390871+00:00"
   },
   "user:bio-single-cell-doublet-doubletfinder-r": {
     "id": "bio-single-cell-doublet-doubletfinder-r",
@@ -6240,8 +6240,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "8f30aba5eea498b71f8eedc7c60d1fa5e0aa064c60f0cb1bfd37cc7a04e5b8a5",
-    "imported_at": "2026-07-09T04:22:34.685423+00:00",
-    "updated_at": "2026-07-09T04:24:14.002956+00:00"
+    "imported_at": "2026-07-13T04:12:03.515059+00:00",
+    "updated_at": "2026-07-13T04:12:03.520870+00:00"
   },
   "user:bio-single-cell-doublet-scdblfinder-r": {
     "id": "bio-single-cell-doublet-scdblfinder-r",
@@ -6254,8 +6254,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "65f60a7d76124396f1709dc1ef0c9acaa6196349756acab7468e605f23fdb34e",
-    "imported_at": "2026-07-09T04:22:34.813540+00:00",
-    "updated_at": "2026-07-09T04:24:14.319380+00:00"
+    "imported_at": "2026-07-13T04:12:03.622980+00:00",
+    "updated_at": "2026-07-13T04:12:03.628418+00:00"
   },
   "user:bio-single-cell-doublet-scrublet": {
     "id": "bio-single-cell-doublet-scrublet",
@@ -6267,9 +6267,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-scrublet",
     "enabled": true,
     "trusted": true,
-    "sha256": "487c03ff4633518970807cbe94f6329d7461123ca56c17e8519468c43d1e59a1",
-    "imported_at": "2026-07-09T04:22:34.985906+00:00",
-    "updated_at": "2026-07-09T04:24:14.911242+00:00"
+    "sha256": "432fe4d5d3c05f5422dad7d787a7fb8e0f6d7c2fc9f97ff81b2ffa5d1d77d15f",
+    "imported_at": "2026-07-13T04:12:03.778758+00:00",
+    "updated_at": "2026-07-13T04:12:03.784608+00:00"
   },
   "user:bio-single-cell-doublet-solo": {
     "id": "bio-single-cell-doublet-solo",
@@ -6281,9 +6281,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-doublet-solo",
     "enabled": true,
     "trusted": true,
-    "sha256": "0bc332f09271321f2ac2cd3101261e9a1f787cae2a03a786aeb3098c0e813785",
-    "imported_at": "2026-07-09T04:22:35.213523+00:00",
-    "updated_at": "2026-07-09T04:24:15.647473+00:00"
+    "sha256": "4edb575fa596cd61746715ccf620294de5e9cc0a598cc8a810099aa920510e61",
+    "imported_at": "2026-07-13T04:12:03.966166+00:00",
+    "updated_at": "2026-07-13T04:12:03.972113+00:00"
   },
   "user:bio-single-cell-enrichment-aucell-r": {
     "id": "bio-single-cell-enrichment-aucell-r",
@@ -6295,9 +6295,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-aucell-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "da70bf8db0a4b5236bba1260917037c2169484bfa85a561b5b88229164ae6420",
-    "imported_at": "2026-07-09T04:22:35.289289+00:00",
-    "updated_at": "2026-07-09T04:24:15.899159+00:00"
+    "sha256": "dfb04a8d8db470334e51c95636e2e56bfa9c3027834663ec52b24cf1a4e6ade6",
+    "imported_at": "2026-07-13T04:12:04.080626+00:00",
+    "updated_at": "2026-07-13T04:12:04.088096+00:00"
   },
   "user:bio-single-cell-enrichment-clusterprofiler-r": {
     "id": "bio-single-cell-enrichment-clusterprofiler-r",
@@ -6310,8 +6310,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "042f75e4b3e985da3db649e11701887d7372dd769e9f5d3d86f47e99d75af972",
-    "imported_at": "2026-07-09T04:22:35.391233+00:00",
-    "updated_at": "2026-07-09T04:24:16.286423+00:00"
+    "imported_at": "2026-07-13T04:12:04.220243+00:00",
+    "updated_at": "2026-07-13T04:12:04.225866+00:00"
   },
   "user:bio-single-cell-enrichment-decoupler-r": {
     "id": "bio-single-cell-enrichment-decoupler-r",
@@ -6323,9 +6323,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-decoupler-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "c96a46709021c4bb5d7d992cbd99f904940d55f3e48befba762b24d03319776f",
-    "imported_at": "2026-07-09T04:22:35.512957+00:00",
-    "updated_at": "2026-07-09T04:24:16.612667+00:00"
+    "sha256": "8734188d76c2de81559dcd8991a10bf691d76d8c05a734ba319a75fc5f5cbc19",
+    "imported_at": "2026-07-13T04:12:04.329380+00:00",
+    "updated_at": "2026-07-13T04:12:04.336451+00:00"
   },
   "user:bio-single-cell-enrichment-gseapy": {
     "id": "bio-single-cell-enrichment-gseapy",
@@ -6337,9 +6337,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-gseapy",
     "enabled": true,
     "trusted": true,
-    "sha256": "5c8b01b051610f33878283faa2b0b75d07923f2e7db316744307f6dca1ddff38",
-    "imported_at": "2026-07-09T04:22:35.790683+00:00",
-    "updated_at": "2026-07-09T04:24:17.190809+00:00"
+    "sha256": "8f136d462a0f174e856dac58bb557cc402c2c040953b8df27c16f08bd135257a",
+    "imported_at": "2026-07-13T04:12:04.721817+00:00",
+    "updated_at": "2026-07-13T04:12:04.728576+00:00"
   },
   "user:bio-single-cell-enrichment-irgsea-r": {
     "id": "bio-single-cell-enrichment-irgsea-r",
@@ -6351,9 +6351,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-irgsea-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "a60e1979b97fb875920c746c483424e8726f12fa180b4f90cad066933a3df02f",
-    "imported_at": "2026-07-09T04:22:35.960549+00:00",
-    "updated_at": "2026-07-09T04:24:17.478800+00:00"
+    "sha256": "deca32b5a39a318148c7e32c9e1ece99ac5c4d3dae7d8afb30832f1fd1ca8111",
+    "imported_at": "2026-07-13T04:12:04.818499+00:00",
+    "updated_at": "2026-07-13T04:12:04.824790+00:00"
   },
   "user:bio-single-cell-enrichment-progeny-r": {
     "id": "bio-single-cell-enrichment-progeny-r",
@@ -6365,9 +6365,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-progeny-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "6b8e20bf6b70176e8228d597bed0404ee34c18ca30fee4c5b95ed9b52562eebd",
-    "imported_at": "2026-07-09T04:22:36.136394+00:00",
-    "updated_at": "2026-07-09T04:24:17.814437+00:00"
+    "sha256": "ac7452d6b1b5c4a5b285a3ca8426c6c34bce42aacf040d6dfd91e65d6feffdcd",
+    "imported_at": "2026-07-13T04:12:04.926040+00:00",
+    "updated_at": "2026-07-13T04:12:04.931788+00:00"
   },
   "user:bio-single-cell-enrichment-ucell-r": {
     "id": "bio-single-cell-enrichment-ucell-r",
@@ -6379,9 +6379,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-enrichment-ucell-r",
     "enabled": true,
     "trusted": true,
-    "sha256": "2d2e802da0f7ed1eee4fdbaf70e7441fa161c722bec4c2d3f22697a1dced4345",
-    "imported_at": "2026-07-09T04:22:36.260075+00:00",
-    "updated_at": "2026-07-09T04:24:18.016908+00:00"
+    "sha256": "38a5ea6b380edfb2ea0a71cde1cd36f7030151a533f0da268356a27d62eb0d26",
+    "imported_at": "2026-07-13T04:12:05.025407+00:00",
+    "updated_at": "2026-07-13T04:12:05.032284+00:00"
   },
   "user:bio-single-cell-fastq2mtx": {
     "id": "bio-single-cell-fastq2mtx",
@@ -6394,8 +6394,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "678bc378d26b4859392005d05198752a3097381a152e7cdb811cd129defe6894",
-    "imported_at": "2026-07-09T04:22:36.412693+00:00",
-    "updated_at": "2026-07-09T04:24:18.371617+00:00"
+    "imported_at": "2026-07-13T04:12:05.150856+00:00",
+    "updated_at": "2026-07-13T04:12:05.157486+00:00"
   },
   "user:bio-single-cell-markers": {
     "id": "bio-single-cell-markers",
@@ -6407,9 +6407,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-markers",
     "enabled": true,
     "trusted": true,
-    "sha256": "ca1a307501531997fdded6a528754d66773a1a02ff688456590bea37971992e9",
-    "imported_at": "2026-07-09T04:22:36.566478+00:00",
-    "updated_at": "2026-07-09T04:24:18.712135+00:00"
+    "sha256": "0e482c5450f21943f1fa897060832e13e4e87f9308ab405e4f89da579f90607c",
+    "imported_at": "2026-07-13T04:12:05.261159+00:00",
+    "updated_at": "2026-07-13T04:12:05.266719+00:00"
   },
   "user:bio-single-cell-metabolism-compass": {
     "id": "bio-single-cell-metabolism-compass",
@@ -6421,9 +6421,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-metabolism-compass",
     "enabled": true,
     "trusted": true,
-    "sha256": "0d60161fa03e911cf676f6992c745239c89f787767d154bc75c3aeef8dcecb61",
-    "imported_at": "2026-07-09T04:22:36.814497+00:00",
-    "updated_at": "2026-07-09T04:24:19.348362+00:00"
+    "sha256": "6f48da4129443fc10199c3674612bf350a94ad53c22026c8b226e7e9f74f5d8b",
+    "imported_at": "2026-07-13T04:12:05.436046+00:00",
+    "updated_at": "2026-07-13T04:12:05.443007+00:00"
   },
   "user:bio-single-cell-metabolism-scmetabolism-r": {
     "id": "bio-single-cell-metabolism-scmetabolism-r",
@@ -6436,8 +6436,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "5b9556716d1153442e03289f88614babec948bfdaca47ec2e3e9bbffebe432b9",
-    "imported_at": "2026-07-09T04:22:36.948153+00:00",
-    "updated_at": "2026-07-09T04:24:19.626588+00:00"
+    "imported_at": "2026-07-13T04:12:05.534644+00:00",
+    "updated_at": "2026-07-13T04:12:05.540274+00:00"
   },
   "user:bio-single-cell-perturbation-augur-r": {
     "id": "bio-single-cell-perturbation-augur-r",
@@ -6450,8 +6450,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "1215acd97e7a3f89c2949ac97ff4639be7843133264512cb5cfa2bb50eb87c9f",
-    "imported_at": "2026-07-09T04:22:37.073735+00:00",
-    "updated_at": "2026-07-09T04:24:19.993330+00:00"
+    "imported_at": "2026-07-13T04:12:05.633714+00:00",
+    "updated_at": "2026-07-13T04:12:05.639944+00:00"
   },
   "user:bio-single-cell-perturbation-pertpy": {
     "id": "bio-single-cell-perturbation-pertpy",
@@ -6463,9 +6463,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-pertpy",
     "enabled": true,
     "trusted": true,
-    "sha256": "2a3f92fc739902dbd7a140cb9f9be33ba129ff7cd6a0cdb49d19dff536e289b1",
-    "imported_at": "2026-07-09T04:22:37.302034+00:00",
-    "updated_at": "2026-07-09T04:24:20.634759+00:00"
+    "sha256": "3ccc599e002fe25c1532063ce49b9bc886ee11f150afba81605b2a5812159dfe",
+    "imported_at": "2026-07-13T04:12:05.832963+00:00",
+    "updated_at": "2026-07-13T04:12:05.839669+00:00"
   },
   "user:bio-single-cell-perturbation-scgen": {
     "id": "bio-single-cell-perturbation-scgen",
@@ -6477,9 +6477,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-perturbation-scgen",
     "enabled": true,
     "trusted": true,
-    "sha256": "a69e2821f7314c5a870b28e36e746a8340f9714b68d3a9e670c1afaf1fb5f197",
-    "imported_at": "2026-07-09T04:22:37.569558+00:00",
-    "updated_at": "2026-07-09T04:24:21.280439+00:00"
+    "sha256": "060ded6931c2dfd429b19feb8baafa91454ebf9b895449db47542ad8541caaf0",
+    "imported_at": "2026-07-13T04:12:06.088947+00:00",
+    "updated_at": "2026-07-13T04:12:06.095764+00:00"
   },
   "user:bio-single-cell-perturbation-sctenifoldknk-r": {
     "id": "bio-single-cell-perturbation-sctenifoldknk-r",
@@ -6492,8 +6492,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "3982a49db8eb119636ad34448e622887bff15e4c1969cc2bdba4d7131ff01fd7",
-    "imported_at": "2026-07-09T04:22:37.693453+00:00",
-    "updated_at": "2026-07-09T04:24:21.601144+00:00"
+    "imported_at": "2026-07-13T04:12:06.213205+00:00",
+    "updated_at": "2026-07-13T04:12:06.220035+00:00"
   },
   "user:bio-single-cell-preprocessing": {
     "id": "bio-single-cell-preprocessing",
@@ -6505,9 +6505,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-preprocessing",
     "enabled": true,
     "trusted": true,
-    "sha256": "a4ba036178c84b74884897f36ea60843bc7bd28839efcd15f86642a2475daa37",
-    "imported_at": "2026-07-09T04:22:37.772434+00:00",
-    "updated_at": "2026-07-09T04:24:21.815738+00:00"
+    "sha256": "db77d9ed6149ef29dd9cc6797226a5072cb9a99934091e8ff9a96bbe90cdce13",
+    "imported_at": "2026-07-13T04:12:06.281924+00:00",
+    "updated_at": "2026-07-13T04:12:06.287986+00:00"
   },
   "user:bio-single-cell-regulatory-pyscenic": {
     "id": "bio-single-cell-regulatory-pyscenic",
@@ -6519,9 +6519,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-regulatory-pyscenic",
     "enabled": true,
     "trusted": true,
-    "sha256": "5c592409219bb9bccbc253b4a3df4c285694a9feaf83a961156d21093536ad17",
-    "imported_at": "2026-07-09T04:22:38.055217+00:00",
-    "updated_at": "2026-07-09T04:24:22.531814+00:00"
+    "sha256": "b06ec8797f445cafbfa5fa9da0fbfe9846baa34f8bd9e8b19b07065da9629d89",
+    "imported_at": "2026-07-13T04:12:06.476562+00:00",
+    "updated_at": "2026-07-13T04:12:06.482497+00:00"
   },
   "user:bio-single-cell-regulatory-scenic-r": {
     "id": "bio-single-cell-regulatory-scenic-r",
@@ -6534,8 +6534,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "b09e6e6791e82de6aaaceffcb6587284f2ee7cdea91fedefefb28c959d937bb7",
-    "imported_at": "2026-07-09T04:22:38.185054+00:00",
-    "updated_at": "2026-07-09T04:24:22.792559+00:00"
+    "imported_at": "2026-07-13T04:12:06.566008+00:00",
+    "updated_at": "2026-07-13T04:12:06.571851+00:00"
   },
   "user:bio-single-cell-splicing-brie2": {
     "id": "bio-single-cell-splicing-brie2",
@@ -6547,9 +6547,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-splicing-brie2",
     "enabled": true,
     "trusted": true,
-    "sha256": "161e1b62e5625c85c1169b50aa351041d7a524ebb57b3dc458991db62b80b59d",
-    "imported_at": "2026-07-09T04:22:38.586315+00:00",
-    "updated_at": "2026-07-09T04:24:23.352698+00:00"
+    "sha256": "e870376418519a3016a2eafd8b927983e93768310af9bdbd1d9c6c1ca87f5571",
+    "imported_at": "2026-07-13T04:12:06.725114+00:00",
+    "updated_at": "2026-07-13T04:12:06.730930+00:00"
   },
   "user:bio-single-cell-tcr-startrac-r": {
     "id": "bio-single-cell-tcr-startrac-r",
@@ -6562,8 +6562,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "5f30d50332ee172c224aa61e78f13c77a9217be58a5643b8169ba9b8e42be1c5",
-    "imported_at": "2026-07-09T04:22:38.734973+00:00",
-    "updated_at": "2026-07-09T04:24:23.654199+00:00"
+    "imported_at": "2026-07-13T04:12:06.828881+00:00",
+    "updated_at": "2026-07-13T04:12:06.835038+00:00"
   },
   "user:bio-single-cell-trajectory-monocle3-r": {
     "id": "bio-single-cell-trajectory-monocle3-r",
@@ -6576,8 +6576,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "25c9b342a8d8194924094e270f3a05ddd50bc8546f0c63e0cc05bcd256bf376f",
-    "imported_at": "2026-07-09T04:22:38.912275+00:00",
-    "updated_at": "2026-07-09T04:24:23.966026+00:00"
+    "imported_at": "2026-07-13T04:12:06.956048+00:00",
+    "updated_at": "2026-07-13T04:12:06.962288+00:00"
   },
   "user:bio-single-cell-trajectory-scvelo": {
     "id": "bio-single-cell-trajectory-scvelo",
@@ -6589,9 +6589,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-trajectory-scvelo",
     "enabled": true,
     "trusted": true,
-    "sha256": "59c6693557aa39b5b706d3ae26edfa26e5fcf886702bec901c9f4c56f34e8183",
-    "imported_at": "2026-07-09T04:22:39.213866+00:00",
-    "updated_at": "2026-07-09T04:24:24.573585+00:00"
+    "sha256": "3b8d3d9b873265974732a3bf16d236ba1aaed6fdad2a2304a8c38bce7e21cd1b",
+    "imported_at": "2026-07-13T04:12:07.149111+00:00",
+    "updated_at": "2026-07-13T04:12:07.154751+00:00"
   },
   "user:bio-spatial-transcriptomics-batch-integration": {
     "id": "bio-spatial-transcriptomics-batch-integration",
@@ -6604,8 +6604,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "e2df7226704397fa485d7383f32653f96ea466fcf873cd24186b4deb1df620f3",
-    "imported_at": "2026-07-09T04:22:39.369957+00:00",
-    "updated_at": "2026-07-09T04:24:24.754068+00:00"
+    "imported_at": "2026-07-13T04:12:07.263529+00:00",
+    "updated_at": "2026-07-13T04:12:07.273196+00:00"
   },
   "user:bio-spatial-transcriptomics-cnv-fastcnv-r": {
     "id": "bio-spatial-transcriptomics-cnv-fastcnv-r",
@@ -6618,8 +6618,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "428044a5f6beb39da530664be0719d0474456d371117b81c1dae102d8f621b54",
-    "imported_at": "2026-07-09T04:22:39.511597+00:00",
-    "updated_at": "2026-07-09T04:24:25.040537+00:00"
+    "imported_at": "2026-07-13T04:12:07.389870+00:00",
+    "updated_at": "2026-07-13T04:12:07.397086+00:00"
   },
   "user:bio-spatial-transcriptomics-cnv-numbat-r": {
     "id": "bio-spatial-transcriptomics-cnv-numbat-r",
@@ -6632,8 +6632,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "a3bba9bab6711b3feaa2c3ae6b54540f55c2f2c3276db49e2ec8c26d302a65e2",
-    "imported_at": "2026-07-09T04:22:39.638132+00:00",
-    "updated_at": "2026-07-09T04:24:25.207716+00:00"
+    "imported_at": "2026-07-13T04:12:07.488537+00:00",
+    "updated_at": "2026-07-13T04:12:07.494326+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-cellchat-r": {
     "id": "bio-spatial-transcriptomics-communication-cellchat-r",
@@ -6646,8 +6646,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "050371c779b42224127329949449273234863b4032653286364e2ede8f1e4a11",
-    "imported_at": "2026-07-09T04:22:39.809599+00:00",
-    "updated_at": "2026-07-09T04:24:25.494897+00:00"
+    "imported_at": "2026-07-13T04:12:07.600831+00:00",
+    "updated_at": "2026-07-13T04:12:07.606497+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-commot": {
     "id": "bio-spatial-transcriptomics-communication-commot",
@@ -6659,9 +6659,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-commot",
     "enabled": true,
     "trusted": true,
-    "sha256": "254e45843e0df9ae5305fcb14e448192538b07063fa77cf5f31d4a9f3dbf9f75",
-    "imported_at": "2026-07-09T04:22:40.032329+00:00",
-    "updated_at": "2026-07-09T04:24:26.322620+00:00"
+    "sha256": "abc1c74711e344b11a1219790c960cb3124e2423c0e8b6fc5ba2b9bd3538c428",
+    "imported_at": "2026-07-13T04:12:07.873832+00:00",
+    "updated_at": "2026-07-13T04:12:07.880453+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-fastccc": {
     "id": "bio-spatial-transcriptomics-communication-fastccc",
@@ -6673,9 +6673,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-fastccc",
     "enabled": true,
     "trusted": true,
-    "sha256": "d6782d11332aa54a7769b228ce99c10072c41c766cc50342d55d55bf3aa87100",
-    "imported_at": "2026-07-09T04:22:40.323077+00:00",
-    "updated_at": "2026-07-09T04:24:27.067025+00:00"
+    "sha256": "ff23dd5833ae05c184899f617d961199d8cc8fa8eab35a9a21afed59a81a6c3d",
+    "imported_at": "2026-07-13T04:12:08.121369+00:00",
+    "updated_at": "2026-07-13T04:12:08.128825+00:00"
   },
   "user:bio-spatial-transcriptomics-communication-liana": {
     "id": "bio-spatial-transcriptomics-communication-liana",
@@ -6687,9 +6687,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-communication-liana",
     "enabled": true,
     "trusted": true,
-    "sha256": "8117dd9c65fa7dc89c709976894fe8797852674f351480e79c966fdca004aa17",
-    "imported_at": "2026-07-09T04:22:40.526782+00:00",
-    "updated_at": "2026-07-09T04:24:27.519779+00:00"
+    "sha256": "dbf81a9d77106bed79bed039bb9f4b6fe4f5cced4cfc19ce054a8d2b78eac20d",
+    "imported_at": "2026-07-13T04:12:08.356289+00:00",
+    "updated_at": "2026-07-13T04:12:08.363391+00:00"
   },
   "user:bio-spatial-transcriptomics-data-io": {
     "id": "bio-spatial-transcriptomics-data-io",
@@ -6701,9 +6701,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-data-io",
     "enabled": true,
     "trusted": true,
-    "sha256": "4443fc03f94bec582f95ff1669f5b908b4e914ea0ad5dec17d4c68cf08d65e0a",
-    "imported_at": "2026-07-09T04:22:40.758403+00:00",
-    "updated_at": "2026-07-09T04:24:27.994767+00:00"
+    "sha256": "788f1f27ed336b527114d51f7b5c1ebb4b1b5ef1299af6221d751bb15794b2d1",
+    "imported_at": "2026-07-13T04:12:08.557889+00:00",
+    "updated_at": "2026-07-13T04:12:08.564705+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-card-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-card-r",
@@ -6716,8 +6716,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "c78f81ee7c5fb26c819101973756312f3c150aae5870096b6c1c5124dde0c51f",
-    "imported_at": "2026-07-09T04:22:40.877904+00:00",
-    "updated_at": "2026-07-09T04:24:28.340770+00:00"
+    "imported_at": "2026-07-13T04:12:08.757285+00:00",
+    "updated_at": "2026-07-13T04:12:08.762651+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-cell2location": {
     "id": "bio-spatial-transcriptomics-deconvolution-cell2location",
@@ -6729,9 +6729,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-cell2location",
     "enabled": true,
     "trusted": true,
-    "sha256": "ee0a963a4387852602ced84010bb84992aebac4242eac17e2c1a05d18a26722a",
-    "imported_at": "2026-07-09T04:22:41.238273+00:00",
-    "updated_at": "2026-07-09T04:24:29.115230+00:00"
+    "sha256": "4aef9ff460db15e5c76b1ad5b8325f67222cd56c48224f8ff476b135a4c983be",
+    "imported_at": "2026-07-13T04:12:09.030066+00:00",
+    "updated_at": "2026-07-13T04:12:09.036919+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-rctd-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-rctd-r",
@@ -6744,8 +6744,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "ada57e7af7824a00ae3e53030a71392f74cb2a650b48332f62549e2162c5ec70",
-    "imported_at": "2026-07-09T04:22:41.392393+00:00",
-    "updated_at": "2026-07-09T04:24:29.392472+00:00"
+    "imported_at": "2026-07-13T04:12:09.165383+00:00",
+    "updated_at": "2026-07-13T04:12:09.170539+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-spotlight-r": {
     "id": "bio-spatial-transcriptomics-deconvolution-spotlight-r",
@@ -6758,8 +6758,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "6868f21c514d3ff8d1a612ac7666f4017390c91f77a336d52d675e4ef42d7363",
-    "imported_at": "2026-07-09T04:22:41.528159+00:00",
-    "updated_at": "2026-07-09T04:24:29.645102+00:00"
+    "imported_at": "2026-07-13T04:12:09.280960+00:00",
+    "updated_at": "2026-07-13T04:12:09.286691+00:00"
   },
   "user:bio-spatial-transcriptomics-deconvolution-tangram": {
     "id": "bio-spatial-transcriptomics-deconvolution-tangram",
@@ -6771,9 +6771,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-deconvolution-tangram",
     "enabled": true,
     "trusted": true,
-    "sha256": "1e2474eee9f5359cccc4c287b848c7696056070457827d7a0e45e9ba44293d68",
-    "imported_at": "2026-07-09T04:22:41.787943+00:00",
-    "updated_at": "2026-07-09T04:24:30.292921+00:00"
+    "sha256": "a69c3bd28f4388e81f46ead3b9979bfd0b8670c864e0248895a654d2192ba263",
+    "imported_at": "2026-07-13T04:12:09.528809+00:00",
+    "updated_at": "2026-07-13T04:12:09.534216+00:00"
   },
   "user:bio-spatial-transcriptomics-differential-abundance-roe-r": {
     "id": "bio-spatial-transcriptomics-differential-abundance-roe-r",
@@ -6786,8 +6786,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "2cebab1c0294c565c39a3cf6572ab0e7d85c376154983fd29617d590e23dbaea",
-    "imported_at": "2026-07-09T04:22:41.928318+00:00",
-    "updated_at": "2026-07-09T04:24:30.622607+00:00"
+    "imported_at": "2026-07-13T04:12:09.676548+00:00",
+    "updated_at": "2026-07-13T04:12:09.682002+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-bayesspace-r": {
     "id": "bio-spatial-transcriptomics-domains-bayesspace-r",
@@ -6800,8 +6800,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "6cd67c936cf025f4cde526a850ee20f05d0568a9204a028e228c42a2a48e9198",
-    "imported_at": "2026-07-09T04:22:42.054878+00:00",
-    "updated_at": "2026-07-09T04:24:30.845385+00:00"
+    "imported_at": "2026-07-13T04:12:09.778286+00:00",
+    "updated_at": "2026-07-13T04:12:09.784383+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-graphst": {
     "id": "bio-spatial-transcriptomics-domains-graphst",
@@ -6813,9 +6813,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-graphst",
     "enabled": true,
     "trusted": true,
-    "sha256": "45349914ed197deecffc69164e002fe65937127fe704c1ac43413f5467909e44",
-    "imported_at": "2026-07-09T04:22:42.446012+00:00",
-    "updated_at": "2026-07-09T04:24:31.532863+00:00"
+    "sha256": "7b0b5988dd0ebe624a469fbbfd117dbea51e9f5520d0a3617dce671568a13dd2",
+    "imported_at": "2026-07-13T04:12:09.985221+00:00",
+    "updated_at": "2026-07-13T04:12:09.990734+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-spagcn": {
     "id": "bio-spatial-transcriptomics-domains-spagcn",
@@ -6827,9 +6827,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-spagcn",
     "enabled": true,
     "trusted": true,
-    "sha256": "cb4c214e54d74c1110102a6746055d18669b0927fc417fc1f5074536c3b4594d",
-    "imported_at": "2026-07-09T04:22:42.875783+00:00",
-    "updated_at": "2026-07-09T04:24:32.277764+00:00"
+    "sha256": "1b8d3d1cb8246cc371efe94a71bd6168edc88b37af250b222afb801259810bed",
+    "imported_at": "2026-07-13T04:12:10.269906+00:00",
+    "updated_at": "2026-07-13T04:12:10.278929+00:00"
   },
   "user:bio-spatial-transcriptomics-domains-stagate": {
     "id": "bio-spatial-transcriptomics-domains-stagate",
@@ -6841,9 +6841,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-domains-stagate",
     "enabled": true,
     "trusted": true,
-    "sha256": "899d7f33802a314f4139738a752afa89393e7f8b408d45f01fa8d9c90ec30862",
-    "imported_at": "2026-07-09T04:22:43.230928+00:00",
-    "updated_at": "2026-07-09T04:24:32.971847+00:00"
+    "sha256": "ac805e081eeae7656ccd311732a06ec30d72647f9776c34d35cb534a163c802d",
+    "imported_at": "2026-07-13T04:12:10.574477+00:00",
+    "updated_at": "2026-07-13T04:12:10.580347+00:00"
   },
   "user:bio-spatial-transcriptomics-fastq2spatial": {
     "id": "bio-spatial-transcriptomics-fastq2spatial",
@@ -6856,8 +6856,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "cb7477822c8803f54b7ab2aa44f4be3c78441a23f4b2077f4ec26f7e8459284b",
-    "imported_at": "2026-07-09T04:22:43.369358+00:00",
-    "updated_at": "2026-07-09T04:24:33.250233+00:00"
+    "imported_at": "2026-07-13T04:12:10.680790+00:00",
+    "updated_at": "2026-07-13T04:12:10.686533+00:00"
   },
   "user:bio-spatial-transcriptomics-integration-spclue": {
     "id": "bio-spatial-transcriptomics-integration-spclue",
@@ -6869,9 +6869,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-integration-spclue",
     "enabled": true,
     "trusted": true,
-    "sha256": "e86c2052ddfc228abb70b75f04494c0f30182e0be26ce532821dc22a7ecf7fea",
-    "imported_at": "2026-07-09T04:22:43.677193+00:00",
-    "updated_at": "2026-07-09T04:24:33.913451+00:00"
+    "sha256": "c7f212f8a7f03f947a94bfd0492b5034f43671f53b013d2755058ff4b9f0ef46",
+    "imported_at": "2026-07-13T04:12:10.868182+00:00",
+    "updated_at": "2026-07-13T04:12:10.874253+00:00"
   },
   "user:bio-spatial-transcriptomics-layers": {
     "id": "bio-spatial-transcriptomics-layers",
@@ -6883,9 +6883,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-layers",
     "enabled": true,
     "trusted": true,
-    "sha256": "daedef8c63eac26dcfb7a06765f0dda21b029c94d63424d6193aa97a1133d538",
-    "imported_at": "2026-07-09T04:22:43.837274+00:00",
-    "updated_at": "2026-07-09T04:24:34.222106+00:00"
+    "sha256": "ceb70d92f9abafe6b246ef82f00cc9788a1adc6ac913c8a1fa6e23c26bca9843",
+    "imported_at": "2026-07-13T04:12:10.983628+00:00",
+    "updated_at": "2026-07-13T04:12:10.989269+00:00"
   },
   "user:bio-spatial-transcriptomics-microenvironment-misty-r": {
     "id": "bio-spatial-transcriptomics-microenvironment-misty-r",
@@ -6898,8 +6898,8 @@
     "enabled": true,
     "trusted": true,
     "sha256": "7376aff0baf523f5fd3d5ef3a11ba43ae4acd02590c0ca4bc74901e66b230934",
-    "imported_at": "2026-07-09T04:22:43.957063+00:00",
-    "updated_at": "2026-07-09T04:24:34.586830+00:00"
+    "imported_at": "2026-07-13T04:12:11.132463+00:00",
+    "updated_at": "2026-07-13T04:12:11.138429+00:00"
   },
   "user:bio-spatial-transcriptomics-neighbors": {
     "id": "bio-spatial-transcriptomics-neighbors",
@@ -6911,9 +6911,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-neighbors",
     "enabled": true,
     "trusted": true,
-    "sha256": "f104edb58a013d1a8aa70cd7eb8b39a53802e8d3bd447a1eff4def6410a54c87",
-    "imported_at": "2026-07-09T04:22:44.114987+00:00",
-    "updated_at": "2026-07-09T04:24:34.918760+00:00"
+    "sha256": "1eeb2acceaa03efff33cfbe6160e1442e48f6a7bc9e565aaa9c4566b40812143",
+    "imported_at": "2026-07-13T04:12:11.263162+00:00",
+    "updated_at": "2026-07-13T04:12:11.269543+00:00"
   },
   "user:bio-spatial-transcriptomics-niches": {
     "id": "bio-spatial-transcriptomics-niches",
@@ -6925,9 +6925,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-niches",
     "enabled": true,
     "trusted": true,
-    "sha256": "3949e5d49f347ac6c211e95cc88d1e8094d25d80afcad91b6a9e97f7c4353847",
-    "imported_at": "2026-07-09T04:22:44.191267+00:00",
-    "updated_at": "2026-07-09T04:24:35.172369+00:00"
+    "sha256": "161e98b67dedffa083f628f3d48b97987e6faef7871b5228c092515f2ee2ef9f",
+    "imported_at": "2026-07-13T04:12:11.327136+00:00",
+    "updated_at": "2026-07-13T04:12:11.332908+00:00"
   },
   "user:bio-spatial-transcriptomics-preprocessing": {
     "id": "bio-spatial-transcriptomics-preprocessing",
@@ -6939,9 +6939,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-preprocessing",
     "enabled": true,
     "trusted": true,
-    "sha256": "4fe1f3877c08200568cc5abd7b5fb355c71b60b44cf167d02bba6807ff8f9400",
-    "imported_at": "2026-07-09T04:22:44.271491+00:00",
-    "updated_at": "2026-07-09T04:24:35.325408+00:00"
+    "sha256": "243855125c53c39622a0335d6d917fb4dc406ec9719255a6c33f5bdd3f630f87",
+    "imported_at": "2026-07-13T04:12:11.382616+00:00",
+    "updated_at": "2026-07-13T04:12:11.388000+00:00"
   },
   "user:bio-spatial-transcriptomics-statistics": {
     "id": "bio-spatial-transcriptomics-statistics",
@@ -6953,9 +6953,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-spatial-transcriptomics-statistics",
     "enabled": true,
     "trusted": true,
-    "sha256": "f96673810989b1e09e797182c540eb961f35e35f275058c53ba33111c5c1914f",
-    "imported_at": "2026-07-09T04:22:44.785875+00:00",
-    "updated_at": "2026-07-09T04:24:36.264389+00:00"
+    "sha256": "fd3091822f651caa765e39f038a43fd987cd3a3ad995a7951fd26aef1869fa4e",
+    "imported_at": "2026-07-13T04:12:11.769621+00:00",
+    "updated_at": "2026-07-13T04:12:11.775735+00:00"
   },
   "user:bio-workflows-scrnaseq-pipeline": {
     "id": "bio-workflows-scrnaseq-pipeline",
@@ -6967,9 +6967,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-scrnaseq-pipeline",
     "enabled": true,
     "trusted": true,
-    "sha256": "b7dc97563f5c0971e1f1178f339a41587dc7f2983c8c7e3006d01d011d388be1",
-    "imported_at": "2026-07-09T04:22:45.142178+00:00",
-    "updated_at": "2026-07-09T04:24:37.282099+00:00"
+    "sha256": "d5be4b98db10a6aa489836c3b0c32814608b629dedb5be3e29e8e9d70be86295",
+    "imported_at": "2026-07-13T04:12:12.085242+00:00",
+    "updated_at": "2026-07-13T04:12:12.091408+00:00"
   },
   "user:bio-workflows-spatial-pipeline": {
     "id": "bio-workflows-spatial-pipeline",
@@ -6981,9 +6981,9 @@
     "source_dir": "/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-workflows-spatial-pipeline",
     "enabled": true,
     "trusted": true,
-    "sha256": "43b506dae505d051d37dec4e79847b52b2eb470cc71e5f55e5e6d25886a5edcf",
-    "imported_at": "2026-07-09T04:22:45.467776+00:00",
-    "updated_at": "2026-07-09T04:24:38.077272+00:00"
+    "sha256": "7d8f0ceb8f6d33379813f90e32ab457fcc3582a527cc730855060cb26e34247e",
+    "imported_at": "2026-07-13T04:12:12.313868+00:00",
+    "updated_at": "2026-07-13T04:12:12.320102+00:00"
   },
   "user:clinical-database-cbioportal": {
     "id": "clinical-database-cbioportal",
@@ -7376,5 +7376,61 @@
     "sha256": "ff83b184bfc9731eada9b62312b913ba5856b44cc8c3587399ca2a38d4c37681",
     "imported_at": "2026-07-03T04:56:48.713518+00:00",
     "updated_at": "2026-07-03T04:56:48.713537+00:00"
+  },
+  "builtin:mcp_pubmed_search": {
+    "id": "mcp_pubmed_search",
+    "namespace": "builtin",
+    "name": "pubmed_search",
+    "version": "1.0",
+    "category": "mcp",
+    "source": "mcp",
+    "source_dir": ".",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.528594+00:00",
+    "updated_at": "2026-07-13T02:39:46.528614+00:00"
+  },
+  "builtin:mcp_pubmed_fetch": {
+    "id": "mcp_pubmed_fetch",
+    "namespace": "builtin",
+    "name": "pubmed_fetch",
+    "version": "1.0",
+    "category": "mcp",
+    "source": "mcp",
+    "source_dir": ".",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.535715+00:00",
+    "updated_at": "2026-07-13T02:39:46.535734+00:00"
+  },
+  "builtin:mcp_uniprot_search": {
+    "id": "mcp_uniprot_search",
+    "namespace": "builtin",
+    "name": "uniprot_search",
+    "version": "1.0",
+    "category": "mcp",
+    "source": "mcp",
+    "source_dir": ".",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.543230+00:00",
+    "updated_at": "2026-07-13T02:39:46.543250+00:00"
+  },
+  "builtin:mcp_geo_search": {
+    "id": "mcp_geo_search",
+    "namespace": "builtin",
+    "name": "geo_search",
+    "version": "1.0",
+    "category": "mcp",
+    "source": "mcp",
+    "source_dir": ".",
+    "enabled": true,
+    "trusted": false,
+    "sha256": null,
+    "imported_at": "2026-07-13T02:39:46.550301+00:00",
+    "updated_at": "2026-07-13T02:39:46.550318+00:00"
   }
 }

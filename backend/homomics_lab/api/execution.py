@@ -204,14 +204,13 @@ async def execution_events(
     pubsub=Depends(get_execution_pubsub),
 ) -> StreamingResponse:
     """Stream execution state updates for a job via SSE."""
-    latest = await pubsub.latest(job_id)
-
     async def event_stream():
-        # Send latest state immediately if available
-        if latest is not None:
-            yield _format_sse(json.dumps(latest.to_dict()), event="state")
+        # Replay historical states so late-connecting clients can see live logs
+        # and intermediate progress that was published before the SSE handshake.
+        for state in pubsub.history(job_id):
+            yield _format_sse(json.dumps(state.to_dict()), event="state")
 
-        # Short-circuit for tests: emit latest state and exit when requested.
+        # Short-circuit for tests: emit history and exit when requested.
         if request.headers.get("x-test-disconnect") == "1":
             return
 

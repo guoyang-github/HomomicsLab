@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 import { useAuthStore } from '@/stores/authStore'
-import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, SystemSettingsOut, SystemSettingsUpdate, Project, AnalysisTemplate, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem } from '@/types/api'
+import type { SendMessageRequest, SendMessageResponse, LlmConfigOut, TestConnectionOut, SystemSettingsOut, SystemSettingsUpdate, HealthStatusResponse, Project, AnalysisTemplate, FileUploadResponse, ReportSummary, ReportDetail, ReportHtmlExport, ReportMarkdownExport, SkillSummary, SkillDetail, ImportSkillRequest, PromoteSkillRequest, PromoteSkillResponse, ImportSkillResponse, SkillValidationResponse, SkillTestResponse, SkillLockResponse, DomainListing, DomainPreview, ExportDomainResponse, ImportDomainResponse, CreateVizSessionRequest, CreateVizSessionResponse, RenderVizRequest, RenderVizResponse, FigureItem, ExecutionTrace, ExecutionStatusResponse, ExecutionTasksResponse, CancelJobResponse, SkillGeneratorSuggestRequest, SkillGeneratorSuggestResponse, SkillGeneratorGenerateRequest, SkillGeneratorGenerateResponse, PlotDataRequest, PlotDataResponse, PlotTypeInfo, MCPServer, MCPServerCreate, MCPServerHealthResponse, LineageGraph } from '@/types/api'
 import type { ChatMessage } from '@/types/chat'
 import type { ChatSession } from '@/stores/chatStore'
 import type { PlanModification } from '@/stores/planStore'
@@ -36,6 +36,9 @@ export const chatApi = {
 
   listSessions: (projectId?: string) =>
     api.get<ChatSession[]>('/chat/sessions', { params: projectId ? { project_id: projectId } : undefined }),
+
+  deleteSession: (sessionId: string) =>
+    api.delete<{ deleted: boolean }>(`/chat/sessions/${sessionId}`),
 
   respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown>; remember?: boolean }) =>
     api.post('/chat/hitl/respond', data),
@@ -139,6 +142,33 @@ export const fileApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+
+  fileUrl: (projectId: string, path: string) => {
+    const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+    // The backend route is `{path:path}`, which matches raw slashes but not
+    // `%2F`. Keep path separators intact and encode each segment instead so
+    // spaces / non-ASCII names still work.
+    const rel = String(path).replace(/^\/+/, '')
+    const encoded = rel
+      .split('/')
+      .map((seg) => encodeURIComponent(seg))
+      .join('/')
+    return `${base}/files/${projectId}/${encoded}`
+  },
+
+  previewUrl: (projectId: string, path: string) => {
+    const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+    const encodedPath = path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    return `${base}/files/${encodeURIComponent(projectId)}/${encodedPath}`
+  },
+}
+
+export const lineageApi = {
+  getProjectLineage: (projectId: string) =>
+    api.get<LineageGraph>(`/lineage/projects/${projectId}`),
 }
 
 export const reportApi = {
@@ -217,6 +247,12 @@ export const vizApi = {
   render: (sessionId: string, data: RenderVizRequest) =>
     api.post<RenderVizResponse>(`/viz/sessions/${sessionId}/render`, data),
 
+  plotData: (data: PlotDataRequest) =>
+    api.post<PlotDataResponse>('/viz/plot-data', data),
+
+  listPlotTypes: () =>
+    api.get<PlotTypeInfo[]>('/viz/plot/types'),
+
   listFigures: (projectId: string) =>
     api.get<FigureItem[]>(`/projects/${projectId}/figures`),
 
@@ -243,6 +279,39 @@ export const settingsApi = {
   getSystemSettings: () => api.get<SystemSettingsOut>('/settings/system'),
   updateSystemSettings: (data: SystemSettingsUpdate) =>
     api.put<SystemSettingsOut>('/settings/system', data),
+}
+
+export const healthApi = {
+  getLive: () => api.get<HealthStatusResponse>('/health/live'),
+}
+
+export const executionApi = {
+  getStatus: (jobId: string) => api.get<ExecutionStatusResponse>(`/execution/${jobId}/status`),
+  getTasks: (jobId: string) => api.get<ExecutionTasksResponse>(`/execution/${jobId}/tasks`),
+  getTrace: (jobId: string) => api.get<ExecutionTrace>(`/execution/${jobId}/trace`),
+  cancel: (jobId: string) => api.post<CancelJobResponse>(`/execution/${jobId}/cancel`),
+  eventsUrl: (jobId: string) => {
+    const base = (api.defaults.baseURL || '').replace(/\/$/, '')
+    return `${base}/execution/${jobId}/events`
+  },
+}
+
+export const skillGeneratorApi = {
+  suggest: (data: SkillGeneratorSuggestRequest) =>
+    api.post<SkillGeneratorSuggestResponse>('/skill-generator/suggest', data),
+  generate: (data: SkillGeneratorGenerateRequest) =>
+    api.post<SkillGeneratorGenerateResponse>('/skill-generator/generate', data),
+}
+
+export const mcpApi = {
+  listServers: () => api.get<MCPServer[]>('/mcp/servers'),
+  addServer: (data: MCPServerCreate) => api.post<MCPServer>('/mcp/servers', data),
+  removeServer: (id: string) => api.delete(`/mcp/servers/${id}`),
+  installServer: (id: string) => api.post<MCPServer>(`/mcp/servers/${id}/install`),
+  enableServer: (id: string) => api.post<MCPServer>(`/mcp/servers/${id}/enable`),
+  disableServer: (id: string) => api.post<MCPServer>(`/mcp/servers/${id}/disable`),
+  getServerTools: (id: string) => api.get<{ id: string; tools: Record<string, unknown>[] }>(`/mcp/servers/${id}/tools`),
+  healthCheck: (id: string) => api.post<MCPServerHealthResponse>(`/mcp/servers/${id}/health`),
 }
 
 export default api

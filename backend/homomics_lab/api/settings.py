@@ -22,6 +22,7 @@ from homomics_lab.llm.runtime_config import (
     save_llm_runtime_config,
 )
 from homomics_lab.llm.router import LLMRouter
+from homomics_lab.agent.permission_ruleset import PermissionRuleSet, get_permission_registry
 from homomics_lab.settings_store import (
     apply_runtime_settings,
     load_runtime_settings,
@@ -243,6 +244,7 @@ class SystemSettingsOut(BaseModel):
     max_llm_cost_per_request_usd: Optional[float]
     monthly_budget_usd: Optional[float]
     skill_hot_reload_enabled: bool
+    open_exploration_mode_enabled: bool
 
 
 class SystemSettingsUpdate(BaseModel):
@@ -258,6 +260,7 @@ class SystemSettingsUpdate(BaseModel):
     max_llm_cost_per_request_usd: Optional[float] = None
     monthly_budget_usd: Optional[float] = None
     skill_hot_reload_enabled: Optional[bool] = None
+    open_exploration_mode_enabled: Optional[bool] = None
 
 
 @router.get("/system", response_model=SystemSettingsOut)
@@ -297,6 +300,9 @@ async def get_system_settings() -> SystemSettingsOut:
         skill_hot_reload_enabled=overrides.get(
             "skill_hot_reload_enabled", settings.skill_hot_reload_enabled
         ),
+        open_exploration_mode_enabled=overrides.get(
+            "open_exploration_mode_enabled", settings.open_exploration_mode_enabled
+        ),
     )
 
 
@@ -315,11 +321,17 @@ async def update_system_settings(
         return await get_system_settings()
 
     try:
-        save_runtime_settings(updates)
+        validated = save_runtime_settings(updates)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # Apply to the running process immediately.
+    # Apply to the running process immediately. We set the validated overrides
+    # directly so tests that monkeypatch ``load_runtime_settings`` still see the
+    # in-memory update; ``apply_runtime_settings`` then picks up any additional
+    # persisted values.
+    for key, value in validated.to_filtered_dict().items():
+        if hasattr(settings, key):
+            setattr(settings, key, value)
     apply_runtime_settings(settings)
 
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -329,3 +341,9 @@ async def update_system_settings(
     )
 
     return await get_system_settings()
+
+
+@router.get("/permissions", response_model=List[PermissionRuleSet])
+async def get_permission_rulesets() -> List[PermissionRuleSet]:
+    """Return the merged permission rulesets from domains and disk."""
+    return get_permission_registry().list_rules()

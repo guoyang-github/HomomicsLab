@@ -12,6 +12,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from dataclasses import dataclass, field
+
 from homomics_lab.agent.agent_loop import AgentLoop, TurnBudget
 from homomics_lab.agent.open_agent.code_generation import CodeActPlanner
 from homomics_lab.agent.open_agent.models import (
@@ -19,9 +21,11 @@ from homomics_lab.agent.open_agent.models import (
     OpenAgentStepType,
 )
 from homomics_lab.agent.open_agent.termination import TerminationPolicy, TerminationState
-from dataclasses import dataclass, field
-
 from homomics_lab.agent.plan.models import Phase, PlanResult
+from homomics_lab.agent.source_attribution import (
+    ensure_source_section,
+    extract_sources,
+)
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.execution.code_act import run_code_act
 from homomics_lab.llm_client import LLMClient
@@ -103,6 +107,7 @@ class OpenAgentExecutor:
             trace_id = trace.trace_id
 
         phase_outputs: List[Dict[str, Any]] = []
+        collected_sources: List[Dict[str, str]] = []
         final_text = ""
         hitl_reason: Optional[str] = None
 
@@ -142,6 +147,9 @@ class OpenAgentExecutor:
                 phase_outputs.append({"phase": phase.phase_type, "output": output})
                 if isinstance(output, str):
                     final_text = output
+                elif isinstance(output, dict):
+                    final_text = output.get("response_text") or final_text
+                    collected_sources.extend(output.get("sources", []))
             except Exception as exc:
                 logger.warning("Open agent phase failed: %s", exc, exc_info=True)
                 state.errors.append(str(exc))
@@ -157,6 +165,8 @@ class OpenAgentExecutor:
 
         if not final_text:
             final_text = self._compose_summary(user_message, phase_outputs)
+
+        final_text = ensure_source_section(final_text, collected_sources)
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -233,15 +243,22 @@ class OpenAgentExecutor:
         context: Dict[str, Any],
         state: TerminationState,
         trace_id: Optional[str],
-    ) -> str:
-        """Run an explore phase using AgentLoop over allowed tools."""
+    ) -> Dict[str, Any]:
+        """Run an explore phase using AgentLoop over allowed tools.
+
+        Returns a dict with ``response_text`` and ``sources`` so the executor can
+        append source attribution to the final answer.
+        """
         tool_intents = phase.parameters.get("tool_intents", [])
         allowed_tools = [ti["tool_name"] for ti in tool_intents if "tool_name" in ti]
         if not allowed_tools:
             allowed_tools = [t.name for t in self.tool_registry.list_all()]
 
         if self.llm_client is None or not self.llm_client.is_configured():
-            return "当前未配置 LLM，无法执行探索性查询。"
+            return {
+                "response_text": "当前未配置 LLM，无法执行探索性查询。",
+                "sources": [],
+            }
 
         loop = AgentLoop(
             llm_client=self.llm_client,
@@ -276,7 +293,8 @@ class OpenAgentExecutor:
                     outputs={"success": record.success, "summary": record.output_summary},
                 )
 
-        return result.response_text
+        sources = extract_sources([record.raw_output for record in result.tool_calls])
+        return {"response_text": result.response_text, "sources": sources}
 
     async def _execute_reason(
         self,

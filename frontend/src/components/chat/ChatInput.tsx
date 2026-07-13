@@ -47,7 +47,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { loadPlan, discardDraft } = usePlanStore()
-  const { setJobId, reset: resetExecution } = useExecutionStore()
+  const { startJob } = useExecutionStore()
 
   useEffect(() => {
     if (!draftInput || consumedDraftRef.current === draftInput) return
@@ -60,7 +60,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     textareaRef.current?.focus()
   }, [draftInput, setDraftInput])
 
-  const processSendResponse = (response: { data: SendMessageResponse }) => {
+  const processSendResponse = (response: { data: SendMessageResponse }, sessionId: string) => {
     const tasks = response.data.task_tree?.tasks || []
     setTaskTree(tasks)
     setProgress(_extractProgress(tasks))
@@ -122,8 +122,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
 
     // Start monitoring any queued job.
     if (response.data.job_id) {
-      resetExecution()
-      setJobId(response.data.job_id)
+      startJob(response.data.job_id, sessionId)
       setTaskTree(tasks)
       const progress = _extractProgress(tasks)
       setProgress(progress)
@@ -175,7 +174,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
           message: '',
           plan_mode: planMode,
         })
-        processSendResponse(response)
+        processSendResponse(response, sessionId)
         return
       }
 
@@ -186,7 +185,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
         message: apiMessage,
         plan_mode: planMode,
       })
-      processSendResponse(response)
+      processSendResponse(response, sessionId)
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error('Chat send failed:', error)

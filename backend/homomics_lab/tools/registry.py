@@ -30,6 +30,19 @@ class ToolRegistry:
         """Register a tool. Overwrites if name already exists."""
         self._tools[tool.name] = tool
 
+    def unregister(self, name: str) -> bool:
+        """Remove a tool by name. Returns True if it existed."""
+        return self._tools.pop(name, None) is not None
+
+    def unregister_by_source(self, source: str) -> List[str]:
+        """Remove all tools from a specific source. Returns removed names."""
+        removed: List[str] = []
+        for name in list(self._tools.keys()):
+            if self._tools[name].source == source:
+                self._tools.pop(name)
+                removed.append(name)
+        return removed
+
     def register_builtin(
         self,
         name: str,

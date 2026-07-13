@@ -1,7 +1,12 @@
+import { Download, FileText, Square } from 'lucide-react'
+import { useState } from 'react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskProgress } from '@/types/tasks'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
+import { fileApi, executionApi } from '@/sdk'
+import type { Artifact } from '@/components/artifacts'
 
 interface Props {
   content: {
@@ -12,7 +17,36 @@ interface Props {
     project_id?: string
     result?: Record<string, any>
     status?: string
+    artifacts?: Artifact[]
   }
+}
+
+function artifactLink(projectId: string | undefined, artifact: Artifact): string | null {
+  if (artifact.url) return artifact.url
+  if (artifact.preview_url) return artifact.preview_url
+  if (artifact.path && projectId) {
+    const marker = `/workspaces/${projectId}/`
+    const idx = artifact.path.indexOf(marker)
+    const rel =
+      idx >= 0
+        ? artifact.path.slice(idx + marker.length)
+        : artifact.path.replace(/^.*\/(outputs|results|data)\//, '$1/')
+    return fileApi.fileUrl(projectId, rel)
+  }
+  return null
+}
+
+function formatSize(bytes: unknown): string {
+  const n = typeof bytes === 'number' ? bytes : Number(bytes)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
+}
+
+function isRichSummary(text: string): boolean {
+  return typeof text === 'string' && /\*\*(关键指标|关键发现|解读|CellTypist|注释结果|一致性比较|结果)\*\*/.test(text)
 }
 
 const statusIcons: Record<TaskNode['status'], string> = {
@@ -78,6 +112,17 @@ export function TodoList({ content }: Props) {
   const failureMessage =
     normalizedResult?.error || normalizedResult?.error_message || normalizedResult?.detail
 
+  const [cancelling, setCancelling] = useState(false)
+  const handleCancel = async () => {
+    if (!content.job_id || !isRunning) return
+    setCancelling(true)
+    try {
+      await executionApi.cancel(content.job_id)
+    } catch {
+      // Ignore; the SSE will reflect the terminal state anyway.
+    }
+  }
+
   const outputFiles = ['output_csv', 'output_h5ad', 'output_summary', 'comparison_csv']
     .map((key) => {
       const path = normalizedResult?.[key]
@@ -86,9 +131,64 @@ export function TodoList({ content }: Props) {
     })
     .filter((item): item is { key: string; href: string; name: string } => Boolean(item?.href))
 
+  const artifacts: Artifact[] = Array.isArray(normalizedResult?.artifacts)
+    ? (normalizedResult!.artifacts as Artifact[])
+    : []
+
+  const rich = isRichSummary(content.text)
+  const messageArtifacts: Artifact[] =
+    artifacts.length > 0 ? artifacts : Array.isArray(content.artifacts) ? content.artifacts : []
+
+  // Backend may embed the rich summary inside final_output.summary. Prefer it
+  // over the legacy one-line text so the chat renders the full interpretation.
+  const summaryText =
+    normalizedResult?.final_output?.summary ||
+    normalizedResult?.summary ||
+    (rich ? content.text : '')
+
+  const renderArtifactLinks = (items: Artifact[]) => {
+    if (items.length === 0) return null
+    return (
+      <div className="mt-2 space-y-1">
+        <p className="text-xs font-medium text-slate-600">产物文件：</p>
+        {items.map((artifact, idx) => {
+          const href = artifactLink(content.project_id, artifact)
+          const name = artifact.name || artifact.path?.split('/').pop() || `file-${idx}`
+          const size = formatSize(artifact.size)
+          return (
+            <div
+              key={`${artifact.path || name}-${idx}`}
+              className="flex items-center gap-2 rounded border border-border bg-muted/30 px-3 py-1.5 text-xs"
+            >
+              <FileText className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+              <span className="flex-1 truncate" title={name}>
+                {name}
+              </span>
+              {size && <span className="text-[10px] text-slate-400">{size}</span>}
+              {href && (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <Download className="h-3.5 w-3.5" /> 下载
+                </a>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // If we have a rich summary, do not also render the initial queue placeholder.
+  const showPlaceholder = !summaryText && content.text
+
   return (
     <div className="space-y-3">
-      <p className="text-sm">{content.text}</p>
+      {summaryText && <MarkdownRenderer content={summaryText} />}
+      {showPlaceholder && content.text && <MarkdownRenderer content={content.text} />}
 
       {progress && progress.total > 0 && (
         <div className="mb-3">
@@ -123,19 +223,32 @@ export function TodoList({ content }: Props) {
 
       {content.job_id && (
         <div className="rounded border border-border bg-card/50 p-2">
-          <div className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-600">
-            {isRunning ? (
-              <>
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-success" />
-                <span>执行中</span>
-              </>
-            ) : (
-              <>
-                <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                <span>等待/已完成</span>
-              </>
+          <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-600">
+            <div className="flex items-center gap-2">
+              {isRunning ? (
+                <>
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-success" />
+                  <span>执行中</span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                  <span>等待/已完成</span>
+                </>
+              )}
+              {isConnected && <span className="text-success">● 实时连接</span>}
+            </div>
+            {isRunning && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="inline-flex items-center gap-1 rounded border border-error/40 px-2 py-0.5 text-[10px] font-medium text-error hover:bg-error/5 disabled:opacity-50"
+              >
+                <Square className="h-3 w-3 fill-current" />
+                {cancelling ? '停止中…' : '停止执行'}
+              </button>
             )}
-            {isConnected && <span className="text-success">● 实时连接</span>}
           </div>
           {recentLogs.length > 0 && (
             <ul className="space-y-0.5 font-mono text-[10px] text-slate-500">
@@ -155,7 +268,7 @@ export function TodoList({ content }: Props) {
         </div>
       )}
 
-      {isSuccess && (
+      {isSuccess && !summaryText && !rich && (
         <div className="rounded border border-success/30 bg-success/5 p-3">
           <div className="mb-2 text-sm font-medium text-success">执行完成</div>
           <div className="space-y-1 text-xs text-slate-700">
@@ -191,6 +304,7 @@ export function TodoList({ content }: Props) {
           </div>
         </div>
       )}
+      {isSuccess && renderArtifactLinks(messageArtifacts)}
 
       {isFailure && (
         <div className="rounded border border-error/30 bg-error/5 p-3">

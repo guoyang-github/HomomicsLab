@@ -12,6 +12,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.source_attribution import (
+    ensure_source_section,
+    extract_sources,
+)
 from homomics_lab.context.prompter import Prompter
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.llm_client import LLMClient
@@ -167,7 +171,7 @@ class GeneralScientificAgent:
         if not tool_name:
             return await self._handle_direct_answer(intent, working_memory, context)
 
-        tool = self.tool_registry.get_tool(tool_name)
+        tool = self.tool_registry.get(tool_name)
         if tool is None:
             response_text = f"工具 '{tool_name}' 不可用。请确认工具名称或换一种方式提问。"
             agent_msg = ChatMessage(
@@ -183,8 +187,10 @@ class GeneralScientificAgent:
                 agent_message=agent_msg,
             )
 
-        result = await tool.invoke(**tool_inputs)
-        response_text = f"工具 {tool_name} 返回结果：\n{result}"
+        result = await self.tool_registry.invoke_async(tool_name, tool_inputs)
+        response_text = f"工具 {tool_name} 返回结果：\n{result.output}"
+        sources = extract_sources([result.output])
+        response_text = ensure_source_section(response_text, sources)
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
             type=MessageType.TEXT,

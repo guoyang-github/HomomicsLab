@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, results, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings, reproducibility, knowledge, templates
+from . import chat, collab, cost, domains, nfcore, projects, files, skills, viz, reports, results, skill_generator, health, execution, plan, scheduler, secrets, checkpoints, llm, settings, reproducibility, knowledge, templates, mcp, lineage
 from .auth import admin_router, auth_router, require_admin, require_analyst_or_admin, require_auth
 from .rate_limit import rate_limit_dependency
 
@@ -25,6 +25,7 @@ api_router.include_router(admin_router, tags=["admin"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(collab.router, prefix="/collab", tags=["collaboration"])
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"], dependencies=_PROTECTED_DEPS)
+api_router.include_router(lineage.router, prefix="/lineage", tags=["lineage"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(files.router, prefix="/files", tags=["files"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(skills.router, prefix="/skills", tags=["skills"], dependencies=_ANALYST_ADMIN_DEPS)
 api_router.include_router(viz.router, prefix="/viz", tags=["visualization"], dependencies=_PROTECTED_DEPS)
@@ -44,3 +45,4 @@ api_router.include_router(reproducibility.router, prefix="/reproducibility", tag
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["knowledge"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"], dependencies=_PROTECTED_DEPS)
 api_router.include_router(results.router, prefix="/results", tags=["results"], dependencies=_PROTECTED_DEPS)
+api_router.include_router(mcp.router, prefix="/mcp", tags=["mcp"], dependencies=_ADMIN_DEPS)

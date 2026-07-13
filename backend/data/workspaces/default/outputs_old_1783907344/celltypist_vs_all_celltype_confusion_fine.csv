@@ -1,0 +1,63 @@
+all_celltype,celltypist_label,n_cells
+Plasma,Memory B cells,15
+Myeloid,Memory B cells,1
+CD4T,Tem/Trm cytotoxic T cells,238
+CD4T,Tcm/Naive helper T cells,1870
+Myeloid,Macrophages,86
+NK,CD16+ NK cells,2775
+CD8T,CD16+ NK cells,242
+CD8T,DC2,1
+Myeloid,Non-classical monocytes,21
+CD8T,Tcm/Naive helper T cells,372
+NK,Tcm/Naive helper T cells,1
+B,Plasmablasts,2
+B,Naive B cells,807
+Myeloid,CD16+ NK cells,1
+NK,CD16- NK cells,27
+CD8T,CD16- NK cells,1
+Ductal,ILC3,6
+Plasma,Plasmablasts,1
+CD4T,Regulatory T cells,373
+CD4T,Type 1 helper T cells,134
+B,Epithelial cells,3
+Myeloid,Tem/Trm cytotoxic T cells,1
+CD4T,Tem/Temra cytotoxic T cells,925
+Myeloid,ILC3,1
+Stellate,Fibroblasts,72
+NK,Memory B cells,1
+Platelet,Tem/Temra cytotoxic T cells,32
+CD8T,MAIT cells,207
+CAF,Fibroblasts,46
+Stellate,CD16+ NK cells,4
+Platelet,Megakaryocytes/platelets,36
+CD8T,Plasmablasts,40
+CD4T,CD16+ NK cells,37
+Myeloid,DC2,54
+B,Tem/Trm cytotoxic T cells,4
+CD8T,Regulatory T cells,23
+Endothelial,CD16+ NK cells,4
+NK,Regulatory T cells,2
+B,Fibroblasts,1
+CD4T,ILC3,3
+NK,Tem/Trm cytotoxic T cells,48
+CD8T,Tem/Trm cytotoxic T cells,1502
+CD8T,Fibroblasts,1
+Endocrine,ILC3,1
+CD4T,Classical monocytes,1
+CD8T,Type 1 helper T cells,31
+NK,Type 1 helper T cells,1
+B,Memory B cells,628
+CD4T,Plasmablasts,7
+NK,Tem/Temra cytotoxic T cells,281
+CD8T,Tem/Temra cytotoxic T cells,3252
+CD4T,MAIT cells,51
+Schwann,Fibroblasts,7
+Endothelial,Tem/Trm cytotoxic T cells,1
+Endothelial,Endothelial cells,159
+NK,ILC3,30
+CD8T,ILC3,7
+Myeloid,Classical monocytes,177
+Ductal,Epithelial cells,222
+Acinar,Tem/Trm cytotoxic T cells,6
+CD8T,Classical monocytes,4
+Myeloid,Mast cells,103

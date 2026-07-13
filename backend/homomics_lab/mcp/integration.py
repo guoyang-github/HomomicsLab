@@ -1,68 +1,20 @@
-"""Bootstrap-time integration of MCP tools into HomomicsLab registries."""
+"""Bootstrap-time integration helpers for MCP tools into HomomicsLab registries.
+
+The actual registration of enabled MCP servers is now handled by
+``homomics_lab.mcp.marketplace.MCPMarketplace``; this module keeps the shared
+helpers (risk inference, handler binding, skill wrapping) used by the
+marketplace and the skill runtime.
+"""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from homomics_lab.config import settings
 from homomics_lab.mcp.client import BioMCPClient
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillRuntime
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
-from homomics_lab.tools.models import ToolDefinition
 from homomics_lab.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
-
-
-async def register_mcp_tools(tool_registry: ToolRegistry) -> Optional[BioMCPClient]:
-    """Register MCP tools into the ToolRegistry with bound handlers.
-
-    Returns the MCP client so the caller can close it on shutdown.
-    """
-    if not settings.mcp_enabled:
-        return None
-
-    try:
-        client = BioMCPClient(
-            mode=settings.mcp_mode,
-            server_script=settings.mcp_server_script,
-            server_url=settings.mcp_server_url,
-        )
-        await client.connect()
-    except Exception as exc:
-        logger.warning(
-            "Failed to initialize MCP client (mode=%s): %s. MCP tools will not be available.",
-            settings.mcp_mode,
-            exc,
-        )
-        return None
-
-    try:
-        tools = await client.list_tools()
-    except Exception as exc:
-        logger.warning("Failed to list MCP tools: %s", exc)
-        await client.close() if hasattr(client, "close") else None
-        return None
-
-    for tool_desc in tools:
-        name = tool_desc["name"]
-        schema = tool_desc.get("parameters") or tool_desc.get("inputSchema", {"type": "object"})
-        risk_level = _infer_risk_level(name)
-        tool = ToolDefinition(
-            name=name,
-            description=tool_desc.get("description", ""),
-            input_schema=schema,
-            source="mcp",
-            risk_level=risk_level,
-            metadata={
-                "mcp_mode": settings.mcp_mode,
-                "mcp_server": "homomics-bio",
-            },
-            handler=_make_tool_handler(client, name),
-        )
-        tool_registry.register(tool)
-        logger.info("Registered MCP tool: %s (risk=%s)", name, risk_level)
-
-    return client
 
 
 def _infer_risk_level(tool_name: str) -> str:

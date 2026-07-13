@@ -39,6 +39,7 @@ class Plan(BaseModel):
     approved_at: Optional[datetime] = None
     parent_plan_id: Optional[str] = None
     version: int = 1
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

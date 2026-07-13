@@ -73,6 +73,11 @@ class ReproducibilityBundle:
     environment_lock: EnvironmentLock = field(default_factory=EnvironmentLock)
     hitl_decisions: List[HITLDecisionRecord] = field(default_factory=list)
 
+    env_snapshot_hash: Optional[str] = None
+    git_snapshot: Optional[Dict[str, Any]] = None
+    provenance_files: Dict[str, str] = field(default_factory=dict)
+    version_lock: Dict[str, Any] = field(default_factory=dict)
+
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_json(self) -> str:
@@ -93,6 +98,10 @@ class ReproducibilityBundle:
             skill_versions=SkillVersionLock(**data.get("skill_versions", {})),
             environment_lock=EnvironmentLock(**data.get("environment_lock", {})),
             hitl_decisions=[HITLDecisionRecord(**h) for h in data.get("hitl_decisions", [])],
+            env_snapshot_hash=data.get("env_snapshot_hash"),
+            git_snapshot=data.get("git_snapshot"),
+            provenance_files=data.get("provenance_files", {}),
+            version_lock=data.get("version_lock", {}),
             created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
         )
 

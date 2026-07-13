@@ -60,6 +60,14 @@ class MemoryManager:
             )
         return sessions
 
+    async def delete_session(self, session_id: str) -> None:
+        """Delete a persisted session and its working memory."""
+        try:
+            await self.session_store.delete(session_id)
+        except Exception:
+            logger.exception("Failed to delete session %s", session_id)
+            raise
+
     @staticmethod
     def _session_name(state: SessionState) -> str:
         """Derive a display name from the first user message."""

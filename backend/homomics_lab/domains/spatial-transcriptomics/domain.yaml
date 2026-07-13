@@ -6,6 +6,7 @@ description: |
   spatial clustering/domain identification, cell-type deconvolution, spatially
   variable gene detection, cell-cell communication, and microenvironment analysis.
 version: "4.0.0"
+plan_approval_strategy: risky_only
 
 orchestrator_skills:
   - bio-workflows-spatial-pipeline

@@ -216,6 +216,14 @@ async def list_sessions(http_request: Request, project_id: Optional[str] = None)
     return await memory_manager.list_sessions(project_id=project_id)
 
 
+@router.delete("/sessions/{session_id}", dependencies=[Depends(require_auth)])
+async def delete_session(session_id: str, http_request: Request) -> Dict[str, bool]:
+    """Delete a persisted chat session and its working memory."""
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    await memory_manager.delete_session(session_id)
+    return {"deleted": True}
+
+
 @router.post("/regenerate", response_model=SendMessageResponse, dependencies=[Depends(require_auth)])
 async def regenerate_message(
     request: SendMessageRequest,

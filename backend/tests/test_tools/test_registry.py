@@ -163,7 +163,23 @@ class TestBuiltinTools:
         files = file_list(str(tmp_path))
         assert len(files) == 2
 
-    def test_shell_exec_echo(self, tmp_path: Path, monkeypatch):
+    def test_file_tools_use_active_workspace_context(self, tmp_path: Path):
+        from homomics_lab.tools.builtin import file_list, file_read, file_write
+        from homomics_lab.workspace.context import workspace_context
+        from homomics_lab.workspace.manager import WorkspaceManager
+
+        workspace = WorkspaceManager(tmp_path, "project_a")
+        with workspace_context(workspace):
+            file_write("outputs/result.txt", "done")
+            assert file_read("outputs/result.txt") == "done"
+            files = file_list("outputs")
+
+        expected = workspace.workspace_dir / "outputs" / "result.txt"
+        assert expected.read_text() == "done"
+        assert files == [str(expected)]
+
+    @pytest.mark.asyncio
+    async def test_shell_exec_echo(self, tmp_path: Path, monkeypatch):
         from homomics_lab.tools.builtin import shell_exec
 
         # In CI there is usually no bubblewrap/container, so allow the legacy
@@ -172,9 +188,35 @@ class TestBuiltinTools:
         monkeypatch.setattr(settings, "interactive_mode", False)
         monkeypatch.setattr(settings, "skill_sandbox_backend", "local")
 
-        result = shell_exec("echo hello", cwd=str(tmp_path))
+        result = await shell_exec("echo hello", cwd=str(tmp_path))
         assert result["returncode"] == 0
         assert "hello" in result["stdout"]
+
+    @pytest.mark.asyncio
+    async def test_shell_exec_auto_falls_back_on_sandbox_infra_error(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import homomics_lab.tools.builtin as builtin
+        from homomics_lab.tools.builtin import shell_exec
+
+        class BrokenSandbox:
+            async def run_command(self, command, cwd=None, timeout_seconds=30):
+                return "bwrap: Can't mkdir /work: Read-only file system"
+
+        monkeypatch.setattr(settings, "force_sandbox", True)
+        monkeypatch.setattr(settings, "interactive_mode", False)
+        monkeypatch.setattr(settings, "skill_sandbox_backend", "auto")
+        monkeypatch.setattr(
+            builtin.Sandbox,
+            "create",
+            classmethod(lambda cls, *args, **kwargs: BrokenSandbox()),
+        )
+
+        result = await shell_exec("echo fallback_ok", cwd=str(tmp_path))
+        assert result["returncode"] == 0
+        assert "fallback_ok" in result["stdout"]
+        assert result["sandbox_backend"] == "local_failed_local_fallback"
+        assert "bwrap" in result["sandbox_warning"]
 
     def test_path_escape_rejected(self, tmp_path: Path):
         from homomics_lab.security import PathSecurityError

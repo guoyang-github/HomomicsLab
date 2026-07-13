@@ -13,20 +13,26 @@ the most secure available backend).
 
 import asyncio
 import json
+import logging
+import os
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+from homomics_lab.config import settings
+from homomics_lab.hpc.state import ExecutionState
+
+logger = logging.getLogger(__name__)
 
 try:
     import resource as _resource_module
 except ImportError:
     _resource_module = None
-
-from homomics_lab.config import settings
-from homomics_lab.hpc.state import ExecutionState
 
 
 class Sandbox(ABC):
@@ -52,6 +58,7 @@ class Sandbox(ABC):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
         unrestricted: bool = False,
@@ -67,6 +74,7 @@ class Sandbox(ABC):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         r_executable: Optional[str] = None,
         r_library_path: Optional[str] = None,
@@ -114,6 +122,53 @@ class Sandbox(ABC):
         return False
 
     @staticmethod
+    def _running_in_venv() -> bool:
+        """Return True when the backend process itself is inside a Python venv.
+
+        This is a pragmatic signal for local development: when the API/worker
+        was started from a project venv that already contains the required
+        packages, preferring ``LocalSandbox`` avoids spinning inside a bare
+        container image that lacks project dependencies.
+
+        Also treats conda environments as venvs because ``sys.prefix`` equals
+        ``sys.base_prefix`` inside a conda env, but the interpreter still lives
+        in an isolated prefix with its own site-packages.
+        """
+        if hasattr(sys, "base_prefix") and sys.prefix != sys.base_prefix:
+            return True
+        conda_prefix = os.environ.get("CONDA_PREFIX")
+        if conda_prefix and Path(conda_prefix) == Path(sys.prefix):
+            return True
+        return False
+
+    @staticmethod
+    def _venv_env(env: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+        """Prepend the configured skill Python environment to PATH.
+
+        This makes ``python``/``pip`` inside ``shell_exec`` resolve to the
+        interpreter configured by ``HOMOMICS_SKILL_PYTHON_PATH`` (or the backend
+        process's own venv when unset), so skills find packages already installed
+        in that environment.
+        """
+        python_path = settings.skill_python_path
+        if python_path:
+            venv_bin = Path(python_path).parent
+        elif Sandbox._running_in_venv():
+            venv_bin = Path(sys.executable).parent
+        else:
+            return env
+        path = str(venv_bin)
+        if env is None:
+            base = dict(os.environ)
+        else:
+            base = dict(env)
+        existing = base.get("PATH", "")
+        if existing:
+            path = f"{path}{os.pathsep}{existing}"
+        base["PATH"] = path
+        return base
+
+    @staticmethod
     def create(
         backend: str,
         working_dir: Path,
@@ -129,15 +184,33 @@ class Sandbox(ABC):
             exec_type: ``python`` or ``r``; used to pick a default container image.
         """
         if backend == "auto":
-            # Prefer container isolation when available, then bwrap, then local.
-            for cls in (ContainerSandbox, BubblewrapSandbox, LocalSandbox):
+            # When running inside a project venv (typical local dev), the host
+            # interpreter already has the dependencies installed by the user.
+            # Prefer LocalSandbox in that case so skills work out of the box;
+            # production deployments should explicitly set the backend to
+            # ``container`` or ``bubblewrap``.
+            if Sandbox._running_in_venv():
+                candidates = (LocalSandbox, ContainerSandbox, BubblewrapSandbox)
+            else:
+                candidates = (ContainerSandbox, BubblewrapSandbox, LocalSandbox)
+            for cls in candidates:
                 candidate = cls(
                     working_dir,
                     container_image=container_image,
                     exec_type=exec_type,
                 )
-                if candidate.is_available():
-                    return candidate
+                if not candidate.is_available():
+                    continue
+                # A backend can report "available" yet be non-functional in
+                # the current environment (e.g. bwrap present but unable to
+                # mount /work under WSL). Probe it and fall back when broken.
+                if isinstance(candidate, BubblewrapSandbox) and not candidate.probe():
+                    logger.warning(
+                        "Bubblewrap sandbox is present but non-functional here; "
+                        "falling back to the local sandbox."
+                    )
+                    continue
+                return candidate
             return LocalSandbox(working_dir)
 
         mapping: Dict[str, type] = {
@@ -189,6 +262,7 @@ class LocalSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
         unrestricted: bool = False,
@@ -205,8 +279,10 @@ class LocalSandbox(Sandbox):
 
         proc = None
         try:
+            # Run Python in unbuffered mode so that skill print() statements are
+            # flushed immediately and can be streamed to the frontend as live logs.
             proc = await asyncio.create_subprocess_exec(
-                executable, str(script_path), inputs_json,
+                executable, "-u", str(script_path), inputs_json,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.working_dir),
@@ -219,6 +295,7 @@ class LocalSandbox(Sandbox):
                 timeout_seconds=timeout_seconds,
                 progress_callback=progress_callback,
                 job_id=job_id,
+                parent_job_id=parent_job_id,
                 current_phase=current_phase,
             )
 
@@ -253,6 +330,7 @@ class LocalSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         r_executable: Optional[str] = None,
         r_library_path: Optional[str] = None,
@@ -302,6 +380,7 @@ class LocalSandbox(Sandbox):
                 timeout_seconds=timeout_seconds,
                 progress_callback=progress_callback,
                 job_id=job_id,
+                parent_job_id=parent_job_id,
                 current_phase=current_phase,
             )
 
@@ -338,12 +417,13 @@ class LocalSandbox(Sandbox):
         job_id: Optional[str] = None,
     ) -> str:
         """Run a shell command locally."""
+        run_env = self._venv_env(env)
         proc = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(cwd or self.working_dir),
-            env=env,
+            env=run_env,
         )
         if job_id:
             self._running[job_id] = proc
@@ -366,40 +446,76 @@ class LocalSandbox(Sandbox):
         timeout_seconds: float,
         progress_callback: Optional[Callable[[ExecutionState], None]],
         job_id: Optional[str],
+        parent_job_id: Optional[str],
         current_phase: Optional[str],
     ) -> tuple[List[str], List[str]]:
-        """Read stdout/stderr incrementally and optionally report progress."""
+        """Read stdout/stderr incrementally and report progress in near real time."""
         stdout_lines: List[str] = []
         stderr_lines: List[str] = []
+        # Each new line is pushed onto this queue so the reporter can emit it
+        # immediately without waiting for a fixed polling interval.
+        line_queue: asyncio.Queue[str] = asyncio.Queue()
 
-        async def _read_stream(stream, lines: List[str]) -> None:
+        async def _read_stream(stream, lines: List[str], prefix: str) -> None:
             while True:
                 line = await stream.readline()
                 if not line:
                     break
-                lines.append(line.decode(errors="replace").rstrip("\n"))
+                text = line.decode(errors="replace").rstrip("\n")
+                lines.append(text)
+                await line_queue.put(f"{prefix}{text}")
 
-        stdout_task = asyncio.create_task(_read_stream(proc.stdout, stdout_lines))
-        stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_lines))
+        stdout_task = asyncio.create_task(_read_stream(proc.stdout, stdout_lines, ""))
+        stderr_task = asyncio.create_task(_read_stream(proc.stderr, stderr_lines, "[stderr] "))
+
+        # Progress events use the parent background job id when available so that
+        # the frontend's SSE subscription sees them; fall back to the local id.
+        progress_job_id = parent_job_id or job_id or "unknown"
 
         async def _progress_reporter() -> None:
-            if progress_callback is None or proc.stdout is None:
+            if progress_callback is None:
                 return
-            while not proc.returncode == 0 and not proc.stdout.at_eof():
-                await asyncio.sleep(1.0)
-                if proc.returncode is not None:
-                    break
-                logs = (stdout_lines + stderr_lines)[-50:]
+            pending_logs: List[str] = []
+            last_emit = time.monotonic()
+
+            def _emit() -> None:
+                nonlocal last_emit
+                if not pending_logs:
+                    return
                 progress_callback(
                     ExecutionState(
-                        job_id=job_id or "unknown",
+                        job_id=progress_job_id,
                         status="RUNNING",
                         current_phase=current_phase,
-                        progress_pct=min(10.0 + len(stdout_lines) * 2.0, 90.0),
-                        logs=logs,
+                        progress_pct=min(
+                            10.0 + (len(stdout_lines) + len(stderr_lines)) * 2.0, 90.0
+                        ),
+                        logs=pending_logs[:],
                         scheduler_type="local",
                     )
                 )
+                pending_logs.clear()
+                last_emit = time.monotonic()
+
+            try:
+                while True:
+                    try:
+                        # Wait for the next line, but flush buffered lines at least
+                        # every 200 ms so the UI feels responsive.
+                        line = await asyncio.wait_for(line_queue.get(), timeout=0.2)
+                        pending_logs.append(line)
+                        # Emit immediately for the first few lines, then batch up
+                        # to a handful of lines to avoid flooding the event bus.
+                        if len(pending_logs) >= 5 or time.monotonic() - last_emit > 0.5:
+                            _emit()
+                    except asyncio.TimeoutError:
+                        if pending_logs:
+                            _emit()
+                        # Exit once the process has finished and the readers are done.
+                        if proc.returncode is not None and line_queue.empty():
+                            break
+            finally:
+                _emit()
 
         reporter_task = asyncio.create_task(_progress_reporter())
 
@@ -419,13 +535,14 @@ class LocalSandbox(Sandbox):
                     pass
             raise TimeoutError(f"Skill execution timed out after {timeout_seconds}s")
 
+        # Wait for the readers to drain their pipes before stopping the reporter.
+        await asyncio.gather(stdout_task, stderr_task)
         reporter_task.cancel()
         try:
             await reporter_task
         except asyncio.CancelledError:
             pass
 
-        await asyncio.gather(stdout_task, stderr_task)
         return stdout_lines, stderr_lines
 
     _RESOURCE_LIMITS_SNIPPET = """\
@@ -587,6 +704,36 @@ class BubblewrapSandbox(Sandbox):
     def is_available(cls) -> bool:
         return shutil.which("bwrap") is not None
 
+    def probe(self) -> bool:
+        """Run a trivial command to confirm bwrap actually works here.
+
+        ``is_available`` only checks the binary exists; under WSL and some
+        locked-down containers bwrap is present but cannot mount ``/work``
+        (``Read-only file system``), which would make every skill fail. This
+        probe replicates the real mount layout with a no-op command.
+        """
+        if not self._bwrap:
+            return False
+        args = [
+            str(self._bwrap),
+            "--ro-bind", "/", "/",
+            "--bind", str(self.working_dir), "/work",
+            "--dir", "/tmp",
+            "--proc", "/proc",
+            "--dev", "/dev",
+            "--unshare-user", "--unshare-ipc", "--unshare-pid",
+            "--unshare-net", "--unshare-uts",
+            "--chdir", "/work",
+            "--", "/bin/echo", "__sandbox_ok__",
+        ]
+        try:
+            result = subprocess.run(
+                args, capture_output=True, text=True, timeout=10
+            )
+        except Exception:
+            return False
+        return result.returncode == 0 and "__sandbox_ok__" in result.stdout
+
     def get_metadata(self) -> Dict[str, Any]:
         return {
             "backend": "bubblewrap",
@@ -616,6 +763,7 @@ class BubblewrapSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
         unrestricted: bool = False,
@@ -626,7 +774,12 @@ class BubblewrapSandbox(Sandbox):
         script_path.write_text(script)
 
         result_path = self.working_dir / "__skill_result__.json"
-        interpreter = python_path if python_path and python_path.startswith("/") else "python"
+        interpreter = (
+            python_path
+            if python_path and python_path.startswith("/")
+            else (settings.skill_python_path if settings.skill_python_path else sys.executable)
+        )
+        run_env = self._venv_env(None)
         args = self._base_args(self.working_dir) + [
             interpreter, "/work/__skill_script__.py", inputs_json,
         ]
@@ -636,7 +789,9 @@ class BubblewrapSandbox(Sandbox):
             timeout_seconds=timeout_seconds,
             progress_callback=progress_callback,
             job_id=job_id,
+            parent_job_id=parent_job_id,
             current_phase=current_phase,
+            env=run_env,
         )
 
     async def run_r(
@@ -646,6 +801,7 @@ class BubblewrapSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         r_executable: Optional[str] = None,
         r_library_path: Optional[str] = None,
@@ -665,6 +821,7 @@ class BubblewrapSandbox(Sandbox):
             timeout_seconds=timeout_seconds,
             progress_callback=progress_callback,
             job_id=job_id,
+            parent_job_id=parent_job_id,
             current_phase=current_phase,
         )
 
@@ -677,12 +834,16 @@ class BubblewrapSandbox(Sandbox):
         job_id: Optional[str] = None,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
+        # Inherit the venv PATH so that `python` inside the sandbox resolves to
+        # the same interpreter the backend uses. Bubblewrap binds the host fs as
+        # read-only, so the venv packages remain accessible.
+        run_env = self._venv_env(env)
         args = self._base_args(run_cwd) + ["/bin/sh", "-c", command]
         proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env,
+            env=run_env,
         )
         if job_id:
             self._running[job_id] = proc
@@ -703,12 +864,15 @@ class BubblewrapSandbox(Sandbox):
         timeout_seconds: float,
         progress_callback: Optional[Callable[[ExecutionState], None]],
         job_id: Optional[str],
+        parent_job_id: Optional[str],
         current_phase: Optional[str],
+        env: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         if job_id:
             self._running[job_id] = proc
@@ -719,6 +883,7 @@ class BubblewrapSandbox(Sandbox):
                 timeout_seconds=timeout_seconds,
                 progress_callback=progress_callback,
                 job_id=job_id,
+                parent_job_id=parent_job_id,
                 current_phase=current_phase,
             )
 
@@ -831,6 +996,7 @@ class ContainerSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         python_path: Optional[str] = None,
         unrestricted: bool = False,
@@ -908,6 +1074,7 @@ class ContainerSandbox(Sandbox):
             timeout_seconds=timeout_seconds,
             progress_callback=progress_callback,
             job_id=job_id,
+            parent_job_id=parent_job_id,
             current_phase=current_phase,
         )
         return self._remap_container_paths(result, host_inputs)
@@ -951,6 +1118,7 @@ class ContainerSandbox(Sandbox):
         timeout_seconds: float = 60.0,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
         job_id: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
         current_phase: Optional[str] = None,
         r_executable: Optional[str] = None,
         r_library_path: Optional[str] = None,
@@ -978,6 +1146,7 @@ class ContainerSandbox(Sandbox):
             timeout_seconds=timeout_seconds,
             progress_callback=progress_callback,
             job_id=job_id,
+            parent_job_id=parent_job_id,
             current_phase=current_phase,
         )
 
@@ -1027,6 +1196,7 @@ class ContainerSandbox(Sandbox):
         timeout_seconds: float,
         progress_callback: Optional[Callable[[ExecutionState], None]],
         job_id: Optional[str],
+        parent_job_id: Optional[str],
         current_phase: Optional[str],
     ) -> Dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(
@@ -1043,6 +1213,7 @@ class ContainerSandbox(Sandbox):
                 timeout_seconds=timeout_seconds,
                 progress_callback=progress_callback,
                 job_id=job_id,
+                parent_job_id=parent_job_id,
                 current_phase=current_phase,
             )
 

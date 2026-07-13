@@ -172,7 +172,8 @@ class SkillPerformanceTracker:
     """Track and analyze skill execution performance with cost estimation."""
 
     def __init__(self, db_path: Path = None, cost_config: CostConfig = None):
-        self.db_path = db_path or Path("./homomics_lab_metrics.db")
+        self.db_path = Path(db_path or "./homomics_lab_metrics.db")
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.cost_config = cost_config or CostConfig()
         self._init_db()
 

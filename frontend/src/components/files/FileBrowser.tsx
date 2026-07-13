@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Folder, FileText, ChevronRight, ChevronLeft, Loader2, RefreshCw, Quote } from 'lucide-react'
+import { Folder, FileText, ChevronRight, ChevronLeft, Loader2, RefreshCw, Quote, Eye } from 'lucide-react'
 import { fileApi, type FileEntry } from '@/services/api'
 import { useProjectStore } from '@/stores/projectStore'
 import { useChatStore } from '@/stores/chatStore'
@@ -10,6 +10,20 @@ import { useTranslation } from '@/i18n'
 interface BreadcrumbSegment {
   name: string
   path: string
+}
+
+const _MAX_READ_BYTES = 5 * 1024 * 1024
+
+function isBinaryMimeType(mimeType: string): boolean {
+  if (!mimeType) return false
+  const binaryPrefixes = ['image/', 'video/', 'audio/', 'application/pdf', 'application/zip']
+  if (binaryPrefixes.some((prefix) => mimeType.startsWith(prefix))) return true
+  // Application types other than known text formats are treated as binary.
+  if (mimeType.startsWith('application/')) {
+    const textSubtypes = ['json', 'yaml', 'x-yaml', 'javascript', 'xml', 'x-sh']
+    return !textSubtypes.some((subtype) => mimeType.endsWith(subtype))
+  }
+  return false
 }
 
 export function FileBrowser() {
@@ -42,7 +56,9 @@ export function FileBrowser() {
   useEffect(() => {
     setSelectedFile(null)
     setFileContent(null)
-    fetchEntries('')
+    // Default to the outputs directory so users immediately see analysis
+    // results; they can still navigate up to the workspace root if needed.
+    fetchEntries('outputs')
   }, [currentProjectId, fetchEntries])
 
   const handleEntryClick = async (entry: FileEntry) => {
@@ -176,17 +192,32 @@ export function FileBrowser() {
                     {fileMimeType || selectedFile.type} · {formatSize(selectedFile.size || 0)}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    useChatStore.getState().setDraftInput(`@file:${selectedFile.path}`)
-                    toastSuccess(t('files.referenceSuccess'))
-                  }}
-                >
-                  <Quote className="mr-1.5 h-4 w-4" />
-                  {t('files.reference')}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {(selectedFile.size !== null && selectedFile.size > _MAX_READ_BYTES) ||
+                  isBinaryMimeType(fileMimeType) ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        window.open(fileApi.previewUrl(currentProjectId, selectedFile.path), '_blank')
+                      }}
+                    >
+                      <Eye className="mr-1.5 h-4 w-4" />
+                      {t('domain.preview')}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      useChatStore.getState().setDraftInput(`@file:${selectedFile.path}`)
+                      toastSuccess(t('files.referenceSuccess'))
+                    }}
+                  >
+                    <Quote className="mr-1.5 h-4 w-4" />
+                    {t('files.reference')}
+                  </Button>
+                </div>
               </div>
               <div className="flex-1 overflow-auto p-4">
                 {reading ? (

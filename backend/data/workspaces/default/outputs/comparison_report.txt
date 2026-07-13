@@ -1,0 +1,36 @@
+Per all_celltype label agreement with CellTypist predictions
+
+                     top_celltypist_label  agreement  n_cells
+all_celltype                                                 
+Acinar          Tem/Trm cytotoxic T cells      1.000        1
+B                           Naive B cells      0.565      207
+CAF                           Fibroblasts      1.000        3
+CD4T             Tcm/Naive helper T cells      0.505      438
+CD8T          Tem/Temra cytotoxic T cells      0.450      786
+Ductal                   Epithelial cells      1.000       32
+Endocrine        Tcm/Naive helper T cells      1.000        1
+Endothelial             Endothelial cells      0.846       26
+Myeloid               Classical monocytes      0.453       64
+NK                         CD16+ NK cells      0.671      417
+Plasma                     Memory B cells      1.000        1
+Platelet      Tem/Temra cytotoxic T cells      1.000        9
+Schwann                        MAIT cells      1.000        1
+Stellate                      Fibroblasts      1.000       14
+
+Row-normalized crosstab (all_celltype x celltypist_predicted):
+majority_voting  CD16+ NK cells  Classical monocytes  Endothelial cells  Epithelial cells  Fibroblasts  MAIT cells  Macrophages  Mast cells  Memory B cells  Naive B cells  Regulatory T cells  Tcm/Naive helper T cells  Tem/Temra cytotoxic T cells  Tem/Trm cytotoxic T cells
+all_celltype                                                                                                                                                                                                                                                                    
+Acinar                    0.000                0.000              0.000             0.000          0.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      1.000
+B                         0.024                0.000              0.000             0.005          0.0       0.000        0.000       0.000           0.406          0.565               0.000                     0.000                        0.000                      0.000
+CAF                       0.000                0.000              0.000             0.000          1.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      0.000
+CD4T                      0.009                0.002              0.000             0.009          0.0       0.087        0.000       0.000           0.002          0.000               0.078                     0.505                        0.281                      0.027
+CD8T                      0.017                0.003              0.000             0.003          0.0       0.055        0.001       0.000           0.001          0.000               0.001                     0.056                        0.450                      0.413
+Ductal                    0.000                0.000              0.000             1.000          0.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      0.000
+Endocrine                 0.000                0.000              0.000             0.000          0.0       0.000        0.000       0.000           0.000          0.000               0.000                     1.000                        0.000                      0.000
+Endothelial               0.154                0.000              0.846             0.000          0.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      0.000
+Myeloid                   0.016                0.453              0.000             0.000          0.0       0.031        0.219       0.234           0.016          0.000               0.000                     0.016                        0.016                      0.000
+NK                        0.671                0.000              0.000             0.000          0.0       0.005        0.000       0.000           0.000          0.000               0.000                     0.000                        0.281                      0.043
+Plasma                    0.000                0.000              0.000             0.000          0.0       0.000        0.000       0.000           1.000          0.000               0.000                     0.000                        0.000                      0.000
+Platelet                  0.000                0.000              0.000             0.000          0.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        1.000                      0.000
+Schwann                   0.000                0.000              0.000             0.000          0.0       1.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      0.000
+Stellate                  0.000                0.000              0.000             0.000          1.0       0.000        0.000       0.000           0.000          0.000               0.000                     0.000                        0.000                      0.000

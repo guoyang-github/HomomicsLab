@@ -3,13 +3,14 @@ import { create } from 'zustand'
 export interface LogEntry {
   id: string
   timestamp: string
-  level: 'info' | 'stdout' | 'stderr' | 'error' | 'success' | 'warning'
+  level: 'info' | 'stdout' | 'stderr' | 'error' | 'success' | 'warning' | 'tool' | 'artifact'
   message: string
   taskId?: string
 }
 
 interface ExecutionState {
   jobId: string | null
+  jobSessionId: string | null
   isConnected: boolean
   logs: LogEntry[]
   status: 'idle' | 'running' | 'completed' | 'failed' | 'aborted'
@@ -17,6 +18,8 @@ interface ExecutionState {
   result: Record<string, any> | null
 
   setJobId: (id: string | null) => void
+  setJobSessionId: (id: string | null) => void
+  startJob: (jobId: string, sessionId: string) => void
   setConnected: (connected: boolean) => void
   setStatus: (status: ExecutionState['status'], percent?: number) => void
   addLog: (entry: Omit<LogEntry, 'id'>) => void
@@ -29,6 +32,7 @@ let logIdCounter = 0
 
 export const useExecutionStore = create<ExecutionState>((set) => ({
   jobId: null,
+  jobSessionId: null,
   isConnected: false,
   logs: [],
   status: 'idle',
@@ -36,6 +40,17 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
   result: null,
 
   setJobId: (jobId) => set({ jobId }),
+  setJobSessionId: (jobSessionId) => set({ jobSessionId }),
+  startJob: (jobId, jobSessionId) =>
+    set({
+      jobId,
+      jobSessionId,
+      isConnected: false,
+      logs: [],
+      status: 'running',
+      percent: 0,
+      result: null,
+    }),
   setConnected: (isConnected) => set({ isConnected }),
   setStatus: (status, percent) => set({ status, ...(percent !== undefined && { percent }) }),
   addLog: (entry) =>
@@ -50,5 +65,14 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
     })),
   clearLogs: () => set({ logs: [] }),
   setResult: (result) => set({ result }),
-  reset: () => set({ jobId: null, isConnected: false, logs: [], status: 'idle', percent: 0, result: null }),
+  reset: () =>
+    set({
+      jobId: null,
+      jobSessionId: null,
+      isConnected: false,
+      logs: [],
+      status: 'idle',
+      percent: 0,
+      result: null,
+    }),
 }))

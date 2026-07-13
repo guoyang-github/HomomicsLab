@@ -1,0 +1,52 @@
+CellTypist Annotation Report
+============================
+
+Model: Immune_All_Low.pkl
+Date: 2026-07-10 17:51
+
+Dataset Summary
+---------------
+Total cells: 2000
+Total genes: 29057
+
+Annotation Summary
+------------------
+Cell types identified: 8
+Mean confidence: 0.736
+Median confidence: 0.956
+High confidence (>0.5): 1494 (74.7%)
+
+Cell Type Breakdown
+-------------------
+
+Tem/Trm cytotoxic T cells:
+  Cells: 510 (25.5%)
+  Mean confidence: 0.569
+
+Tem/Temra cytotoxic T cells:
+  Cells: 427 (21.3%)
+  Mean confidence: 0.819
+
+CD16+ NK cells:
+  Cells: 405 (20.2%)
+  Mean confidence: 0.798
+
+Tcm/Naive helper T cells:
+  Cells: 307 (15.3%)
+  Mean confidence: 0.649
+
+Memory B cells:
+  Cells: 149 (7.4%)
+  Mean confidence: 0.909
+
+Epithelial cells:
+  Cells: 125 (6.2%)
+  Mean confidence: 0.822
+
+Naive B cells:
+  Cells: 60 (3.0%)
+  Mean confidence: 0.945
+
+Mast cells:
+  Cells: 17 (0.9%)
+  Mean confidence: 0.932

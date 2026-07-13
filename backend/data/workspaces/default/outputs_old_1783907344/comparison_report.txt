@@ -1,0 +1,25 @@
+CellTypist vs all_celltype comparison (PA12_sc.h5ad)
+====================================================
+Model: Immune_All_Low.pkl (majority voting, best match)
+Total cells: 14990
+Mean CellTypist confidence: 0.7396
+Coarse overall agreement (immune-class mapped): 0.8346 (12510/14990)
+
+Per-reference-label summary:
+  CD8T         n=5683  recall=0.873  top_pred=Tem/Temra cytotoxic T cells
+  CD4T         n=3639  recall=0.653  top_pred=Tcm/Naive helper T cells
+  NK           n=3166  recall=0.895  top_pred=CD16+ NK cells
+  B            n=1445  recall=0.993  top_pred=Naive B cells
+  Myeloid      n=445   recall=0.991  top_pred=Classical monocytes
+  Ductal       n=228   recall=0.974  top_pred=Epithelial cells
+  Endothelial  n=164   recall=0.970  top_pred=Endothelial cells
+  Stellate     n=76    recall=0.000  top_pred=Fibroblasts
+  Platelet     n=68    recall=0.529  top_pred=Megakaryocytes/platelets
+  CAF          n=46    recall=1.000  top_pred=Fibroblasts
+  Plasma       n=16    recall=0.062  top_pred=Memory B cells
+  Schwann      n=7     recall=0.000  top_pred=Fibroblasts
+  Acinar       n=6     recall=0.000  top_pred=Tem/Trm cytotoxic T cells
+  Endocrine    n=1     recall=0.000  top_pred=ILC3
+
+Coarse agreement = fraction of cells whose CellTypist fine label maps to the same broad class as all_celltype.
+Note: non-immune all_celltype classes (Acinar/Ductal/Endocrine/Schwann/Stellate/CAF) are outside the Immune_All_Low model scope and are expected to show low recall.

@@ -7,6 +7,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Project root: backend/homomics_lab/config.py -> backend -> HomomicsLab
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
+_BACKEND_ROOT = Path(__file__).parent.parent
+
+
+def _abs_backend_path(path: Path) -> Path:
+    """Resolve a config path relative to the backend package unless absolute."""
+    p = Path(path)
+    return p if p.is_absolute() else (_BACKEND_ROOT / p).resolve()
+
+
+def _abs_sqlite_url(url: str) -> str:
+    """Anchor relative SQLite URLs to the backend directory.
+
+    Relative sqlite URLs otherwise depend on the process CWD, which is fragile
+    once background jobs execute inside per-project workspaces.
+    """
+    prefix = "sqlite+aiosqlite:///"
+    if not url.startswith(prefix):
+        return url
+    raw = url[len(prefix):]
+    if raw.startswith("/") or raw in {":memory:", ""}:
+        return url
+    return prefix + str(_abs_backend_path(Path(raw)))
 
 
 class Settings(BaseSettings):
@@ -89,6 +111,11 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def _validate_data_dir(cls, v: Any) -> Path:
+        return _abs_backend_path(Path(v))
+
     @field_validator("database_url")
     @classmethod
     def _validate_database_url(cls, v: str) -> str:
@@ -107,7 +134,7 @@ class Settings(BaseSettings):
             # Normalize legacy prefixes to asyncpg.
             if not v.startswith("postgresql+asyncpg://"):
                 v = "postgresql+asyncpg://" + v.split("://", 1)[1]
-        return v
+        return _abs_sqlite_url(v)
 
     @field_validator("external_skills_dirs", mode="before")
     @classmethod
@@ -149,7 +176,7 @@ class Settings(BaseSettings):
         if v.startswith("postgresql://") or v.startswith("postgres://"):
             if not v.startswith("postgresql+asyncpg://"):
                 v = "postgresql+asyncpg://" + v.split("://", 1)[1]
-        return v
+        return _abs_sqlite_url(v)
 
     @field_validator("storage_backend")
     @classmethod
@@ -196,6 +223,11 @@ class Settings(BaseSettings):
     # Skill sandbox / security settings
     auto_load_domain_strategies: bool = True
     skill_sandbox_backend: str = "auto"  # "auto" | "local" | "bubblewrap" | "container"
+    # Optional explicit Python interpreter for skill/sandbox execution. When set,
+    # sandboxes prepend this interpreter's bin directory to PATH so skills can use
+    # a pre-installed environment (e.g. a conda env or project venv). If unset,
+    # the backend process's own interpreter is used.
+    skill_python_path: Optional[str] = None
     # Comma-separated list of allowed git URL prefixes for skill/domain import.
     # Empty list allows all git URLs (development default). Set this in production
     # to restrict imports to trusted hosts, e.g. "https://github.com/your-org/".
@@ -219,6 +251,9 @@ class Settings(BaseSettings):
     skills_shell_execution_enabled: bool = False  # Claude Code-style !`cmd` injection
     domain_strict_validation: bool = False  # if False, missing skills become warnings instead of failing the whole domain
     interactive_mode: bool = False  # require approval for high-risk tool calls
+    plan_approval_strategy: str = (
+        "risky_only"  # always | first_time | risky_only | never (plan-level gate)
+    )
     force_sandbox: bool = (
         True  # if True, shell_exec and CodeAct must run through a sandbox
     )
@@ -246,8 +281,8 @@ class Settings(BaseSettings):
     rate_limit_redis_url: Optional[str] = None
     rate_limit_trust_proxy: bool = False
     rate_limit_requests_per_minute: int = 60
-    rate_limit_upload_max_bytes: int = 1024 * 1024 * 1024  # 1 GB
-    max_upload_file_bytes: int = 1024 * 1024 * 1024  # 1 GB per file
+    rate_limit_upload_max_bytes: int = 5 * 1024 * 1024 * 1024  # 5 GB
+    max_upload_file_bytes: int = 5 * 1024 * 1024 * 1024  # 5 GB per file
 
     @field_validator("rate_limit_backend")
     @classmethod
@@ -303,6 +338,11 @@ class Settings(BaseSettings):
     # skill and open-agent planners.  This is now the default and recommended
     # mode; set to False to restore the legacy _should_use_* rule set.
     capability_first_routing_enabled: bool = True
+    open_exploration_mode_enabled: bool = False
+
+    # Agent executor reliability
+    agent_retry_backoff_base_seconds: float = 2.0
+    agent_max_idle_iterations: int = 3
 
     @field_validator("llm_response_cache_backend")
     @classmethod
@@ -377,6 +417,20 @@ class Settings(BaseSettings):
     default_job_timeout_seconds: float = 3600.0
     max_skill_timeout_seconds: float = 86400.0
 
+    # Agentic skill convergence guardrails. These keep a slow / flaky LLM
+    # provider from hanging a job indefinitely and let the executor recover the
+    # common "wrote a script but never ran it" case without extra round-trips.
+    agent_llm_call_timeout_seconds: float = 240.0
+    agent_max_consecutive_llm_failures: int = 3
+    agent_skill_wall_clock_seconds: float = 1500.0
+    agent_source_read_hard_limit: int = 12
+    # If True, the skill agent tries to generate and run a single driver script
+    # before falling back to the interactive tool loop. Enabled by default because
+    # it avoids the long-context doom loop for standard analysis tasks while still
+    # falling back to the interactive loop when the script fails.
+    agent_script_first_enabled: bool = True
+    agent_auto_run_script: bool = True
+
     # Workflow execution settings
     workflow_nextflow_enabled: bool = True
     workflow_nextflow_min_phases: int = 3
@@ -409,6 +463,10 @@ class Settings(BaseSettings):
     ncbi_api_key: Optional[str] = None
     literature_cache_ttl_seconds: float = 3600.0
     literature_max_results: int = 10
+    science_connectors_enabled: bool = (
+        True  # register science_search / science_list_dbs tools (on-demand network)
+    )
+    subagent_review_enabled: bool = False  # enable specialist + critic review before execution
 
     # HITL thresholds
     hitl_confidence_threshold: float = 0.7
@@ -439,6 +497,14 @@ class Settings(BaseSettings):
     mcp_mode: str = "embedded"  # "embedded" | "stdio" | "sse"
     mcp_server_script: Optional[str] = None
     mcp_server_url: Optional[str] = None
+
+    # MCP server marketplace settings
+    mcp_marketplace_enabled: bool = True
+    mcp_venv_dir: Path = Field(default_factory=lambda: Path("./data/mcp_venvs"))
+    mcp_servers_state_path: Path = Field(default_factory=lambda: Path("./data/mcp_servers.json"))
+    mcp_marketplace_catalog_path: Path = Field(
+        default_factory=lambda: Path("./data/mcp_marketplace_catalog.json")
+    )
 
     @field_validator("mcp_mode")
     @classmethod

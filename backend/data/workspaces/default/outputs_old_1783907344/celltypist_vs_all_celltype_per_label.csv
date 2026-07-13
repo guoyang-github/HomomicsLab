@@ -1,0 +1,15 @@
+all_celltype,n_cells,mean_conf,top_celltypist_label,coarse_recall
+CD8T,5683,0.6921,Tem/Temra cytotoxic T cells,0.8730
+CD4T,3639,0.6700,Tcm/Naive helper T cells,0.6532
+NK,3166,0.7999,CD16+ NK cells,0.8945
+B,1445,0.9283,Naive B cells,0.9931
+Myeloid,445,0.6734,Classical monocytes,0.9910
+Ductal,228,0.9222,Epithelial cells,0.9737
+Endothelial,164,0.9915,Endothelial cells,0.9695
+Stellate,76,0.7829,Fibroblasts,0.0000
+Platelet,68,0.8249,Megakaryocytes/platelets,0.5294
+CAF,46,0.6469,Fibroblasts,1.0000
+Plasma,16,0.7472,Memory B cells,0.0625
+Schwann,7,0.9999,Fibroblasts,0.0000
+Acinar,6,0.5214,Tem/Trm cytotoxic T cells,0.0000
+Endocrine,1,1.0000,ILC3,0.0000

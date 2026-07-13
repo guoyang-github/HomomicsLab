@@ -5,10 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.capability_assembler import CapabilityAssembler
+from homomics_lab.agent.plan.composite_planner import CompositePlanner
+from homomics_lab.agent.plan.cross_domain_planner import CrossDomainPlanner
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
 from homomics_lab.agent.open_agent.planner import OpenAgentPlanner
-from homomics_lab.agent.plan.cross_domain_planner import CrossDomainPlanner
 from homomics_lab.agent.plan.standalone_planner import StandaloneSkillPlanner
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
@@ -99,12 +100,14 @@ class TaskDecomposer:
         capability_index=None,
         analysis_template_store: Optional[AnalysisTemplateStore] = None,
         capability_assembler: Optional[CapabilityAssembler] = None,
+        composite_planner: Optional[CompositePlanner] = None,
     ):
         self._plan_engine = plan_engine
         self._skill_registry = skill_registry or get_default_registry()
         self._standalone_planner = standalone_planner
         self._cross_domain_planner = cross_domain_planner
         self._open_agent_planner = open_agent_planner
+        self._composite_planner = composite_planner
         self._cbkb = cbkb
         self._capability_index = capability_index
         self._analysis_template_store = analysis_template_store
@@ -214,6 +217,16 @@ class TaskDecomposer:
                 plan_engine=self._get_plan_engine()
             )
         return self._cross_domain_planner
+
+    def _get_composite_planner(self) -> CompositePlanner:
+        """Lazy initialize the composite planner with bridge skill support."""
+        if self._composite_planner is None:
+            self._composite_planner = CompositePlanner(
+                plan_engine=self._get_plan_engine(),
+                skill_registry=self._skill_registry,
+                cross_domain_planner=self._get_cross_domain_planner(),
+            )
+        return self._composite_planner
 
     @staticmethod
     def _should_use_cross_domain_planner(intent: UserIntent) -> bool:
@@ -348,9 +361,9 @@ class TaskDecomposer:
         )
 
         if assembly.route == "cross_domain":
-            cross_domain_plan = await self._get_cross_domain_planner().plan(intent)
-            if cross_domain_plan is not None:
-                return cross_domain_plan, self._plan_result_to_task_tree(cross_domain_plan)
+            composite_plan = await self._get_composite_planner().plan(intent)
+            if composite_plan is not None:
+                return composite_plan, self._plan_result_to_task_tree(composite_plan)
             return None
 
         if assembly.route == "domain_template":
@@ -444,9 +457,9 @@ class TaskDecomposer:
             # Legacy routing rules (kept for backward compatibility).
             # Cross-domain path: compose a plan when the intent spans multiple domains.
             if self._should_use_cross_domain_planner(intent):
-                cross_domain_plan = await self._get_cross_domain_planner().plan(intent)
-                if cross_domain_plan is not None:
-                    return cross_domain_plan, self._plan_result_to_task_tree(cross_domain_plan)
+                composite_plan = await self._get_composite_planner().plan(intent)
+                if composite_plan is not None:
+                    return composite_plan, self._plan_result_to_task_tree(composite_plan)
 
             # Standalone skill path: try standalone skills when no strong domain signal.
             if self._should_use_standalone_planner(intent):

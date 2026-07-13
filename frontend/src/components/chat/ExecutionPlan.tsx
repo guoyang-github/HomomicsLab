@@ -18,9 +18,9 @@ interface Props {
 export function ExecutionPlan({ content }: Props) {
   const { t } = useTranslation()
   const { plan_id, response_text, tasks, progress, estimates } = content
-  const { addMessage } = useChatStore()
+  const { addMessage, currentSessionId } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
-  const { setJobId, reset: resetExecution } = useExecutionStore()
+  const { startJob } = useExecutionStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editing, setEditing] = useState(false)
   const [params, setParams] = useState<Record<string, Record<string, unknown>>>(() => {
@@ -86,9 +86,8 @@ export function ExecutionPlan({ content }: Props) {
 
       if (approved) {
         toastSuccess(t('plan.approved'))
-        if (response.data.job_id) {
-          resetExecution()
-          setJobId(response.data.job_id)
+        if (response.data.job_id && currentSessionId) {
+          startJob(response.data.job_id, currentSessionId)
           setTaskTree(tasks)
           if (progress) setProgress(progress)
           addMessage({

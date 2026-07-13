@@ -15,6 +15,7 @@ Directory layout:
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -24,6 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
+from homomics_lab.workspace.git_snapshot import GitWorkspaceSnapshot
 from homomics_lab.workspace.lineage import LineageEdge, LineageGraph, LineageNode
 from homomics_lab.stability.version_locker import VersionLocker, VersionLock
 
@@ -456,6 +458,50 @@ class WorkspaceManager:
             return
 
         # Restore from manifest only (MVP fallback).
+
+    # ─────────────────────────────────────────
+    # Git snapshots
+    # ─────────────────────────────────────────
+
+    @property
+    def git_snapshot(self) -> GitWorkspaceSnapshot:
+        """Lazy GitWorkspaceSnapshot wrapper for this workspace."""
+        if not hasattr(self, "_git_snapshot") or self._git_snapshot is None:
+            self._git_snapshot = GitWorkspaceSnapshot(self.workspace_dir)
+        return self._git_snapshot
+
+    def create_git_snapshot(
+        self, label: str, task_id: str
+    ) -> Optional[str]:
+        """Create a git-based snapshot of the workspace.
+
+        Returns:
+            The commit hash, or None if git is unavailable or the commit fails.
+        """
+        try:
+            return self.git_snapshot.commit(label=label, task_id=task_id)
+        except Exception:  # pragma: no cover - defensive
+            logging.getLogger(__name__).warning(
+                "Git snapshot creation failed", exc_info=True
+            )
+            return None
+
+    def list_git_snapshots(self) -> List[Dict]:
+        """List git-based snapshots for the workspace."""
+        try:
+            return self.git_snapshot.list_commits()
+        except Exception:  # pragma: no cover - defensive
+            return []
+
+    def restore_git_snapshot(self, commit_id: str) -> bool:
+        """Restore the workspace file tree to a git snapshot commit."""
+        try:
+            return self.git_snapshot.restore(commit_id)
+        except Exception:  # pragma: no cover - defensive
+            logging.getLogger(__name__).warning(
+                "Git snapshot restore failed", exc_info=True
+            )
+            return False
 
     # ─────────────────────────────────────────
     # Data lineage

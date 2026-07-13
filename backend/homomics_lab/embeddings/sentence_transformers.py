@@ -45,11 +45,32 @@ class SentenceTransformersProvider(EmbeddingProvider):
 
     @functools.lru_cache(maxsize=1)
     def _load_model(self):
-        """Lazy-load the sentence-transformers model."""
+        """Lazy-load the sentence-transformers model.
+
+        Prefer the local Hugging Face cache (``local_files_only=True``) so that
+        startup never blocks on network HEAD/etag checks when the model is
+        already cached. Only fall back to an online load on a genuine cache
+        miss (e.g. first run on a fresh machine).
+        """
         from sentence_transformers import SentenceTransformer
 
-        if self._model is None:
-            logger.info("Loading sentence-transformers model: %s", self.model_name)
+        if self._model is not None:
+            return self._model
+        logger.info("Loading sentence-transformers model: %s", self.model_name)
+        try:
+            self._model = SentenceTransformer(
+                self.model_name, device=self.device, local_files_only=True
+            )
+            logger.info(
+                "Loaded sentence-transformers model from local cache: %s",
+                self.model_name,
+            )
+        except Exception:
+            logger.info(
+                "Local cache miss for %s; falling back to online load",
+                self.model_name,
+                exc_info=True,
+            )
             self._model = SentenceTransformer(self.model_name, device=self.device)
         return self._model
 

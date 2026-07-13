@@ -84,6 +84,7 @@ class BaseScheduler(ABC):
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
+        parent_job_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute a skill and return its output."""
         pass
@@ -178,13 +179,17 @@ class LocalScheduler(BaseScheduler):
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
+        parent_job_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         job_id = self._new_job_id(f"local_{skill.id}")
+        # When running inside a background job, stream all progress under the
+        # parent job id so the frontend's SSE subscription sees it.
+        progress_job_id = parent_job_id or job_id
         started_at = datetime.now(timezone.utc)
 
         self._report_progress(
             ExecutionState(
-                job_id=job_id,
+                job_id=progress_job_id,
                 status="PENDING",
                 current_phase=skill.id,
                 progress_pct=0.0,
@@ -241,7 +246,7 @@ class LocalScheduler(BaseScheduler):
 
         self._report_progress(
             ExecutionState(
-                job_id=job_id,
+                job_id=progress_job_id,
                 status="RUNNING",
                 current_phase=skill.id,
                 progress_pct=10.0,
@@ -251,8 +256,10 @@ class LocalScheduler(BaseScheduler):
         )
 
         def _progress_callback(state: ExecutionState) -> None:
-            # Ensure the state carries this scheduler's metadata.
-            state.job_id = job_id
+            # Ensure the state carries this scheduler's metadata. Preserve the
+            # parent job id when provided so live logs route to the right SSE
+            # channel; use the local id only for internal process tracking.
+            state.job_id = progress_job_id
             state.current_phase = skill.id
             state.started_at = started_at
             state.scheduler_type = "local"
@@ -266,6 +273,7 @@ class LocalScheduler(BaseScheduler):
                     timeout_seconds=timeout_seconds,
                     progress_callback=_progress_callback,
                     job_id=job_id,
+                    parent_job_id=progress_job_id,
                     current_phase=skill.id,
                     r_executable=env_info.r_executable,
                     r_library_path=env_info.r_library_path,
@@ -277,6 +285,7 @@ class LocalScheduler(BaseScheduler):
                     timeout_seconds=timeout_seconds,
                     progress_callback=_progress_callback,
                     job_id=job_id,
+                    parent_job_id=progress_job_id,
                     current_phase=skill.id,
                     python_path=env_info.python_path,
                     unrestricted=skill.metadata.get("trusted", False),
@@ -284,7 +293,7 @@ class LocalScheduler(BaseScheduler):
         except Exception as exc:
             self._report_progress(
                 ExecutionState(
-                    job_id=job_id,
+                    job_id=progress_job_id,
                     status="FAILED",
                     current_phase=skill.id,
                     progress_pct=0.0,
@@ -328,13 +337,50 @@ class LocalScheduler(BaseScheduler):
                     result_summary={"status": status},
                 )
                 self._provenance_recorder.record(prov)
+
+                # Append-only workspace JSONL provenance + content-addressed
+                # environment snapshot (best-effort; never blocks execution).
+                import hashlib
+
+                from homomics_lab.provenance.env_snapshot import store_env_snapshot
+                from homomics_lab.provenance.jsonl import (
+                    record_provenance,
+                    record_run,
+                )
+
+                code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+                env_hash = store_env_snapshot(self.working_dir / ".metadata")
+                record_provenance(
+                    self.working_dir,
+                    job_id=progress_job_id,
+                    skill_id=skill.id,
+                    skill_version=prov.skill_version,
+                    code_hash=code_hash,
+                    env_hash=env_hash,
+                    output_files=prov.output_files,
+                    status=status,
+                    started_at=started_at.isoformat() if started_at else None,
+                    ended_at=ended_at.isoformat() if ended_at else None,
+                )
+                record_run(
+                    self.working_dir,
+                    {
+                        "job_id": progress_job_id,
+                        "skill_id": skill.id,
+                        "status": status,
+                        "code_hash": code_hash,
+                        "env_hash": env_hash,
+                        "started_at": started_at.isoformat() if started_at else None,
+                        "ended_at": ended_at.isoformat() if ended_at else None,
+                    },
+                )
             except Exception as exc:
                 # Provenance failures must not break skill execution.
                 logger.warning("Failed to record provenance: %s", exc)
 
         self._report_progress(
             ExecutionState(
-                job_id=job_id,
+                job_id=progress_job_id,
                 status=status,
                 current_phase=skill.id,
                 progress_pct=100.0,
@@ -450,6 +496,7 @@ class SlurmScheduler(BaseScheduler):
         code: str,
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
+        parent_job_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Submit a skill as a SLURM batch job and return a submitted handle.
 
@@ -850,6 +897,7 @@ Rscript script.R"""
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         resume: bool = True,
+        parent_job_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         job_id = self._new_job_id(f"nf_{skill.id}")
         started_at = datetime.now(timezone.utc)

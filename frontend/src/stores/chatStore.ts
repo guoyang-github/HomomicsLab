@@ -85,6 +85,18 @@ export const useChatStore = create<ChatState>()(
       setSessionId: (currentSessionId) => set({ currentSessionId }),
       selectSession: async (id) => {
         set({ currentSessionId: id, messages: [] })
+        usePlanStore.getState().discardDraft()
+        useExecutionStore.getState().reset()
+        useTaskStore.getState().setTaskTree([])
+        useTaskStore.getState().setProgress({
+          total: 0,
+          pending: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          awaiting_human: 0,
+          percent: 0,
+        })
         await get().loadSessionMessages(id)
       },
       loadSessionMessages: async (sessionId) => {
@@ -148,7 +160,8 @@ export const useChatStore = create<ChatState>()(
           ),
         })),
 
-      deleteSession: (id) =>
+      deleteSession: async (id) => {
+        const previous = get().sessions
         set((state) => {
           const remaining = state.sessions.filter((s) => s.id !== id)
           if (state.currentSessionId === id && remaining.length > 0) {
@@ -160,7 +173,21 @@ export const useChatStore = create<ChatState>()(
             }
           }
           return { sessions: remaining }
-        }),
+        })
+        try {
+          await chatApi.deleteSession(id)
+          await get().fetchSessions(get().currentProjectId)
+        } catch (err: any) {
+          // If the backend does not know this session (e.g. it was only local),
+          // keep it removed instead of restoring it.
+          const status = err?.response?.status
+          if (status !== 404) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to delete session', err)
+            set({ sessions: previous })
+          }
+        }
+      },
 
       getCurrentSession: () => {
         const state = get()
@@ -242,8 +269,7 @@ export const useChatStore = create<ChatState>()(
           get().setMessages(response.data.messages)
 
           if (response.data.job_id) {
-            useExecutionStore.getState().reset()
-            useExecutionStore.getState().setJobId(response.data.job_id)
+            useExecutionStore.getState().startJob(response.data.job_id, sessionId)
             useTaskStore.getState().setTaskTree(tasks)
             useTaskStore.getState().setProgress(_extractProgress(tasks))
           }

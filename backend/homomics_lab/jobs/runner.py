@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.config import settings
 from homomics_lab.context.memory_manager import MemoryManager
@@ -12,7 +12,7 @@ from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
 from homomics_lab.metrics import set_active_jobs
-from homomics_lab.models.common import MessageType
+from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
@@ -138,7 +138,7 @@ class BackgroundJobRunner:
             await self._update_active_jobs()
 
             progress_callback = self._make_progress_callback(job_id)
-            runner = self._runner_factory(progress_callback, self._skill_executor)
+            runner = self._runner_factory(progress_callback, self._skill_executor, job_id=job_id)
 
             # Start reproducibility tracking for this job.
             repro_engine = self._create_repro_engine(job)
@@ -196,10 +196,12 @@ class BackgroundJobRunner:
                 if not cognify_handled:
                     project_id = job.project_id or "default"
                     workspace = WorkspaceManager(settings.data_dir, project_id)
+                    workspace.create_git_snapshot("pre-run", job_id)
                     if self._skill_executor is not None and hasattr(self._skill_executor, "set_workspace"):
                         self._skill_executor.set_workspace(workspace)
                     with workspace_context(workspace):
                         result = await asyncio.wait_for(coro, timeout=timeout)
+                    workspace.create_git_snapshot("post-run", job_id)
 
                     # Persist mutated state
                     job.task_tree = result.task_tree
@@ -305,34 +307,72 @@ class BackgroundJobRunner:
                 tree = getattr(result, "task_tree", None)
                 if tree:
                     for task in getattr(tree, "tasks", []):
-                        if getattr(task, "status", None) == "completed" and getattr(task, "result", None):
+                        status = getattr(task, "status", None)
+                        if status in ("completed", "failed") and getattr(task, "result", None):
                             task_result = task.result
                             break
             if not task_result:
                 return
 
-            summary_text = self._format_result_summary(task_result, job.status)
+            tree = getattr(result, "task_tree", None) or job.task_tree
+            summary_text, envelopes = self._compose_result_message(
+                task_result, tree, job.status
+            )
+            if job.status == JobStatus.COMPLETED:
+                todo_text = "分析已完成，详细结果见下一条消息。"
+            else:
+                err = str(task_result.get("error", ""))[:120] if isinstance(task_result, dict) else ""
+                todo_text = f"执行失败，详细原因见下一条消息。{err}"
             todo_type = {MessageType.TODO_LIST, MessageType.TODO_LIST.value, "todo_list"}
 
             def _apply_update(messages):
+                fallback_msg = None
+                updated = False
                 for msg in reversed(messages):
                     msg_type = getattr(msg, "type", None)
                     if isinstance(msg_type, str):
                         msg_type = msg_type.lower()
                     content = getattr(msg, "content", None)
-                    if (
-                        msg_type in todo_type
-                        and isinstance(content, dict)
-                        and content.get("job_id") == job.job_id
-                    ):
+                    if msg_type not in todo_type or not isinstance(content, dict):
+                        continue
+                    # Exact match first.
+                    if content.get("job_id") == job.job_id:
                         content["result"] = task_result
                         content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
-                        content["text"] = summary_text
-                        return True
-                return False
+                        content["text"] = todo_text
+                        if envelopes:
+                            content["artifacts"] = envelopes
+                        updated = True
+                        break
+                    # Remember the most recent pending todo as a fallback target.
+                    if fallback_msg is None and content.get("status") in (None, "pending", "running"):
+                        fallback_msg = msg
+                if not updated and fallback_msg is not None:
+                    content = fallback_msg.content
+                    content["result"] = task_result
+                    content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
+                    content["text"] = todo_text
+                    if envelopes:
+                        content["artifacts"] = envelopes
+                    updated = True
+                return updated
+
+            def _append_result_text(messages):
+                related = [e.get("path") for e in envelopes if e.get("path")]
+                messages.append(
+                    ChatMessage(
+                        id=f"msg_{len(messages)}",
+                        type=MessageType.TEXT,
+                        content=summary_text,
+                        sender="agent",
+                        related_files=related,
+                    )
+                )
 
             # Update the in-memory copy carried by the job.
-            _apply_update(getattr(job.working_memory, "messages", []))
+            in_memory_messages = getattr(job.working_memory, "messages", [])
+            if _apply_update(in_memory_messages):
+                _append_result_text(in_memory_messages)
 
             # Persist the update so reloads / other processes see the summary.
             if self._memory_manager is not None and job.session_id:
@@ -341,6 +381,7 @@ class BackgroundJobRunner:
                         job.session_id, job.project_id or "default"
                     )
                     if _apply_update(working_memory.messages):
+                        _append_result_text(working_memory.messages)
                         await self._memory_manager._save_session(
                             job.session_id,
                             job.project_id or "default",
@@ -353,12 +394,130 @@ class BackgroundJobRunner:
             logger.warning("Failed to update queued TODO message", exc_info=True)
 
     @staticmethod
+    def _collect_artifact_envelopes(
+        task_result: Any, tree: Any
+    ) -> List[Dict[str, Any]]:
+        """Harvest frontend-ready artifact envelopes from a skill result/tree.
+
+        Accepts already-built envelopes (dicts with ``path``), plain path strings,
+        or ``output_files``/``output_paths`` lists. Re-running ``build_artifact``
+        normalizes everything to full ``{kind, mime, name, path, size}`` envelopes
+        so the chat can render inline tables/images instead of bare file links.
+        """
+        from pathlib import Path
+
+        from homomics_lab.artifacts import build_artifact
+
+        raw_paths: List[str] = []
+
+        def harvest(obj: Any) -> None:
+            if not isinstance(obj, dict):
+                return
+            arts = obj.get("artifacts")
+            if isinstance(arts, list):
+                for a in arts:
+                    if isinstance(a, dict) and a.get("path"):
+                        raw_paths.append(str(a["path"]))
+                    elif isinstance(a, str):
+                        raw_paths.append(a)
+            for key in ("output_files", "output_paths"):
+                val = obj.get(key)
+                if isinstance(val, (list, tuple)):
+                    raw_paths.extend(str(x) for x in val if x)
+                elif isinstance(val, str):
+                    raw_paths.append(val)
+
+        harvest(task_result)
+        for task in getattr(tree, "tasks", []) or []:
+            harvest(getattr(task, "result", None))
+
+        envelopes: List[Dict[str, Any]] = []
+        seen: set = set()
+        for p in raw_paths:
+            if not p or p in seen:
+                continue
+            seen.add(p)
+            env = build_artifact(Path(p))
+            if env:
+                envelopes.append(env)
+        return envelopes
+
+    @staticmethod
+    def _derive_user_message(tree: Any) -> str:
+        for task in getattr(tree, "tasks", []) or []:
+            params = getattr(task, "parameters", None) or {}
+            if isinstance(params, dict):
+                request = params.get("user_request")
+                if request:
+                    return str(request)
+        return ""
+
+    @staticmethod
+    def _derive_skill_id(tree: Any) -> Optional[str]:
+        ids = [
+            task.skills_required[0]
+            for task in getattr(tree, "tasks", []) or []
+            if getattr(task, "skills_required", None)
+        ]
+        return ids[0] if len(ids) == 1 else None
+
+    @classmethod
+    def _compose_result_message(
+        cls, task_result: Any, tree: Any, status: JobStatus
+    ) -> tuple:
+        """Build ``(text, envelopes)`` for the queued TODO message.
+
+        On success with artifacts, the text is the deterministic, sourced
+        markdown from :mod:`homomics_lab.result_summary` (inline tables,
+        findings, interpretation, next steps). Falls back to the legacy one-line
+        summary when nothing richer is available, so the chat is never empty.
+        """
+        envelopes = cls._collect_artifact_envelopes(task_result, tree)
+        text = ""
+        is_partial = isinstance(task_result, dict) and task_result.get("partial")
+        has_error = isinstance(task_result, dict) and task_result.get("error")
+        if (status == JobStatus.COMPLETED or is_partial or has_error) and envelopes:
+            try:
+                from homomics_lab.result_summary import summarize_artifacts
+
+                text = summarize_artifacts(
+                    envelopes,
+                    skill_id=cls._derive_skill_id(tree),
+                    user_message=cls._derive_user_message(tree),
+                ).to_markdown()
+                if is_partial:
+                    text = (
+                        "⚠️ 执行未完全成功，但已生成部分结果，仍可参考：\n\n" + text
+                    )
+                elif has_error:
+                    err = str(task_result.get("error", ""))[:300]
+                    text = f"❌ 执行失败：{err}\n\n已生成的部分结果仍可参考：\n\n{text}"
+            except Exception:
+                logger.debug("rich result summary failed", exc_info=True)
+                text = ""
+        if not text:
+            text = cls._format_result_summary(task_result, status)
+        return text, envelopes
+
+    @staticmethod
     def _format_result_summary(task_result: Dict[str, Any], status: JobStatus) -> str:
         """Build a concise, human-readable summary for the chat message."""
+        has_error = isinstance(task_result, dict) and task_result.get("error")
+        is_partial = isinstance(task_result, dict) and task_result.get("partial")
+
+        if has_error:
+            err = str(task_result.get("error", ""))[:300]
+            prefix = "⚠️ 执行未完全成功，但已生成部分结果。" if is_partial else "❌ 执行失败："
+            return f"{prefix}{err}"
+
         if status != JobStatus.COMPLETED:
+            if is_partial:
+                return "执行未完全成功，但已生成部分结果（见下方文件/表格）。"
             return "执行结束，结果概要如下。"
         if not isinstance(task_result, dict):
             return "分析已完成。"
+        if is_partial:
+            return "⚠️ 执行未完全成功，但已生成部分结果（见下方文件/表格）。"
         parts = ["分析已完成"]
         cells = task_result.get("cells")
         genes = task_result.get("genes")
@@ -442,6 +601,7 @@ class BackgroundJobRunner:
     def _default_runner_factory(
         progress_callback: Callable[[ExecutionState], None],
         skill_executor: Optional[Any] = None,
+        job_id: Optional[str] = None,
     ):
         # Local import to avoid a circular dependency between jobs.runner
         # and agent.turn_runner at module load time.
@@ -456,6 +616,7 @@ class BackgroundJobRunner:
         # so agentic skills stream live state updates to the frontend.
         if skill_executor is not None:
             skill_executor.set_progress_callback(progress_callback)
+            skill_executor.set_parent_job_id(job_id)
 
         workflow_service = WorkflowExecutionService(
             progress_callback=progress_callback,

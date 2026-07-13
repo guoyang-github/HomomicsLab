@@ -291,7 +291,10 @@ class Orchestrator:
             if any(t.status == TaskStatus.AWAITING_HUMAN for t in executable_tasks):
                 hitl_triggered = True
 
-        if hitl_triggered:
+        has_failed = any(t.status == TaskStatus.FAILED for t in tree.tasks)
+        if has_failed:
+            self._publish_task_update(tree, status="FAILED")
+        elif hitl_triggered:
             self._publish_task_update(tree, status="AWAITING_HUMAN")
         else:
             self._publish_task_update(tree, status="COMPLETED")
@@ -385,6 +388,16 @@ class Orchestrator:
             self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
             results[task.id] = {"hitl": checkpoint.model_dump()}
             self._publish_task_update(tree, task, "AWAITING_HUMAN")
+            return
+
+        # Respect explicit agent/skill failure before gates/reviewers.
+        if isinstance(result, dict) and result.get("success") is False:
+            error_message = result.get("error") or "Skill execution failed"
+            task.error_message = error_message
+            self.state_machine.transition(task, TaskStatus.FAILED)
+            self._publish_task_update(
+                tree, task, "FAILED", error_message=error_message
+            )
             return
 
         # SWR: escalate worker failures that survived retries.

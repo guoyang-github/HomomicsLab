@@ -527,6 +527,19 @@ export function SettingsPanel() {
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div>
+                    <p className="font-medium">{t('settings.general.openExploration')}</p>
+                    <p className="text-sm text-muted-foreground">{t('settings.general.openExplorationDesc')}</p>
+                  </div>
+                  <Switch
+                    checked={settings.openExplorationMode}
+                    onChange={(e) => {
+                      settings.setOpenExplorationMode(e.target.checked)
+                      handleChange()
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div>
                     <p className="font-medium">{t('settings.general.notifications')}</p>
                     <p className="text-sm text-muted-foreground">{t('settings.general.notificationsDesc')}</p>
                   </div>

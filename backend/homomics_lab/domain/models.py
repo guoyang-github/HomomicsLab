@@ -112,6 +112,10 @@ class DomainRole(BaseModel):
     allowed_tools: List[str] = Field(default_factory=list)
     permissions: Dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=2, description="Role priority for task routing")
+    plan_approval_strategy: Optional[str] = Field(
+        default=None,
+        description="Override plan-approval strategy for this role (always|first_time|risky_only|never)",
+    )
 
 
 class DomainSOP(BaseModel):
@@ -135,6 +139,10 @@ class DomainDefinition(BaseModel):
     domain: str = Field(description="Domain identifier (e.g. metagenomics, genomics)")
     description: str = Field(default="", description="Human-readable description")
     version: str = Field(default="1.0.0")
+    plan_approval_strategy: Optional[str] = Field(
+        default=None,
+        description="Plan-approval strategy for this domain (always|first_time|risky_only|never); None inherits the global setting",
+    )
 
     # Analysis strategy: phases form a DAG; orchestrator skills are shortcuts
     # that execute whole workflows over that DAG.

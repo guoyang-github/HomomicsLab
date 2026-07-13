@@ -6,6 +6,7 @@ external (file-based) skills.
 """
 
 import importlib.metadata
+import logging
 import re
 import subprocess
 import sys
@@ -31,6 +32,8 @@ from homomics_lab.stability.schema_validator import SchemaValidator
 from homomics_lab.tools.approval import ToolApprovalRequired
 from homomics_lab.tools.registry import ToolRegistry, get_default_tool_registry
 from homomics_lab.workspace.context import current_workspace
+
+logger = logging.getLogger(__name__)
 
 
 class UntrustedSkillError(ValueError):
@@ -68,6 +71,7 @@ class SkillRuntimeExecutor:
         self.llm_client = llm_client
         self.provenance_recorder = provenance_recorder
         self.progress_callback = progress_callback
+        self.parent_job_id: Optional[str] = None
         self._agent_executor: Optional[AgentSkillExecutor] = None
         self.data_store = DataStore(
             working_dir or Path.cwd(),
@@ -87,6 +91,10 @@ class SkillRuntimeExecutor:
         if self._agent_executor is not None:
             self._agent_executor.progress_callback = progress_callback
 
+    def set_parent_job_id(self, parent_job_id: Optional[str]) -> None:
+        """Set the background job id under which skill progress should be reported."""
+        self.parent_job_id = parent_job_id
+
     def _get_agent_executor(self) -> AgentSkillExecutor:
         """Lazy initialization of the declarative skill agent executor."""
         if self._agent_executor is None:
@@ -103,6 +111,7 @@ class SkillRuntimeExecutor:
             self._scheduler = get_scheduler(
                 self._executor_type,
                 working_dir=self.working_dir,
+                progress_callback=self.progress_callback,
                 provenance_recorder=self.provenance_recorder,
             )
         return self._scheduler
@@ -363,6 +372,11 @@ class SkillRuntimeExecutor:
 
         start_time = time.time()
         workspace = self._bind_workspace()
+        # For agentic/declarative skills, surface the workspace and any
+        # discoverable input files so the LLM does not have to guess where the
+        # user's data lives (it was previously receiving empty inputs).
+        if workspace is not None and self._is_declarative(skill):
+            self._augment_agent_inputs(validated, workspace, inputs)
         fingerprint = skill.metadata.get("sha256") or skill.metadata.get("version") or ""
         if self._is_cacheable(skill) and self.cache is not None:
             cached = self.cache.get(skill_id, validated, fingerprint=fingerprint)
@@ -397,12 +411,27 @@ class SkillRuntimeExecutor:
                     )
 
             success = True
+            if workspace is not None:
+                harvested = result.get("artifacts")
+                if isinstance(harvested, list) and harvested and all(
+                    isinstance(a, dict) and a.get("path") for a in harvested
+                ):
+                    # Agentic / executor-provided envelopes: keep them and
+                    # register each in the workspace. Do not let the weaker
+                    # string-only collector clobber them.
+                    self._register_envelopes(workspace, skill_id, harvested)
+                else:
+                    from homomics_lab.artifacts import collect_result_artifacts
+
+                    if "artifacts" not in result:
+                        result["artifacts"] = collect_result_artifacts(workspace, result)
+                    self._register_result_artifacts(workspace, skill_id, result)
             stored = self.data_store.store(
                 task_id=f"{skill_id}_{uuid.uuid4().hex[:8]}",
                 data=result,
             )
             if workspace is not None:
-                self._register_result_artifacts(workspace, skill_id, result)
+                workspace.create_git_snapshot(f"skill:{skill_id}", self.parent_job_id or skill_id)
             if self._is_cacheable(skill) and self.cache is not None:
                 self.cache.put(skill_id, validated, stored, fingerprint=fingerprint)
             return self._unwrap_reference(stored, skill_id=skill_id)
@@ -462,6 +491,72 @@ class SkillRuntimeExecutor:
             return None
         self.set_workspace(workspace)
         return workspace
+
+    @staticmethod
+    def _augment_agent_inputs(
+        validated: Dict[str, Any], workspace, raw_inputs: Dict[str, Any]
+    ) -> None:
+        """Inject workspace/file context into a declarative skill's inputs.
+
+        Agentic skills receive their inputs as a JSON blob in the system prompt;
+        when that blob is empty the LLM has no idea where the user's data is and
+        either guesses (e.g. bundled mock files) or stalls. We surface the
+        workspace dir, its data dir, and any real files we can find, without
+        overwriting anything the caller already provided.
+        """
+        ws_dir = Path(workspace.workspace_dir)
+        validated.setdefault("workspace_dir", str(ws_dir))
+
+        data_dir = ws_dir / "data"
+        if data_dir.is_dir():
+            validated.setdefault("data_dir", str(data_dir))
+
+        candidates: List[str] = []
+        for value in raw_inputs.values():
+            if isinstance(value, str) and "/" in value:
+                p = Path(value)
+                if p.is_file():
+                    candidates.append(str(p))
+        if data_dir.is_dir():
+            for p in sorted(data_dir.rglob("*")):
+                if not p.is_file():
+                    continue
+                rel = p.relative_to(data_dir)
+                if any(part.startswith(".") for part in rel.parts):
+                    continue
+                candidates.append(str(p))
+
+        seen: set = set()
+        input_files: List[str] = []
+        for f in candidates:
+            if f not in seen:
+                seen.add(f)
+                input_files.append(f)
+            if len(input_files) >= 50:
+                break
+        if input_files:
+            validated.setdefault("input_files", input_files)
+
+    @staticmethod
+    def _register_envelopes(
+        workspace, skill_id: str, envelopes: List[Dict[str, Any]]
+    ) -> None:
+        """Register executor-provided artifact envelopes in the workspace."""
+        for env in envelopes:
+            path = env.get("path") if isinstance(env, dict) else None
+            if not path:
+                continue
+            try:
+                rel = Path(path).relative_to(workspace.workspace_dir)
+            except ValueError:
+                continue
+            artifact_type = "output" if "output" in str(rel) else "intermediate"
+            workspace.register_artifact(
+                task_id=skill_id,
+                artifact_type=artifact_type,
+                filename=rel.name,
+                metadata={"relative_path": str(rel), "kind": env.get("kind")},
+            )
 
     @staticmethod
     def _register_result_artifacts(
@@ -853,7 +948,9 @@ class SkillRuntimeExecutor:
             )
 
         scheduler = self._get_scheduler()
-        return await scheduler.execute(skill, code, inputs, timeout_seconds=timeout)
+        return await scheduler.execute(
+            skill, code, inputs, timeout_seconds=timeout, parent_job_id=self.parent_job_id
+        )
 
     @staticmethod
     def _resolve_entrypoint(

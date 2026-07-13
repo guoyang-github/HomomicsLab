@@ -3,7 +3,7 @@
 from typing import Any, Optional
 
 from homomics_lab.context.working_memory import WorkingMemory
-from homomics_lab.prompts import render_prompt
+from homomics_lab.prompts.layers import build_system_prompt, build_task_prompt
 
 
 class Prompter:
@@ -62,22 +62,32 @@ class Prompter:
     def _system_prompt(self, domain: Optional[str] = None, mode: str = "analysis") -> str:
         """Render the layered system prompt from the registry.
 
-        ``mode`` should be one of: base, qa, analysis, planning.
-        """
-        # Always include the base identity.
-        base = render_prompt("system.base", domain=domain, combine=True)
-        if base is None:
-            base = (
-                "You are HomomicsLab, an AI assistant specialized in bioinformatics analysis. "
-                "You help researchers design experiments, analyze omics data, and interpret results."
-            )
+        ``mode`` should be one of: qa, analysis, planning, general_scientific_agent,
+        open_agent.
 
-        # Add the mode-specific guidance (qa/analysis/planning).
-        mode_key = f"system.{mode}"
-        mode_prompt = render_prompt(mode_key, domain=domain, combine=True)
-        if mode_prompt:
-            return f"{base}\n\n{mode_prompt}"
-        return base
+        Backward compatibility: this method still exists and produces the same
+        concatenation of provider identity + agent mode that callers expect.
+        """
+        prompt = build_system_prompt(
+            ["provider.base", "agent.{mode}"],
+            domain=domain,
+            mode=mode,
+        )
+        if prompt:
+            return prompt
+        return (
+            "You are HomomicsLab, an AI assistant specialized in bioinformatics analysis. "
+            "You help researchers design experiments, analyze omics data, and interpret results."
+        )
+
+    def build_task_prompt(
+        self,
+        mode: str,
+        task: str,
+        domain: Optional[str] = None,
+    ) -> str:
+        """Build a task-aware system prompt for the current turn."""
+        return build_task_prompt(mode=mode, task=task, domain=domain)
 
     def _truncate_if_needed(self, prompt: str) -> str:
         words = prompt.split()

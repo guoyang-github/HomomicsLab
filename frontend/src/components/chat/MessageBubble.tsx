@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Copy, Check, RotateCcw, ThumbsUp, ThumbsDown, FileText, Eye, Quote } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { TodoList } from './TodoList'
 import { ExecutionPlan } from './ExecutionPlan'
@@ -11,8 +11,10 @@ import { PlotChart } from '../shared/PlotChart'
 import { ResultPreview, type ResultPreviewContent } from './ResultPreview'
 import { FollowUpSuggestions } from './FollowUpSuggestions'
 import { useTranslation } from '@/i18n'
-import { chatApi } from '@/services/api'
+import { chatApi, fileApi } from '@/services/api'
 import { toastSuccess } from '@/stores/toastStore'
+import { useProjectStore } from '@/stores/projectStore'
+import { useChatStore } from '@/stores/chatStore'
 import type {
   ChatMessage,
   TodoListContent,
@@ -115,6 +117,8 @@ interface Props {
 export function MessageBubble({ message, onRegenerate }: Props) {
   const { t } = useTranslation()
   const isUser = message.sender === 'user'
+  const currentProjectId = useProjectStore((state) => state.currentProjectId)
+  const setDraftInput = useChatStore((state) => state.setDraftInput)
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
 
@@ -146,7 +150,15 @@ export function MessageBubble({ message, onRegenerate }: Props) {
 
   const renderContent = () => {
     if (typeof message.content === 'string') {
-      return <MarkdownRenderer content={message.content} />
+      // Strip the backend file-reference appendix from user-visible text;
+      // the resolved file is already shown as an attachment chip below.
+      const cleaned = isUser
+        ? message.content.replace(
+            /\n?\n---\n\nReferenced context:\n\n<file[^>]*>.*?<\/file>\s*$/s,
+            ''
+          )
+        : message.content
+      return <MarkdownRenderer content={cleaned} />
     }
 
     switch (message.type) {
@@ -316,6 +328,42 @@ export function MessageBubble({ message, onRegenerate }: Props) {
         </div>
 
         <div className={clsx(isUser && 'prose-invert')}>{renderContent()}</div>
+
+        {message.related_files && message.related_files.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {message.related_files.map((path) => {
+              const name = path.split('/').pop() || path
+              return (
+                <div
+                  key={path}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+                >
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="max-w-[160px] truncate" title={path}>
+                    {name}
+                  </span>
+                  <button
+                    onClick={() => window.open(fileApi.previewUrl(currentProjectId, path), '_blank')}
+                    className="rounded p-0.5 hover:bg-muted"
+                    title={t('files.preview')}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDraftInput(`@file:${path}`)
+                      toastSuccess(t('files.referenceSuccess'))
+                    }}
+                    className="rounded p-0.5 hover:bg-muted"
+                    title={t('files.reference')}
+                  >
+                    <Quote className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

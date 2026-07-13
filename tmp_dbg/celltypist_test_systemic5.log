@@ -1,0 +1,6 @@
+Loaded skill: bio-single-cell-annotation-celltypist
+Runtime type: python
+Source dir: /mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/skills/bio-single-cell-annotation-celltypist
+No secrets master key configured. Secrets will be stored as plaintext. Set HOMOMICS_SECRETS_MASTER_KEY to enable encryption.
+LLM configured: True
+Default model: unknown

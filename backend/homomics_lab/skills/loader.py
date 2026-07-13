@@ -397,6 +397,9 @@ class SkillLoader:
             metadata["workflow"] = workflow
         if "code_act" in frontmatter:
             metadata["code_act"] = bool(frontmatter["code_act"])
+        # Respect explicit trust declarations in SKILL.md frontmatter.
+        if "trusted" in frontmatter:
+            metadata["trusted"] = bool(frontmatter["trusted"])
 
         # Lightweight progressive-disclosure hints so the runtime can decide
         # agentic vs script execution without activating the full skill body.

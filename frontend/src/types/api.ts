@@ -73,6 +73,7 @@ export interface SystemSettingsOut {
   max_llm_cost_per_request_usd: number | null
   monthly_budget_usd: number | null
   skill_hot_reload_enabled: boolean
+  open_exploration_mode_enabled: boolean
 }
 
 export interface SystemSettingsUpdate {
@@ -86,6 +87,7 @@ export interface SystemSettingsUpdate {
   max_llm_cost_per_request_usd?: number
   monthly_budget_usd?: number
   skill_hot_reload_enabled?: boolean
+  open_exploration_mode_enabled?: boolean
 }
 
 export interface HealthStatusResponse {
@@ -94,6 +96,100 @@ export interface HealthStatusResponse {
   llm_configured: boolean
   llm_provider: string | null
   llm_model: string | null
+}
+
+export interface ExecutionTraceNode {
+  node_id: string
+  parent_id?: string | null
+  node_type: string
+  name: string
+  status: string
+  started_at?: string
+  ended_at?: string | null
+  inputs?: Record<string, unknown> | null
+  outputs?: Record<string, any> | null
+  error?: string | null
+  logs?: string[]
+  metadata?: Record<string, unknown>
+}
+
+export interface ExecutionTrace {
+  trace_id: string
+  session_id?: string | null
+  project_id?: string | null
+  status: string
+  started_at?: string
+  ended_at?: string | null
+  error_message?: string | null
+  nodes: ExecutionTraceNode[]
+}
+
+export interface ExecutionStatusResponse {
+  job_id: string
+  status: string
+  mode?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  error_message?: string | null
+  latest_state?: Record<string, any> | null
+}
+
+export interface ExecutionProgress {
+  total: number
+  pending: number
+  running: number
+  completed: number
+  failed: number
+  awaiting_human: number
+  percent: number
+}
+
+export interface ExecutionTasksResponse {
+  job_id: string
+  status: string
+  tasks: TaskNode[]
+  progress: ExecutionProgress
+}
+
+export interface CancelJobResponse {
+  job_id: string
+  status: string
+  cancelled: boolean
+}
+
+export interface SkillGeneratorInput {
+  name: string
+  description: string
+  required: boolean
+  default?: string
+}
+
+export interface SkillGeneratorSuggestRequest {
+  description: string
+}
+
+export interface SkillGeneratorSuggestResponse {
+  tool_type: string
+  category: string
+  keywords: string[]
+}
+
+export interface SkillGeneratorGenerateRequest {
+  name: string
+  description: string
+  category: string
+  tool_type: string
+  primary_tool: string
+  supported_tools: string[]
+  keywords: string[]
+  dependencies: string[]
+  inputs: SkillGeneratorInput[]
+  outputs: string[]
+}
+
+export interface SkillGeneratorGenerateResponse {
+  skill_id: string
+  files: Record<string, string>
 }
 
 export interface FileUploadResponse {
@@ -354,4 +450,88 @@ export interface ImportDomainResponse {
   imported: boolean
   domain_id: string
   domain_dir: string
+}
+
+export interface PlotDataRequest {
+  plot_type: 'umap' | 'heatmap' | 'violin' | 'bar' | 'scatter' | 'histogram'
+  data: Record<string, unknown>
+  title?: string
+  width?: number
+  height?: number
+}
+
+export interface PlotDataResponse {
+  data: unknown[]
+  layout: Record<string, unknown>
+  plot_type: string
+}
+
+export interface PlotTypeInfo {
+  type: string
+  description: string
+}
+
+export type MCPTransport = 'embedded' | 'stdio' | 'sse'
+
+export interface MCPServer {
+  id: string
+  name: string
+  description: string
+  transport: MCPTransport
+  package?: string | null
+  command?: string | null
+  args: string[]
+  url?: string | null
+  env: Record<string, string>
+  category: string
+  enabled: boolean
+  installed: boolean
+  trusted: boolean
+  builtin: boolean
+  install_status?: string | null
+  tools: Record<string, unknown>[]
+}
+
+export interface MCPServerCreate {
+  id: string
+  name: string
+  description?: string
+  transport: MCPTransport
+  package?: string
+  command?: string
+  args?: string[]
+  url?: string
+  env?: Record<string, string>
+  category?: string
+}
+
+export interface MCPServerHealthResponse {
+  id: string
+  status: 'ok' | 'error'
+  tool_count: number
+  tools: Record<string, unknown>[]
+  error?: string
+}
+
+export interface LineageNode {
+  node_id: string
+  path: string
+  type: 'raw' | 'intermediate' | 'output' | 'data'
+  checksum: string
+  created_by_task: string
+  created_at: string
+  metadata?: Record<string, unknown>
+}
+
+export interface LineageEdge {
+  from_node: string
+  to_node: string
+  transform_type: string
+  transform_id: string
+  metadata?: Record<string, unknown>
+}
+
+export interface LineageGraph {
+  nodes: LineageNode[]
+  edges: LineageEdge[]
 }

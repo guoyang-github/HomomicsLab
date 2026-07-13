@@ -12,6 +12,7 @@ import {
   CardContent,
 } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
+import { skillGeneratorApi } from '@/sdk'
 
 interface GeneratedFile {
   path: string
@@ -50,17 +51,11 @@ export function SkillGenerator() {
   const handleSuggest = async () => {
     if (!description.trim()) return
     try {
-      const response = await fetch('/api/skill-generator/suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }),
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setToolType(data.tool_type)
-        setCategory(data.category)
-        setKeywords(data.keywords)
-      }
+      const res = await skillGeneratorApi.suggest({ description })
+      const data = res.data
+      setToolType(data.tool_type)
+      setCategory(data.category)
+      setKeywords(data.keywords.join(', '))
     } catch (err) {
       console.error('Suggest failed:', err)
     }
@@ -75,31 +70,25 @@ export function SkillGenerator() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/skill-generator/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          description,
-          category,
-          tool_type: toolType,
-          primary_tool: primaryTool,
-          supported_tools: supportedTools.split(',').map((s) => s.trim()).filter(Boolean),
-          keywords: keywords.split(',').map((s) => s.trim()).filter(Boolean),
-          dependencies: dependencies.split(',').map((s) => s.trim()).filter(Boolean),
-          inputs: inputs.map((inp) => ({
-            name: inp.name,
-            description: inp.description,
-            required: inp.required,
-            default: inp.default || undefined,
-          })),
-          outputs: outputs.map((out) => out.name),
-        }),
+      const res = await skillGeneratorApi.generate({
+        name,
+        description,
+        category,
+        tool_type: toolType,
+        primary_tool: primaryTool,
+        supported_tools: supportedTools.split(',').map((s) => s.trim()).filter(Boolean),
+        keywords: keywords.split(',').map((s) => s.trim()).filter(Boolean),
+        dependencies: dependencies.split(',').map((s) => s.trim()).filter(Boolean),
+        inputs: inputs.map((inp) => ({
+          name: inp.name,
+          description: inp.description,
+          required: inp.required,
+          default: inp.default || undefined,
+        })),
+        outputs: outputs.map((out) => out.name),
       })
 
-      if (!response.ok) throw new Error('Generation failed')
-
-      const data = await response.json()
+      const data = res.data
       setSkillId(data.skill_id)
       const files = Object.entries(data.files).map(([path, content]) => ({
         path,

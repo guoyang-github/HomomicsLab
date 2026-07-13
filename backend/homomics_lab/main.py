@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     app.state.strategy_library = ctx["strategy_library"]
     app.state.domain_reloader = ctx["domain_reloader"]
     app.state.skill_reloader = ctx["skill_reloader"]
-    app.state.mcp_client = ctx["mcp_client"]
+    app.state.mcp_marketplace = ctx["mcp_marketplace"]
     app.state.memory_manager = ctx["memory_manager"]
     app.state.capability_index = ctx["capability_index"]
     app.state.context_engine = ctx["context_engine"]

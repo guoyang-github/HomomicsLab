@@ -98,7 +98,7 @@ def repository() -> JobRepository:
 
 @pytest.fixture
 def runner_factory():
-    return lambda progress_callback=None: _FakeRunner(progress_callback)
+    return lambda progress_callback=None, skill_executor=None, job_id=None: _FakeRunner(progress_callback)
 
 
 @pytest.fixture

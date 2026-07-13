@@ -55,6 +55,8 @@ class CapabilityAssembler:
 
     DEFAULT_TEMPLATE_COVERAGE_THRESHOLD = 0.7
     DEFAULT_STANDALONE_SCORE_THRESHOLD = 0.5
+    OPEN_EXPLORATION_TEMPLATE_THRESHOLD = 0.45
+    OPEN_EXPLORATION_CLEAR_STANDALONE_THRESHOLD = 0.75
 
     # Analysis types that are too broad to be treated as domain signals.
     _BROAD_ANALYSIS_TYPES = {
@@ -158,16 +160,32 @@ class CapabilityAssembler:
 
         # 2. Domain template match.
         template, coverage = await self._match_template(intent, data_state)
-        if template is not None and coverage >= self.template_coverage_threshold:
-            return CapabilityAssembly(
-                route="domain_template",
-                domains=[template.domain] if template.domain else [],
-                template=template,
-                coverage=coverage,
-                reason=(
-                    f"Template '{template.name}' covers {coverage:.0%} of intent signals"
-                ),
-            )
+        if template is not None:
+            if coverage >= self.template_coverage_threshold:
+                return CapabilityAssembly(
+                    route="domain_template",
+                    domains=[template.domain] if template.domain else [],
+                    template=template,
+                    coverage=coverage,
+                    reason=(
+                        f"Template '{template.name}' covers {coverage:.0%} of intent signals"
+                    ),
+                )
+            # Open exploration mode weakens the domain gate so borderline
+            # requests are handled by the open agent instead of forcing a
+            # domain pipeline.
+            if (
+                self.settings.open_exploration_mode_enabled
+                and coverage >= self.OPEN_EXPLORATION_TEMPLATE_THRESHOLD
+            ):
+                return CapabilityAssembly(
+                    route="open_agent",
+                    domains=domains,
+                    reason=(
+                        f"Weak domain signal (coverage {coverage:.0%}); "
+                        "routing to open agent"
+                    ),
+                )
 
         # 3. Standalone / domain-agnostic skill match.
         # Only consider standalone skills when the intent lacks a concrete domain
@@ -177,6 +195,20 @@ class CapabilityAssembler:
         if not self._has_domain_signal(intent):
             skills, score = await self._match_standalone_skills(intent, data_state)
             if skills and score >= self.standalone_score_threshold:
+                # In open exploration mode, only a clear standalone skill match
+                # is allowed to bypass the open agent.
+                if (
+                    self.settings.open_exploration_mode_enabled
+                    and score < self.OPEN_EXPLORATION_CLEAR_STANDALONE_THRESHOLD
+                ):
+                    return CapabilityAssembly(
+                        route="open_agent",
+                        domains=domains,
+                        reason=(
+                            f"Uncertain standalone skill match ({score:.2f}); "
+                            "routing to open agent"
+                        ),
+                    )
                 return CapabilityAssembly(
                     route="standalone_skill",
                     prebuilt_skills=skills,

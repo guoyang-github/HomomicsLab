@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { usePresence } from '@/api/collab'
 import { PresenceCursors } from './PresenceCursors'
-import { ActiveUsers } from './ActiveUsers'
 import { useProjectStore } from '@/stores/projectStore'
 
 const THROTTLE_MS = 80
 
 export function CollabLayer() {
   const projectId = useProjectStore((state) => state.currentProjectId)
-  const { users, isConnected, sendCursor } = usePresence(
+  const { users, sendCursor } = usePresence(
     projectId === 'default' ? null : projectId,
     'me'
   )
@@ -28,19 +27,9 @@ export function CollabLayer() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [sendCursor])
 
-  // Only show the collaboration badge when actually connected or when other
-  // users are present. Hiding it avoids the distracting "Offline" label in
-  // normal single-user usage.
-  const showBadge = isConnected || users.length > 0
-
-  return (
-    <>
-      <PresenceCursors users={users} />
-      {showBadge && (
-        <div className="fixed bottom-4 right-4 z-40 rounded-full bg-white/80 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/80">
-          <ActiveUsers users={users} isConnected={isConnected} />
-        </div>
-      )}
-    </>
-  )
+  // The collaboration badge in the bottom-right corner is intentionally removed.
+  // A persistent "Offline" label is distracting and collides with the LLM status
+  // indicator in the sidebar. Cursors still render when multi-user collaboration
+  // is active.
+  return <PresenceCursors users={users} />
 }
