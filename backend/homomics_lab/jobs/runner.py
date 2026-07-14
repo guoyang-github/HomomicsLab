@@ -4,6 +4,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.config import settings
@@ -325,11 +326,8 @@ class BackgroundJobRunner:
             summary_text, envelopes = self._compose_result_message(
                 task_result, tree, job.status
             )
-            if job.status == JobStatus.COMPLETED:
-                todo_text = "分析已完成，详细结果见下一条消息。"
-            else:
-                err = str(task_result.get("error", ""))[:120] if isinstance(task_result, dict) else ""
-                todo_text = f"执行失败，详细原因见下一条消息。{err}"
+            # Keep the TODO card itself useful instead of a generic placeholder.
+            todo_text = summary_text or self._format_result_summary(task_result, job.status)
             todo_type = {MessageType.TODO_LIST, MessageType.TODO_LIST.value, "todo_list"}
 
             def _apply_update(messages):
@@ -366,15 +364,21 @@ class BackgroundJobRunner:
 
             def _append_result_text(messages):
                 related = [e.get("path") for e in envelopes if e.get("path")]
-                messages.append(
-                    ChatMessage(
-                        id=f"msg_{len(messages)}",
-                        type=MessageType.TEXT,
-                        content=summary_text,
-                        sender="agent",
-                        related_files=related,
+                # Only append a separate TEXT message when the summary actually
+                # carries detail beyond the generic fallback. This prevents empty
+                # or duplicated "分析已完成。" messages.
+                detail = summary_text.strip()
+                if detail and detail != "分析已完成。" and len(detail) > 20:
+                    messages.append(
+                        ChatMessage(
+                            id=f"msg_{len(messages)}",
+                            type=MessageType.TEXT,
+                            content=summary_text,
+                            sender="agent",
+                            related_files=related,
+                        )
                     )
-                )
+                return True
 
             # Update the in-memory copy carried by the job.
             in_memory_messages = getattr(job.working_memory, "messages", [])
@@ -525,6 +529,12 @@ class BackgroundJobRunner:
             return "分析已完成。"
         if is_partial:
             return "⚠️ 执行未完全成功，但已生成部分结果（见下方文件/表格）。"
+
+        # Prefer an explicit summary/text payload when the skill provides one.
+        explicit_summary = task_result.get("summary") or task_result.get("text")
+        if isinstance(explicit_summary, str) and explicit_summary.strip():
+            return explicit_summary.strip()[:800]
+
         parts = ["分析已完成"]
         cells = task_result.get("cells")
         genes = task_result.get("genes")
@@ -541,11 +551,22 @@ class BackgroundJobRunner:
                 parts.append(f"；与现有标签的 Adjusted Rand Index 为 {ari:.3f}")
             elif acc is not None:
                 parts.append(f"；与现有标签的准确率为 {acc:.3f}")
-        output_csv = task_result.get("output_csv")
-        if output_csv:
-            parts.append("。详细结果已保存到输出文件，可点击下方链接查看。")
-        else:
-            parts.append("。")
+
+        # Generic artifact/output file detection.
+        outputs: List[str] = []
+        for key in ("artifacts", "output_files", "output_paths", "output_csv"):
+            val = task_result.get(key)
+            if isinstance(val, list):
+                outputs.extend(str(v) for v in val if v)
+            elif isinstance(val, str) and val:
+                outputs.append(val)
+        if outputs:
+            names = [Path(o).name or o for o in outputs[:5]]
+            suffix = "等" if len(outputs) > 5 else ""
+            parts.append(f"，已生成 {len(outputs)} 个结果文件：{', '.join(names)}{suffix}")
+        elif task_result.get("output_csv"):
+            parts.append("，详细结果已保存到输出文件，可点击下方链接查看。")
+        parts.append("。")
         return "".join(parts)
 
     def _publish_state(
