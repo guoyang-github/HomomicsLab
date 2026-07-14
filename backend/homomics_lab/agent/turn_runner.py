@@ -16,7 +16,6 @@ import asyncio
 import logging
 import random
 import time
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
@@ -32,29 +31,26 @@ from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.agent.general_agent import GeneralScientificAgent
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
 from homomics_lab.agent.open_agent.executor import OpenAgentExecutor
-from homomics_lab.agent.intent.models import IntentMatch
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.phase_gate import PhaseGateEvaluator
-from homomics_lab.agent.plan.replanning import DynamicReplanningEngine, ReplanningTrigger
-from homomics_lab.agent.plan.self_correction import (
-    SelfCorrectionAction,
-    SelfCorrectionEngine,
-)
-from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
+from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
+from homomics_lab.agent.plan.self_correction import SelfCorrectionEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.turn_clarification import ClarificationHandler
 from homomics_lab.agent.turn_context_formatter import ContextFormatter
 from homomics_lab.agent.turn_file_resolver import FileReferenceResolver
+from homomics_lab.agent.turn_intent_router import IntentRouter
+from homomics_lab.agent.turn_response_generator import ResponseGenerator
 from homomics_lab.agent.turn_result_assembler import ResultAssembler
 from homomics_lab.agent.turn_risk_assessor import RiskAssessor
-from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
+from homomics_lab.agent.turn_self_correction import SelfCorrectionHandler
+from homomics_lab.agent.turn_workflow_handler import WorkflowHandler
 from homomics_lab.agent.permission_ruleset import (
     PermissionRegistry,
     get_permission_registry,
 )
 from homomics_lab.config import settings
-from homomics_lab.domain.registry import get_domain_registry
-from homomics_lab.metrics import record_plan_created
 from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
@@ -64,10 +60,8 @@ from homomics_lab.context.memory_backend import MemoryBackend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.prompter import Prompter
-from homomics_lab.context.relevance_filter import ContextItem
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
-from homomics_lab.jobs.constants import JobMode
 from homomics_lab.workspace.context import current_workspace
 from homomics_lab.workspace.manager import WorkspaceManager
 from homomics_lab.llm_client import LLMClient
@@ -78,10 +72,9 @@ from homomics_lab.models.common import (
     MessageType,
     Option,
 )
-from homomics_lab.plan.models import Plan, PlanStatus
+from homomics_lab.plan.models import Plan
 from homomics_lab.tools.registry import ToolRegistry
-from homomics_lab.plan.presenter import PlanPresenter
-from homomics_lab.plan.store import PlanStore, _new_plan_id
+from homomics_lab.plan.store import PlanStore
 from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.tasks.models import TaskStatus
@@ -262,6 +255,11 @@ class TurnRunner:
         self._context_formatter = ContextFormatter(self)
         self._risk_assessor = RiskAssessor(self)
         self._file_resolver = FileReferenceResolver(self)
+        self._clarification_handler = ClarificationHandler(self)
+        self._intent_router = IntentRouter(self)
+        self._response_generator = ResponseGenerator(self)
+        self._self_correction_handler = SelfCorrectionHandler(self)
+        self._workflow_handler = WorkflowHandler(self)
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -1219,500 +1217,6 @@ class TurnRunner:
             agent_message=agent_msg,
         )
 
-    def _handle_clarification(
-        self,
-        intent: UserIntent,
-        working_memory: WorkingMemory,
-    ) -> TurnResult:
-        """Return a clarification question or debate request to the user."""
-        debate_data = intent.metadata.get("debate")
-        if debate_data and debate_data.get("options"):
-            agent_msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.DEBATE_REQUEST,
-                content={
-                    "debate_id": f"debate_{intent.original_message or 'clarify'}",
-                    "topic": debate_data.get("topic", "请选择最符合您需求的选项"),
-                    "options": debate_data.get("options", []),
-                    "recommendation": debate_data.get("recommendation"),
-                    "round_summaries": debate_data.get("round_summaries", []),
-                },
-                sender="agent",
-            )
-            working_memory.add_message(agent_msg)
-            return TurnResult(
-                mode=ExecutionMode.AWAITING_DEBATE,
-                response_text=agent_msg.content["topic"],
-                agent_message=agent_msg,
-            )
-
-        question = (
-            intent.metadata.get("clarification_question")
-            or "我不太确定您的需求，请再具体描述一下。"
-        )
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TEXT,
-            content=question,
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.DIRECT_RESPONSE,
-            response_text=question,
-            agent_message=agent_msg,
-        )
-
-    def _build_debate_resolved_intent(
-        self,
-        debate_response: Dict[str, Any],
-        user_message: str,
-    ) -> UserIntent:
-        """Convert a user's debate choice into a concrete intent."""
-        choice_id = debate_response.get("choice_id", "")
-        return self.intent_analyzer._to_user_intent(
-            IntentMatch(
-                analysis_type=choice_id,
-                confidence=1.0,
-                source="debate",
-                reason="user selected debate option",
-            ),
-            user_message,
-        )
-
-    async def _route_by_intent(
-        self,
-        intent: UserIntent,
-        user_message: str,
-        working_memory: WorkingMemory,
-        project_id: str,
-        session_id: str,
-        plan_store: Optional[PlanStore],
-        job_service: Optional[Any],
-        enqueue_skills: bool,
-        plan_mode: bool = False,
-    ) -> TurnResult:
-        """Route a user intent to the right execution path.
-
-        Uses the structured ``interaction_mode`` and ``scope`` fields when
-        available, with backward-compatible fallbacks to ``analysis_type`` and
-        ``complexity``.
-        """
-        interaction_mode = intent.interaction_mode
-        scope = intent.scope
-
-        # Backward compatibility for legacy intents that don't set the new fields.
-        if intent.analysis_type == "clarification":
-            interaction_mode = "clarify"
-        elif intent.complexity == "direct_response" and not intent.metadata.get(
-            "tool_name"
-        ):
-            interaction_mode = "answer"
-
-        if interaction_mode == "clarify":
-            return self._handle_clarification(intent, working_memory)
-
-        if interaction_mode == "answer":
-            return await self._handle_direct_response(
-                intent, user_message, working_memory, project_id
-            )
-
-        # MCP tool agent loop.
-        mcp_tool_name = intent.metadata.get("tool_name")
-        if mcp_tool_name and self._tool_registry is not None:
-            try:
-                return await self._handle_agent_loop(
-                    user_message=user_message,
-                    working_memory=working_memory,
-                    allowed_tools=[
-                        t.name for t in self._tool_registry.list_by_source("mcp")
-                    ],
-                    intent=intent,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "AgentLoop failed, falling back to direct MCP tool: %s",
-                    exc,
-                    exc_info=True,
-                )
-                return await self._handle_mcp_tool(
-                    mcp_tool_name,
-                    intent.metadata.get("tool_inputs", {}),
-                    working_memory,
-                )
-
-        # Everything else is some form of execution.
-        plan_result, tree = await self.task_decomposer.decompose_with_plan(
-            intent, context={"project_id": project_id}
-        )
-
-        # Open agent plans are executed by the open agent executor.
-        if plan_result.derivation == "open-agent":
-            executor = self._get_open_agent_executor()
-            exec_context = {
-                "session_id": session_id,
-                "project_id": project_id,
-                "project_path": str(settings.data_dir / "workspaces" / project_id)
-                if project_id
-                else None,
-                "trace_id": getattr(self, "_trace_id", None),
-            }
-            exec_result = await executor.execute(
-                plan_result=plan_result,
-                user_message=user_message,
-                working_memory=working_memory,
-                context=exec_context,
-            )
-            # Convert OpenAgentExecutionResult to TurnResult.
-            from homomics_lab.models.common import HITLCheckpoint
-
-            hitl_checkpoint = None
-            if exec_result.hitl_checkpoint is not None and isinstance(
-                exec_result.hitl_checkpoint, HITLCheckpoint
-            ):
-                hitl_checkpoint = exec_result.hitl_checkpoint
-            return TurnResult(
-                mode=ExecutionMode(exec_result.mode),
-                response_text=exec_result.response_text,
-                agent_message=exec_result.agent_message,
-                hitl_checkpoint=hitl_checkpoint,
-            )
-
-        plan: Optional[Plan] = None
-        if plan_store is not None:
-            plan = Plan(
-                plan_id=_new_plan_id(),
-                session_id=session_id,
-                project_id=project_id,
-                status=PlanStatus.PENDING_APPROVAL,
-                is_fallback=plan_result.is_fallback,
-                intent_analysis_type=intent.analysis_type,
-                intent_complexity=intent.complexity,
-                original_intent={
-                    "analysis_type": intent.analysis_type,
-                    "complexity": intent.complexity,
-                    "confidence": intent.confidence,
-                    "original_message": intent.original_message,
-                    "domain": intent.domain,
-                    "target": intent.target,
-                    "scope": intent.scope,
-                    "interaction_mode": intent.interaction_mode,
-                    "metadata": dict(intent.metadata) if isinstance(intent.metadata, dict) else {"_raw": intent.metadata},
-                },
-                plan_result=plan_result,
-                task_tree=tree,
-                working_memory=working_memory,
-            )
-            await plan_store.create(plan)
-            record_plan_created(
-                strategy=plan_result.strategy_name,
-                is_fallback=plan_result.is_fallback,
-            )
-
-        if enqueue_skills and job_service is not None:
-            return await self._enqueue_execution(
-                intent=intent,
-                user_message=user_message,
-                tree=tree,
-                plan=plan,
-                working_memory=working_memory,
-                session_id=session_id,
-                project_id=project_id,
-                job_service=job_service,
-                plan_store=plan_store,
-                plan_mode=plan_mode,
-            )
-
-        if scope == "single_step" or intent.complexity == "single_step":
-            return await self._handle_single_step(
-                tree,
-                working_memory,
-                project_id,
-                intent=intent,
-                user_message=user_message,
-            )
-
-        return await self._handle_workflow(
-            tree,
-            working_memory,
-            project_id,
-            intent=intent,
-            user_message=user_message,
-            plan=plan,
-        )
-
-    # Domain values used by the domain registry for real analysis workflows.
-    # Builtin intent definitions use placeholder domains such as "builtin" or
-    # "general"; those should not trigger the domain canvas / approval path.
-    _REAL_DOMAIN_VALUES = {
-        "single-cell-transcriptomics",
-        "spatial-transcriptomics",
-        "metagenomics",
-        "genomics",
-        "transcriptomics",
-        "proteomics",
-        "epigenomics",
-    }
-
-    @classmethod
-    def _is_domain_template_analysis(cls, intent: UserIntent) -> bool:
-        """Return True for real domain-specific analysis workflows."""
-        return intent.domain in cls._REAL_DOMAIN_VALUES
-
-    def _plan_is_auto_approved(
-        self,
-        tree: TaskTree,
-        domain: Optional[str],
-        role_id: Optional[str] = None,
-    ) -> bool:
-        """Return True when every task skill is auto-approved for the domain/role."""
-        if not tree.tasks:
-            return False
-        registry = self._permission_registry
-        for task in tree.tasks:
-            skills = task.skills_required or []
-            if not skills:
-                return False
-            for skill_id in skills:
-                if registry.is_denied_skill(role_id, domain, skill_id):
-                    return False
-                if not registry.can_auto_approve_skill(
-                    role_id, domain, skill_id, risk_level=task.risk_level
-                ):
-                    return False
-        return True
-
-    async def _enqueue_execution(
-        self,
-        intent: UserIntent,
-        user_message: str,
-        tree: TaskTree,
-        plan: Optional[Plan],
-        working_memory: WorkingMemory,
-        session_id: str,
-        project_id: str,
-        job_service: Any,
-        plan_store: Optional[PlanStore],
-        plan_mode: bool = False,
-    ) -> TurnResult:
-        """Submit a task tree to the background job queue or request approval."""
-        is_domain = self._is_domain_template_analysis(intent)
-        plan_result = plan.plan_result if plan is not None else None
-        is_high_risk = (
-            plan_result is not None
-            and (plan_result.is_fallback or plan_result.risk_level == "high")
-        )
-        # A concrete single-task execution (e.g. "use CellTypist on sample.h5ad")
-        # should execute immediately even when the LLM labelled the overall intent
-        # as complex.  We trust the decomposed task tree over the noisy structured
-        # complexity score when there is exactly one low-risk, dependency-free task.
-        is_single_task_tree = (
-            tree is not None
-            and len(tree.tasks) == 1
-            and not tree.tasks[0].dependencies
-            and tree.tasks[0].risk_level != "high"
-        )
-        # Plan approval is governed by a configurable strategy resolved as
-        # role -> domain -> global (default: risky_only). Explicit plan_mode and
-        # fallback/high-risk plans always gate; a single concrete low-risk task
-        # runs directly under every strategy.
-        domain_def = get_domain_registry().get(intent.domain) if intent.domain else None
-        strategy = resolve_strategy(domain_def=domain_def, role_id=None, settings=settings)
-        signature_cache = getattr(self, "_approved_plan_signatures", None)
-        if signature_cache is None:
-            signature_cache = {}
-            self._approved_plan_signatures = signature_cache
-        seen_signatures = signature_cache.setdefault(session_id, set())
-        needs_approval = should_require_approval(
-            strategy=strategy,
-            plan=plan,
-            tree=tree,
-            is_high_risk=is_high_risk,
-            is_single_task_tree=is_single_task_tree,
-            plan_mode=plan_mode,
-            seen_signatures=seen_signatures,
-        )
-
-        # Permission rulesets can auto-approve plans that only use allowed
-        # tools/skills for the current role/domain.  Invariants (plan_mode,
-        # high-risk, fallback) still gate regardless of rules.
-        if (
-            needs_approval
-            and not plan_mode
-            and not is_high_risk
-            and tree is not None
-            and self._plan_is_auto_approved(tree, domain=intent.domain)
-        ):
-            needs_approval = False
-
-        # Optional specialist + critic review for complex / high-risk plans.
-        review: Optional[Dict[str, Any]] = None
-        if (
-            settings.subagent_review_enabled
-            and plan is not None
-            and self._llm_client is not None
-            and self._tool_registry is not None
-            and (is_high_risk or len(tree.tasks) > 1 or intent.complexity in ("complex", "multi_step"))
-        ):
-            try:
-                review = await self._review_plan_with_subagents(
-                    request=user_message,
-                    plan=plan,
-                    intent=intent,
-                    domain_def=domain_def,
-                    working_memory=working_memory,
-                )
-                plan.metadata["critic_review"] = review
-                if plan_store is not None:
-                    await plan_store.update(plan)
-            except Exception:
-                logger.warning("Sub-agent review failed; continuing without it", exc_info=True)
-
-        if plan is not None and needs_approval:
-            review_note = ""
-            if review:
-                summary = review.get("summary", "")
-                concerns = review.get("concerns", [])
-                suggestions = review.get("suggestions", [])
-                parts = []
-                if summary:
-                    parts.append(f"复核结论：{summary}")
-                if concerns:
-                    parts.append(f"关注点：{'; '.join(concerns)}")
-                if suggestions:
-                    parts.append(f"建议：{'; '.join(suggestions)}")
-                if parts:
-                    review_note = "\n\n" + "\n".join(parts)
-
-            if is_domain:
-                response_text = "我为您生成了一个分析计划，请确认后再执行。" + review_note
-                plan_payload = PlanPresenter.to_user_payload(plan)
-                agent_msg = ChatMessage(
-                    id=f"msg_{len(working_memory.messages)}",
-                    type=MessageType.PLAN_REQUEST,
-                    content={
-                        "plan_id": plan.plan_id,
-                        "plan": plan_payload,
-                        "response_text": response_text,
-                        "critic_review": review,
-                    },
-                    sender="agent",
-                )
-            else:
-                response_text = "我为您规划了以下执行步骤，请确认后再执行。" + review_note
-                estimates = {}
-                if plan is not None:
-                    estimates = {
-                        "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
-                        "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
-                    }
-                agent_msg = ChatMessage(
-                    id=f"msg_{len(working_memory.messages)}",
-                    type=MessageType.EXECUTION_PLAN,
-                    content={
-                        "plan_id": plan.plan_id,
-                        "response_text": response_text,
-                        "tasks": [t.model_dump() for t in tree.tasks],
-                        "progress": self._build_initial_progress(tree),
-                        "estimates": estimates,
-                        "critic_review": review,
-                    },
-                    sender="agent",
-                )
-            working_memory.add_message(agent_msg)
-            return TurnResult(
-                mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
-                response_text=response_text,
-                task_tree=tree,
-                agent_message=agent_msg,
-                plan_id=plan.plan_id,
-            )
-
-        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
-        mode = (
-            JobMode.SINGLE_STEP
-            if intent.scope == "single_step"
-            or intent.complexity == "single_step"
-            or is_single_task_tree
-            else JobMode.WORKFLOW
-        )
-        job = await job_service.create_job(
-            session_id=session_id,
-            project_id=project_id,
-            working_memory=working_memory,
-            task_tree=tree,
-            mode=mode,
-            plan_id=plan.plan_id if plan is not None else None,
-        )
-        if plan is not None and plan_store is not None:
-            plan.status = PlanStatus.APPROVED
-            plan.approved_by = "system"
-            await plan_store.update(plan)
-
-        response_text = "已提交后台执行，完成后会通知您。"
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": response_text,
-                "tasks": [t.model_dump() for t in tree.tasks],
-                "progress": self._build_initial_progress(tree),
-                "job_id": job.job_id,
-                "project_id": project_id,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-        return TurnResult(
-            mode=ExecutionMode.QUEUED,
-            response_text=response_text,
-            task_tree=tree,
-            agent_message=agent_msg,
-            job_id=job.job_id,
-            plan_id=plan.plan_id if plan is not None else None,
-        )
-
-    async def _review_plan_with_subagents(
-        self,
-        request: str,
-        plan: Plan,
-        intent: UserIntent,
-        domain_def: Any,
-        working_memory: WorkingMemory,
-    ) -> Dict[str, Any]:
-        """Run a domain specialist + critic review on a plan before approval.
-
-        The review is best-effort: failures are logged and do not block execution.
-        """
-        role = None
-        if domain_def is not None and getattr(domain_def, "roles", None):
-            role = domain_def.roles[0]
-
-        orchestrator = SpecialistCriticOrchestrator(
-            llm_client=self._llm_client,
-            tool_registry=self._tool_registry,
-            role=role,
-            domain=intent.domain,
-        )
-        history = self._working_memory_to_history(working_memory)
-        review = await orchestrator.review(request, plan, history=history)
-        return review.to_dict()
-
-    @staticmethod
-    def _build_initial_progress(tree: TaskTree) -> Dict[str, Any]:
-        total = len(tree.tasks)
-        return {
-            "total": total,
-            "pending": total,
-            "running": 0,
-            "completed": 0,
-            "failed": 0,
-            "awaiting_human": 0,
-            "percent": 0,
-        }
-
     async def _evaluate_risk(
         self,
         intent: UserIntent,
@@ -1984,229 +1488,6 @@ class TurnRunner:
         ids = [t.skills_required[0] for t in tree.tasks if t.skills_required]
         return ids[0] if len(ids) == 1 else None
 
-    async def _handle_workflow(
-        self,
-        tree: TaskTree,
-        working_memory: WorkingMemory,
-        project_id: str,
-        intent: Optional[UserIntent] = None,
-        user_message: Optional[str] = None,
-        plan: Optional[Plan] = None,
-    ) -> TurnResult:
-        """Handle complex multi-step workflows."""
-        # Handle non-executable fallback suggestions directly.
-        if self._is_fallback_suggestion(tree):
-            return self._build_fallback_result(tree, working_memory)
-
-        # Multi-step workflows may be offloaded to Nextflow when appropriate.
-        if plan is not None and len(tree.tasks) > 1:
-            service = self._get_workflow_execution_service()
-            if service is not None:
-                try:
-                    context = await self._build_orchestrator_context(
-                        project_id,
-                        intent=intent,
-                        user_message=user_message,
-                        working_memory=working_memory,
-                    )
-                    wf_result = await service.execute(
-                        plan=plan,
-                        project_id=project_id,
-                        context=context,
-                    )
-                    return self._build_workflow_result(
-                        tree=wf_result.task_tree,
-                        working_memory=working_memory,
-                        backend=wf_result.backend,
-                        artifacts=wf_result.artifacts,
-                        error=wf_result.error_message,
-                        user_message=user_message or "",
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "WorkflowExecutionService failed; falling back to local orchestrator: %s",
-                        exc,
-                        exc_info=True,
-                    )
-
-        orchestrator = self._get_orchestrator()
-        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
-        context = await self._build_orchestrator_context(
-            project_id,
-            intent=intent,
-            user_message=user_message,
-            working_memory=working_memory,
-        )
-        try:
-            results = await orchestrator.run_tree(tree, context=context)
-        except ExecutionError as exc:
-            corrected = await self._apply_self_correction(
-                tree,
-                working_memory,
-                project_id,
-                exc,
-                intent=intent,
-                user_message=user_message,
-            )
-            if corrected is not None:
-                return corrected
-            raise
-
-        # Check for HITL
-        hitl_info = self._extract_hitl(results)
-        if hitl_info:
-            return self._build_hitl_result(tree, hitl_info, working_memory)
-
-        await self._record_execution_feedback(tree, results, project_id)
-
-        response_text = f"已为您规划 {len(tree.tasks)} 个分析步骤。"
-
-        # Collect rich artifact envelopes + a data-driven findings summary so the
-        # chat renders tables/figures inline (not just file links) and explains
-        # what the numbers mean with provenance.
-        envelopes = self._envelopes_from_results(results)
-        summary_md = self._summarize(
-            envelopes, user_message or "", self._single_skill_id(tree)
-        )
-        if summary_md:
-            response_text = f"{response_text}\n\n{summary_md}"
-
-        # Extract any plots produced during the workflow
-        plot_messages = self._extract_plot_messages(results, tree, working_memory)
-        for msg in plot_messages:
-            working_memory.add_message(msg)
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": response_text,
-                "tasks": [t.model_dump() for t in tree.tasks],
-                "progress": orchestrator.get_progress(tree),
-                "artifacts": envelopes,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.WORKFLOW,
-            response_text=response_text,
-            task_tree=tree,
-            progress=orchestrator.get_progress(tree),
-            agent_message=agent_msg,
-            attachments=plot_messages,
-        )
-
-    async def _apply_self_correction(
-        self,
-        tree: TaskTree,
-        working_memory: WorkingMemory,
-        project_id: str,
-        error: Exception,
-        intent: Optional[UserIntent] = None,
-        user_message: Optional[str] = None,
-    ) -> Optional[TurnResult]:
-        """Try to self-correct a failed execution.
-
-        Returns a TurnResult if a correction decision was made, or None if the
-        engine decided to stop or no failed tasks were found.
-        """
-        failed_tasks = [
-            t for t in tree.tasks if str(t.status.value) == "failed"
-        ]
-        if not failed_tasks:
-            return None
-
-        # Respect per-task replan limits to avoid infinite loops.
-        for task in failed_tasks:
-            if task.replan_attempt_count >= task.max_replan_attempts:
-                return None
-            task.replan_attempt_count += 1
-
-        triggers: List[ReplanningTrigger] = []
-        for task in failed_tasks:
-            error_msg = task.error_message or str(error)
-            severity = "major" if "validation" in error_msg.lower() else "minor"
-            triggers.append(
-                ReplanningTrigger(
-                    trigger_type="skill_failure",
-                    severity=severity,
-                    context={
-                        "phase_type": task.phase,
-                        "task_id": task.id,
-                        "skill_id": task.skills_required[0] if task.skills_required else None,
-                        "error": error_msg,
-                        "reason": f"Skill execution failed for {task.name}: {error_msg}",
-                    },
-                )
-            )
-
-        # Build a PlanResult from the current task tree so the replanning engine
-        # has a plan to mutate.
-        placeholder_intent = intent or UserIntent(
-            analysis_type="runtime_replan",
-            complexity="single_step",
-        )
-        current_plan = self.task_decomposer._task_tree_to_plan_result(
-            tree,
-            placeholder_intent,
-            strategy_name="runtime-replan",
-        )
-
-        decision = self._get_self_correction_engine().evaluate(
-            current_plan=current_plan,
-            triggers=triggers,
-        )
-
-        if decision.action == SelfCorrectionAction.STOP:
-            return None
-
-        if decision.action == SelfCorrectionAction.HITL_REPLAN:
-            response_text = (
-                f"执行中遇到问题，我计划调整方案：{decision.delta_summary}"
-                "请确认是否继续。"
-            )
-            agent_msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.EXECUTION_PLAN,
-                content={
-                    "response_text": response_text,
-                    "tasks": [t.model_dump() for t in tree.tasks],
-                    "delta_summary": decision.delta_summary,
-                    "replanned": True,
-                },
-                sender="agent",
-            )
-            working_memory.add_message(agent_msg)
-            return TurnResult(
-                mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
-                response_text=response_text,
-                task_tree=tree,
-                agent_message=agent_msg,
-            )
-
-        # AUTO_REPLAN: rebuild the task tree from the new plan and re-execute.
-        if decision.new_plan is not None:
-            new_tree = self.task_decomposer._plan_result_to_task_tree(decision.new_plan)
-            if len(new_tree.tasks) == 1:
-                return await self._handle_single_step(
-                    new_tree,
-                    working_memory,
-                    project_id,
-                    intent=intent,
-                    user_message=user_message,
-                )
-            return await self._handle_workflow(
-                new_tree,
-                working_memory,
-                project_id,
-                intent=intent,
-                user_message=user_message,
-            )
-
-        return None
-
     async def resume_hitl(
         self,
         session_id: str,
@@ -2310,462 +1591,6 @@ class TurnRunner:
                 messages.append(msg)
 
         return messages
-
-    def _compress_working_memory(
-        self, working_memory: WorkingMemory, current_goal: str
-    ) -> str:
-        """Compress recent conversation history into a concise context string.
-
-        Uses ContextCompressor to keep only the most relevant messages for the
-        current user request. Falls back to the latest 6 raw messages if
-        compression fails.
-        """
-        messages = working_memory.get_recent_messages()
-        if not messages:
-            return ""
-
-        now = datetime.now(timezone.utc)
-        items: List[ContextItem] = []
-        for msg in messages:
-            raw_content = msg.content
-            if not isinstance(raw_content, str):
-                try:
-                    text = json.dumps(raw_content, ensure_ascii=False)
-                except Exception:
-                    text = str(raw_content)
-            else:
-                text = raw_content
-            if not text.strip():
-                continue
-            hours = 0.0
-            if msg.timestamp:
-                try:
-                    hours = (now - msg.timestamp).total_seconds() / 3600.0
-                except Exception:
-                    hours = 0.0
-            items.append(
-                ContextItem(
-                    content=f"{msg.sender}: {text}",
-                    type=msg.type.value,
-                    is_pinned=msg.id in working_memory.pinned_items,
-                    is_upstream_result=bool(msg.task_id),
-                    agent_importance=0.7 if msg.sender == "agent" else 0.5,
-                    hours_since_created=hours,
-                )
-            )
-
-        try:
-            compressed = self.compressor.compress(items, current_goal=current_goal)
-        except Exception:
-            compressed = items[-6:]
-
-        return "\n".join(item.content for item in compressed)
-
-    async def _generate_general_help_response(
-        self, user_message: str, working_memory: WorkingMemory
-    ) -> str:
-        """Generate a code/explanation response for general help requests.
-
-        Uses Prompter with compressed conversation history and CBKB-enriched
-        project context. Falls back to a safe template response if LLM is not
-        configured or fails.
-        """
-        llm = LLMClient()
-        if not llm.is_configured():
-            return (
-                "我可以帮您写代码或解释数据处理逻辑，但需要配置 LLM 才能生成具体代码。\n"
-                "请设置 OPENAI_API_KEY，或告诉我您想处理什么数据，我会尽量给出建议。"
-            )
-
-        if self._context_bundle is not None:
-            # Use the already assembled, token-safe context from ContextEngine.
-            messages = self._context_bundle.to_prompt(user_message)
-            # Keep only system/assistant messages; the user message will be appended below.
-            prompt_messages = [m for m in messages if m.get("role") != "user"]
-            prompt_messages.append({"role": "user", "content": user_message})
-        else:
-            compressed_history = self._compress_working_memory(
-                working_memory, user_message
-            )
-            extra_context = self._format_extra_context()
-            project_context = "\n\n".join(
-                filter(None, [compressed_history, extra_context])
-            )
-
-            prompt = self.prompter.build_prompt(
-                user_message=user_message,
-                working_memory=WorkingMemory(max_messages=0),
-                project_context=project_context,
-                mode="analysis",
-            )
-            prompt_messages = [{"role": "user", "content": prompt}]
-
-        try:
-            return await llm.chat_completion(
-                messages=prompt_messages,
-                temperature=0.2,
-                max_tokens=1500,
-                session_id=getattr(self, "_session_id", None),
-                project_id=getattr(self, "_project_id", None),
-                request_id=f"{getattr(self, '_turn_request_id', 'code')}_code",
-            )
-        except Exception:
-            return (
-                "我目前无法调用 LLM 生成代码。请检查 OPENAI_API_KEY 配置，"
-                "或把需求拆分成更具体的步骤。"
-            )
-
-    async def _generate_direct_response_via_llm(
-        self,
-        response_type: str,
-        user_message: str,
-        intent: UserIntent,
-        working_memory: WorkingMemory,
-        project_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-    ) -> Optional[str]:
-        """Generate a greeting/QA/information direct response via the configured LLM.
-
-        Falls back to static templates when the LLM client is unavailable or fails.
-        """
-        if self._llm_client is None:
-            return None
-
-        import logging
-
-        logger = logging.getLogger(__name__)
-
-        # Layered system prompt from the prompt registry (base + domain + mode).
-        mode_map = {
-            "greeting": "base",
-            "qa": "qa",
-            "information_request": "qa",
-        }
-        from homomics_lab.prompts import render_prompt
-
-        base_prompt = render_prompt("system.base", domain=intent.domain, combine=True)
-        if base_prompt is None:
-            base_prompt = (
-                "You are HomomicsLab, an AI assistant specialized in bioinformatics and computational biology. "
-                "You have access to project context, SOPs, CBKB knowledge, and executable skills/workflows."
-            )
-
-        mode_prompt = render_prompt(
-            f"system.{mode_map.get(response_type, 'qa')}",
-            domain=intent.domain,
-            combine=True,
-        )
-
-        response_type_instructions = {
-            "greeting": (
-                "Greet the user warmly and briefly introduce HomomicsLab. "
-                "Mention that you can help with bioinformatics analysis, "
-                "experiment design, code snippets, and workflow building."
-            ),
-            "qa": (
-                "Answer the user's question accurately in a bioinformatics context. "
-                "When project context, SOPs, or skills are relevant, use them to give "
-                "actionable HomomicsLab-specific guidance rather than a generic answer."
-            ),
-            "information_request": (
-                "Explain what HomomicsLab can do for the requested domain. List relevant "
-                "analysis steps, SOPs, and executable skills when known, and offer to run "
-                "them for the user. Keep the response structured and actionable."
-            ),
-        }
-
-        parts = [base_prompt]
-        if mode_prompt:
-            parts.append(mode_prompt)
-        parts.append(
-            f"Task type: {response_type}\n"
-            f"Instructions: {response_type_instructions.get(response_type, response_type_instructions['qa'])}\n\n"
-            "Use the provided context and intent, but do not mention internal fields or system internals."
-        )
-        system_prompt = "\n\n".join(parts)
-
-        messages: List[Dict[str, str]] = []
-
-        if self._context_bundle is not None:
-            # The ContextEngine already assembles token-safe project state, CBKB
-            # retrieval, semantic memory, and conversation history. Prepend our
-            # direct-response system instruction so the model knows how to answer.
-            messages = self._context_bundle.to_prompt(user_message)
-            messages.insert(0, {"role": "system", "content": system_prompt})
-        else:
-            # Fallback minimal context when the context engine is not used.
-            context_parts: List[str] = [
-                f"Intent: type={intent.analysis_type}, domain={intent.domain or 'none'}, "
-                f"analysis_type={intent.analysis_type or 'none'}, confidence={intent.confidence:.2f}"
-            ]
-            recent_messages = working_memory.get_recent_messages()[-6:]
-            if recent_messages:
-                history_lines = []
-                for msg in recent_messages:
-                    content = msg.content
-                    if not isinstance(content, str):
-                        try:
-                            content = json.dumps(content, ensure_ascii=False)
-                        except Exception:
-                            content = str(content)
-                    history_lines.append(f"{msg.sender}: {content}")
-                context_parts.append(
-                    "Recent conversation:\n" + "\n".join(history_lines)
-                )
-
-            if self.project_state_manager is not None and project_id is not None:
-                try:
-                    project_state = self.project_state_manager.load(project_id)
-                    context_parts.append(project_state.to_prompt_text())
-                except Exception:
-                    logger.debug(
-                        "Failed to load project state for LLM direct response",
-                        exc_info=True,
-                    )
-
-            context_text = "\n\n".join(context_parts)
-            messages = [{"role": "system", "content": system_prompt}]
-            if context_text:
-                messages.append({"role": "system", "content": context_text})
-            messages.append({"role": "user", "content": user_message})
-
-        type_max_tokens = {"greeting": 800, "qa": 2000, "information_request": 2000}
-        try:
-            return await self._llm_client.chat_completion(
-                messages=messages,
-                temperature=0.3,
-                max_tokens=max_tokens or type_max_tokens.get(response_type, 2000),
-                session_id=getattr(self, "_session_id", None),
-                project_id=getattr(self, "_project_id", None),
-                request_id=f"{getattr(self, '_turn_request_id', 'direct')}_direct",
-            )
-        except Exception:
-            logger.warning(
-                "LLM direct response failed for type %s; using fallback",
-                response_type,
-                exc_info=True,
-            )
-            return None
-
-    async def _generate_greeting_response(
-        self,
-        user_message: str,
-        working_memory: WorkingMemory,
-        project_id: Optional[str] = None,
-    ) -> str:
-        """Return a friendly self-introduction for greeting intents.
-
-        Uses the configured LLM when available for a warmer, context-aware greeting;
-        falls back to a static template if no LLM is configured or the call fails.
-        """
-        greeting_intent = UserIntent(
-            analysis_type="greeting",
-            domain="general",
-            complexity="direct_response",
-            original_message=user_message,
-        )
-        llm_response = await self._generate_direct_response_via_llm(
-            response_type="greeting",
-            user_message=user_message,
-            intent=greeting_intent,
-            working_memory=working_memory,
-            project_id=project_id,
-        )
-        if llm_response:
-            return llm_response
-
-        return (
-            "Hello! I'm **HomomicsLab**, your AI assistant specialized in bioinformatics "
-            "and computational biology.\n\n"
-            "I can help you with:\n"
-            "- Bioinformatics analysis (genomics, transcriptomics, single-cell, proteomics, etc.)\n"
-            "- Experimental design and statistical frameworks\n"
-            "- Code snippets in Python, R, bash, SQL, Nextflow, Snakemake, and WDL\n"
-            "- Workflow building, automation, reproducibility, and HPC/cloud optimization\n\n"
-            "What project or analysis can I help you with today?"
-        )
-
-    async def _generate_qa_response(
-        self,
-        intent: UserIntent,
-        user_message: str,
-        working_memory: WorkingMemory,
-        project_id: Optional[str] = None,
-    ) -> str:
-        """Generate a direct text response for QA-style queries.
-
-        Uses the configured LLM when available; falls back to domain-specific
-        Chinese templates.
-        """
-        llm_response = await self._generate_direct_response_via_llm(
-            response_type="qa",
-            user_message=user_message,
-            intent=intent,
-            working_memory=working_memory,
-            project_id=project_id,
-        )
-        if llm_response:
-            return llm_response
-
-        domain = intent.domain or intent.analysis_type
-        qa_responses = {
-            "single-cell-transcriptomics": (
-                "单细胞测序（scRNA-seq）是一种在单个细胞水平上分析基因表达的技术。"
-                "它可以揭示细胞异质性，发现稀有细胞类型，并追踪细胞发育轨迹。"
-            ),
-            "spatial-transcriptomics": (
-                "空间转录组学结合了基因表达分析和空间位置信息，"
-                "可以在组织切片上绘制基因表达图谱。"
-            ),
-            "metagenomics": (
-                "宏基因组学通过直接提取环境样本中全部微生物基因组 DNA，"
-                "研究群落组成、功能和多样性，无需培养。"
-            ),
-            "genomics": (
-                "基因组学是对生物体全部 DNA 的研究，包括变异检测、结构变异、"
-                "功能注释等分析内容。"
-            ),
-            "transcriptomics": (
-                "转录组学研究细胞或组织中全部 RNA 分子的表达情况，"
-                "常用于差异表达、通路富集等分析。"
-            ),
-            "proteomics": (
-                "蛋白质组学是对生物体全部蛋白质的研究，包括蛋白鉴定、定量、"
-                "翻译后修饰等分析。"
-            ),
-            "epigenomics": (
-                "表观基因组学研究不改变 DNA 序列的遗传调控机制，"
-                "如 DNA 甲基化、组蛋白修饰、染色质可及性等。"
-            ),
-            "file_conversion": (
-                "我可以帮您转换常见的生物信息学数据格式，"
-                "如 CSV、h5ad、10x Genomics 格式等。"
-            ),
-            "general": (
-                "我是一个生物信息学分析助手，可以帮您进行单细胞分析、"
-                "空间转录组分析、实验设计等任务。请问有什么具体需求？"
-            ),
-        }
-        if domain in qa_responses and domain != "general":
-            return qa_responses[domain]
-
-        # No domain-specific template: try a web search fallback when no LLM is
-        # available, so general real-time questions (weather, news, etc.) still
-        # get a useful answer.
-        search_response = await self._try_web_search_response(user_message)
-        if search_response:
-            return search_response
-
-        return qa_responses["general"]
-
-    async def _try_web_search_response(self, user_message: str) -> Optional[str]:
-        """Fallback to a web search summary when no LLM or domain template is available.
-
-        Only runs if the ``web_search`` builtin tool is registered and returns
-        results. Network failures or missing dependencies are silently ignored so
-        the caller can fall back to the generic template.
-        """
-        if not self._tool_registry:
-            return None
-
-        web_tools = [t for t in self._tool_registry.list_by_source("builtin") if t.name == "web_search"]
-        if not web_tools:
-            return None
-
-        try:
-            result = await self._tool_registry.invoke_async(
-                "web_search", {"query": user_message, "num_results": 3}
-            )
-            if not result.success or not result.output:
-                return None
-
-            results = result.output
-            if not isinstance(results, list) or not results:
-                return None
-
-            lines: List[str] = []
-            for r in results[:3]:
-                title = r.get("title", "").strip()
-                href = r.get("href", "").strip()
-                body = r.get("body", "").strip()
-                if not title and not body:
-                    continue
-                snippet = body[:200] + "..." if len(body) > 200 else body
-                lines.append(f"- **{title}**\n  {snippet}\n  {href}")
-
-            if not lines:
-                return None
-
-            return "我查到了一些相关信息：\n\n" + "\n\n".join(lines)
-        except Exception:
-            return None
-
-    async def _generate_information_request_response(
-        self,
-        intent: UserIntent,
-        working_memory: WorkingMemory,
-        project_id: Optional[str] = None,
-    ) -> str:
-        """Respond to "what can you do / what are the steps" style queries.
-
-        Uses the configured LLM when available; falls back to step-by-step
-        Chinese templates.
-        """
-        llm_response = await self._generate_direct_response_via_llm(
-            response_type="information_request",
-            user_message=intent.original_message or "",
-            intent=intent,
-            working_memory=working_memory,
-            project_id=project_id,
-        )
-        if llm_response:
-            return llm_response
-
-        domain = intent.domain
-        if domain == "single-cell-transcriptomics":
-            return (
-                "单细胞转录组分析通常包括以下主要步骤：\n"
-                "1. 数据质控（QC）：过滤低质量细胞和基因；\n"
-                "2. 标准化与归一化；\n"
-                "3. 高变基因选择；\n"
-                "4. 降维（PCA、UMAP/t-SNE）；\n"
-                "5. 聚类与细胞类型注释；\n"
-                "6. 差异表达分析；\n"
-                "7. 通路富集与可视化。\n\n"
-                "您可以上传数据后，让我直接帮您跑完整流程或只做其中某一步。"
-            )
-        if domain == "spatial-transcriptomics":
-            return (
-                "空间转录组分析通常包括以下主要步骤：\n"
-                "1. 数据加载与质控；\n"
-                "2. 空间坐标与表达矩阵整合；\n"
-                "3. 降维与聚类；\n"
-                "4. 空间可变基因分析；\n"
-                "5. 组织区域注释与细胞类型去卷积；\n"
-                "6. 可视化（spot/细胞空间表达图）。\n\n"
-                "请上传数据或告诉我您想重点关注的空间生物学问题。"
-            )
-        if domain == "metagenomics":
-            return (
-                "宏基因组分析通常包括以下主要步骤：\n"
-                "1. 原始数据质控与去宿主；\n"
-                "2. 序列拼接与基因预测；\n"
-                "3. 物种注释与分类；\n"
-                "4. 功能注释（KEGG/GO/CAZy 等）；\n"
-                "5. Alpha/Beta 多样性分析；\n"
-                "6. 差异物种/功能分析。\n\n"
-                "您可以提供原始测序数据或 OTU/ASV 表，让我帮您分析。"
-            )
-        return (
-            "HomomicsLab 支持多种生物信息学分析，包括：\n"
-            "- 单细胞转录组分析（质控、聚类、差异表达、细胞注释等）\n"
-            "- 空间转录组分析\n"
-            "- 宏基因组/微生物组分析\n"
-            "- 基因组、转录组、蛋白质组、表观组分析\n"
-            "- 文献检索（PubMed）、蛋白查询（UniProt）、数据集查询（GEO）\n"
-            "- 代码/脚本生成与数据处理帮助\n\n"
-            "请告诉我您想进行哪类分析，或上传数据让我开始。"
-        )
 
     # --- Delegated collaborators -------------------------------------------
     # Thin shells kept for backward compatibility: tests and internal callers
@@ -2919,3 +1744,145 @@ class TurnRunner:
         self, error: Union[str, TurnError], working_memory: WorkingMemory
     ) -> TurnResult:
         return self._result_assembler.build_error_result(error, working_memory)
+
+    def _handle_clarification(
+        self,
+        intent: UserIntent,
+        working_memory: WorkingMemory,
+    ) -> TurnResult:
+        return self._clarification_handler.handle_clarification(intent, working_memory)
+
+    def _build_debate_resolved_intent(
+        self,
+        debate_response: Dict[str, Any],
+        user_message: str,
+    ) -> UserIntent:
+        return self._clarification_handler.build_debate_resolved_intent(
+            debate_response, user_message
+        )
+
+    def _compress_working_memory(
+        self, working_memory: WorkingMemory, current_goal: str
+    ) -> str:
+        return self._context_formatter.compress_working_memory(
+            working_memory, current_goal
+        )
+
+    async def _route_by_intent(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        session_id: str,
+        plan_store: Optional[PlanStore],
+        job_service: Optional[Any],
+        enqueue_skills: bool,
+        plan_mode: bool = False,
+    ) -> TurnResult:
+        return await self._intent_router.route(
+            intent=intent,
+            user_message=user_message,
+            working_memory=working_memory,
+            project_id=project_id,
+            session_id=session_id,
+            plan_store=plan_store,
+            job_service=job_service,
+            enqueue_skills=enqueue_skills,
+            plan_mode=plan_mode,
+        )
+
+    async def _handle_workflow(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+        project_id: str,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
+        plan: Optional[Plan] = None,
+    ) -> TurnResult:
+        return await self._workflow_handler.handle(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
+            intent=intent,
+            user_message=user_message,
+            plan=plan,
+        )
+
+    async def _apply_self_correction(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+        project_id: str,
+        error: Exception,
+        intent: Optional[UserIntent] = None,
+        user_message: Optional[str] = None,
+    ) -> Optional[TurnResult]:
+        return await self._self_correction_handler.apply(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
+            error=error,
+            intent=intent,
+            user_message=user_message,
+        )
+
+    async def _generate_general_help_response(
+        self, user_message: str, working_memory: WorkingMemory
+    ) -> str:
+        return await self._response_generator.generate_general_help_response(
+            user_message, working_memory
+        )
+
+    async def _generate_direct_response_via_llm(
+        self,
+        response_type: str,
+        user_message: str,
+        intent: UserIntent,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+    ) -> Optional[str]:
+        return await self._response_generator.generate_direct_response_via_llm(
+            response_type=response_type,
+            user_message=user_message,
+            intent=intent,
+            working_memory=working_memory,
+            project_id=project_id,
+            max_tokens=max_tokens,
+        )
+
+    async def _generate_greeting_response(
+        self,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        return await self._response_generator.generate_greeting_response(
+            user_message, working_memory, project_id
+        )
+
+    async def _generate_qa_response(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        return await self._response_generator.generate_qa_response(
+            intent, user_message, working_memory, project_id
+        )
+
+    async def _try_web_search_response(self, user_message: str) -> Optional[str]:
+        return await self._response_generator.try_web_search_response(user_message)
+
+    async def _generate_information_request_response(
+        self,
+        intent: UserIntent,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        return await self._response_generator.generate_information_request_response(
+            intent, working_memory, project_id
+        )

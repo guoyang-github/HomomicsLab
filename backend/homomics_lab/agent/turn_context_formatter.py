@@ -6,7 +6,11 @@ changes).
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from homomics_lab.context.relevance_filter import ContextItem
 
 if TYPE_CHECKING:
     from homomics_lab.agent.turn_runner import TurnRunner
@@ -220,6 +224,56 @@ class ContextFormatter:
         if abstract:
             lines.append(f"\n{abstract}")
         return "\n".join(lines)
+
+    def compress_working_memory(
+        self, working_memory: "WorkingMemory", current_goal: str
+    ) -> str:
+        """Compress recent conversation history into a concise context string.
+
+        Uses ContextCompressor to keep only the most relevant messages for the
+        current user request. Falls back to the latest 6 raw messages if
+        compression fails.
+        """
+        messages = working_memory.get_recent_messages()
+        if not messages:
+            return ""
+
+        now = datetime.now(timezone.utc)
+        items: List[ContextItem] = []
+        for msg in messages:
+            raw_content = msg.content
+            if not isinstance(raw_content, str):
+                try:
+                    text = json.dumps(raw_content, ensure_ascii=False)
+                except Exception:
+                    text = str(raw_content)
+            else:
+                text = raw_content
+            if not text.strip():
+                continue
+            hours = 0.0
+            if msg.timestamp:
+                try:
+                    hours = (now - msg.timestamp).total_seconds() / 3600.0
+                except Exception:
+                    hours = 0.0
+            items.append(
+                ContextItem(
+                    content=f"{msg.sender}: {text}",
+                    type=msg.type.value,
+                    is_pinned=msg.id in working_memory.pinned_items,
+                    is_upstream_result=bool(msg.task_id),
+                    agent_importance=0.7 if msg.sender == "agent" else 0.5,
+                    hours_since_created=hours,
+                )
+            )
+
+        try:
+            compressed = self._runner.compressor.compress(items, current_goal=current_goal)
+        except Exception:
+            compressed = items[-6:]
+
+        return "\n".join(item.content for item in compressed)
 
     def format_extra_context(self) -> str:
         """Render CBKB/semantic-memory enrichment into a short project context string."""
