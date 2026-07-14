@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { clsx } from 'clsx'
-import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { toast as sonnerToast } from 'sonner'
+import { Toaster } from './shadcn/sonner'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -12,65 +12,41 @@ export interface Toast {
   duration?: number
 }
 
-export interface ToastItemProps extends Toast {
-  onRemove: (id: string) => void
-}
-
-const icons: Record<ToastType, React.ElementType> = {
-  success: CheckCircle,
-  error: AlertCircle,
-  warning: AlertTriangle,
-  info: Info,
-}
-
-const styles: Record<ToastType, string> = {
-  success: 'bg-success/10 text-success border-success/20',
-  error: 'bg-error/10 text-error border-error/20',
-  warning: 'bg-warning/10 text-warning border-warning/20',
-  info: 'bg-primary/10 text-primary border-primary/20',
-}
-
-export function ToastItem({ id, type, title, message, duration = 5000, onRemove }: ToastItemProps) {
-  const Icon = icons[type]
-
-  useEffect(() => {
-    if (duration <= 0) return
-    const timer = setTimeout(() => onRemove(id), duration)
-    return () => clearTimeout(timer)
-  }, [id, duration, onRemove])
-
-  return (
-    <div
-      className={clsx(
-        'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border p-4 shadow-floating animate-slide-in',
-        styles[type]
-      )}
-    >
-      <Icon className="mt-0.5 h-5 w-5 shrink-0" />
-      <div className="flex-1">
-        {title && <p className="font-medium">{title}</p>}
-        <p className={clsx('text-sm', title && 'mt-1')}>{message}</p>
-      </div>
-      <button onClick={() => onRemove(id)} className="shrink-0 rounded p-1 hover:bg-black/5">
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  )
-}
-
 export interface ToastContainerProps {
   toasts: Toast[]
   onRemove: (id: string) => void
 }
 
+// Adapter: the toast store stays the source of truth (call sites unchanged),
+// but rendering is delegated to sonner. New store entries are drained into
+// sonner toasts; removals dismiss them again.
 export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-  if (toasts.length === 0) return null
+  const shownRef = useRef<Set<string>>(new Set())
 
-  return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} {...toast} onRemove={onRemove} />
-      ))}
-    </div>
-  )
+  useEffect(() => {
+    const shown = shownRef.current
+    const currentIds = new Set(toasts.map((t) => t.id))
+
+    for (const toast of toasts) {
+      if (shown.has(toast.id)) continue
+      shown.add(toast.id)
+      const options = {
+        id: toast.id,
+        description: toast.title ? toast.message : undefined,
+        duration: toast.duration === undefined ? 5000 : toast.duration <= 0 ? Infinity : toast.duration,
+        onDismiss: () => onRemove(toast.id),
+        onAutoClose: () => onRemove(toast.id),
+      }
+      sonnerToast[toast.type](toast.title ?? toast.message, options)
+    }
+
+    for (const id of Array.from(shown)) {
+      if (!currentIds.has(id)) {
+        sonnerToast.dismiss(id)
+        shown.delete(id)
+      }
+    }
+  }, [toasts, onRemove])
+
+  return <Toaster position="bottom-right" richColors closeButton />
 }

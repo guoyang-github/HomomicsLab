@@ -8,8 +8,16 @@ export default {
   theme: {
     extend: {
       colors: {
+        // shadcn semantic tokens (CSS variables defined in src/index.css).
+        // Keep in sync with the :root / .dark blocks there.
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         primary: {
           DEFAULT: '#2563eb',
+          foreground: 'hsl(var(--primary-foreground))',
           50: '#eff6ff',
           100: '#dbeafe',
           200: '#bfdbfe',
@@ -21,6 +29,30 @@ export default {
           800: '#1e40af',
           900: '#1e3a8a',
           950: '#172554',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
         success: {
           DEFAULT: '#16a34a',
@@ -65,10 +97,39 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
+      fontSize: {
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
+      },
+      spacing: {
+        'xs': 'var(--space-xs)',
+        'sm': 'var(--space-sm)',
+        'md': 'var(--space-md)',
+        'lg': 'var(--space-lg)',
+        'xl': 'var(--space-xl)',
+        '2xl': 'var(--space-2xl)',
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
       boxShadow: {
+        'sm': 'var(--shadow-sm)',
+        'md': 'var(--shadow-md)',
+        'lg': 'var(--shadow-lg)',
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'card': '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
         'floating': '0 10px 40px -10px rgba(0, 0, 0, 0.15)',
+      },
+      transitionDuration: {
+        'fast': 'var(--duration-fast)',
+        'base': 'var(--duration-base)',
+        'slow': 'var(--duration-slow)',
+      },
+      transitionTimingFunction: {
+        'standard': 'var(--ease-standard)',
+        'emphasized': 'var(--ease-emphasized)',
+        'spring': 'var(--ease-spring)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -90,5 +151,6 @@ export default {
   },
   plugins: [
     require('@tailwindcss/typography'),
+    require('tailwindcss-animate'),
   ],
 }

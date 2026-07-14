@@ -1,37 +1,87 @@
-import { forwardRef } from 'react'
 import { clsx } from 'clsx'
+import {
+  Select as ShadcnSelect,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './shadcn/select'
 
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+// Radix Select reserves the empty string for "no selection", so legacy
+// options with value "" are mapped to an internal sentinel.
+const EMPTY_VALUE = '__homomics_select_empty__'
+
+export interface SelectProps {
   error?: string
   options: Array<{ value: string; label: string; disabled?: boolean }>
+  value?: string
+  defaultValue?: string
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  disabled?: boolean
+  name?: string
+  required?: boolean
+  id?: string
+  placeholder?: string
+  className?: string
+  children?: React.ReactNode
+  'aria-label'?: string
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, error, options, children, ...props }, ref) => {
-    return (
-      <div className="w-full">
-        <select
-          ref={ref}
-          className={clsx(
-            'flex h-10 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm',
-            'text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-error focus-visible:ring-error',
-            className
-          )}
-          {...props}
+// Adapter: legacy native-select API (options prop + onChange event) on top of
+// the shadcn (radix) Select so existing call sites stay unchanged.
+export function Select({
+  className,
+  error,
+  options,
+  children,
+  value,
+  defaultValue,
+  onChange,
+  disabled,
+  name,
+  required,
+  id,
+  placeholder,
+  'aria-label': ariaLabel,
+}: SelectProps) {
+  const toInternal = (v: string) => (v === '' ? EMPTY_VALUE : v)
+  const toExternal = (v: string) => (v === EMPTY_VALUE ? '' : v)
+
+  return (
+    <div className="w-full">
+      <ShadcnSelect
+        value={value !== undefined ? toInternal(value) : undefined}
+        defaultValue={defaultValue !== undefined ? toInternal(defaultValue) : undefined}
+        onValueChange={(next) => {
+          onChange?.({
+            target: { value: toExternal(next), name: name ?? '' },
+          } as React.ChangeEvent<HTMLSelectElement>)
+        }}
+        disabled={disabled}
+        name={name}
+        required={required}
+      >
+        <SelectTrigger
+          id={id}
+          aria-label={ariaLabel}
+          className={clsx('h-10 bg-card', error && 'border-error focus:ring-error', className)}
         >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
           {children}
           {options.map((option) => (
-            <option key={option.value} value={option.value} disabled={option.disabled}>
+            <SelectItem
+              key={option.value === '' ? EMPTY_VALUE : option.value}
+              value={toInternal(option.value)}
+              disabled={option.disabled}
+            >
               {option.label}
-            </option>
+            </SelectItem>
           ))}
-        </select>
-        {error && <p className="mt-1 text-xs text-error">{error}</p>}
-      </div>
-    )
-  }
-)
-
-Select.displayName = 'Select'
+        </SelectContent>
+      </ShadcnSelect>
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
+    </div>
+  )
+}

@@ -1,24 +1,34 @@
 import { forwardRef } from 'react'
 import { clsx } from 'clsx'
+import { Switch as ShadcnSwitch } from './shadcn/switch'
 
-export interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface SwitchProps {
   label?: string
+  checked?: boolean
+  defaultChecked?: boolean
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  disabled?: boolean
+  name?: string
+  value?: string
+  id?: string
+  required?: boolean
+  className?: string
+  'aria-label'?: string
 }
 
-export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
-  ({ className, label, ...props }, ref) => {
+// Adapter: legacy checkbox-style Switch API (onChange with e.target.checked)
+// on top of the shadcn (radix) Switch so existing call sites stay unchanged.
+export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
+  ({ className, label, onChange, ...props }, ref) => {
     return (
       <label className={clsx('inline-flex cursor-pointer items-center gap-3', className)}>
-        <div className="relative inline-flex h-5 w-9 items-center">
-          <input
-            ref={ref}
-            type="checkbox"
-            className="peer sr-only"
-            {...props}
-          />
-          <span className="absolute inset-0 rounded-full bg-muted transition-colors peer-checked:bg-primary peer-disabled:opacity-50" />
-          <span className="absolute left-0.5 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
-        </div>
+        <ShadcnSwitch
+          ref={ref}
+          {...props}
+          onCheckedChange={(checked) => {
+            onChange?.({ target: { checked } } as React.ChangeEvent<HTMLInputElement>)
+          }}
+        />
         {label && <span className="text-sm text-foreground">{label}</span>}
       </label>
     )

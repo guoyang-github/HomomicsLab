@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { clsx } from 'clsx'
+import { Button as ShadcnButton } from './shadcn/button'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link'
@@ -7,32 +7,17 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   loading?: boolean
 }
 
+// Adapter: keeps the legacy Button API (size "md", `loading` prop) on top of
+// the shadcn button so existing call sites stay unchanged.
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', size = 'md', loading = false, children, disabled, ...props }, ref) => {
     return (
-      <button
+      <ShadcnButton
         ref={ref}
+        variant={variant}
+        size={size === 'md' ? 'default' : size}
         disabled={disabled || loading}
-        className={clsx(
-          'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-          'disabled:pointer-events-none disabled:opacity-50',
-          {
-            'bg-primary text-white hover:bg-primary-700 active:bg-primary-800': variant === 'default',
-            'bg-secondary text-secondary-foreground hover:bg-muted': variant === 'secondary',
-            'border border-border bg-card text-card-foreground hover:bg-muted': variant === 'outline',
-            'text-foreground hover:bg-muted': variant === 'ghost',
-            'bg-error text-white hover:bg-error-700': variant === 'destructive',
-            'text-primary underline-offset-4 hover:underline': variant === 'link',
-          },
-          {
-            'h-8 px-3 text-xs': size === 'sm',
-            'h-10 px-4 py-2 text-sm': size === 'md',
-            'h-11 px-6 text-sm': size === 'lg',
-            'h-9 w-9 p-0': size === 'icon',
-          },
-          className
-        )}
+        className={className}
         {...props}
       >
         {loading && (
@@ -47,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           </svg>
         )}
         {children}
-      </button>
+      </ShadcnButton>
     )
   }
 )
