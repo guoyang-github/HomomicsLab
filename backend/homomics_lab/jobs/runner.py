@@ -13,7 +13,7 @@ from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
 from homomics_lab.metrics import set_active_jobs
-from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.models.common import ArtifactEnvelope, ChatMessage, MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
@@ -380,10 +380,38 @@ class BackgroundJobRunner:
                     )
                 return True
 
+            def _append_artifact_messages(messages):
+                # Plot images and ready-made Plotly figures are already streamed
+                # as dedicated PLOT/PLOT_DATA messages by TurnRunner; skip them
+                # here to avoid duplicate inline cards.
+                skip_kinds = {"image", "plotly"}
+                for env in envelopes:
+                    kind = env.get("kind")
+                    if kind in skip_kinds:
+                        continue
+                    path = env.get("path")
+                    try:
+                        payload = ArtifactEnvelope.model_validate(env).model_dump(
+                            mode="json", exclude_none=True
+                        )
+                    except Exception:
+                        payload = dict(env)
+                    messages.append(
+                        ChatMessage(
+                            id=f"msg_{len(messages)}",
+                            type=MessageType.ARTIFACT,
+                            content=payload,
+                            sender="agent",
+                            related_files=[path] if path else [],
+                        )
+                    )
+                return True
+
             # Update the in-memory copy carried by the job.
             in_memory_messages = getattr(job.working_memory, "messages", [])
             if _apply_update(in_memory_messages):
                 _append_result_text(in_memory_messages)
+                _append_artifact_messages(in_memory_messages)
 
             # Persist the update so reloads / other processes see the summary.
             if self._memory_manager is not None and job.session_id:
@@ -393,6 +421,7 @@ class BackgroundJobRunner:
                     )
                     if _apply_update(working_memory.messages):
                         _append_result_text(working_memory.messages)
+                        _append_artifact_messages(working_memory.messages)
                         await self._memory_manager._save_session(
                             job.session_id,
                             job.project_id or "default",
@@ -414,12 +443,14 @@ class BackgroundJobRunner:
         or ``output_files``/``output_paths`` lists. Re-running ``build_artifact``
         normalizes everything to full ``{kind, mime, name, path, size}`` envelopes
         so the chat can render inline tables/images instead of bare file links.
+        Any extra metadata already present in an artifact dict (e.g. ``report_id``,
+        ``summary``, ``url``) is preserved.
         """
         from pathlib import Path
 
         from homomics_lab.artifacts import build_artifact
 
-        raw_paths: List[str] = []
+        raw_items: List[Dict[str, Any]] = []
 
         def harvest(obj: Any) -> None:
             if not isinstance(obj, dict):
@@ -428,15 +459,15 @@ class BackgroundJobRunner:
             if isinstance(arts, list):
                 for a in arts:
                     if isinstance(a, dict) and a.get("path"):
-                        raw_paths.append(str(a["path"]))
+                        raw_items.append(dict(a))
                     elif isinstance(a, str):
-                        raw_paths.append(a)
+                        raw_items.append({"path": a})
             for key in ("output_files", "output_paths"):
                 val = obj.get(key)
                 if isinstance(val, (list, tuple)):
-                    raw_paths.extend(str(x) for x in val if x)
+                    raw_items.extend({"path": str(x)} for x in val if x)
                 elif isinstance(val, str):
-                    raw_paths.append(val)
+                    raw_items.append({"path": val})
 
         harvest(task_result)
         for task in getattr(tree, "tasks", []) or []:
@@ -444,12 +475,14 @@ class BackgroundJobRunner:
 
         envelopes: List[Dict[str, Any]] = []
         seen: set = set()
-        for p in raw_paths:
+        for item in raw_items:
+            p = item.get("path")
             if not p or p in seen:
                 continue
             seen.add(p)
             env = build_artifact(Path(p))
             if env:
+                env.update({k: v for k, v in item.items() if k != "path" and v is not None})
                 envelopes.append(env)
         return envelopes
 

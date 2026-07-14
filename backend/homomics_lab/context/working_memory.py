@@ -25,7 +25,7 @@ class WorkingMemory:
             return 85
         if msg.type == MessageType.PLAN_REQUEST:
             return 80
-        if msg.type in (MessageType.RESULT_PREVIEW, MessageType.PLOT, MessageType.PLOT_DATA):
+        if msg.type in (MessageType.RESULT_PREVIEW, MessageType.PLOT, MessageType.PLOT_DATA, MessageType.ARTIFACT):
             return 70
         if msg.type == MessageType.TODO_LIST:
             return 60

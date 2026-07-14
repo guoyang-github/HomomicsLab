@@ -35,6 +35,7 @@ class MessageType(str, Enum):
     FILE_REFERENCE = "file_reference"
     PLOT = "plot"
     PLOT_DATA = "plot_data"
+    ARTIFACT = "artifact"
     ERROR = "error"
     SYSTEM = "system"
 
@@ -76,6 +77,27 @@ class HITLCheckpoint(BaseModel):
     default_option: Optional[Option] = None
     timeout_minutes: int = 60 * 24
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ArtifactEnvelope(BaseModel):
+    """Normalized artifact payload emitted as a chat message of type ``artifact``.
+
+    Mirrors the frontend ``Artifact`` type in ``components/artifacts/types.ts``.
+    The frontend keys on ``kind`` to pick an inline renderer (image/table/html/
+    pdf/json/anndata/plotly/report/file). For report artifacts, ``report_id``
+    opens the full-screen report overlay.
+    """
+
+    kind: str
+    name: str
+    path: Optional[str] = None
+    mime: Optional[str] = None
+    size: Optional[int] = None
+    url: Optional[str] = None
+    preview_url: Optional[str] = None
+    summary: Optional[str] = None
+    report_id: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
 
 
 class ChatMessage(BaseModel):
