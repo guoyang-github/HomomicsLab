@@ -608,6 +608,8 @@ class BackgroundJobRunner:
         from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
         from homomics_lab.agent.turn_runner import TurnRunner
         from homomics_lab.knowledge.cbkb import CBKB
+        from homomics_lab.skills.registry import get_default_registry
+        from homomics_lab.skills.skill_dag import SkillDAG
         from homomics_lab.workflow.execution_service import WorkflowExecutionService
 
         cbkb = CBKB(settings.data_dir)
@@ -624,12 +626,23 @@ class BackgroundJobRunner:
             tool_registry=skill_executor.tool_registry if skill_executor is not None else None,
             llm_client=skill_executor.llm_client if skill_executor is not None else None,
         )
+        # Share the same persisted SkillDAG the API process uses, so
+        # observations recorded during background jobs evolve the same graph.
+        try:
+            skill_dag = SkillDAG(
+                registry=get_default_registry(),
+                db_path=settings.data_dir / "skill_dag.db",
+            )
+        except Exception:
+            logger.warning("Failed to init SkillDAG for job runner", exc_info=True)
+            skill_dag = None
         return TurnRunner(
             progress_callback=progress_callback,
             cbkb=cbkb,
             analysis_template_store=analysis_template_store,
             workflow_execution_service=workflow_service,
             skill_executor=skill_executor,
+            skill_dag=skill_dag,
         )
 
     @staticmethod

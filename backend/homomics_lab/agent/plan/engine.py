@@ -26,6 +26,7 @@ from homomics_lab.agent.plan.models import (
     PlanResult,
     StrategyTrace,
 )
+from homomics_lab.agent.plan.mode_selector import ModeSelector
 from homomics_lab.agent.plan.parameter_enricher import ParameterEnricher
 from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
@@ -67,6 +68,7 @@ class PlanEngine:
         capability_index: Optional[CapabilityIndex] = None,
         strategy_library: Optional[StrategyLibrary] = None,
         parameter_enricher: Optional[ParameterEnricher] = None,
+        mode_selector: Optional[ModeSelector] = None,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
@@ -104,6 +106,7 @@ class PlanEngine:
             tracker=self.tracker,
             deterministic_fallback=True,
         )
+        self.mode_selector = mode_selector or ModeSelector()
         self.cbkb = cbkb
 
     async def plan(
@@ -233,6 +236,11 @@ class PlanEngine:
             plan_result.risks.extend(
                 self._evaluate_skill_dag_risks(plan_result)
             )
+
+        # 6. Select the plan-level execution mode. Only fill it when the
+        # caller left the default ("auto"); an explicit mode is honoured.
+        if plan_result.execution_mode == "auto":
+            plan_result.execution_mode = self.mode_selector.select(plan_result)
 
         return plan_result
 

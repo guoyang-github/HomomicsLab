@@ -273,13 +273,19 @@ class ProviderRegistry:
             # If the runtime provider is not registered yet (e.g. custom), the
             # caller is responsible for registering it; fall through below.
 
-        # Explicit provider setting takes precedence.
+        # Explicit provider setting takes precedence, but only when it names a
+        # registered provider.  Unrecognised values (e.g. the "none" sentinel
+        # used to disable LLM access) fall through to model-name inference.
         explicit = os.environ.get("HOMOMICS_LLM_PROVIDER")
         if explicit:
-            return self.get(explicit)
+            provider = self.get(explicit)
+            if provider is not None:
+                return provider
         explicit_setting = getattr(settings, "llm_provider", None)
         if explicit_setting:
-            return self.get(explicit_setting)
+            provider = self.get(explicit_setting)
+            if provider is not None:
+                return provider
 
         model_lower = model.lower()
         # International

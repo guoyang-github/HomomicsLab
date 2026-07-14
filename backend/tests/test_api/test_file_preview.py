@@ -6,8 +6,8 @@ from homomics_lab.config import settings
 
 
 def _write_project_file(tmp_path, project_id: str, rel_path: str, content: bytes) -> None:
-    """Create a file under the project's raw directory."""
-    target = tmp_path / "raw" / project_id / rel_path
+    """Create a file under the project's workspace directory."""
+    target = tmp_path / "workspaces" / project_id / rel_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
     return target

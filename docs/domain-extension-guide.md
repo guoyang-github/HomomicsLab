@@ -1,4 +1,4 @@
-# HomomicsLab 领域扩展完全指南（v0.4.1 — 智能化扩展）
+# HomomicsLab 领域扩展完全指南（v0.5.0 — 智能化扩展）
 
 > **目标读者**: 希望将 HomomicsLab 扩展到基因组学、蛋白组学、微生物组学、代谢组学等领域的开发者。
 >
@@ -33,9 +33,9 @@ homomics install . --domains-dir ../backend/homomics_lab/domains
 
 ## 二、扩展全景图（新旧对比）
 
-### v0.4.0（手动扩展）→ v0.4.1（智能化扩展）
+### v0.4.0（手动扩展）→ v0.5.0（智能化扩展）
 
-| 步骤 | v0.4.0 手动方式 | v0.4.1 智能化方式 | 时间对比 |
+| 步骤 | v0.4.0 手动方式 | v0.5.0 智能化方式 | 时间对比 |
 |:---|:---|:---|:---|
 | 1. 技能注册 | 手动创建 `skills/*/SKILL.md + scripts/` | `homomics domain init` 自动生成骨架 | 30 min → 2 min |
 | 2. 意图分析 | 硬编码 Python 关键词列表 | `domain.yaml` 中的 `intents:` 声明，自动加载 | 15 min → 0 min |
@@ -51,7 +51,7 @@ homomics install . --domains-dir ../backend/homomics_lab/domains
 
 ## 三、核心组件：`domain.yaml` 单文件声明
 
-`domain.yaml` 是 HomomicsLab v0.4.1 引入的**单文件领域声明格式**。一个文件替代了原来分散在 5+ 位置的配置。
+`domain.yaml` 是 HomomicsLab v0.5.0 引入的**单文件领域声明格式**。一个文件替代了原来分散在 5+ 位置的配置。
 
 ### 完整示例：宏基因组学
 
@@ -307,7 +307,7 @@ await skill_reloader.start()
 
 ## 六、DataState 通用化：领域状态隔离
 
-v0.4.1 重构了 `DataState`，引入 `domain_state` 命名空间，避免字段膨胀：
+v0.5.0 重构了 `DataState`，引入 `domain_state` 命名空间，避免字段膨胀：
 
 ```python
 from homomics_lab.agent.plan.models import DataState
@@ -349,7 +349,7 @@ state_checks:
 
 ## 七、配置驱动意图分析器
 
-v0.4.1 的 `IntentAnalyzer` 不再硬编码关键词，而是从 `DomainRegistry` 动态加载：
+v0.5.0 的 `IntentAnalyzer` 不再硬编码关键词，而是从 `DomainRegistry` 动态加载：
 
 ```python
 from homomics_lab.agent.intent_analyzer_v2 import IntentAnalyzer
@@ -414,7 +414,7 @@ homomics domain generate \
 
 ## 九、常见陷阱（已在新架构中自动避免）
 
-| 陷阱 | v0.4.0 手动扩展 | v0.4.1 自动防护 |
+| 陷阱 | v0.4.0 手动扩展 | v0.5.0 自动防护 |
 |:---|:---|:---|
 | Phase 类型命名冲突 | 不同领域都用 `annotation` | `domain.yaml` 中的 `id` 自动带领域前缀 |
 | DataState 字段膨胀 | 每加一个领域 +10 个字段 | `domain_state` 命名空间隔离 |
@@ -428,7 +428,7 @@ homomics domain generate \
 
 ## 十、总结：扩展的本质
 
-### v0.4.1 的核心改进
+### v0.5.0 的核心改进
 
 1. **单文件声明** (`domain.yaml`) — 替代 5+ 分散配置文件
 2. **CLI 脚手架** (`homomics domain init/validate/install`) — 替代手动创建目录和文件
@@ -439,13 +439,13 @@ homomics domain generate \
 
 ### 架构层零修改原则
 
-> **AgentCore, PlanEngine, DynamicReplanningEngine, SkillDAG, CBKB, CBKBCurator, ReproducibilityEngine, AgentSwarm, AgentEvolutionEngine, SchemaValidator, VersionLocker** — 这些核心组件在 v0.4.1 中**完全不需要修改**。
+> **AgentCore, PlanEngine, DynamicReplanningEngine, SkillDAG, CBKB, CBKBCurator, ReproducibilityEngine, AgentSwarm, AgentEvolutionEngine, SchemaValidator, VersionLocker** — 这些核心组件在 v0.5.0 中**完全不需要修改**。
 >
 > 扩展新领域 = 写一个 `domain.yaml` + 运行 `homomics validate` + `homomics install`。
 
 ### 工作量对比
 
-| 任务 | v0.4.0 | v0.4.1 |
+| 任务 | v0.4.0 | v0.5.0 |
 |:---|:---|:---|
 | 单细胞 → 宏基因组学 | ~1.5 人天 | **~20 分钟** |
 | 验证配置正确性 | 运行全量测试 | **`homomics validate` 秒级** |

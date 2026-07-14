@@ -24,6 +24,7 @@ The source (builtin/external/community/user) is recorded in skill.metadata["sour
 """
 
 import asyncio
+import logging
 import re
 import shlex
 from enum import Enum
@@ -42,6 +43,8 @@ from homomics_lab.skills.models import (
 )
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.sandbox import Sandbox
+
+logger = logging.getLogger(__name__)
 
 
 class DisclosureLevel(str, Enum):
@@ -284,7 +287,15 @@ class SkillLoader:
         # applied after discovery.
         preserved_meta = {
             k: skill.metadata[k]
-            for k in ("source", "source_dir", "source_path", "namespace", "trusted", "sha256")
+            for k in (
+                "source",
+                "source_dir",
+                "source_path",
+                "namespace",
+                "trusted",
+                "trust_level",
+                "sha256",
+            )
             if k in skill.metadata
         }
         original_id = skill.id
@@ -400,6 +411,20 @@ class SkillLoader:
         # Respect explicit trust declarations in SKILL.md frontmatter.
         if "trusted" in frontmatter:
             metadata["trusted"] = bool(frontmatter["trusted"])
+        # Optional explicit trust level (official/verified/community/experimental).
+        # Invalid values are ignored so resolution falls back to source/trusted.
+        if "trust_level" in frontmatter:
+            from homomics_lab.skills.trust import TrustLevel
+
+            raw_level = str(frontmatter["trust_level"]).strip().lower()
+            if raw_level in {level.value for level in TrustLevel}:
+                metadata["trust_level"] = raw_level
+            else:
+                logger.warning(
+                    "Skill '%s' declares invalid trust_level %r; ignoring it",
+                    name,
+                    frontmatter["trust_level"],
+                )
 
         # Lightweight progressive-disclosure hints so the runtime can decide
         # agentic vs script execution without activating the full skill body.

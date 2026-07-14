@@ -26,7 +26,10 @@ def test_app_name_default():
 
 def test_session_memory_settings():
     settings = Settings()
-    assert settings.session_store_url == "sqlite+aiosqlite:///./data/sessions.db"
+    # Relative SQLite URLs are anchored to the backend directory at load time
+    # (see _abs_sqlite_url), so the resolved value is an absolute path.
+    assert settings.session_store_url.startswith("sqlite+aiosqlite:///")
+    assert settings.session_store_url.endswith("/data/sessions.db")
     assert settings.session_ttl_days == 90
     assert settings.enable_semantic_memory is True
     assert settings.semantic_memory_backend == "sqlite"
@@ -50,7 +53,10 @@ def test_semantic_memory_backend_rejects_unknown():
 
 def test_database_url_validator_accepts_sqlite_async_driver():
     settings = Settings(database_url="sqlite+aiosqlite:///./test.db")
-    assert settings.database_url == "sqlite+aiosqlite:///./test.db"
+    # Relative SQLite URLs are resolved to absolute paths anchored at the
+    # backend directory (see _abs_sqlite_url).
+    assert settings.database_url.startswith("sqlite+aiosqlite:///")
+    assert settings.database_url.endswith("/test.db")
 
 
 def test_database_url_validator_rejects_legacy_sqlite_driver():

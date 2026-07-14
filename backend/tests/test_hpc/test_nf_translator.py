@@ -39,8 +39,15 @@ class TestSimpleNFTranslator:
         assert "nextflow.enable.dsl = 2" in script
         assert "process scanpy_qc" in script
         assert "workflow {" in script
-        assert "params {" in script
+        # Params are emitted in DSL2 assignment style (params.<key> = ...).
+        assert 'params.input_file = "data.h5ad"' in script
         assert 'input_file = "data.h5ad"' in script
+
+        # Both required phases select the same skill: DSL2 forbids defining or
+        # invoking a process more than once, so names must be disambiguated.
+        assert "process scanpy_qc {" in script
+        assert "process scanpy_qc_1 {" in script
+        assert "scanpy_qc_1_out = scanpy_qc_1(scanpy_qc.out)" in script
 
     def test_sanitizes_process_names(self):
         assert SimpleNFTranslator._sanitize_process_name("my-skill.id") == "my_skill_id"

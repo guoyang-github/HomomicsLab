@@ -40,7 +40,7 @@
   - 定义 `Sandbox` 协议：`run_script(entrypoint, inputs, env, limits) -> ExecutionResult`
   - 实现 `LocalSandbox`（保留当前能力，仅用于开发模式）
   - 实现 `ContainerSandbox`（Docker/Podman，默认生产模式）
-  - 实现 `FirejailSandbox`（轻量 Linux 隔离，可选 fallback）
+  - 实现 `BubblewrapSandbox`（轻量 Linux 隔离，可选 fallback）
 
 **修改文件**：
 - `backend/homomics_lab/skills/runtime.py`

@@ -48,6 +48,7 @@ class SimpleNFTranslator:
 
         # Prepare per-phase scripts and inputs before emitting the workflow.
         phase_dirs = self._prepare_phase_directories(phases, inputs)
+        process_names = self._unique_process_names(phases)
 
         lines: List[str] = [
             "#!/usr/bin/env nextflow",
@@ -61,10 +62,10 @@ class SimpleNFTranslator:
 
         for idx, phase in enumerate(phases):
             phase_dir = phase_dirs[idx]
-            lines.extend(self._emit_process(phase, idx, phase_dir))
+            lines.extend(self._emit_process(phase, idx, phase_dir, process_names[idx]))
             lines.append("")
 
-        lines.extend(self._emit_workflow(phases, phase_dirs, inputs))
+        lines.extend(self._emit_workflow(phases, phase_dirs, inputs, process_names))
         lines.append("")
 
         output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -187,6 +188,29 @@ class SimpleNFTranslator:
             name = "_" + name
         return name
 
+    def _unique_process_names(self, phases: List[Phase]) -> List[str]:
+        """Compute a unique process name per phase.
+
+        Multiple phases may select the same skill (or share a phase type).
+        Nextflow DSL2 forbids defining or invoking a process more than once,
+        so colliding names get a numeric suffix based on the phase index.
+        """
+        names: List[str] = []
+        seen: set = set()
+        for idx, phase in enumerate(phases):
+            skill = self._get_skill(phase)
+            base = self._sanitize_process_name(
+                skill.id if skill is not None else phase.phase_type
+            )
+            name = base
+            suffix = idx
+            while name in seen:
+                name = f"{base}_{suffix}"
+                suffix += 1
+            seen.add(name)
+            names.append(name)
+        return names
+
     def _emit_params(self, inputs: Dict[str, Any]) -> List[str]:
         """Emit Nextflow params for top-level inputs."""
         lines: List[str] = []
@@ -208,12 +232,11 @@ class SimpleNFTranslator:
                 lines.append(f"params.{key} = {value}")
         return lines
 
-    def _emit_process(self, phase: Phase, idx: int, phase_dir: Path) -> List[str]:
+    def _emit_process(
+        self, phase: Phase, idx: int, phase_dir: Path, process_name: str
+    ) -> List[str]:
         """Emit a single Nextflow process for a phase."""
         skill = self._get_skill(phase)
-        process_name = self._sanitize_process_name(
-            skill.id if skill is not None else phase.phase_type
-        )
 
         lines = [f"process {process_name} {{"]
 
@@ -296,6 +319,7 @@ class SimpleNFTranslator:
         phases: List[Phase],
         phase_dirs: List[Path],
         inputs: Dict[str, Any],
+        process_names: List[str],
     ) -> List[str]:
         """Emit the DSL2 workflow wiring processes sequentially."""
         lines = ["workflow {"]
@@ -309,10 +333,7 @@ class SimpleNFTranslator:
 
         prev_var = "inputs_ch"
         for idx, phase in enumerate(phases):
-            skill = self._get_skill(phase)
-            process_name = self._sanitize_process_name(
-                skill.id if skill is not None else phase.phase_type
-            )
+            process_name = process_names[idx]
             phase_dir = phase_dirs[idx]
             script_file = self._first_existing(phase_dir / "script.py", phase_dir / "script.R")
             if script_file is not None:

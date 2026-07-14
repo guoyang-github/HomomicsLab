@@ -1,4 +1,4 @@
-# HomomicsLab Architecture Design (v0.4.1)
+# HomomicsLab Architecture Design (v0.5.0)
 
 ## System Overview
 
@@ -301,7 +301,7 @@ PENDING → TRIGGERED → AWAITING_HUMAN → RESPONDED → APPLIED
 
 ## Extension Points
 
-### Adding a New Domain (Recommended: v0.4.1+)
+### Adding a New Domain (Recommended: v0.5.0+)
 
 The **single-file domain declaration** is the preferred way to extend HomomicsLab to a new bioinformatics sub-discipline.
 
@@ -338,11 +338,11 @@ The marketplace is exposed in the frontend through the **Domains** workspace tab
 3. Add scripts to `skills/{skill_id}/scripts/python/` or `scripts/r/`
 4. SkillLoader.auto-discovers on restart (or call `SkillRegistry.load_all()`)
 
-**v0.4.1+**: Skills can also be hot-reloaded at runtime via `SkillHotReloader`.
+**v0.5.0+**: Skills can also be hot-reloaded at runtime via `SkillHotReloader`.
 
 ### Adding a New Agent Role
 
-1. Define role in `domain.yaml` under `roles:` (v0.4.1+)
+1. Define role in `domain.yaml` under `roles:` (v0.5.0+)
 2. Or create `agent/core/roles/{role_id}.yaml` (legacy)
 3. AgentCore auto-discovers on restart
 
@@ -354,12 +354,12 @@ The marketplace is exposed in the frontend through the **Domains** workspace tab
 
 ### Adding a New Plan Strategy
 
-1. Define strategy in `domain.yaml` under `phases:` + `state_checks:` (v0.4.1+)
+1. Define strategy in `domain.yaml` under `phases:` + `state_checks:` (v0.5.0+)
 2. Or add strategy template to `agent/plan/strategies.py` (legacy)
 
 ---
 
-## Domain Extension Architecture (v0.4.1)
+## Domain Extension Architecture (v0.5.0)
 
 ### DataState v2
 

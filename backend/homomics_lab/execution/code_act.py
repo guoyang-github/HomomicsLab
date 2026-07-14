@@ -61,12 +61,19 @@ async def generate_code_async(
     llm_client: Optional[LLMClient] = None,
     skill_registry: Optional[SkillRegistry] = None,
     retrieval_context: Optional[RetrievalContext] = None,
+    use_cache: Optional[bool] = None,
 ) -> str:
-    """Async version of ``generate_code`` for use inside async callers."""
+    """Async version of ``generate_code`` for use inside async callers.
+
+    ``use_cache=None`` falls back to ``settings.codeact_cache_enabled``;
+    callers (e.g. the skill runtime) can force it off for low-trust skills.
+    """
     from homomics_lab.config import settings
     from homomics_lab.execution.code_cache import CodeActCache
 
-    cache = CodeActCache(settings.codeact_cache_dir) if settings.codeact_cache_enabled else None
+    if use_cache is None:
+        use_cache = settings.codeact_cache_enabled
+    cache = CodeActCache(settings.codeact_cache_dir) if use_cache else None
     if cache is not None:
         cached = cache.get(task, language, context, retrieval_context)
         if cached is not None:
@@ -517,11 +524,13 @@ async def run_code_act(
     skill_registry: Optional[SkillRegistry] = None,
     retrieval_context: Optional[RetrievalContext] = None,
     tool_registry: Optional[ToolRegistry] = None,
+    use_cache: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Generate and execute code for a CodeAct task."""
     context = context or {}
     code = await generate_code_async(
-        task, language, context, llm_client, skill_registry, retrieval_context
+        task, language, context, llm_client, skill_registry, retrieval_context,
+        use_cache=use_cache,
     )
     execution = await execute_code(
         code, language, working_dir, tool_registry=tool_registry, save_artifact=True

@@ -85,6 +85,7 @@ class BaseScheduler(ABC):
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         parent_job_id: Optional[str] = None,
+        allow_local_sandbox: bool = True,
     ) -> Dict[str, Any]:
         """Execute a skill and return its output."""
         pass
@@ -149,7 +150,7 @@ class LocalScheduler(BaseScheduler):
         self._env_manager = env_manager or EnvironmentManager()
         self._provenance_recorder = provenance_recorder
 
-    def _get_sandbox(self, exec_type: str) -> Sandbox:
+    def _get_sandbox(self, exec_type: str, allow_local: bool = True) -> Sandbox:
         if self._sandbox_override is not None:
             return self._sandbox_override
         container_image = settings.r_container_image if exec_type == "r" else settings.skill_container_image
@@ -158,6 +159,7 @@ class LocalScheduler(BaseScheduler):
             self.working_dir,
             container_image=container_image,
             exec_type=exec_type,
+            allow_local=allow_local,
         )
         self._last_sandbox = sandbox
         return sandbox
@@ -180,6 +182,7 @@ class LocalScheduler(BaseScheduler):
         inputs: Dict[str, Any],
         timeout_seconds: float = 3600.0,
         parent_job_id: Optional[str] = None,
+        allow_local_sandbox: bool = True,
     ) -> Dict[str, Any]:
         job_id = self._new_job_id(f"local_{skill.id}")
         # When running inside a background job, stream all progress under the
@@ -212,7 +215,7 @@ class LocalScheduler(BaseScheduler):
         # Prepare isolated environment and resolve the right sandbox image.
         scripts_dir = Path(skill.metadata.get("scripts_dir", self.working_dir))
         env_info = self._env_manager.prepare(skill.id, scripts_dir, exec_type)
-        sandbox = self._get_sandbox(exec_type)
+        sandbox = self._get_sandbox(exec_type, allow_local=allow_local_sandbox)
         # In local-dev mode the host project venv already contains the packages
         # installed by the user (e.g. via uv add / pip install). Reuse it so
         # skills work without waiting for per-skill venv creation.

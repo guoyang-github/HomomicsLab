@@ -174,6 +174,7 @@ class Sandbox(ABC):
         working_dir: Path,
         container_image: Optional[str] = None,
         exec_type: Optional[str] = None,
+        allow_local: bool = True,
     ) -> "Sandbox":
         """Factory for sandboxes.
 
@@ -182,6 +183,8 @@ class Sandbox(ABC):
             working_dir: Directory for inputs/outputs.
             container_image: Image for ``container`` backend.
             exec_type: ``python`` or ``r``; used to pick a default container image.
+            allow_local: When False, never fall back to ``LocalSandbox``. Used for
+                untrusted skills that must run in bubblewrap/container isolation.
         """
         if backend == "auto":
             # When running inside a project venv (typical local dev), the host
@@ -193,6 +196,8 @@ class Sandbox(ABC):
                 candidates = (LocalSandbox, ContainerSandbox, BubblewrapSandbox)
             else:
                 candidates = (ContainerSandbox, BubblewrapSandbox, LocalSandbox)
+            if not allow_local:
+                candidates = tuple(c for c in candidates if c is not LocalSandbox)
             for cls in candidates:
                 candidate = cls(
                     working_dir,
@@ -211,6 +216,11 @@ class Sandbox(ABC):
                     )
                     continue
                 return candidate
+            if not allow_local:
+                raise RuntimeError(
+                    "No isolated sandbox backend (bubblewrap/container) is available "
+                    "for this untrusted skill."
+                )
             return LocalSandbox(working_dir)
 
         mapping: Dict[str, type] = {

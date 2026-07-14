@@ -1,4 +1,4 @@
-# HomomicsLab Operations Guide (v0.4.0)
+# HomomicsLab Operations Guide (v0.5.0)
 
 ## Table of Contents
 

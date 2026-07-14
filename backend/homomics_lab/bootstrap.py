@@ -321,6 +321,19 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         db_path=settings.data_dir / "skill_dag.db",
     )
 
+    # Cold-start self-evolution baseline (P2-2): on a fresh deployment both
+    # CBKB and SkillDAG are empty, so broadcast the bundled benchmark seed
+    # records to give the self-evolution loop a starting point. Best-effort:
+    # any failure is logged and must never block startup.
+    try:
+        from homomics_lab.knowledge.seed import is_store_empty, seed_baselines
+
+        if is_store_empty(cbkb, skill_dag):
+            report = seed_baselines(cbkb, skill_dag)
+            logger.info("Auto-seeded cold-start baselines: %s", report)
+    except Exception:
+        logger.warning("Auto-seed of baseline records failed; continuing", exc_info=True)
+
     # Domains and strategies
     domain_registry = get_domain_registry()
     strategy_library = StrategyLibrary()

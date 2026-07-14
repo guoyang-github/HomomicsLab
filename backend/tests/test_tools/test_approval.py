@@ -113,7 +113,17 @@ async def test_non_interactive_mode_allows_high_risk_tools(tool_registry, monkey
     class SteppedFakeLLM(FakeLLMClient):
         def __init__(self):
             super().__init__(response="")
+            # The agent loop enforces an inspection-first Phase 1, so the first
+            # turn must be a non-writing tool call before file_write is allowed.
             self._responses = [
+                json.dumps(
+                    {
+                        "thought": "inspect workspace",
+                        "action": "tool",
+                        "tool": "file_list",
+                        "arguments": {"directory": str(tmp_path)},
+                    }
+                ),
                 json.dumps(
                     {
                         "thought": "write file",
@@ -150,4 +160,8 @@ async def test_non_interactive_mode_allows_high_risk_tools(tool_registry, monkey
 
     result = await executor.execute(skill, {})
     assert result["success"] is True
-    assert result["tool_outputs"][0]["success"] is True
+    write_outputs = [
+        o for o in result["tool_outputs"] if o.get("tool") == "file_write"
+    ]
+    assert write_outputs, "file_write should have executed without approval"
+    assert write_outputs[0]["success"] is True

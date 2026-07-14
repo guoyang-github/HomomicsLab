@@ -1,0 +1,144 @@
+# Cold-start self-evolution baseline seeds (P2-2).
+#
+# These are pre-computed benchmark experiment records, NOT real run outputs.
+# They are broadcast into CBKB (experiment nodes/edges) and SkillDAG
+# (FOLLOWED_BY edges promoted to CONFIRMED) on first deployment so that the
+# self-evolution loop has a non-empty starting point.
+#
+# Isolation rules:
+#   - project_id is always "system" (never a real user project)
+#   - bundle_id always has the "seed_" prefix
+#   - metadata always carries {"source": "seed"}
+#
+# Dataset names in metadata.dataset refer to well-known public datasets
+# (e.g. 10x Genomics) and serve as provenance only; no raw data is shipped.
+
+experiments:
+  - bundle_id: seed_pbmc3k_scrnaseq_standard
+    project_id: system
+    created_at: "2024-01-01T00:00:00+00:00"
+    skills_used:
+      - bio-single-cell-data-io
+      - bio-single-cell-preprocessing
+      - bio-single-cell-doublet-scrublet
+      - bio-single-cell-clustering
+      - bio-single-cell-markers
+      - bio-single-cell-annotation-celltypist
+    phases:
+      - data_io
+      - qc
+      - preprocessing
+      - clustering
+      - annotation
+    summary: >-
+      Reference single-cell RNA-seq workflow on the 10x PBMC 3k dataset:
+      load 10x matrix, QC/normalize, remove doublets, cluster, score marker
+      genes and annotate cell types with CellTypist.
+    metadata:
+      source: seed
+      dataset: pbmc3k_10x
+      dataset_url: https://www.10xgenomics.com/datasets/pbmc-3k
+      domain: single_cell
+
+  - bundle_id: seed_pbmc_multi_batch_integration
+    project_id: system
+    created_at: "2024-01-01T00:00:00+00:00"
+    skills_used:
+      - bio-single-cell-data-io
+      - bio-single-cell-preprocessing
+      - bio-single-cell-batch-integration
+      - bio-single-cell-clustering
+      - bio-single-cell-trajectory-scvelo
+    phases:
+      - data_io
+      - qc
+      - integration
+      - clustering
+      - trajectory
+    summary: >-
+      Multi-batch single-cell RNA-seq workflow on 10x PBMC batches: load and
+      preprocess each batch, integrate across batches, cluster the integrated
+      embedding and infer RNA-velocity trajectories with scVelo.
+    metadata:
+      source: seed
+      dataset: pbmc_multi_batch_10x
+      domain: single_cell
+
+  - bundle_id: seed_visium_mouse_brain_spatial
+    project_id: system
+    created_at: "2024-01-01T00:00:00+00:00"
+    skills_used:
+      - bio-spatial-transcriptomics-data-io
+      - bio-spatial-transcriptomics-preprocessing
+      - bio-spatial-transcriptomics-domains-spagcn
+      - bio-spatial-transcriptomics-deconvolution-cell2location
+    phases:
+      - data_io
+      - qc
+      - spatial_domains
+      - deconvolution
+    summary: >-
+      Reference Visium spatial transcriptomics workflow on the 10x mouse brain
+      dataset: load Space Ranger output, QC/normalize spots, detect spatial
+      domains with SpaGCN and deconvolve spot composition with cell2location.
+    metadata:
+      source: seed
+      dataset: visium_mouse_brain_10x
+      dataset_url: https://www.10xgenomics.com/datasets/mouse-brain-serial-section-1-sagittal-anterior-1-standard-1-1-0
+      domain: spatial_transcriptomics
+
+experiment_edges:
+  - from_bundle: seed_pbmc3k_scrnaseq_standard
+    to_bundle: seed_pbmc_multi_batch_integration
+    edge_type: shares_skill
+    strength: 0.8
+    metadata:
+      source: seed
+      shared_skills:
+        - bio-single-cell-data-io
+        - bio-single-cell-preprocessing
+        - bio-single-cell-clustering
+
+# SkillDAG baseline edges. All are FOLLOWED_BY edges seeded through the public
+# propose_edge + record_observation(success) path (see knowledge/seed.py).
+skill_edges:
+  - from: bio-single-cell-data-io
+    to: bio-single-cell-preprocessing
+    edge_type: followed_by
+    context: "scRNA-seq baseline: 10x matrix loading is followed by QC/normalization"
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-doublet-scrublet
+    edge_type: followed_by
+    context: "scRNA-seq baseline: doublet detection after preprocessing"
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-clustering
+    edge_type: followed_by
+    context: "scRNA-seq baseline: clustering on the preprocessed embedding"
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-markers
+    edge_type: followed_by
+    context: "scRNA-seq baseline: marker gene scoring per cluster"
+  - from: bio-single-cell-markers
+    to: bio-single-cell-annotation-celltypist
+    edge_type: followed_by
+    context: "scRNA-seq baseline: cell-type annotation from marker profiles"
+  - from: bio-single-cell-preprocessing
+    to: bio-single-cell-batch-integration
+    edge_type: followed_by
+    context: "scRNA-seq baseline: batch integration for multi-sample data"
+  - from: bio-single-cell-clustering
+    to: bio-single-cell-trajectory-scvelo
+    edge_type: followed_by
+    context: "scRNA-seq baseline: trajectory/RNA-velocity analysis after clustering"
+  - from: bio-spatial-transcriptomics-data-io
+    to: bio-spatial-transcriptomics-preprocessing
+    edge_type: followed_by
+    context: "Spatial baseline: Visium loading is followed by spot QC/normalization"
+  - from: bio-spatial-transcriptomics-preprocessing
+    to: bio-spatial-transcriptomics-domains-spagcn
+    edge_type: followed_by
+    context: "Spatial baseline: spatial domain detection after preprocessing"
+  - from: bio-spatial-transcriptomics-preprocessing
+    to: bio-spatial-transcriptomics-deconvolution-cell2location
+    edge_type: followed_by
+    context: "Spatial baseline: spot deconvolution against a scRNA reference"

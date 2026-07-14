@@ -15,11 +15,9 @@ import json
 import asyncio
 import logging
 import random
-import re
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
@@ -45,6 +43,10 @@ from homomics_lab.agent.plan.self_correction import (
 )
 from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.turn_context_formatter import ContextFormatter
+from homomics_lab.agent.turn_file_resolver import FileReferenceResolver
+from homomics_lab.agent.turn_result_assembler import ResultAssembler
+from homomics_lab.agent.turn_risk_assessor import RiskAssessor
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
 from homomics_lab.agent.permission_ruleset import (
     PermissionRegistry,
@@ -199,8 +201,10 @@ class TurnRunner:
         workflow_execution_service: Optional[WorkflowExecutionService] = None,
         skill_executor: Optional[Any] = None,
         permission_registry: Optional[PermissionRegistry] = None,
+        skill_dag: Optional[Any] = None,
     ):
         self._cbkb = cbkb
+        self.skill_dag = skill_dag
         self._skill_executor = skill_executor
         self._llm_client = llm_client
         self._trace_store = trace_store
@@ -251,6 +255,13 @@ class TurnRunner:
             capability_index=self.capability_index,
             analysis_template_store=analysis_template_store,
         )
+
+        # Collaborators extracted from TurnRunner (pure code move, no logic
+        # changes). The private delegate shells live at the end of the class.
+        self._result_assembler = ResultAssembler(self)
+        self._context_formatter = ContextFormatter(self)
+        self._risk_assessor = RiskAssessor(self)
+        self._file_resolver = FileReferenceResolver(self)
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -1208,208 +1219,6 @@ class TurnRunner:
             agent_message=agent_msg,
         )
 
-    def _working_memory_to_history(
-        self, working_memory: WorkingMemory
-    ) -> List[Dict[str, Any]]:
-        """Convert recent working-memory messages to OpenAI-compatible history."""
-        history: List[Dict[str, Any]] = []
-        for msg in working_memory.get_recent_messages()[-10:]:
-            if msg.sender == "user":
-                role = "user"
-            elif msg.sender == "agent":
-                role = "assistant"
-            else:
-                continue
-            content = msg.content
-            if isinstance(content, dict):
-                content = (
-                    content.get("response_text") or content.get("text") or str(content)
-                )
-            if not isinstance(content, str):
-                content = str(content)
-            history.append({"role": role, "content": content})
-        return history
-
-    @staticmethod
-    def _summarize_mcp_result(
-        tool_name: str,
-        output: Any,
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Generate a useful text summary from an MCP tool output."""
-        if not isinstance(output, dict):
-            return f"{tool_name} 调用完成"
-
-        error = output.get("error")
-        if error:
-            return f"工具返回错误：{error}"
-
-        if tool_name == "pubmed_search":
-            return TurnRunner._format_pubmed_search(output, tool_inputs)
-        if tool_name == "pubmed_fetch":
-            return TurnRunner._format_pubmed_fetch(output, tool_inputs)
-        if tool_name == "science_search":
-            return TurnRunner._format_science_search(output, tool_inputs)
-        if tool_name == "science_list_dbs":
-            return TurnRunner._format_science_dbs(output)
-
-        count = output.get("count")
-        if count is not None:
-            return f"{tool_name} 返回 {count} 条结果"
-        return f"{tool_name} 调用完成"
-
-    @staticmethod
-    def _format_pubmed_search(
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Format PubMed search results into a readable Markdown list."""
-        from urllib.parse import quote
-
-        query = ""
-        if isinstance(tool_inputs, dict):
-            query = tool_inputs.get("query", "") or ""
-        count = output.get("count", "0")
-        try:
-            count_int = int(count)
-        except (TypeError, ValueError):
-            count_int = 0
-
-        encoded_query = quote(query.encode("utf-8")) if query else ""
-        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={encoded_query}"
-
-        if count_int == 0:
-            return (
-                f"未找到与“{query}”相关的 PubMed 文献。\n\n"
-                "建议：\n"
-                "- 尝试用英文关键词或同义词；\n"
-                "- 去掉过于具体的限定词，扩大检索范围；\n"
-                "- 直接提供 PMID 或 DOI，我可以帮你解读。\n\n"
-                f"[在 PubMed 中打开检索]({pubmed_url})"
-            )
-
-        articles = output.get("articles", []) or []
-        lines = [f"找到 {count_int} 条相关文献，以下是前 {len(articles)} 条：\n"]
-        for idx, article in enumerate(articles, start=1):
-            if not isinstance(article, dict):
-                continue
-            title = article.get("title", "未知标题") or "未知标题"
-            authors = article.get("authors", []) or []
-            authors_str = ", ".join(authors[:3])
-            if len(authors) > 3:
-                authors_str += " et al."
-            journal = article.get("journal", "") or ""
-            pubdate = article.get("pubdate", "") or ""
-            pmid = article.get("pmid", "") or ""
-            doi = article.get("doi", "") or ""
-            pmid_link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
-            parts = [
-                p
-                for p in [authors_str, f"*{journal}*" if journal else "", pubdate]
-                if p
-            ]
-            meta = " · ".join(parts)
-            pmid_part = f" · PMID: [{pmid}]({pmid_link})" if pmid else ""
-            doi_part = f" · DOI: {doi}" if doi else ""
-            lines.append(f"{idx}. **{title}**  \n   {meta}{pmid_part}{doi_part}")
-
-        lines.append(f"\n[在 PubMed 中查看全部结果]({pubmed_url})")
-        return "\n".join(lines)
-
-    @staticmethod
-    def _format_science_dbs(output: Dict[str, Any]) -> str:
-        """Format the science database catalog into a readable list."""
-        databases = output.get("databases", []) or []
-        if not databases:
-            return "当前没有可用的科学数据库连接器。"
-        lines = ["可查询的科学数据库：\n"]
-        for db in databases:
-            if not isinstance(db, dict):
-                continue
-            name = db.get("name", "?")
-            desc = db.get("description", "") or ""
-            available = db.get("available", True)
-            badge = "可用" if available else "不可用（缺少依赖或密钥）"
-            suffix = f" — {desc}" if desc else ""
-            lines.append(f"- **{name}** [{badge}]{suffix}")
-        return "\n".join(lines)
-
-    @staticmethod
-    def _format_science_search(
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Format merged science_search results into a readable Markdown list."""
-        query = ""
-        if isinstance(tool_inputs, dict):
-            query = tool_inputs.get("query", "") or ""
-        results = output.get("results", []) or []
-        databases = output.get("databases", []) or []
-        errors = output.get("errors", {}) or {}
-
-        if not results:
-            hint = "、".join(databases) or "科学数据库"
-            msg = f"在 {hint} 中未找到与“{query}”相关的结果。"
-            if errors:
-                msg += "\n\n部分来源返回错误：" + "; ".join(
-                    f"{k}: {v}" for k, v in errors.items() if k != "_"
-                )
-            return msg
-
-        lines = [
-            f"检索到 {len(results)} 条结果（来源：{', '.join(databases) or '多库'}）：\n"
-        ]
-        for idx, hit in enumerate(results, start=1):
-            if not isinstance(hit, dict):
-                continue
-            title = hit.get("title") or "Untitled"
-            source = hit.get("source") or ""
-            url = hit.get("url") or ""
-            snippet = (hit.get("snippet") or "").strip().replace("\n", " ")
-            if len(snippet) > 240:
-                snippet = snippet[:240] + "…"
-            published = hit.get("published") or ""
-            meta = " · ".join(x for x in [source, published] if x)
-            head = f"{idx}. **{title}**"
-            if meta:
-                head += f"  _{meta}_"
-            lines.append(head)
-            if snippet:
-                lines.append(f"   {snippet}")
-            if url:
-                lines.append(f"   {url}")
-        if errors:
-            failed = [k for k in errors if k != "_"]
-            if failed:
-                lines.append("\n_部分来源失败： " + ", ".join(failed) + "_")
-        return "\n".join(lines)
-
-    @staticmethod
-    def _format_pubmed_fetch(
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Format a fetched PubMed article into a readable summary."""
-        # `pubmed_fetch` returns the article directly, not wrapped in an `articles` list.
-        if isinstance(output, dict) and output.get("articles"):
-            article = output["articles"][0]
-        elif isinstance(output, dict) and output.get("pmid"):
-            article = output
-        else:
-            return "未获取到 PubMed 文章详情。"
-        if not isinstance(article, dict):
-            return "PubMed 返回格式异常。"
-        title = article.get("title", "未知标题") or "未知标题"
-        abstract = article.get("abstract", "") or ""
-        pmid = article.get("pmid", "") or ""
-        pmid_link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
-        lines = [f"**{title}**"]
-        if pmid:
-            lines.append(f"PMID: [{pmid}]({pmid_link})")
-        if abstract:
-            lines.append(f"\n{abstract}")
-        return "\n".join(lines)
-
     def _handle_clarification(
         self,
         intent: UserIntent,
@@ -1962,71 +1771,6 @@ class TurnRunner:
                 user_message, intent, low_risk_keywords, high_risk_keywords
             )
 
-    @staticmethod
-    def _build_risk_prompt(
-        intent: UserIntent,
-        user_message: str,
-        working_memory: WorkingMemory,
-        project_id: Optional[str] = None,
-    ) -> str:
-        return (
-            "Evaluate the risk that executing this user request will lead to "
-            "data loss, destruction, or unintended modification of project state.\n\n"
-            f"User message: {user_message}\n"
-            f"Intent: {intent.analysis_type}\n"
-            f"Intent confidence: {intent.confidence:.2f}\n"
-            f"Project ID: {project_id or 'unknown'}\n\n"
-            'Respond with a JSON object: {"risk_score": 0.0} where the score is '
-            "a float between 0.0 (no risk) and 1.0 (very high risk)."
-        )
-
-    @staticmethod
-    def _parse_risk_score(response: Any) -> float:
-        """Parse a risk score from an LLM response."""
-        text = ""
-        if isinstance(response, str):
-            text = response
-        elif isinstance(response, dict):
-            if "risk_score" in response:
-                return float(response["risk_score"])
-            text = str(response.get("content", response))
-        else:
-            text = str(response)
-
-        # Try to extract JSON from the text.
-        try:
-            match = re.search(r"\{[^}]*\"risk_score\"[^}]*\}", text)
-            if match:
-                data = json.loads(match.group(0))
-                return float(data["risk_score"])
-        except Exception:
-            pass
-
-        # Fall back to a plain float in the response.
-        try:
-            return float(text.strip())
-        except Exception:
-            pass
-
-        return 0.0
-
-    @staticmethod
-    def _heuristic_risk_score(
-        user_message: str,
-        intent: UserIntent,
-        low_risk_keywords: set,
-        high_risk_keywords: set,
-    ) -> float:
-        message_lower = user_message.lower()
-        score = 0.0
-        if any(kw in message_lower for kw in high_risk_keywords):
-            score += 0.7
-        if any(kw in message_lower for kw in low_risk_keywords):
-            score -= 0.3
-        if intent.analysis_type in ("file_conversion", "qa", "information_request"):
-            score -= 0.2
-        return max(0.0, min(1.0, score))
-
     async def _build_orchestrator_context(
         self,
         project_id: str,
@@ -2059,82 +1803,21 @@ class TurnRunner:
 
         return context
 
-    def _resolve_uploaded_file_references(
-        self,
-        user_message: Optional[str],
-        project_id: str,
-    ) -> List[Tuple[str, str]]:
-        """Find bare filenames in the message that exist as uploaded project files.
-
-        Returns a list of ``(filename, resolved_path)`` tuples. Both the project
-        raw directory and the workspace data directory are checked so files
-        uploaded via the file API are discoverable without explicit ``@file:``
-        references.
-        """
-        if not user_message:
-            return []
-
-        candidates = re.findall(r"[\w\-\.]+\.\w{2,8}", user_message)
-        seen: set[str] = set()
-        resolved: List[Tuple[str, str]] = []
-
-        for candidate in candidates:
-            filename = Path(candidate).name
-            if filename in seen or not filename:
-                continue
-            seen.add(filename)
-
-            for base in (
-                settings.data_dir / "raw" / project_id,
-                settings.data_dir / "workspaces" / project_id / "data",
-            ):
-                candidate_path = base / filename
-                if candidate_path.is_file():
-                    resolved.append((filename, str(candidate_path.resolve())))
-                    break
-
-        return resolved
-
-    def _attach_uploaded_files_to_tree(
-        self,
-        tree: TaskTree,
-        user_message: Optional[str],
-        project_id: str,
-    ) -> None:
-        """Inject request context and uploaded file paths into task parameters.
-
-        This lets skills/agents know the concrete user objective and which files
-        it refers to, even when the message only mentions a filename without an
-        ``@file:`` reference. For single-step skills the file is usually the
-        primary input; for workflows it is added as a fallback when a task does
-        not already specify an input file.
-        """
-        files = self._resolve_uploaded_file_references(user_message, project_id)
-        primary_path = files[0][1] if files else None
-        for task in tree.tasks:
-            if task.parameters is None:
-                task.parameters = {}
-            if user_message and "user_request" not in task.parameters:
-                task.parameters["user_request"] = user_message
-            if primary_path and "input_file" not in task.parameters:
-                task.parameters["input_file"] = primary_path
-            # Also expose the full list for multi-file tasks.
-            if files and "uploaded_files" not in task.parameters:
-                task.parameters["uploaded_files"] = [
-                    {"filename": name, "path": path} for name, path in files
-                ]
-
     async def _record_execution_feedback(
         self,
         tree: TaskTree,
         results: Dict[str, Any],
         project_id: str,
     ) -> None:
-        """Record skill execution feedback into CapabilityIndex and MemoryBackend.
+        """Record skill execution feedback into CapabilityIndex, MemoryBackend and SkillDAG.
 
         This is best-effort: failures are logged but never break the turn.
         """
-        if self.capability_index is None and self.memory_backend is None:
+        if (
+            self.capability_index is None
+            and self.memory_backend is None
+            and self.skill_dag is None
+        ):
             return
 
         for task in tree.tasks:
@@ -2193,6 +1876,36 @@ class TurnRunner:
                     logger.warning(
                         "Failed to record task memory for %s", skill_id, exc_info=True
                     )
+
+        if self.skill_dag is not None:
+            # Record adjacent skill transitions so the SkillDAG evolves from
+            # real executions instead of only offline mining.
+            try:
+                from homomics_lab.skills.skill_dag import EdgeType
+
+                prev_skill: Optional[str] = None
+                prev_ok = True
+                for task in tree.tasks:
+                    if not task.skills_required:
+                        continue
+                    skill_id = task.skills_required[0]
+                    if not skill_id:
+                        continue
+                    ok = task.status == TaskStatus.COMPLETED
+                    if prev_skill is not None and prev_skill != skill_id:
+                        self.skill_dag.record_observation(
+                            prev_skill,
+                            skill_id,
+                            EdgeType.FOLLOWED_BY,
+                            prev_ok and ok,
+                            context=f"Turn execution in project {project_id}",
+                        )
+                    prev_skill = skill_id
+                    prev_ok = ok
+            except Exception:
+                logger.warning(
+                    "Failed to record SkillDAG observations", exc_info=True
+                )
 
     async def _handle_single_step(
         self,
@@ -2267,178 +1980,9 @@ class TurnRunner:
         )
 
     @staticmethod
-    def _envelopes_from_artifacts(artifacts: Optional[List[Any]]) -> List[Dict[str, Any]]:
-        """Normalize any artifact collection into frontend-ready envelopes.
-
-        Accepts rich envelopes (dicts with ``path``), ``Artifact`` model objects
-        (``.path``/``.artifact_type``), or plain paths. Always returns full
-        ``{kind, mime, name, path, size}`` envelopes so the frontend renderer
-        registry can pick an inline renderer (image/table/...) instead of the
-        generic file-link fallback.
-        """
-        from homomics_lab.artifacts import build_artifact
-
-        envelopes: List[Dict[str, Any]] = []
-        seen: set = set()
-        for a in artifacts or []:
-            path: Optional[str] = None
-            extra: Dict[str, Any] = {}
-            if isinstance(a, dict):
-                path = a.get("path")
-                extra = {
-                    k: a[k]
-                    for k in ("kind", "mime", "name", "size", "url", "preview_url")
-                    if a.get(k) is not None
-                }
-            else:
-                path = getattr(a, "path", None)
-                task_id = getattr(a, "task_id", None)
-                atype = getattr(a, "artifact_type", None)
-                if task_id is not None:
-                    extra["task_id"] = task_id
-                if atype is not None:
-                    extra["type"] = atype
-            if not path:
-                continue
-            key = str(path)
-            if key in seen:
-                continue
-            seen.add(key)
-            env = build_artifact(Path(key)) or {"kind": "file", "mime": "application/octet-stream", "name": Path(key).name, "path": key}
-            env.update(extra)
-            env.setdefault("path", key)
-            envelopes.append(env)
-        return envelopes
-
-    @staticmethod
-    def _envelopes_from_results(results: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Harvest artifact envelopes from an orchestrator ``run_tree`` result map."""
-        if not results:
-            return []
-        collected: List[Dict[str, Any]] = []
-        for raw in results.values():
-            if not isinstance(raw, dict):
-                continue
-            arts = raw.get("artifacts")
-            if isinstance(arts, list) and arts:
-                collected.extend(TurnRunner._envelopes_from_artifacts(arts))
-                continue
-            paths: List[Any] = []
-            for key in ("output_files", "output_paths"):
-                val = raw.get(key)
-                if isinstance(val, (list, tuple)):
-                    paths.extend(val)
-                elif isinstance(val, (str, Path)):
-                    paths.append(val)
-            if paths:
-                collected.extend(TurnRunner._envelopes_from_artifacts(paths))
-        # de-dup by path
-        seen: set = set()
-        out: List[Dict[str, Any]] = []
-        for env in collected:
-            p = env.get("path")
-            if p and p not in seen:
-                seen.add(p)
-                out.append(env)
-        return out
-
-    @staticmethod
-    def _summarize(envelopes: List[Dict[str, Any]], user_message: str, skill_id: Optional[str]) -> str:
-        """Return a sourced markdown summary, or '' when there is nothing to say."""
-        if not envelopes:
-            return ""
-        try:
-            from homomics_lab.result_summary import summarize_artifacts
-
-            summary = summarize_artifacts(
-                envelopes, skill_id=skill_id, user_message=user_message or ""
-            )
-            md = summary.to_markdown()
-            return md if md else ""
-        except Exception:  # never let summarization break the turn
-            logger.debug("result summarization failed", exc_info=True)
-            return ""
-
-    def _build_workflow_result(
-        self,
-        tree: TaskTree,
-        working_memory: WorkingMemory,
-        backend: str,
-        artifacts: Optional[List[Any]] = None,
-        error: Optional[str] = None,
-        user_message: str = "",
-    ) -> TurnResult:
-        """Build a TurnResult from a WorkflowResult."""
-        envelopes = self._envelopes_from_artifacts(artifacts)
-        if error:
-            response_text = f"工作流执行失败（{backend}）：{error}"
-        else:
-            response_text = (
-                f"已完成 {len(tree.tasks)} 个分析步骤（执行后端：{backend}）。"
-            )
-        summary_md = self._summarize(envelopes, user_message, self._single_skill_id(tree))
-        if summary_md:
-            response_text = f"{response_text}\n\n{summary_md}"
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": response_text,
-                "tasks": [t.model_dump() for t in tree.tasks],
-                "progress": self._tree_progress(tree),
-                "backend": backend,
-                "artifacts": envelopes,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.WORKFLOW,
-            response_text=response_text,
-            task_tree=tree,
-            progress=self._tree_progress(tree),
-            agent_message=agent_msg,
-            error=error,
-        )
-
-    @staticmethod
     def _single_skill_id(tree: TaskTree) -> Optional[str]:
         ids = [t.skills_required[0] for t in tree.tasks if t.skills_required]
         return ids[0] if len(ids) == 1 else None
-
-    @staticmethod
-    def _tree_progress(tree: TaskTree) -> Dict[str, Any]:
-        """Compute a simple progress summary from a TaskTree."""
-        total = len(tree.tasks)
-        if total == 0:
-            return {
-                "total": 0,
-                "pending": 0,
-                "running": 0,
-                "completed": 0,
-                "failed": 0,
-                "awaiting_human": 0,
-                "percent": 0,
-            }
-
-        counts = {
-            "pending": 0,
-            "running": 0,
-            "completed": 0,
-            "failed": 0,
-            "awaiting_human": 0,
-        }
-        for task in tree.tasks:
-            status = (
-                task.status.value if hasattr(task.status, "value") else str(task.status)
-            )
-            if status in counts:
-                counts[status] += 1
-        counts["total"] = total
-        counts["percent"] = int((counts["completed"] / total) * 100)
-        return counts
 
     async def _handle_workflow(
         self,
@@ -2720,39 +2264,6 @@ class TurnRunner:
             and not tree.tasks[0].skills_required
         )
 
-    def _build_fallback_result(
-        self,
-        tree: TaskTree,
-        working_memory: WorkingMemory,
-    ) -> TurnResult:
-        """Build a TurnResult for a non-executable fallback suggestion."""
-        suggestion = tree.tasks[0].description
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": suggestion,
-                "is_fallback": True,
-                "tasks": [],
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.WORKFLOW,
-            response_text=suggestion,
-            task_tree=tree,
-            agent_message=agent_msg,
-        )
-
-    def _extract_hitl(self, results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Scan execution results for HITL checkpoints."""
-        for task_id, result in results.items():
-            if isinstance(result, dict) and "hitl" in result:
-                return {"checkpoint": result["hitl"], "task_id": task_id}
-        return None
-
     def _extract_plot_messages(
         self,
         results: Dict[str, Any],
@@ -2799,70 +2310,6 @@ class TurnRunner:
                 messages.append(msg)
 
         return messages
-
-    def _build_hitl_result(
-        self,
-        tree: TaskTree,
-        hitl_info: Dict[str, Any],
-        working_memory: WorkingMemory,
-    ) -> TurnResult:
-        """Build a TurnResult when execution pauses for HITL."""
-        response_text = "部分步骤需要您确认参数。"
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.HITL_REQUEST,
-            content=hitl_info,
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.AWAITING_HITL,
-            response_text=response_text,
-            task_tree=tree,
-            hitl_task_id=hitl_info["task_id"],
-            hitl_checkpoint=hitl_info["checkpoint"],
-            agent_message=agent_msg,
-        )
-
-    def _build_error_result(
-        self, error: Union[str, TurnError], working_memory: WorkingMemory
-    ) -> TurnResult:
-        """Build a TurnResult when an error occurs."""
-        if isinstance(error, TurnError):
-            payload = error.to_payload()
-            recovery = payload["recovery_action"]
-            response_text = f"抱歉，处理您的请求时出现了问题：{payload['message']}"
-            if recovery == "retry":
-                response_text += " 已自动重试一次仍未成功，请稍后再试或换一种方式描述。"
-            elif recovery == "clarify":
-                response_text += " 能否补充说明一下您的具体需求？"
-            elif recovery == "approve":
-                response_text += " 该操作需要您确认授权。"
-        else:
-            payload = {
-                "error_type": "ExecutionError",
-                "message": str(error),
-                "recovery_action": "escalate",
-                "retryable": False,
-                "context": {},
-            }
-            response_text = f"抱歉，处理您的请求时出现了问题：{error}"
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.ERROR,
-            content={"error": payload, "message": response_text},
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.ERROR,
-            response_text=response_text,
-            error=payload["message"],
-            agent_message=agent_msg,
-        )
 
     def _compress_working_memory(
         self, working_memory: WorkingMemory, current_goal: str
@@ -2913,45 +2360,6 @@ class TurnRunner:
             compressed = items[-6:]
 
         return "\n".join(item.content for item in compressed)
-
-    def _format_extra_context(self) -> str:
-        """Render CBKB/semantic-memory enrichment into a short project context string."""
-        if not self._extra_context:
-            return ""
-        parts: List[str] = []
-        snippets = self._extra_context.get("memory_snippets") or []
-        if snippets:
-            parts.append(
-                "Relevant memory snippets:\n"
-                + "\n".join(f"- {s}" for s in snippets[:3])
-            )
-        experiments = self._extra_context.get("recent_experiments") or []
-        if experiments:
-            parts.append(
-                "Recent experiments:\n"
-                + "\n".join(
-                    f"- {e.get('bundle_id', '')}: {e.get('summary', '')}"
-                    for e in experiments[:3]
-                )
-            )
-        sops = self._extra_context.get("recent_sops") or []
-        if sops:
-            parts.append(
-                "Relevant SOPs:\n"
-                + "\n".join(
-                    f"- {s.get('name', '')} ({s.get('category', '')})" for s in sops[:3]
-                )
-            )
-        anomalies = self._extra_context.get("recent_anomalies") or []
-        if anomalies:
-            parts.append(
-                "Recent anomalies:\n"
-                + "\n".join(
-                    f"- {a.get('phase_type', '')}: {a.get('summary', '')}"
-                    for a in anomalies[:3]
-                )
-            )
-        return "\n\n".join(parts)
 
     async def _generate_general_help_response(
         self, user_message: str, working_memory: WorkingMemory
@@ -3358,3 +2766,156 @@ class TurnRunner:
             "- 代码/脚本生成与数据处理帮助\n\n"
             "请告诉我您想进行哪类分析，或上传数据让我开始。"
         )
+
+    # --- Delegated collaborators -------------------------------------------
+    # Thin shells kept for backward compatibility: tests and internal callers
+    # still invoke these private methods on TurnRunner, while the
+    # implementations live in dedicated collaborator classes (pure code move,
+    # no logic changes).
+
+    def _working_memory_to_history(
+        self, working_memory: WorkingMemory
+    ) -> List[Dict[str, Any]]:
+        return self._context_formatter.working_memory_to_history(working_memory)
+
+    def _summarize_mcp_result(
+        self,
+        tool_name: str,
+        output: Any,
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        return self._context_formatter.summarize_mcp_result(
+            tool_name, output, tool_inputs
+        )
+
+    def _format_pubmed_search(
+        self,
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        return self._context_formatter.format_pubmed_search(output, tool_inputs)
+
+    def _format_science_dbs(self, output: Dict[str, Any]) -> str:
+        return self._context_formatter.format_science_dbs(output)
+
+    def _format_science_search(
+        self,
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        return self._context_formatter.format_science_search(output, tool_inputs)
+
+    def _format_pubmed_fetch(
+        self,
+        output: Dict[str, Any],
+        tool_inputs: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        return self._context_formatter.format_pubmed_fetch(output, tool_inputs)
+
+    def _format_extra_context(self) -> str:
+        return self._context_formatter.format_extra_context()
+
+    def _build_risk_prompt(
+        self,
+        intent: UserIntent,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: Optional[str] = None,
+    ) -> str:
+        return self._risk_assessor.build_risk_prompt(
+            intent, user_message, working_memory, project_id
+        )
+
+    def _parse_risk_score(self, response: Any) -> float:
+        return self._risk_assessor.parse_risk_score(response)
+
+    def _heuristic_risk_score(
+        self,
+        user_message: str,
+        intent: UserIntent,
+        low_risk_keywords: set,
+        high_risk_keywords: set,
+    ) -> float:
+        return self._risk_assessor.heuristic_risk_score(
+            user_message, intent, low_risk_keywords, high_risk_keywords
+        )
+
+    def _resolve_uploaded_file_references(
+        self,
+        user_message: Optional[str],
+        project_id: str,
+    ) -> List[Tuple[str, str]]:
+        return self._file_resolver.resolve_uploaded_file_references(
+            user_message, project_id
+        )
+
+    def _attach_uploaded_files_to_tree(
+        self,
+        tree: TaskTree,
+        user_message: Optional[str],
+        project_id: str,
+    ) -> None:
+        return self._file_resolver.attach_uploaded_files_to_tree(
+            tree, user_message, project_id
+        )
+
+    def _envelopes_from_artifacts(
+        self, artifacts: Optional[List[Any]]
+    ) -> List[Dict[str, Any]]:
+        return self._result_assembler.envelopes_from_artifacts(artifacts)
+
+    def _envelopes_from_results(
+        self, results: Optional[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        return self._result_assembler.envelopes_from_results(results)
+
+    def _summarize(
+        self,
+        envelopes: List[Dict[str, Any]],
+        user_message: str,
+        skill_id: Optional[str],
+    ) -> str:
+        return self._result_assembler.summarize(envelopes, user_message, skill_id)
+
+    def _build_workflow_result(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+        backend: str,
+        artifacts: Optional[List[Any]] = None,
+        error: Optional[str] = None,
+        user_message: str = "",
+    ) -> TurnResult:
+        return self._result_assembler.build_workflow_result(
+            tree=tree,
+            working_memory=working_memory,
+            backend=backend,
+            artifacts=artifacts,
+            error=error,
+            user_message=user_message,
+        )
+
+    def _build_fallback_result(
+        self,
+        tree: TaskTree,
+        working_memory: WorkingMemory,
+    ) -> TurnResult:
+        return self._result_assembler.build_fallback_result(tree, working_memory)
+
+    def _extract_hitl(self, results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return self._result_assembler.extract_hitl(results)
+
+    def _build_hitl_result(
+        self,
+        tree: TaskTree,
+        hitl_info: Dict[str, Any],
+        working_memory: WorkingMemory,
+    ) -> TurnResult:
+        return self._result_assembler.build_hitl_result(
+            tree, hitl_info, working_memory
+        )
+
+    def _build_error_result(
+        self, error: Union[str, TurnError], working_memory: WorkingMemory
+    ) -> TurnResult:
+        return self._result_assembler.build_error_result(error, working_memory)

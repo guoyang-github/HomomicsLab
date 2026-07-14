@@ -1,86 +1,23 @@
 """Core CodeAct skill: generate and execute code for a sub-task.
 
-This is a rule-based implementation sufficient for the MVP CodeAct loop.
-In production it is replaced by an LLM-backed code generator that receives
-retrieved skill/tool/SOP context and emits executable code.
+This skill now delegates code generation to the real LLM-backed path in
+``homomics_lab.execution.code_act.generate_code_async``. If no LLM is
+configured or the LLM call fails, it falls back to the rule-based templates so
+offline and test environments keep working.
 """
 
+import asyncio
 import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any, Dict
 
-
-def _generate_code(task: str, language: str, context: dict) -> str:
-    """Generate a code snippet based on task keywords and available context."""
-    task_lower = task.lower()
-
-    # Resolve common context variables
-    input_path = context.get("input_path") or context.get("adata_path") or "data/pbmc3k_raw.h5ad"
-    output_path = context.get("output_path") or "output/result.h5ad"
-
-    if language == "python":
-        if any(k in task_lower for k in ("read", "load", "h5ad", "10x", "import")):
-            return f"""import scanpy as sc
-adata = sc.read_h5ad("{input_path}")
-print(f"Loaded {{adata.n_obs}} cells x {{adata.n_vars}} genes")
-"""
-        if any(k in task_lower for k in ("qc", "filter", "quality", "mito")):
-            return f"""import scanpy as sc
-adata = sc.read_h5ad("{input_path}")
-adata.var['mt'] = adata.var_names.str.startswith('MT-')
-sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
-adata = adata[adata.obs.n_genes_by_counts > 200, :]
-adata = adata[adata.obs.pct_counts_mt < 5, :]
-adata.write("{output_path}")
-print(f"QC done: {{adata.n_obs}} cells remain")
-"""
-        if any(k in task_lower for k in ("normalize", "normalization", "log1p")):
-            return f"""import scanpy as sc
-adata = sc.read_h5ad("{input_path}")
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
-adata.write("{output_path}")
-print("Normalization done")
-"""
-        if any(k in task_lower for k in ("cluster", "clustering", "leiden", "umap", "pca")):
-            return f"""import scanpy as sc
-adata = sc.read_h5ad("{input_path}")
-sc.pp.highly_variable_genes(adata, n_top_genes=2000)
-sc.tl.pca(adata)
-sc.pp.neighbors(adata)
-sc.tl.umap(adata)
-sc.tl.leiden(adata)
-adata.write("{output_path}")
-print("Clustering done")
-"""
-        if any(k in task_lower for k in ("plot", "visualize", "umap", "heatmap")):
-            return f"""import scanpy as sc
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-adata = sc.read_h5ad("{input_path}")
-fig, ax = plt.subplots(figsize=(6, 5))
-sc.pl.umap(adata, color='leiden', ax=ax, show=False)
-fig.savefig("{output_path.replace('.h5ad', '.png')}")
-print("Plot saved")
-"""
-        # Generic fallback
-        return f"""print('Executing generic task: {task.replace(chr(39), chr(92)+chr(39))}')
-print('Context:', {context})
-"""
-
-    if language == "bash":
-        return f"""echo "Executing shell task: {task}"
-ls -la {Path(input_path).parent}
-"""
-
-    if language == "r":
-        return f"""cat('Executing R task: {task}\n')
-"""
-
-    return f"print('Unsupported language: {language}')"
+from homomics_lab.config import settings
+from homomics_lab.execution.code_act import generate_code_async
+from homomics_lab.llm_client import LLMClient
+from homomics_lab.skills.registry import SkillRegistry
 
 
 def _execute_code(code: str, language: str) -> dict:
@@ -142,13 +79,38 @@ def _execute_code(code: str, language: str) -> dict:
             pass
 
 
+async def _generate_code(task: str, language: str, context: Dict[str, Any]) -> str:
+    """Generate code via the shared CodeAct engine (LLM + retrieval fallback)."""
+    llm_client = None
+    skill_registry = None
+    try:
+        if settings.llm_provider:
+            llm_client = LLMClient()
+    except Exception:
+        llm_client = None
+    try:
+        skill_registry = SkillRegistry()
+    except Exception:
+        skill_registry = None
+
+    code = await generate_code_async(
+        task,
+        language,
+        context,
+        llm_client=llm_client,
+        skill_registry=skill_registry,
+        retrieval_context=None,
+    )
+    return code
+
+
 def main(skill_inputs: dict) -> dict:
     """Generate and execute a code action for the given task."""
     task = skill_inputs["task"]
     language = skill_inputs.get("language", "python")
     context = skill_inputs.get("context", {})
 
-    code = _generate_code(task, language, context)
+    code = asyncio.run(_generate_code(task, language, context))
     execution = _execute_code(code, language)
 
     return {

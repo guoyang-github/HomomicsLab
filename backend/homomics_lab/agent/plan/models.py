@@ -288,6 +288,12 @@ class PlanResult:
     risk_level: str = "low"  # aggregated from phases; "low" | "medium" | "high"
     approval_required: bool = False  # when True, execution must be explicitly approved
 
+    # Plan-level execution mode: "auto" | "fixed_pipeline" | "codeact".
+    # "auto" (default) defers per-phase routing to the ExecutionRouter;
+    # "fixed_pipeline" runs curated skills as-is; "codeact" generates code.
+    # Filled by ModeSelector in PlanEngine when left at the default.
+    execution_mode: str = "auto"
+
     @property
     def skill_sequence(self) -> List[str]:
         """Extract the sequence of selected skill IDs."""
@@ -327,6 +333,7 @@ class PlanResult:
             "derivation": self.derivation,
             "risk_level": self.risk_level,
             "approval_required": self.approval_required,
+            "execution_mode": self.execution_mode,
         }
         if self.strategy_trace is not None:
             result["strategy_trace"] = self.strategy_trace.to_dict()
@@ -351,4 +358,5 @@ class PlanResult:
             derivation=data.get("derivation"),
             risk_level=data.get("risk_level", "low"),
             approval_required=data.get("approval_required", False),
+            execution_mode=data.get("execution_mode", "auto"),
         )

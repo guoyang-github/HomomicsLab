@@ -15,7 +15,7 @@ The repository contains:
 - HPC/workflow orchestration backends (local, SLURM, Nextflow, nf-core).
 - Docker Compose and Helm deployment artifacts.
 
-The package version in `pyproject.toml` is `0.1.0`. The project documentation refers to the running feature set as **v0.4.1/v0.5.0** (see `README.md` and `CHANGELOG.md`).
+The package version in `pyproject.toml` is `0.5.0`. The project documentation refers to the running feature set as **v0.5.0** (see `README.md` and `CHANGELOG.md`).
 
 ## Repository layout
 
@@ -129,6 +129,8 @@ Key variables:
 
 The frontend uses `VITE_API_BASE_URL` and `VITE_WS_URL` for build-time/dev proxy configuration (see `frontend/vite.config.ts`).
 
+Note: relative SQLite URLs in `HOMOMICS_DATABASE_URL` / `HOMOMICS_SESSION_STORE_URL` are anchored to the `backend/` directory at load time (`_abs_sqlite_url` in `config.py`), so `Settings()` resolves them to absolute paths rather than CWD-dependent relative ones.
+
 ## Build and run commands
 
 ### Local development
@@ -181,6 +183,7 @@ honomics validate domain.yaml
 homomics install ./metagenomics --domains-dir ./backend/homomics_lab/domains
 homomics list --domains-dir ./backend/homomics_lab/domains
 homomics generate "16S amplicon analysis with DADA2 and QIIME2"
+homomics seed [--force] [--data-dir PATH]   # broadcast cold-start CBKB/SkillDAG baseline seeds
 ```
 
 ## Testing instructions
@@ -272,31 +275,34 @@ A `domain.yaml` defines:
 
 Key invariant from the architecture docs: **SkillDAG is not the plan driver**. Plans come from domain strategy templates; SkillDAG assists with skill selection, conflict detection, and alternatives.
 
+Plan-level execution mode: `PlanResult.execution_mode` (`auto` / `fixed_pipeline` / `codeact`) is filled by `agent/plan/mode_selector.py` from skill coverage, gaps, and risk signals. `auto` defers to the phase-level `agent/execution_router.py`. Quantitative comparison: `python -m homomics_lab.evaluation.mode_benchmark`.
+
 ### Skill format
 
 Skills use the unified `SKILL.md + scripts/` layout:
 
 ```text
 skills/{skill_id}/
-├── SKILL.md              # YAML frontmatter + documentation
-├── scripts/
-│   ├── python/
-│   │   └── run.py        # Python entrypoint (or use `entrypoint` in frontmatter)
+├── SKILL.md              # YAML frontmatter + agent-facing documentation
+├── scripts/              # Reference implementations the agent reads and adapts
+│   ├── python/           # Named by purpose (core_analysis.py, utils.py, ...);
+│   │                     # there is NO fixed run.py entrypoint contract
 │   └── r/
-│       └── run.R         # Optional R implementation
+├── assets/               # Optional reference data (model registries, marker lists, ...)
 ├── requirements.txt      # Optional Python dependencies
 ├── environment.yml       # Optional conda environment
-├── examples/             # Optional example inputs/outputs
 └── tests/                # Optional skill-level tests
 ```
 
-`SKILL.md` frontmatter supports multiple skill types:
+The agent treats `SKILL.md` and `scripts/` as **reference material**: it reads them and generates task-specific analysis code step by step, rather than invoking a pre-defined entrypoint.
 
-- `tool_type: agent` — LLM-driven declarative skill (default recommended for methodology).
-- `tool_type: python` / `tool_type: cli` — script-type skill for deterministic computation.
-- `tool_type: knowledge` — read-only reference.
+`SKILL.md` frontmatter declares the skill type via `tool_type`:
 
-External/imported skills default to `trusted=false`. Script-type skills will not execute until trusted. High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high` and require approval in interactive mode.
+- `tool_type: python` / `r` / `mixed` — reference-script skills (the common case in `skills/`).
+- `tool_type: cli` — wraps an external command-line tool.
+- `tool_type: agent` / `knowledge` — LLM-driven declarative skill / read-only reference (rare).
+
+External/imported skills default to the `experimental` trust tier and will not execute in non-interactive mode until trusted (see the four-tier trust model under Security). High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high` and require approval in interactive mode.
 
 ### Hot reload
 
@@ -385,7 +391,7 @@ Production Gunicorn config is in `gunicorn.conf.py`:
 
 - **Authentication is opt-in locally**. Set `HOMOMICS_AUTH_ENABLED=true` in production and provide `HOMOMICS_API_KEY` / JWT secret / OIDC config.
 - **Sandbox all code execution**. `HOMOMICS_FORCE_SANDBOX=true` routes `shell_exec` and CodeAct through `local`, `bubblewrap`, or `container` sandboxes. The production compose file enables this and requires a capable container runtime.
-- **Skill trust model**. Imported/external skills default to `trusted=false`. Trust toggles via `POST /api/skills/{id}/trust`. Untrusted script-type skills do not execute.
+- **Skill trust model**. Four tiers (`skills/trust.py`): `official` (builtin) / `verified` (trusted) / `community` / `experimental` (untrusted). They differentiate sandbox backend (community/experimental never use the local sandbox), CodeAct cache (excluded for experimental), and HITL. Experimental skills do not execute in non-interactive mode; trust toggles via `POST /api/skills/{id}/trust`.
 - **High-risk tool approval**. When `HOMOMICS_INTERACTIVE_MODE=true`, `shell_exec`, `file_write`, and `file_edit` calls pause for explicit approval.
 - **Secrets**. API keys, DB passwords, S3 credentials, and JWT secrets live in `.env` only. `config.py` provides `masked_dump()` for logs/health output. Never commit `.env`.
 - **CORS / trusted hosts**. Production should set `HOMOMICS_CORS_ORIGINS` and `HOMOMICS_TRUSTED_HOSTS` explicitly. Debug mode allows `localhost:5173` and `localhost:3000`.

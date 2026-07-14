@@ -156,6 +156,8 @@ def test_auto_run_unrun_script_produces_partial_success(
 
     llm = _FakeLLM(
         responses=[
+            # Phase 1 requires an inspection turn before any file writes.
+            '{"action":"tool","tool":"file_list","arguments":{"directory":"."}}',
             # Write a script …
             '{"action":"tool","tool":"file_write","arguments":{"path":"run.py","content":"print(1)"}}',
             # … then never run it; burn the remaining iterations with a no-op.

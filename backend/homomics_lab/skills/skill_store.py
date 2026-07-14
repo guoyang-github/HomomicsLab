@@ -455,6 +455,11 @@ class SkillStore:
         if skill is None:
             skill = self.enable_skill(skill_id, namespace)
         skill.metadata["trusted"] = trusted
+        if trusted:
+            # Clear any explicit trust_level override so resolution falls back
+            # to the trusted flag + source (VERIFIED/COMMUNITY).
+            skill.metadata.pop("trust_level", None)
+            entry.pop("trust_level", None)
 
         self._save_meta()
         return skill

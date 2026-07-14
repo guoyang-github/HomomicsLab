@@ -25,6 +25,7 @@ from homomics_lab.execution.code_act import run_code_act
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 from homomics_lab.skills.tracker import SkillPerformanceTracker
+from homomics_lab.skills.trust import TrustLevel, policy_for, resolve_trust_level
 from homomics_lab.hpc.scheduler import get_scheduler, BaseScheduler
 from homomics_lab.hpc.router import select_execution_backend
 from homomics_lab.llm_client import LLMClient
@@ -307,6 +308,7 @@ class SkillRuntimeExecutor:
             skill_registry=self.registry,
             retrieval_context=retrieval_context,
             tool_registry=self.tool_registry,
+            use_cache=policy_for(resolve_trust_level(skill)).use_code_cache,
         )
         return {
             "skill_id": skill.id,
@@ -341,14 +343,29 @@ class SkillRuntimeExecutor:
         if skill is None:
             raise ValueError(f"Skill '{skill_id}' disappeared during activation")
 
-        # Trust model: only builtin skills are trusted by default. All other
-        # sources (external, imported, community, user drop-in, promoted, etc.)
-        # must be explicitly trusted before execution.
-        source = skill.metadata.get("source") or "builtin"
-        if source != "builtin" and not skill.metadata.get("trusted"):
+        # Trust model (P3-1): resolve the four-tier trust level and enforce
+        # its differentiated policy. Builtin skills are OFFICIAL; trusted
+        # external skills are VERIFIED (or COMMUNITY); everything else is
+        # EXPERIMENTAL and only runs in interactive mode, always flagged for
+        # HITL review. In non-interactive mode EXPERIMENTAL skills are refused
+        # exactly as the legacy untrusted-skill gate did.
+        level = resolve_trust_level(skill)
+        policy = policy_for(level)
+        if not policy.can_execute:
             raise UntrustedSkillError(
-                f"Skill '{skill_id}' from source '{source}' is not trusted. "
+                f"Skill '{skill_id}' at trust level '{level.value}' is not allowed "
+                f"to execute in non-interactive mode. "
                 f"Run 'homomics trust {skill_id}' or POST /skills/{skill_id}/trust first."
+            )
+        if policy.require_hitl:
+            # No skill-level approval hook exists in this runtime; record the
+            # HITL requirement in the log and on the execution result instead
+            # of inventing a new approval UI.
+            logger.warning(
+                "Skill '%s' at trust level '%s' requires HITL review; "
+                "proceeding because interactive mode is enabled",
+                skill_id,
+                level.value,
             )
 
         # Schema validation (if validator configured)
@@ -382,6 +399,8 @@ class SkillRuntimeExecutor:
             cached = self.cache.get(skill_id, validated, fingerprint=fingerprint)
             if cached is not None:
                 result = self._unwrap_cached(cached, skill_id=skill_id)
+                if policy.require_hitl:
+                    self._tag_hitl(result, level)
                 if self.tracker is not None:
                     duration_ms = (time.time() - start_time) * 1000
                     self.tracker.record(
@@ -434,7 +453,10 @@ class SkillRuntimeExecutor:
                 workspace.create_git_snapshot(f"skill:{skill_id}", self.parent_job_id or skill_id)
             if self._is_cacheable(skill) and self.cache is not None:
                 self.cache.put(skill_id, validated, stored, fingerprint=fingerprint)
-            return self._unwrap_reference(stored, skill_id=skill_id)
+            final_result = self._unwrap_reference(stored, skill_id=skill_id)
+            if policy.require_hitl:
+                self._tag_hitl(final_result, level)
+            return final_result
 
         except ToolApprovalRequired as exc:
             error_msg = str(exc)
@@ -655,6 +677,13 @@ class SkillRuntimeExecutor:
         if skill.metadata.get("code_act") is True or skill.metadata.get("agent") is True:
             return False
         return skill.runtime.type.lower() in {"python", "r", "mixed"} and skill.has_entrypoint
+
+    @staticmethod
+    def _tag_hitl(result: Any, level: TrustLevel) -> None:
+        """Mark an execution result as requiring HITL review (EXPERIMENTAL skills)."""
+        if isinstance(result, dict):
+            result["trust_level"] = level.value
+            result["hitl_required"] = True
 
     @staticmethod
     def _unwrap_reference(ref: ResultReference, skill_id: str) -> Any:
@@ -948,8 +977,17 @@ class SkillRuntimeExecutor:
             )
 
         scheduler = self._get_scheduler()
+        # Sandbox isolation is differentiated by trust level (P3-1): OFFICIAL
+        # and VERIFIED skills may use the local sandbox when force_sandbox is
+        # off; COMMUNITY and EXPERIMENTAL skills require bubblewrap/container.
+        allow_local_sandbox = policy_for(resolve_trust_level(skill)).allow_local_sandbox
         return await scheduler.execute(
-            skill, code, inputs, timeout_seconds=timeout, parent_job_id=self.parent_job_id
+            skill,
+            code,
+            inputs,
+            timeout_seconds=timeout,
+            parent_job_id=self.parent_job_id,
+            allow_local_sandbox=allow_local_sandbox,
         )
 
     @staticmethod

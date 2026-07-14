@@ -1,13 +1,14 @@
-# HomomicsLab Architecture (v0.4.1)
+# HomomicsLab Architecture (v0.5.0)
 
 ## Overview
 
 HomomicsLab uses a layered hybrid architecture:
 - **Core**: Python/FastAPI modular monolith
 - **Frontend**: React 18 + TypeScript + Zustand + ReactFlow + Tailwind CSS, with a reusable `components/ui` library and light/dark theme system
-- **Skills**: Local subprocess sandbox execution (Python / R), with optional container/Firejail backends
+- **Skills**: Local subprocess sandbox execution (Python / R), with optional bubblewrap/container backends. CodeAct and `shell_exec` are forced through the sandbox when `force_sandbox=True`; if no isolation backend is available, execution is **refused** rather than run unsandboxed.
 - **HPC/Orchestration**: Pluggable execution backends (`LocalScheduler`, `SlurmScheduler`, `NextflowRunner`) and nf-core integration for cluster/cloud reproducible workflows
 - **Storage**: SQLite + filesystem + Parquet/H5AD/pickle offloading for large results
+- **Self-evolution loop**: Execution feedback is recorded into `capability_index` and `memory_backend`; every job finalizes a `ReproducibilityBundle` that is ingested into CBKB as an experiment node. Nightly curation and agent-evolution jobs are opt-in (`curation_enabled` / `evolution_enabled`).
 
 ## Data Flow
 
@@ -105,7 +106,7 @@ HomomicsLab uses a layered hybrid architecture:
 - `context/working_memory.py` — **WorkingMemory**: session-level message and state storage
 - `context/semantic_memory.py` — **SemanticMemory**: persistent vector-based memory for skill and result storage/retrieval
 
-## Architecture Principles (v0.4.1)
+## Architecture Principles (v0.5.0)
 
 1. **SkillDAG is NOT the plan driver**: Plan skeleton comes from domain strategy templates (`single_cell_standard`, `spatial_transcriptomics`, etc.). SkillDAG is only used for skill selection candidates, conflict detection, and alternative recommendations.
 
@@ -128,7 +129,7 @@ HomomicsLab uses a layered hybrid architecture:
 
 9. **Defense in depth for tools**: High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high`; interactive mode requires explicit approval before invocation; cross-process sandbox execution isolates tool side effects from the API process.
 
-10. **Reproducibility per job**: Every background job produces a finalized `ReproducibilityBundle`, and outcomes are ingested into CBKB for self-evolution.
+10. **Reproducibility per job and self-evolution loop**: Every background job produces a finalized `ReproducibilityBundle`. Execution feedback is recorded into `capability_index` and `memory_backend`; bundle outcomes are ingested into CBKB as experiment nodes. `SkillDAG.record_execution` is wired into the offline miner; real-time edge promotion is best-effort in the main path. Nightly curation and agent evolution are disabled by default (`curation_enabled=False`, `evolution_enabled=False`).
 
 11. **Auto-regression baselines**: Successful CodeAct executions automatically record baselines so future runs can be checked for drift.
 

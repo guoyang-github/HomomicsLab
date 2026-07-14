@@ -198,9 +198,19 @@ def test_augment_agent_inputs_does_not_override(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _disable_venv_preference(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Tests run under `uv run`, i.e. inside a venv, where Sandbox.create("auto")
+    # deliberately prefers LocalSandbox. Pin the selection to the
+    # container → bubblewrap → local ordering these tests exercise.
+    monkeypatch.setattr(
+        sandbox_mod.Sandbox, "_running_in_venv", staticmethod(lambda: False)
+    )
+
+
 def test_auto_sandbox_falls_back_when_bubblewrap_unhealthy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _disable_venv_preference(monkeypatch)
     monkeypatch.setattr(
         sandbox_mod.ContainerSandbox, "is_available", classmethod(lambda c: False)
     )
@@ -218,6 +228,7 @@ def test_auto_sandbox_falls_back_when_bubblewrap_unhealthy(
 def test_auto_sandbox_keeps_healthy_bubblewrap(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    _disable_venv_preference(monkeypatch)
     monkeypatch.setattr(
         sandbox_mod.ContainerSandbox, "is_available", classmethod(lambda c: False)
     )

@@ -2,8 +2,6 @@
 
 nextflow.enable.dsl = 2
 
-params {
-}
 
 process qc {
     input:

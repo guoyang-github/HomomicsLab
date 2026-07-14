@@ -67,6 +67,10 @@ knowledge = ["pypdf>=5.0", "python-docx>=1.1", "beautifulsoup4>=4.12", "httpx>=0
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 norecursedirs = ["data", ".git", ".venv", "node_modules", "dist", "build"]
+# importlib mode avoids "import file mismatch" collection errors for the many
+# same-named test modules across test dirs (e.g. test_agent/test_retrieval.py
+# vs test_evaluation/test_retrieval.py).
+addopts = "--import-mode=importlib"
 filterwarnings = [
     "ignore:'crypt' is deprecated:DeprecationWarning",
     "ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning",

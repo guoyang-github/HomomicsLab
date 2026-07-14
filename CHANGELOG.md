@@ -27,11 +27,30 @@ All notable changes to HomomicsLab are documented in this file.
   - Provenance recorder wired into schedulers.
   - RO-Crate export API (`/api/projects/{id}/export/rocrate`) and CLI (`homomics export`).
   - R skills default to `settings.r_container_image` in container sandboxes.
+  - **Cross-process tool invocation sandbox** (`backend/homomics_lab/tools/invoke_tool.py`): uniform protocol for invoking atomic tools across process boundaries, with `local`, `bubblewrap`, and `container` backends so high-risk tool calls run in isolated sandboxes.
+  - **CodeAct code cache** (`backend/homomics_lab/execution/code_cache.py`): caches CodeAct-generated code keyed by task-description embeddings so similar tasks hit the cache instead of calling the LLM again.
+  - **Auto-recorded regression baselines**: after a successful CodeAct execution, the system automatically records a regression baseline for drift detection.
+  - **"Save as Skill" frontend button**: promotes a successful CodeAct run into a curated `SKILL.md + scripts/` package.
 
 - **Frontend & collaboration**
   - PWA manifest, service worker, and offline fallback.
   - Real-time presence WebSocket with remote cursor overlay.
   - RO-Crate export button in the top bar.
+  - **Modern UI/UX overhaul**: new component library (`Button`, `Input`, `Card`, `Modal`, `Tabs`, `Toast`, `CommandPalette`), light/dark theme system, sidebar + top-bar navigation, keyboard shortcuts and command palette (`Ctrl+K` / `Cmd+K`), settings panel for LLM provider/model, execution backend, search, budget, and general preferences.
+  - **Chat**: Markdown + LaTeX + syntax-highlighted code rendering, drag-and-drop file uploads, session switching, and HITL inline forms.
+  - **Workflow canvas**: real-time execution log panel, node status badges, zoom-to-fit, and detail sidebars.
+
+- **Task orchestration & resource scheduling**
+  - New `backend/homomics_lab/hpc/` module with pluggable execution backends: `LocalScheduler`, `SlurmScheduler`, and `NextflowRunner`.
+  - Nextflow DSL2 template registry maps analysis intents to curated workflow templates.
+  - nf-core integration supports pipeline discovery, download, schema-driven parameter loading, profile selection, and execution.
+  - SLURM support via `sbatch`/`squeue`/`sacct` integration.
+  - Execution backend is selectable per request.
+
+- **Domain template marketplace**
+  - `backend/homomics_lab/domain/marketplace.py` + `backend/homomics_lab/api/domains.py`.
+  - Endpoints: `GET /api/domains/`, `POST /api/domains/import`, `POST /api/domains/import-zip`, `POST /api/domains/{id}/export`, `POST /api/domains/import-templates`.
+  - Frontend: `frontend/src/components/domains/DomainMarketplace.tsx`.
 
 - **Reproducibility & governance**
   - Project audit log endpoint (`/api/projects/{id}/audit`).
@@ -44,6 +63,8 @@ All notable changes to HomomicsLab are documented in this file.
 ### Changed
 
 - Updated `docs/operations.md` with new API endpoints, PWA/collaboration, audit/versioning, and evaluation sections.
+- Updated `docs/architecture.md` to v0.5.0 and corrected sandbox backend names (bubblewrap/container, no Firejail).
+- Updated `AGENTS.md` and `backend/homomics_lab/version.py` fallback to `0.5.0`.
 
 ## [0.4.2] — Agent Execution Hardening & Domain Marketplace
 

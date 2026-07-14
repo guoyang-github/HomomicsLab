@@ -145,6 +145,7 @@ async def send_message(
         analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
         skill_executor=skill_executor,
+        skill_dag=getattr(http_request.app.state, "skill_dag", None),
     )
     result = await runner.run_turn(
         session_id=request.session_id,
@@ -247,6 +248,7 @@ async def regenerate_message(
         capability_index=getattr(http_request.app.state, "capability_index", None),
         analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
+        skill_dag=getattr(http_request.app.state, "skill_dag", None),
     )
     result = await runner.regenerate_response(
         session_id=request.session_id,
@@ -401,6 +403,7 @@ async def respond_to_tool_approval(
         capability_index=getattr(http_request.app.state, "capability_index", None),
         analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
+        skill_dag=getattr(http_request.app.state, "skill_dag", None),
     )
     result = await runner.respond_to_tool_approval(
         call_id=request.call_id,
@@ -451,6 +454,7 @@ async def respond_to_debate(
         capability_index=getattr(http_request.app.state, "capability_index", None),
         analysis_template_store=getattr(http_request.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(http_request.app.state, "workflow_execution_service", None),
+        skill_dag=getattr(http_request.app.state, "skill_dag", None),
     )
     user_message = f"我选择 {chosen.get('label', request.choice_id)}"
     result = await runner.run_turn(
@@ -512,6 +516,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         llm_client=llm_client,
         analysis_template_store=getattr(websocket.app.state, "analysis_template_store", None),
         workflow_execution_service=getattr(websocket.app.state, "workflow_execution_service", None),
+        skill_dag=getattr(websocket.app.state, "skill_dag", None),
     )
 
     try:
