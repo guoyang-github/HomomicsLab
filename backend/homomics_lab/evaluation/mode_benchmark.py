@@ -13,8 +13,9 @@ measures:
 Everything is deterministic and offline: skills live in an in-memory
 ``SkillRegistry`` and the only LLM involved is ``FakeLLMClient``.
 Coverage-sensitive tasks build their ``PlanResult`` synthetically instead of
-running the engine, because the engine's fuzzy fallback matcher can attach
-skills to arbitrary phase names and would make coverage non-deterministic.
+running the engine: although the engine's fallback matcher is now gated by a
+similarity floor (``PlanEngine.fallback_min_similarity``), synthetic plans
+keep coverage exactly deterministic regardless of index contents.
 
 Run directly::
 
@@ -83,9 +84,8 @@ class BenchmarkTask:
       ``ModeSelector``.
     - plan tasks (``build_plan``): build a ``PlanResult`` synthetically and
       run ``ModeSelector.select`` directly. Used for coverage-sensitive
-      scenarios where the engine's fuzzy fallback matcher would otherwise
-      attach skills to arbitrary phase names and make coverage
-      non-deterministic.
+      scenarios so coverage stays exactly deterministic regardless of the
+      engine's threshold-gated fallback matcher.
     """
 
     name: str
@@ -181,8 +181,9 @@ def _intent(analysis_type: str = "single_cell_analysis") -> UserIntent:
 
 
 # Descriptions must not contain the tokens "analysis"/"step" (they appear in
-# every auto-generated phase description) or uncovered phases would match
-# skills via TF-IDF fallback search.
+# every auto-generated phase description) so that, before the fallback
+# similarity floor existed, uncovered phases could not match skills via the
+# fallback search.  Kept as a guard for the thresholded matcher as well.
 _FULL_SKILLS = [
     _make_skill("scanpy_qc", "Quality control of droplet count matrices"),
     _make_skill("scanpy_normalize", "Library-size normalization and log transform"),

@@ -389,6 +389,12 @@ class SkillLoader:
             metadata["agent"] = str(frontmatter["agent"])
         if "model" in frontmatter:
             metadata["model"] = str(frontmatter["model"])
+        # Capability tier for per-skill model selection ("cheap" | "reasoning"
+        # | "coding"); both YAML spellings are accepted.
+        if "model_tier" in frontmatter or "model-tier" in frontmatter:
+            metadata["model_tier"] = str(
+                frontmatter.get("model_tier") or frontmatter.get("model-tier")
+            )
         if "argument-hint" in frontmatter:
             metadata["argument_hint"] = str(frontmatter["argument-hint"])
         if "arguments" in frontmatter:

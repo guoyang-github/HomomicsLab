@@ -13,6 +13,7 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     AWAITING_HUMAN = "awaiting_human"
+    AWAITING_EVENT = "awaiting_event"
 
 
 class JobMode(str, Enum):

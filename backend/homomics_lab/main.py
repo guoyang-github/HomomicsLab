@@ -69,6 +69,9 @@ async def lifespan(app: FastAPI):
     # Workflow execution service: routes Plans to local orchestrator or Nextflow.
     app.state.workflow_execution_service = ctx["workflow_execution_service"]
 
+    # Waiting orchestrator: event-driven job suspend/resume.
+    app.state.waiting_service = ctx["waiting_service"]
+
     # CBKB: shared knowledge base for reproducibility, evolution, and intent enrichment.
     cbkb = ctx["cbkb"]
     app.state.cbkb = cbkb
@@ -99,6 +102,7 @@ async def lifespan(app: FastAPI):
     app.state.job_service = JobService(
         skill_executor=app.state.skill_executor,
         memory_manager=app.state.memory_manager,
+        waiting_service=app.state.waiting_service,
     )
     app.state.execution_pubsub = app.state.job_service.pubsub
     await app.state.job_service.start_worker()
@@ -107,6 +111,21 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = HomomicsScheduler()
     app.state.scheduler.set_context(ctx)
     await app.state.scheduler.start()
+
+    # Wire persisted timer wait conditions into the live scheduler so they
+    # survive process restarts; a periodic tick() sweep is the fallback for
+    # any one-shot job that gets missed.
+    app.state.waiting_service.attach_scheduler(app.state.scheduler.scheduler)
+    app.state.waiting_service.rebuild_timer_jobs()
+    app.state.scheduler.scheduler.add_job(
+        app.state.waiting_service.tick,
+        "interval",
+        minutes=1,
+        id="waiting_tick",
+        name="waiting_tick",
+        replace_existing=True,
+        max_instances=1,
+    )
 
     yield
 

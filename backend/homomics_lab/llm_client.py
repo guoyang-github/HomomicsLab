@@ -86,6 +86,15 @@ class LLMClient:
         provider = getattr(runtime, "provider", None)
         return provider in ("ollama", "local")
 
+    @property
+    def router(self) -> LLMRouter:
+        """The router used for provider/model selection (read-only access).
+
+        Exposed so executors can resolve skill-declared models/tiers through
+        the same routing logic the client uses for regular calls.
+        """
+        return self._router
+
     @staticmethod
     def _supports_temperature(provider_name: str, model: str, base_url: Optional[str] = None) -> bool:
         """Return False for models with fixed server-side sampling parameters."""

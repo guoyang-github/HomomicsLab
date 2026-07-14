@@ -424,6 +424,10 @@ class Settings(BaseSettings):
     agent_max_consecutive_llm_failures: int = 3
     agent_skill_wall_clock_seconds: float = 1500.0
     agent_source_read_hard_limit: int = 12
+    # Per-field character budget for tool output text before it enters the LLM
+    # context or the persisted tool_outputs list. Long compile logs / stdout
+    # dumps are truncated to this size (error outputs get 1.5x, tail-priority).
+    agent_tool_output_max_chars: int = 4000
     # If True, the skill agent tries to generate and run a single driver script
     # before falling back to the interactive tool loop. Enabled by default because
     # it avoids the long-context doom loop for standard analysis tasks while still

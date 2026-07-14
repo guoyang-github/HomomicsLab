@@ -279,6 +279,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.empty': 'No logs yet',
     'executionLog.reconnecting': 'SSE disconnected. Reconnecting in {{delay}}ms (attempt {{count}}/{{max}})...',
     'executionLog.reconnectFailed': 'SSE connection lost and reconnect limit reached.',
+    'executionLog.subagentCompleted': '{{actor}} completed',
+    'executionLog.subagentFailed': '{{actor}} failed',
 
     // Domain Marketplace
     'domain.title': 'Domain Marketplace',
@@ -860,6 +862,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.empty': '暂无日志',
     'executionLog.reconnecting': 'SSE 断开，{{delay}}ms 后重连（第 {{count}}/{{max}} 次）...',
     'executionLog.reconnectFailed': 'SSE 连接丢失，已达到最大重试次数。',
+    'executionLog.subagentCompleted': '{{actor}} 已完成',
+    'executionLog.subagentFailed': '{{actor}} 失败',
 
     // Domain Marketplace
     'domain.title': 'Domain 市场',

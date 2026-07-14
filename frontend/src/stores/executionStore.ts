@@ -6,6 +6,12 @@ export interface LogEntry {
   level: 'info' | 'stdout' | 'stderr' | 'error' | 'success' | 'warning' | 'tool' | 'artifact'
   message: string
   taskId?: string
+  /** Set when the event comes from a sub-executor, e.g. "subagent:<skill_id>". */
+  actor?: string
+  /** Parent job/task id of the sub-executor that produced the event. */
+  parentId?: string
+  /** Terminal marker for the sub-executor group this entry belongs to. */
+  subStatus?: 'completed' | 'failed'
 }
 
 interface ExecutionState {

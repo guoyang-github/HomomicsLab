@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException, Request
 
 from homomics_lab.jobs import JobService
+from homomics_lab.jobs.waiting import WaitingService
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan import PlanStore
 from homomics_lab.reports.store import ReportStore
@@ -43,3 +44,7 @@ def get_report_store(request: Request) -> ReportStore:
 
 def get_execution_pubsub(request: Request) -> Any:
     return _get_app_state_attr(request, "execution_pubsub", "Execution pubsub")
+
+
+def get_waiting_service(request: Request) -> WaitingService:
+    return _get_app_state_attr(request, "waiting_service", "Waiting service")

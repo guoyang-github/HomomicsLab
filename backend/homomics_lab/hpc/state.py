@@ -24,6 +24,11 @@ class ExecutionState:
     active_task_id: Optional[str] = None
     # Optional result summary for terminal states.
     result: Optional[Dict[str, Any]] = None
+    # Subagent attribution (see homomics_lab.agent.progress_events). Present
+    # only when this state was produced by a child execution; top-level
+    # executions leave both unset and the keys are omitted from to_dict().
+    actor: Optional[str] = None
+    parent_id: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
@@ -45,11 +50,13 @@ class ExecutionState:
             tasks=data.get("tasks"),
             active_task_id=data.get("active_task_id"),
             result=data.get("result"),
+            actor=data.get("actor"),
+            parent_id=data.get("parent_id"),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to a JSON-friendly dict."""
-        return {
+        payload = {
             "job_id": self.job_id,
             "status": self.status,
             "current_phase": self.current_phase,
@@ -68,3 +75,8 @@ class ExecutionState:
             "active_task_id": self.active_task_id,
             "result": self.result,
         }
+        # Top-level executions must not carry these keys at all (contract).
+        if self.actor is not None and self.parent_id is not None:
+            payload["actor"] = self.actor
+            payload["parent_id"] = self.parent_id
+        return payload

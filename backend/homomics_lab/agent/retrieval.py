@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
+from homomics_lab.agent.retrieval_rerank import SkillReranker
 from homomics_lab.config import settings
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
@@ -30,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RetrievedSkill:
-    """A skill retrieved together with graph-derived context."""
+    """A skill retrieved together with graph-derived context.
+
+    After reranking, ``semantic_score`` holds the composite rerank score while
+    ``raw_semantic_score`` preserves the original upstream score.
+    """
 
     skill: SkillDefinition
     semantic_score: float
@@ -38,6 +43,7 @@ class RetrievedSkill:
     conflict_warning: Optional[str] = None
     followed_by: List[str] = field(default_factory=list)
     depends_on: List[str] = field(default_factory=list)
+    raw_semantic_score: Optional[float] = None
 
 
 @dataclass
@@ -134,6 +140,8 @@ class SkillRetriever:
         data_sources: Optional[List[Dict[str, Any]]] = None,
         literature_retriever: Optional[LiteratureRetriever] = None,
         capability_index: Optional[CapabilityIndex] = None,
+        rerank_min_score: float = 0.1,
+        reranker: Optional[SkillReranker] = None,
     ):
         self.registry = skill_registry
         self.skill_dag = skill_dag
@@ -146,6 +154,7 @@ class SkillRetriever:
         self.data_sources = data_sources or []
         self.literature_retriever = literature_retriever
         self.capability_index = capability_index
+        self.reranker = reranker or SkillReranker(min_score=rerank_min_score)
 
     async def retrieve(
         self,
@@ -235,7 +244,12 @@ class SkillRetriever:
         top_k: int,
         include_graph: bool,
     ) -> List[RetrievedSkill]:
-        """Retrieve skills via semantic search and optional SkillDAG boost."""
+        """Retrieve skills via semantic search and optional SkillDAG boost.
+
+        Both paths are reranked by the BM25 reranker: candidates below the
+        reranker's ``min_score`` are dropped, and ``top_k`` is applied only
+        after threshold filtering.
+        """
         if self.skill_dag is not None and include_graph:
             dag_results = self.skill_dag.search(
                 query=query,
@@ -243,7 +257,7 @@ class SkillRetriever:
                 include_neighbors=True,
                 exclude_conflicts=True,
             )
-            return [
+            candidates = [
                 RetrievedSkill(
                     skill=r.skill,
                     semantic_score=r.semantic_score,
@@ -254,14 +268,24 @@ class SkillRetriever:
                 )
                 for r in dag_results
             ]
+            return self.reranker.rerank(
+                query, candidates, top_k=top_k, corpus=self.registry.list_all()
+            )
 
-        # Fallback to plain registry semantic search
-        results: List[RetrievedSkill] = []
-        for skill in self.registry.search(query):
-            results.append(RetrievedSkill(skill=skill, semantic_score=1.0))
-            if len(results) >= top_k:
-                break
-        return results
+        # Fallback to plain registry search.  Keep the registry's recall
+        # (semantic + legacy keyword substring) but attach the real semantic
+        # scores instead of a hard-coded 1.0; the reranker re-scores anyway.
+        scored = {
+            skill.id: score
+            for skill, score in self.registry.semantic_search(query, top_k=top_k * 2)
+        }
+        candidates = [
+            RetrievedSkill(skill=skill, semantic_score=scored.get(skill.id, 0.0))
+            for skill in self.registry.search(query)
+        ]
+        return self.reranker.rerank(
+            query, candidates, top_k=top_k, corpus=self.registry.list_all()
+        )
 
     async def _retrieve_capabilities(
         self,

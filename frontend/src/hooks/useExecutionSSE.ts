@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useExecutionStore } from '@/stores/executionStore'
+import type { LogEntry } from '@/stores/executionStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useTranslation } from '@/i18n'
@@ -17,6 +18,10 @@ interface ExecutionStatePayload {
   result?: Record<string, any> | null
   logs?: string[]
   resource_usage?: Record<string, any> | null
+  /** Present when the event originates from a sub-executor, e.g. "subagent:<skill_id>". */
+  actor?: string
+  /** Parent job/task id of the sub-executor; absent for top-level events. */
+  parent_id?: string
 }
 
 const MAX_RECONNECT_RETRIES = 5
@@ -86,8 +91,16 @@ export function useExecutionSSE(jobId: string | null) {
     function applyPayload(data: ExecutionStatePayload) {
       const status = data.status.toLowerCase()
       const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+      const actor = typeof data.actor === 'string' && data.actor ? data.actor : undefined
+      const parentId = typeof data.parent_id === 'string' && data.parent_id ? data.parent_id : undefined
+      const isSubagentEvent = Boolean(actor)
+      // Tag every log line produced by this event with its sub-executor so the
+      // log panel can fold it into the parent group. Top-level events (no
+      // actor) flow through unchanged.
+      const pushLog = (entry: Omit<LogEntry, 'id'>) =>
+        addLog(actor ? { ...entry, actor, parentId } : entry)
 
-      if (data.tasks && data.tasks.length > 0) {
+      if (!isSubagentEvent && data.tasks && data.tasks.length > 0) {
         setTaskTree(data.tasks)
         setProgress(buildProgress(data.tasks))
         // Some agentic runs nest the final skill result inside the task tree
@@ -104,7 +117,7 @@ export function useExecutionSSE(jobId: string | null) {
           console.log('[useExecutionSSE] setResult from task', JSON.parse(JSON.stringify(completedTask.result)))
           setResult(completedTask.result as Record<string, any>)
         }
-      } else if (data.active_task_id || isTerminal) {
+      } else if (!isSubagentEvent && (data.active_task_id || isTerminal)) {
         // Agentic skills stream state events without a full task tree.
         // Drive the active task's status from the job state so the
         // TODO list and progress bar update in real time.
@@ -128,7 +141,7 @@ export function useExecutionSSE(jobId: string | null) {
       }
 
       if (data.active_task_id || data.current_phase) {
-        addLog({
+        pushLog({
           timestamp: new Date().toISOString(),
           level: 'info',
           message: `${data.current_phase || data.active_task_id}`,
@@ -138,7 +151,7 @@ export function useExecutionSSE(jobId: string | null) {
 
       if (data.logs && data.logs.length > 0) {
         data.logs.forEach((line) => {
-          addLog({
+          pushLog({
             timestamp: new Date().toISOString(),
             level: 'stdout',
             message: line,
@@ -157,7 +170,7 @@ export function useExecutionSSE(jobId: string | null) {
             const argText = evt.arguments?.summary
               ? evt.arguments.summary
               : JSON.stringify(evt.arguments || {})
-            addLog({
+            pushLog({
               timestamp: ts,
               level: 'tool',
               message: `▶ ${evt.tool}${argText ? ` (${argText})` : ''}`,
@@ -168,7 +181,7 @@ export function useExecutionSSE(jobId: string | null) {
             if (evt.success === false) parts.push('failed')
             if (evt.output) parts.push(evt.output)
             if (evt.error_message) parts.push(`error: ${evt.error_message}`)
-            addLog({
+            pushLog({
               timestamp: ts,
               level: evt.success === false ? 'error' : 'tool',
               message: parts.join(' · '),
@@ -176,7 +189,7 @@ export function useExecutionSSE(jobId: string | null) {
             })
           } else if (evt.type === 'artifact' && Array.isArray(evt.artifacts)) {
             evt.artifacts.forEach((path: string) => {
-              addLog({
+              pushLog({
                 timestamp: ts,
                 level: 'artifact',
                 message: `📄 ${path}`,
@@ -184,7 +197,7 @@ export function useExecutionSSE(jobId: string | null) {
               })
             })
           } else if (evt.type === 'llm_retry') {
-            addLog({
+            pushLog({
               timestamp: ts,
               level: 'warning',
               message: `模型调用失败，正在重试${evt.error_message ? `: ${evt.error_message}` : ''}`,
@@ -194,25 +207,29 @@ export function useExecutionSSE(jobId: string | null) {
         })
       }
 
-      setStatus(
-        status === 'completed'
-          ? 'completed'
-          : status === 'failed' || status === 'cancelled'
-          ? 'failed'
-          : status === 'awaiting_human'
-          ? 'running'
-          : 'running',
-        data.progress_pct
-      )
+      // Sub-executor events must not overwrite the parent job's status,
+      // percent or result; their progress lives inside the tagged log group.
+      if (!isSubagentEvent) {
+        setStatus(
+          status === 'completed'
+            ? 'completed'
+            : status === 'failed' || status === 'cancelled'
+            ? 'failed'
+            : status === 'awaiting_human'
+            ? 'running'
+            : 'running',
+          data.progress_pct
+        )
 
-      if (data.result) {
-        // eslint-disable-next-line no-console
-        console.log('[useExecutionSSE] setResult', JSON.parse(JSON.stringify(data.result)))
-        setResult(data.result)
+        if (data.result) {
+          // eslint-disable-next-line no-console
+          console.log('[useExecutionSSE] setResult', JSON.parse(JSON.stringify(data.result)))
+          setResult(data.result)
+        }
       }
 
       if (data.error_message) {
-        addLog({
+        pushLog({
           timestamp: new Date().toISOString(),
           level: 'error',
           message: data.error_message,
@@ -221,13 +238,29 @@ export function useExecutionSSE(jobId: string | null) {
       }
 
       if (isTerminal) {
+        if (actor) {
+          // A sub-executor finished: drop a terminal marker into its log
+          // group so the panel can pin a final status badge on it. The parent
+          // job keeps running — do not touch the SSE connection or the
+          // top-level status here.
+          pushLog({
+            timestamp: new Date().toISOString(),
+            level: status === 'completed' ? 'success' : 'error',
+            message:
+              status === 'completed'
+                ? t('executionLog.subagentCompleted', { actor })
+                : t('executionLog.subagentFailed', { actor }),
+            subStatus: status === 'completed' ? 'completed' : 'failed',
+          })
+          return false
+        }
         eventSourceRef.current?.close()
         if (pollTimerRef.current) {
           clearInterval(pollTimerRef.current)
           pollTimerRef.current = null
         }
         setConnected(false)
-        addLog({
+        pushLog({
           timestamp: new Date().toISOString(),
           level: status === 'completed' ? 'success' : 'error',
           message: status === 'completed' ? t('executionLog.completed') : t('executionLog.failed'),

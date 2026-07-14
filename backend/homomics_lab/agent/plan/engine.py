@@ -31,7 +31,8 @@ from homomics_lab.agent.plan.parameter_enricher import ParameterEnricher
 from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.plan.template import AnalysisTemplate
-from homomics_lab.agent.retrieval import SkillRetriever
+from homomics_lab.agent.retrieval import RetrievedSkill, SkillRetriever
+from homomics_lab.agent.retrieval_rerank import SkillReranker
 from homomics_lab.agent.plan.validator import PlanValidator
 from homomics_lab.config import settings
 from homomics_lab.knowledge.cbkb import CBKB
@@ -69,6 +70,7 @@ class PlanEngine:
         strategy_library: Optional[StrategyLibrary] = None,
         parameter_enricher: Optional[ParameterEnricher] = None,
         mode_selector: Optional[ModeSelector] = None,
+        fallback_min_similarity: float = 0.15,
     ):
         self.skill_registry = skill_registry
         self.skill_dag = skill_dag
@@ -108,6 +110,11 @@ class PlanEngine:
         )
         self.mode_selector = mode_selector or ModeSelector()
         self.cbkb = cbkb
+        # Similarity floor for the last-resort registry fallback in
+        # ``_select_skill_for_phase``: below it the phase stays unmatched
+        # instead of being force-attached to an arbitrary skill.
+        self.fallback_min_similarity = fallback_min_similarity
+        self._fallback_reranker = SkillReranker(min_score=fallback_min_similarity)
 
     async def plan(
         self,
@@ -539,9 +546,18 @@ class PlanEngine:
                 # Pick the highest-ranked skill
                 return results[0].skill
 
-        # Fallback: direct registry search
-        skills = self.skill_registry.search(query)
-        return skills[0] if skills else None
+        # Fallback: direct registry search, gated by a similarity floor so an
+        # unrelated phase name is left unmatched instead of being
+        # force-attached to the highest-scoring arbitrary skill.
+        results = self.skill_registry.semantic_search(query, top_k=5)
+        candidates = [
+            RetrievedSkill(skill=skill, semantic_score=score)
+            for skill, score in results
+        ]
+        reranked = self._fallback_reranker.rerank(
+            query, candidates, top_k=1, corpus=self.skill_registry.list_all()
+        )
+        return reranked[0].skill if reranked else None
 
     def _apply_learned_defaults(
         self,

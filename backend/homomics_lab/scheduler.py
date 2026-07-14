@@ -31,6 +31,11 @@ class HomomicsScheduler:
         self._curator: Optional[CBKBCurator] = None
         self._evolution_engine: Optional[Any] = None
 
+    @property
+    def scheduler(self) -> AsyncIOScheduler:
+        """The underlying APScheduler instance (for one-shot timer jobs)."""
+        return self._scheduler
+
     def set_context(self, ctx: Dict[str, Any]) -> None:
         """Receive bootstrap context so the scheduler can use the live SkillDAG."""
         skill_dag = ctx.get("skill_dag")

@@ -1,9 +1,12 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useMemo } from 'react'
 import { clsx } from 'clsx'
-import { Terminal, ChevronUp, ChevronDown, Trash2, Download, Activity } from 'lucide-react'
+import { Terminal, ChevronUp, ChevronDown, ChevronRight, Trash2, Download, Activity } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
+import type { LogEntry } from '@/stores/executionStore'
 import { Button, Badge } from '@/components/ui'
 import { useTranslation } from '@/i18n'
+import { formatActorLabel, groupSubagentLogs } from '@/utils/subagentLogs'
+import type { SubagentLogGroup, SubagentStatus } from '@/utils/subagentLogs'
 
 export function ExecutionLogPanel() {
   const { t } = useTranslation()
@@ -13,6 +16,15 @@ export function ExecutionLogPanel() {
   const clearLogs = useExecutionStore((state) => state.clearLogs)
   const [expanded, setExpanded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const items = useMemo(() => groupSubagentLogs(logs), [logs])
+  // Per-group open state; groups default to expanded while running and
+  // collapse once the sub-executor reaches a terminal state.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const isGroupOpen = (group: SubagentLogGroup) =>
+    openGroups[group.key] ?? group.status === 'running'
+  const toggleGroup = (group: SubagentLogGroup) =>
+    setOpenGroups((prev) => ({ ...prev, [group.key]: !isGroupOpen(group) }))
 
   useEffect(() => {
     if (expanded) {
@@ -53,6 +65,78 @@ export function ExecutionLogPanel() {
       default:
         return null
     }
+  }
+
+  const renderGroupBadge = (groupStatus: SubagentStatus) => {
+    switch (groupStatus) {
+      case 'completed':
+        return <Badge variant="success">{t('executionLog.completed')}</Badge>
+      case 'failed':
+        return <Badge variant="error">{t('executionLog.failed')}</Badge>
+      default:
+        return (
+          <Badge variant="info">
+            <Activity className="mr-1 h-3 w-3 animate-pulse" />
+            {t('executionLog.running')}
+          </Badge>
+        )
+    }
+  }
+
+  const renderLogLine = (log: LogEntry) => (
+    <div key={log.id} className="flex gap-2">
+      <span className="shrink-0 text-muted-foreground">
+        {new Date(log.timestamp).toLocaleTimeString()}
+      </span>
+      <span
+        className={clsx(
+          'shrink-0 font-bold uppercase',
+          log.level === 'error' && 'text-error',
+          log.level === 'stderr' && 'text-error',
+          log.level === 'stdout' && 'text-foreground',
+          log.level === 'success' && 'text-success',
+          log.level === 'info' && 'text-primary',
+          log.level === 'warning' && 'text-warning',
+          log.level === 'tool' && 'text-primary',
+          log.level === 'artifact' && 'text-success'
+        )}
+      >
+        {log.level}
+      </span>
+      <span className={clsx('break-all', log.level === 'error' && 'text-error', log.level === 'stderr' && 'text-error')}>
+        {log.message}
+      </span>
+      {log.taskId && <span className="shrink-0 text-muted-foreground">[{log.taskId}]</span>}
+    </div>
+  )
+
+  const renderGroup = (group: SubagentLogGroup) => {
+    const open = isGroupOpen(group)
+    return (
+      <div key={group.key} className="rounded border border-border bg-muted/20">
+        <button
+          type="button"
+          onClick={() => toggleGroup(group)}
+          aria-expanded={open}
+          className="flex w-full items-center gap-1.5 px-2 py-1 text-left"
+        >
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+          )}
+          <span className="flex-1 truncate font-medium text-foreground">
+            {formatActorLabel(group.actor)}
+          </span>
+          {renderGroupBadge(group.status)}
+        </button>
+        {open && (
+          <div className="space-y-1 border-t border-border/60 py-1 pl-6 pr-2">
+            {group.logs.map(renderLogLine)}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -96,32 +180,9 @@ export function ExecutionLogPanel() {
             </div>
           ) : (
             <div className="space-y-1">
-              {logs.map((log) => (
-                <div key={log.id} className="flex gap-2">
-                  <span className="shrink-0 text-muted-foreground">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>
-                  <span
-                    className={clsx(
-                      'shrink-0 font-bold uppercase',
-                      log.level === 'error' && 'text-error',
-                      log.level === 'stderr' && 'text-error',
-                      log.level === 'stdout' && 'text-foreground',
-                      log.level === 'success' && 'text-success',
-                      log.level === 'info' && 'text-primary',
-                      log.level === 'warning' && 'text-warning',
-                      log.level === 'tool' && 'text-primary',
-                      log.level === 'artifact' && 'text-success'
-                    )}
-                  >
-                    {log.level}
-                  </span>
-                  <span className={clsx('break-all', log.level === 'error' && 'text-error', log.level === 'stderr' && 'text-error')}>
-                    {log.message}
-                  </span>
-                  {log.taskId && <span className="shrink-0 text-muted-foreground">[{log.taskId}]</span>}
-                </div>
-              ))}
+              {items.map((item) =>
+                item.type === 'log' ? renderLogLine(item.log) : renderGroup(item.group)
+              )}
             </div>
           )}
         </div>

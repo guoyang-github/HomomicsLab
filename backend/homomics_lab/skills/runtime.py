@@ -95,6 +95,8 @@ class SkillRuntimeExecutor:
     def set_parent_job_id(self, parent_job_id: Optional[str]) -> None:
         """Set the background job id under which skill progress should be reported."""
         self.parent_job_id = parent_job_id
+        if self._agent_executor is not None:
+            self._agent_executor.set_parent_context(parent_job_id)
 
     def _get_agent_executor(self) -> AgentSkillExecutor:
         """Lazy initialization of the declarative skill agent executor."""
@@ -103,6 +105,7 @@ class SkillRuntimeExecutor:
                 tool_registry=self.tool_registry,
                 llm_client=self.llm_client,
                 progress_callback=self.progress_callback,
+                parent_id=self.parent_job_id,
             )
         return self._agent_executor
 

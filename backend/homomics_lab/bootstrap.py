@@ -27,6 +27,7 @@ from homomics_lab.database import Base, get_engine
 from homomics_lab.domain.hot_reload import DomainHotReloader, SkillHotReloader
 from homomics_lab.domain.loader import DomainLoader
 from homomics_lab.domain.registry import get_domain_registry
+from homomics_lab.jobs.waiting import WaitingService
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.llm.cache import get_llm_response_cache
 from homomics_lab.llm.runtime_config import (
@@ -321,6 +322,11 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         db_path=settings.data_dir / "skill_dag.db",
     )
 
+    # Waiting orchestrator: persistent wait conditions for event-driven
+    # job suspend/resume (timer / webhook / manual). The APScheduler timer
+    # wiring happens in main.py once the scheduler instance exists.
+    waiting_service = WaitingService(db_path=settings.data_dir / "waiting.db")
+
     # Cold-start self-evolution baseline (P2-2): on a fresh deployment both
     # CBKB and SkillDAG are empty, so broadcast the bundled benchmark seed
     # records to give the self-evolution loop a starting point. Best-effort:
@@ -494,6 +500,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         "skill_executor": skill_executor,
         "skill_store": skill_store,
         "skill_dag": skill_dag,
+        "waiting_service": waiting_service,
         "domain_registry": domain_registry,
         "strategy_library": strategy_library,
         "domain_reloader": domain_reloader,

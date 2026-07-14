@@ -129,6 +129,13 @@ class BackgroundJobRunner:
                 await trace_store.finish_trace(job_id, "cancelled")
                 return
 
+            # The job may have been suspended for an external event while queued;
+            # it will be re-enqueued once the wait condition resolves.
+            if job.status == JobStatus.AWAITING_EVENT:
+                logger.info("Job %s is awaiting an external event; skipping execution", job_id)
+                await trace_store.finish_trace(job_id, "running")
+                return
+
             job.status = JobStatus.RUNNING
             job.updated_at = datetime.now(timezone.utc)
             await self._repository.update(job)
@@ -572,6 +579,7 @@ class BackgroundJobRunner:
             JobStatus.PENDING.value,
             JobStatus.RUNNING.value,
             JobStatus.AWAITING_HUMAN.value,
+            JobStatus.AWAITING_EVENT.value,
         }
         try:
             jobs = await self._repository.list_all()
@@ -826,4 +834,5 @@ def _status_to_progress(status: JobStatus) -> float:
         JobStatus.FAILED: 0.0,
         JobStatus.CANCELLED: 0.0,
         JobStatus.AWAITING_HUMAN: 50.0,
+        JobStatus.AWAITING_EVENT: 50.0,
     }.get(status, 0.0)

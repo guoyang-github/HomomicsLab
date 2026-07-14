@@ -12,12 +12,17 @@ retrieval or manual execution.
 import asyncio
 import ast
 import json
+import logging
 import os
 import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from homomics_lab.agent.progress_events import (
+    build_agent_event,
+    subagent_actor,
+)
 from homomics_lab.artifacts import build_artifact
 from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
@@ -26,6 +31,8 @@ from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.tools.approval import ToolApprovalRequired, get_default_approval_store
 from homomics_lab.tools.models import ToolResult
 from homomics_lab.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 # Common aliases used by community skills (e.g. utils-workflow-management-nextflow)
@@ -44,7 +51,6 @@ _TOOL_ALIASES = {
 _INPUT_DIR_NAMES = {"data", "input", "inputs", "raw", "reference", "references"}
 _SCAN_SKIP_DIRS = _INPUT_DIR_NAMES | {".git", ".metadata", "__pycache__", ".venv", "node_modules"}
 _MAX_SCAN_FILES = 2000
-_MAX_TOOL_OUTPUT_CHARS = 4000
 
 # Convergence guardrails (read from settings with safe fallbacks so tests that
 # construct the executor without a fully wired settings object still pass).
@@ -80,6 +86,94 @@ def _max_idle_iterations() -> int:
     return int(_cfg("agent_max_idle_iterations", 3))
 
 
+def _tool_output_budget(is_error: bool) -> int:
+    """Per-field character budget for tool output text.
+
+    Read from settings (``HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS``, default 4000)
+    so operators can tune it. Error outputs get a wider budget (1.5x): the tail
+    stack trace is the single most useful debugging signal and is worth the
+    extra tokens.
+    """
+    base = max(500, int(_cfg("agent_tool_output_max_chars", 4000)))
+    return int(base * 1.5) if is_error else base
+
+
+def _is_error_tool_output(tool_output: Dict[str, Any]) -> bool:
+    """Heuristic: does this record carry an error whose tail must be preserved?"""
+    if tool_output.get("success") is False:
+        return True
+    error_message = tool_output.get("error_message")
+    if isinstance(error_message, str) and error_message.strip():
+        return True
+    output = tool_output.get("output")
+    if isinstance(output, dict):
+        stderr = output.get("stderr")
+        if isinstance(stderr, str) and stderr.strip():
+            return True
+        returncode = output.get("returncode")
+        if isinstance(returncode, int) and not isinstance(returncode, bool) and returncode != 0:
+            return True
+    return False
+
+
+def _truncate_text(value: str, budget: int, is_error: bool) -> str:
+    """Truncate ``value`` to at most ``budget`` chars, marker included.
+
+    Successful output keeps head+tail halves (initial context plus the final
+    status lines). Error output is tail-priority: compile logs and tracebacks
+    put the actionable frames at the end, so only a small head is kept for
+    context and the rest of the budget goes to the tail.
+    """
+    if len(value) <= budget:
+        return value
+    head = budget // 4 if is_error else budget // 2
+    # Reserve room for the marker so the result never exceeds the budget.
+    # Two passes are enough: the omitted count only grows as the tail shrinks,
+    # so its digit width (and thus the marker length) stabilizes immediately.
+    tail = budget - head
+    for _ in range(2):
+        omitted = len(value) - head - tail
+        marker_len = len(f"\n... [truncated {omitted} chars] ...\n")
+        tail = max(0, budget - head - marker_len)
+    omitted = len(value) - head - tail
+    tail_text = value[len(value) - tail :] if tail else ""
+    return f"{value[:head]}\n... [truncated {omitted} chars] ...\n{tail_text}"
+
+
+def _compact_tool_output(tool_output: Dict[str, Any]) -> Dict[str, Any]:
+    """Bound tool output before it enters the LLM context or persisted results.
+
+    This is the single compaction point for agent tool outputs: the executor
+    applies it right after each tool invocation, before the record is appended
+    to ``tool_outputs``. That list is both replayed into later prompts and
+    serialized into the skill result, so raw multi-megabyte logs must never
+    land there. Only long text fields are truncated; structured fields (paths,
+    return codes, numbers, short strings) pass through intact so artifact
+    harvesting and downstream consumers keep working.
+
+    Strategy: successful output keeps head+tail; error output (``success`` is
+    False, an ``error_message``/``stderr`` is present, or the command exited
+    non-zero) is tail-priority because stack traces and the failing line sit at
+    the end of compile/runtime logs, and gets a 1.5x wider budget.
+    """
+    is_error = _is_error_tool_output(tool_output)
+    budget = _tool_output_budget(is_error)
+    compact = dict(tool_output)
+    for key in ("output", "error_message", "stderr"):
+        value = compact.get(key)
+        if isinstance(value, str):
+            compact[key] = _truncate_text(value, budget, is_error)
+        elif key == "output" and isinstance(value, dict):
+            # shell_exec nests stdout/stderr/returncode here: truncate long
+            # strings in place, keep structured fields intact.
+            trimmed = dict(value)
+            for sub_key, sub_val in value.items():
+                if isinstance(sub_val, str):
+                    trimmed[sub_key] = _truncate_text(sub_val, budget, is_error)
+            compact[key] = trimmed
+    return compact
+
+
 _SCRIPT_RUNNERS = {
     ".py": "python",
     ".R": "Rscript",
@@ -88,28 +182,22 @@ _SCRIPT_RUNNERS = {
 }
 
 
-def _compact_tool_output(tool_output: Dict[str, Any]) -> Dict[str, Any]:
-    """Bound tool output shown to the LLM while preserving the full record.
-
-    Agentic runs keep the complete tool output for harvesting/artifacts, but the
-    prompt only needs a compact view. Very large stdout/file dumps slow the LLM
-    loop and can cause provider timeouts without improving decisions.
-    """
-    compact = dict(tool_output)
-    for key in ("output", "error_message"):
-        value = compact.get(key)
-        if isinstance(value, str) and len(value) > _MAX_TOOL_OUTPUT_CHARS:
-            head = value[: _MAX_TOOL_OUTPUT_CHARS // 2]
-            tail = value[-_MAX_TOOL_OUTPUT_CHARS // 2 :]
-            compact[key] = (
-                f"{head}\n... [truncated {len(value) - _MAX_TOOL_OUTPUT_CHARS} chars] ...\n{tail}"
-            )
-    return compact
-
-
 def _oneliner(text: Any, n: int = 120) -> str:
     s = " ".join(str(text).split())
     return s if len(s) <= n else s[: max(0, n - 1)] + "…"
+
+
+# Per-skill model selection. A skill may pin an explicit model via the
+# ``model`` frontmatter key, or ask for a capability tier via ``model_tier``
+# (``model: cheap|reasoning|coding`` is accepted as an alias). Tiers map to
+# ModelCatalog task types and are resolved through the LLMRouter.
+_SKILL_MODEL_TIERS = {"cheap", "reasoning", "coding"}
+_TIER_TASK_TYPE = {
+    "cheap": "cheap",
+    "reasoning": "planning",
+    "coding": "code_generation",
+}
+_DEFAULT_MODEL_WORDS = {"", "default", "inherit"}
 
 
 def _first_doc_line(doc: Optional[str]) -> str:
@@ -423,6 +511,7 @@ class AgentSkillExecutor:
         max_iterations: int = 25,
         max_tool_retries: int = 2,
         progress_callback: Optional[Callable[[ExecutionState], None]] = None,
+        parent_id: Optional[str] = None,
     ):
         self.tool_registry = tool_registry
         self.llm_client = llm_client
@@ -430,8 +519,82 @@ class AgentSkillExecutor:
         self.max_tool_retries = max(max_tool_retries, 0)
         self.progress_callback = progress_callback
         self._last_progress_pct: float = 0.0
+        # Subagent attribution: when this loop runs as a child execution of a
+        # parent job/task, progress events carry actor="subagent:<skill_id>"
+        # and parent_id. Top-level executions leave both unset.
+        self._parent_id: Optional[str] = parent_id
+        # Per-execute() state, (re)assigned at the start of every run so a
+        # shared executor instance never leaks one skill's settings into the
+        # next (same pattern as _last_progress_pct).
+        self._actor: Optional[str] = None
+        self._model_override: Optional[str] = None
+
+    def set_parent_context(self, parent_id: Optional[str]) -> None:
+        """Set the parent job/task id used to attribute progress events."""
+        self._parent_id = parent_id
 
     async def execute(
+        self,
+        skill: SkillDefinition,
+        inputs: Dict[str, Any],
+        working_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Execute a declarative skill (public entry point).
+
+        Wraps :meth:`_execute_impl` and, for child executions, emits exactly
+        one terminal progress state (COMPLETED/FAILED) carrying the subagent
+        attribution, so consumers can close out the subagent's event group.
+        Top-level executions emit no terminal state here — their lifecycle is
+        owned by the job runner.
+        """
+        # Reset per-run state so a shared executor never leaks one skill's
+        # settings into the next; _execute_impl (re)assigns both on the agent
+        # path. Early knowledge-mode returns leave them unset, so no terminal
+        # state is emitted for runs that never published attributed progress.
+        self._actor = None
+        self._model_override = None
+        try:
+            result = await self._execute_impl(skill, inputs, working_dir)
+        except ToolApprovalRequired:
+            # Awaiting human approval pauses the run; it is not terminal.
+            raise
+        except Exception as exc:
+            self._publish_terminal(False, f"子执行失败：{_oneliner(exc, 120)}")
+            raise
+        self._publish_terminal(
+            bool(result.get("success")),
+            "子执行完成" if result.get("success") else "子执行失败",
+        )
+        return result
+
+    def _publish_terminal(self, success: bool, phase: str) -> None:
+        """Emit the single terminal state for a child execution.
+
+        No-op for top-level executions: only runs attributed to a parent
+        (``actor``/``parent_id`` set) close their event group this way.
+        """
+        if (
+            self._actor is None
+            or self._parent_id is None
+            or self.progress_callback is None
+        ):
+            return
+        try:
+            self.progress_callback(
+                ExecutionState(
+                    job_id="",
+                    status="COMPLETED" if success else "FAILED",
+                    current_phase=phase,
+                    progress_pct=100.0 if success else self._last_progress_pct,
+                    scheduler_type="agent",
+                    actor=self._actor,
+                    parent_id=self._parent_id,
+                )
+            )
+        except Exception:
+            pass
+
+    async def _execute_impl(
         self,
         skill: SkillDefinition,
         inputs: Dict[str, Any],
@@ -473,6 +636,11 @@ class AgentSkillExecutor:
                     "Skill requested tools that are not registered or all tools were disallowed."
                 ),
             }
+
+        # Per-run context: subagent attribution for progress events and the
+        # per-skill model selection (frontmatter model / model_tier).
+        self._actor = subagent_actor(skill.id) if self._parent_id else None
+        self._model_override = self._resolve_skill_model(skill)
 
         system_prompt = self._build_system_prompt(skill, inputs, tools)
 
@@ -860,6 +1028,12 @@ class AgentSkillExecutor:
             tool_output = await self._invoke_tool_with_logging(
                 canonical_tool_name, tool_name, arguments
             )
+            # Compact BEFORE the record enters tool_outputs: that list is both
+            # persisted in the skill result and replayed into later prompts, so
+            # raw multi-megabyte logs must never land there. Only long text
+            # fields are truncated; paths/structured fields survive for
+            # artifact harvesting and the tool events below.
+            tool_output = _compact_tool_output(tool_output)
             tool_outputs.append(tool_output)
 
             result_preview = self._result_preview(tool_output)
@@ -907,9 +1081,11 @@ class AgentSkillExecutor:
             messages.append(
                 {
                     "role": "user",
+                    # tool_output was already compacted at the append site
+                    # above; _compact_tool_output is the single source of truth.
                     "content": "Tool result: "
                     + json.dumps(
-                        _compact_tool_output(tool_output),
+                        tool_output,
                         ensure_ascii=False,
                         default=str,
                     ),
@@ -1063,6 +1239,117 @@ class AgentSkillExecutor:
             "tool_outputs": tool_outputs,
         }
 
+    def _resolve_skill_model(self, skill: SkillDefinition) -> Optional[str]:
+        """Resolve the model this skill's agent loop should use, if any.
+
+        Honors the skill frontmatter keys ``model`` (explicit model name, or a
+        tier alias) and ``model_tier`` (``cheap`` | ``reasoning`` | ``coding``).
+        Tiers are resolved to a concrete model through the LLMRouter /
+        ModelCatalog. Any resolution failure falls back to the default model
+        with a warning, so a bad declaration never breaks execution.
+
+        Returns ``None`` when the default routing should be used.
+        """
+        metadata = skill.metadata or {}
+        raw_model = str(metadata.get("model") or "").strip()
+        tier = str(metadata.get("model_tier") or "").strip().lower()
+
+        # ``model: cheap|reasoning|coding`` doubles as a tier declaration.
+        if raw_model.lower() in _SKILL_MODEL_TIERS:
+            tier = tier or raw_model.lower()
+            raw_model = ""
+
+        if raw_model.lower() not in _DEFAULT_MODEL_WORDS:
+            return self._resolve_explicit_model(raw_model, skill.id)
+
+        if tier in _DEFAULT_MODEL_WORDS:
+            return None
+        task_type = _TIER_TASK_TYPE.get(tier)
+        if task_type is None:
+            logger.warning(
+                "Skill '%s' declares unknown model_tier %r; using the default model",
+                skill.id,
+                tier,
+            )
+            return None
+
+        router = self._llm_router()
+        if router is None:
+            logger.warning(
+                "Skill '%s' declares model_tier %r but no LLM router is available; "
+                "using the default model",
+                skill.id,
+                tier,
+            )
+            return None
+        try:
+            decision = router.select(task_type=task_type, prefer_cheap=(tier == "cheap"))
+        except Exception as exc:
+            logger.warning(
+                "Failed to resolve model_tier %r for skill '%s': %s; using the default model",
+                tier,
+                skill.id,
+                exc,
+            )
+            return None
+        honored = decision.reason.startswith("catalog:") or decision.reason == "cheap"
+        if not honored:
+            logger.warning(
+                "Skill '%s' model_tier %r could not be honored (no configured provider "
+                "serves a tier model); using the default model",
+                skill.id,
+                tier,
+            )
+            return None
+        logger.info(
+            "Skill '%s' uses model %r for model_tier %r (%s)",
+            skill.id,
+            decision.model,
+            tier,
+            decision.reason,
+        )
+        return decision.model
+
+    def _resolve_explicit_model(self, model: str, skill_id: str) -> Optional[str]:
+        """Validate an explicit ``model`` declaration against configured providers."""
+        router = self._llm_router()
+        if router is None:
+            logger.warning(
+                "Skill '%s' declares model %r but no LLM router is available; "
+                "using the default model",
+                skill_id,
+                model,
+            )
+            return None
+        try:
+            decision = router.select(model=model)
+        except Exception as exc:
+            logger.warning(
+                "Failed to resolve model %r for skill '%s': %s; using the default model",
+                model,
+                skill_id,
+                exc,
+            )
+            return None
+        if decision.model != model:
+            logger.warning(
+                "Skill '%s' requested model %r but no configured provider serves it; "
+                "using the default model",
+                skill_id,
+                model,
+            )
+            return None
+        logger.info("Skill '%s' uses explicitly declared model %r", skill_id, model)
+        return decision.model
+
+    def _llm_router(self) -> Optional[Any]:
+        """Return the LLMRouter backing the configured client, if reachable."""
+        if self.llm_client is None:
+            return None
+        return getattr(self.llm_client, "router", None) or getattr(
+            self.llm_client, "_router", None
+        )
+
     def _publish_progress(
         self,
         status: str,
@@ -1083,6 +1370,8 @@ class AgentSkillExecutor:
                     progress_pct=progress_pct,
                     scheduler_type="agent",
                     active_task_id=active_task_id,
+                    actor=self._actor,
+                    parent_id=self._parent_id,
                 )
             )
         except Exception:
@@ -1105,24 +1394,24 @@ class AgentSkillExecutor:
 
         Events travel inside ``ExecutionState.resource_usage`` so they do not
         break existing consumers that only look at ``status``/``current_phase``.
+        Child executions (subagents) stamp every event with ``actor`` and
+        ``parent_id``; see ``homomics_lab.agent.progress_events`` for the
+        contract.
         """
         if self.progress_callback is None:
             return
-        event: Dict[str, Any] = {"type": event_type, "timestamp": time.time()}
-        if tool is not None:
-            event["tool"] = tool
-        if arguments is not None:
-            event["arguments"] = arguments
-        if success is not None:
-            event["success"] = success
-        if output is not None:
-            event["output"] = output[:2000]
-        if error_message is not None:
-            event["error_message"] = error_message[:1000]
-        if artifacts is not None:
-            event["artifacts"] = artifacts
-        if latency_ms is not None:
-            event["latency_ms"] = latency_ms
+        event = build_agent_event(
+            event_type,
+            actor=self._actor,
+            parent_id=self._parent_id,
+            tool=tool,
+            arguments=arguments,
+            success=success,
+            output=output,
+            error_message=error_message,
+            artifacts=artifacts,
+            latency_ms=latency_ms,
+        )
         try:
             self.progress_callback(
                 ExecutionState(
@@ -1133,6 +1422,8 @@ class AgentSkillExecutor:
                     scheduler_type="agent",
                     active_task_id=active_task_id,
                     resource_usage={"agent_events": [event]},
+                    actor=self._actor,
+                    parent_id=self._parent_id,
                 )
             )
         except Exception:
@@ -1232,13 +1523,18 @@ class AgentSkillExecutor:
         try:
             if self.progress_callback is not None:
                 heartbeat_task = asyncio.create_task(_llm_heartbeat())
-            coro = self.llm_client.chat_completion(
-                messages,
-                temperature=0.2,
-                max_tokens=max_tokens,
-                response_format=response_format,
-                intent_type="code_generation",
-            )
+            call_kwargs: Dict[str, Any] = {
+                "temperature": 0.2,
+                "max_tokens": max_tokens,
+                "response_format": response_format,
+            }
+            if self._model_override:
+                # A skill-declared model/tier pins the route; skip complexity
+                # routing (which would otherwise ignore the explicit model).
+                call_kwargs["model"] = self._model_override
+            else:
+                call_kwargs["intent_type"] = "code_generation"
+            coro = self.llm_client.chat_completion(messages, **call_kwargs)
             text = await asyncio.wait_for(coro, timeout=timeout)
             if _cfg("debug", False):
                 print(
@@ -1415,6 +1711,9 @@ class AgentSkillExecutor:
         output = await self._invoke_tool_with_logging(
             "shell_exec", "shell_exec", {"command": f"{runner} {path}"}
         )
+        # Compact before the record joins tool_outputs (persisted + replayed
+        # into prompts); see the main loop for the rationale.
+        output = _compact_tool_output(output)
         tool_outputs.append(output)
         return output
 
@@ -1540,6 +1839,10 @@ class AgentSkillExecutor:
             "shell_exec",
             {"command": f"{runner} {script_path}", "timeout": 600},
         )
+        # Compact before the record is persisted in the result or handed to the
+        # fallback loop (which extends its tool_outputs from this result).
+        # Structured fields (returncode, paths) survive truncation.
+        output = _compact_tool_output(output)
 
         # shell_exec reports tool-level success even when the inner command exits
         # non-zero. Treat a non-zero returncode as a script failure so we fall
@@ -1598,11 +1901,18 @@ class AgentSkillExecutor:
             }
 
         # Script failed: return a partial result so the caller can fall back.
+        # ``output`` was already compacted above; bound the error string itself
+        # too, since it propagates into the job result and the parent agent's
+        # context — a raw multi-KB log must not leak through it (tail-priority:
+        # the actionable traceback lines sit at the end).
+        raw_error = output.get("error_message") or "unknown error"
+        if not isinstance(raw_error, str):
+            raw_error = str(raw_error)
         return {
             "success": False,
             "partial": False,
             "skill_id": skill.id,
-            "error": f"Generated driver script failed: {output.get('error_message', 'unknown error')}",
+            "error": f"Generated driver script failed: {_truncate_text(raw_error, 2000, is_error=True)}",
             "tool_outputs": [output],
         }
 

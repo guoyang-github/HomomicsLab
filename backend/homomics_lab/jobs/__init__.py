@@ -6,6 +6,7 @@ from .queue import JobQueue
 from .repository import JobRepository
 from .runner import BackgroundJobRunner
 from .service import JobService
+from .waiting import WaitCondition, WaitingService
 
 __all__ = [
     "Job",
@@ -15,4 +16,6 @@ __all__ = [
     "JobRepository",
     "BackgroundJobRunner",
     "JobService",
+    "WaitCondition",
+    "WaitingService",
 ]

@@ -67,7 +67,8 @@ HomomicsLab/
 │   │   ├── hooks/               # Theme, keyboard shortcuts, command palette
 │   │   ├── services/            # API/WebSocket clients
 │   │   ├── stores/              # Zustand state management
-│   │   └── types/               # Shared TypeScript types
+│   │   ├── types/               # Shared TypeScript types
+│   │   └── utils/               # Pure helpers (e.g. subagent log grouping)
 │   ├── e2e/                     # Playwright end-to-end tests
 │   ├── index.html
 │   ├── package.json
@@ -123,6 +124,7 @@ Key variables:
 | `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, `auto` |
 | `HOMOMICS_CODEACT_CACHE_ENABLED` | `true` | Cache CodeAct-generated code |
 | `HOMOMICS_SKILL_CACHE_ENABLED` | `true` | Memoize deterministic skill results |
+| `HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS` | `4000` | Per-tool output budget before `_compact_tool_output` truncation (errors keep the tail, get 1.5x budget) |
 | `HOMOMICS_WORKER_MODE` | `true` | Run a local worker inside the API process |
 | `HOMOMICS_CURATION_ENABLED` | `false` | Nightly CBKB curation (disabled by default) |
 | `HOMOMICS_EVOLUTION_ENABLED` | `false` | Nightly agent evolution (disabled by default) |
@@ -304,6 +306,10 @@ The agent treats `SKILL.md` and `scripts/` as **reference material**: it reads t
 
 External/imported skills default to the `experimental` trust tier and will not execute in non-interactive mode until trusted (see the four-tier trust model under Security). High-risk tools (`shell_exec`, `file_write`, `file_edit`) carry `risk_level=high` and require approval in interactive mode.
 
+### Skill retrieval
+
+Skill candidates from hybrid retrieval are reranked by `agent/retrieval_rerank.py` (pure-Python BM25 over skill docs, blended 0.4 semantic / 0.5 BM25 / 0.1 graph boost) before reaching the planner. Generic phase-text queries (e.g. `"{phase_type} analysis step"`) score ~0.16-0.19 cosine against arbitrary skills, so both the retrieval path (`rerank_min_score=0.1`) and the PlanEngine fallback matcher (`fallback_min_similarity=0.15`) apply explicit thresholds — never lower them to force a match; an unmatched step should fall through to CodeAct instead of binding a wrong skill.
+
 ### Hot reload
 
 `domain.yaml` files and external skill directories can be watched at runtime. This is enabled by `HOMOMICS_SKILL_HOT_RELOAD_ENABLED` (default `true`) and started in `main.py` lifespan.
@@ -322,6 +328,7 @@ Major route prefixes:
 - `/api/domains` — domain marketplace (list, import, import-zip, export).
 - `/api/nfcore` — nf-core pipeline discovery and execution.
 - `/api/reports`, `/api/viz`, `/api/knowledge`, `/api/scheduler`, `/api/settings`, `/api/secrets`, `/api/costs`, `/api/collab`.
+- `/api/waiting` — Waiting Orchestrator: list/get wait conditions, resume (webhook token validated), cancel. Backed by `jobs/waiting.py` (`WaitingService`, SQLite at `data/waiting.db`); jobs suspend via `JobService.suspend_for_event` (`JobStatus.AWAITING_EVENT`) and re-queue on event via the `RESUME_HITL` resume path. Timer conditions use the APScheduler instance from `scheduler.py` with a periodic `tick()` fallback.
 
 Health/metrics endpoints are public:
 
@@ -418,5 +425,6 @@ Production Gunicorn config is in `gunicorn.conf.py`:
 
 - Prefer editing `domain.yaml` over Python code when adding or modifying analysis strategies, intents, roles, or SOPs.
 - When adding a new skill, follow the `SKILL.md + scripts/` convention and place it in the correct domain `skills/` directory or use the skill import API.
+- Subagent progress events follow the contract in `agent/progress_events.py`: sub-execution states carry top-level `actor: "subagent:<skill_id>"` and `parent_id`; top-level executions omit both keys. The frontend (`utils/subagentLogs.ts`, `ExecutionLogPanel`) relies on this to group nested logs — keep both ends in sync when changing the event shape.
 - Run `make lint-backend` / `make test-backend` after backend changes and `npm test -- --run` / `npm run build` after frontend changes.
 - Do not run `git commit`, `git push`, or destructive production actions unless explicitly asked.
