@@ -162,6 +162,7 @@ prompts:
       - ``greeting``: greeting, self-introduction, or small talk (e.g., "hello", "你是谁").
       - ``file_conversion``: format conversion only (e.g., "把 CSV 转成 h5ad").
       - ``analysis``: a domain-specific bioinformatics analysis request (e.g., single-cell, spatial, metagenomics, genomics, proteomics). Use this for any request that should actually run analysis skills.
+      - ``visualization_edit``: the user wants to modify a figure/plot that was recently shown in the conversation (e.g., "换成箱线图", "加误差线", "换个配色", "改标题").  Set ``interaction_mode=modify`` and ``scope=single_step``.
       - ``tool_call``: explicit request for an external tool such as PubMed search, GEO search, or UniProt search.
       - ``clarification``: the message is ambiguous and the system must ask a follow-up question before acting.
       - ``general``: anything else.
@@ -286,6 +287,24 @@ prompts:
           "entities": {},
           "confidence": 0.99,
           "reason": "User asks for an explanation"
+        },
+        "alternative_intents": [],
+        "sub_intents": [],
+        "needs_clarification": false,
+        "clarification_question": null
+      }
+
+      User: "把刚才的图换成箱线图"
+      Output: {
+        "primary_intent": {
+          "intent_type": "visualization_edit",
+          "interaction_mode": "modify",
+          "domain": null,
+          "target": "visualization_edit",
+          "scope": "single_step",
+          "entities": {"edit": "change plot type to box"},
+          "confidence": 0.96,
+          "reason": "User wants to edit the most recent figure"
         },
         "alternative_intents": [],
         "sub_intents": [],

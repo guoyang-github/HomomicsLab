@@ -87,6 +87,18 @@ class IntentRouter:
                 intent, user_message, working_memory, project_id
             )
 
+        # Fast-path natural-language figure editing.
+        if intent.analysis_type == "visualization_edit":
+            from homomics_lab.agent.turn_viz_handler import VisualizationEditHandler
+
+            handler = VisualizationEditHandler(self._runner)
+            return await handler.handle(
+                user_message=user_message,
+                working_memory=working_memory,
+                project_id=project_id,
+                intent=intent,
+            )
+
         # MCP tool agent loop.
         mcp_tool_name = intent.metadata.get("tool_name")
         if mcp_tool_name and self._runner._tool_registry is not None:

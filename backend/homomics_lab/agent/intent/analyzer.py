@@ -128,6 +128,7 @@ class CascadeIntentAnalyzer:
             ("general_help", "builtin"),
             ("greeting", "builtin"),
             ("file_conversion", "builtin"),
+            ("visualization_edit", "builtin"),
             ("single_cell_analysis", "builtin"),
             ("spatial_analysis", "builtin"),
             ("metagenomics_analysis", "builtin"),
@@ -172,6 +173,16 @@ class CascadeIntentAnalyzer:
                     "转换", "convert", "格式", "format", "变成", "转成",
                     "改为", "change to",
                 ]
+            elif analysis_type == "visualization_edit":
+                keywords = [
+                    "图", "plot", "figure", "chart", "graph",
+                    "颜色", "配色", "colormap", "palette",
+                    "箱线图", "箱型图", "box plot", "boxplot",
+                    "violin", "小提琴", "violinplot",
+                    "误差线", "errorbar", "error bar", "error bars",
+                    "标题", "title", "legend", "图例",
+                ]
+                complexity_indicators = []
             elif analysis_type == "single_cell_analysis":
                 keywords = [
                     "单细胞", "single cell", "scRNA", "10x", "scanpy", "seurat",

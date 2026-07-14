@@ -70,6 +70,14 @@ class KeywordIntentClassifier(IntentClassifier):
             "hello", "hi ", "hi,", "hey", "你好", "您好", "哈喽",
             "你是谁", "你会什么", "介绍一下你自己", "自我介绍一下",
         ],
+        "visualization_edit": [
+            "图", "plot", "figure", "chart", "graph",
+            "颜色", "配色", "colormap", "palette",
+            "箱线图", "箱型图", "box plot", "boxplot",
+            "violin", "小提琴", "violinplot",
+            "误差线", "errorbar", "error bar", "error bars",
+            "标题", "title", "legend", "图例",
+        ],
     }
 
     # Phrases that should suppress any workflow/analysis intent.
@@ -192,6 +200,7 @@ class KeywordIntentClassifier(IntentClassifier):
             "general_help": ("general_help", "answer", None, "generate_code", "single_step"),
             "greeting": ("greeting", "answer", None, None, "single_step"),
             "file_conversion": ("file_conversion", "execute", None, "convert_file", "single_step"),
+            "visualization_edit": ("analysis", "modify", None, "visualization_edit", "single_step"),
         }
         if analysis_type in mapping:
             intent_type, interaction_mode, domain, target, scope = mapping[analysis_type]

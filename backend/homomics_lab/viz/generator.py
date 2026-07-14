@@ -20,6 +20,7 @@ class PlotType(str, Enum):
     UMAP = "umap"
     HEATMAP = "heatmap"
     VIOLIN = "violin"
+    BOX = "box"
     BAR = "bar"
     SCATTER = "scatter"
     HISTOGRAM = "histogram"
@@ -62,6 +63,8 @@ class PlotGenerator:
                 self._render_heatmap(ax, data)
             elif plot_type == PlotType.VIOLIN:
                 self._render_violin(ax, data)
+            elif plot_type == PlotType.BOX:
+                self._render_box(ax, data)
             elif plot_type == PlotType.BAR:
                 self._render_bar(ax, data)
             elif plot_type == PlotType.SCATTER:
@@ -166,6 +169,26 @@ class PlotGenerator:
 
         ax.set_xticks(positions)
         ax.set_xticklabels(labels, rotation=45, ha="right")
+        ax.set_ylabel("Value")
+
+    def _render_box(self, ax: plt.Axes, data: Dict[str, Any]) -> None:
+        """Render box plot."""
+        groups = data.get("groups", {})
+
+        if not groups:
+            np.random.seed(42)
+            groups = {
+                "Group A": np.random.normal(0, 1, 100).tolist(),
+                "Group B": np.random.normal(2, 1.5, 100).tolist(),
+                "Group C": np.random.normal(-1, 0.5, 100).tolist(),
+            }
+
+        labels = list(groups.keys())
+        values = list(groups.values())
+        bp = ax.boxplot(values, labels=labels, patch_artist=True)
+        for patch in bp["boxes"]:
+            patch.set_facecolor("steelblue")
+            patch.set_alpha(0.7)
         ax.set_ylabel("Value")
 
     def _render_bar(self, ax: plt.Axes, data: Dict[str, Any]) -> None:

@@ -24,6 +24,7 @@ def to_plotly_json(
         PlotType.UMAP: _convert_umap,
         PlotType.HEATMAP: _convert_heatmap,
         PlotType.VIOLIN: _convert_violin,
+        PlotType.BOX: _convert_box,
         PlotType.BAR: _convert_bar,
         PlotType.SCATTER: _convert_scatter,
         PlotType.HISTOGRAM: _convert_histogram,
@@ -169,6 +170,39 @@ def _convert_violin(data: Dict[str, Any]) -> Dict[str, Any]:
         "layout": {
             "yaxis": {"title": "Value", "zeroline": False},
             "violingroupgap": 0.1,
+        },
+    }
+
+
+def _convert_box(data: Dict[str, Any]) -> Dict[str, Any]:
+    groups = data.get("groups", {})
+
+    import numpy as np
+
+    if not groups:
+        np.random.seed(42)
+        groups = {
+            "Group A": np.random.normal(0, 1, 100).tolist(),
+            "Group B": np.random.normal(2, 1.5, 100).tolist(),
+            "Group C": np.random.normal(-1, 0.5, 100).tolist(),
+        }
+
+    traces = []
+    for group_name, values in groups.items():
+        traces.append(
+            {
+                "type": "box",
+                "y": values,
+                "name": group_name,
+                "boxpoints": False,
+                "hovertemplate": f"<b>{group_name}</b><br>Value: %{{y:.3f}}<extra></extra>",
+            }
+        )
+
+    return {
+        "data": traces,
+        "layout": {
+            "yaxis": {"title": "Value", "zeroline": False},
         },
     }
 
