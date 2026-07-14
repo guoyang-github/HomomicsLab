@@ -243,6 +243,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs:
 - Run from `Makefile`:
   - `make lint-frontend`
   - `make format-frontend`
+- UI components: shadcn/ui (Tailwind v3 registry via `shadcn@2.1.8` CLI — the v4 CLI emits incompatible code) lives in `src/components/ui/shadcn/`; the legacy exports in `src/components/ui/` are adaptation wrappers keeping the old props API — import from the legacy paths, not from `shadcn/` directly. Design tokens (spacing/elevation/motion) are extended incrementally in `src/index.css`; never change existing `:root`/`.dark` semantic variable names or values.
+- Navigation is hash-routed (`App.tsx` syncs `activeItem` with `window.location.hash`); no react-router. Sidebar shows only Chat / Files / Skills / Domains / MCP / Settings. Reports / Workflow / Figures are no longer top-level entries; they are reached from the Chat page toolbar or inline message artifacts and rendered by `src/components/overlay/OverlayManager.tsx` (Zustand `overlayStore.ts`).
+- Message types: `frontend/src/types/chat.ts` defines the chat message contract. The frontend now supports `type: 'artifact'` for rendering reports / figures / tables / images / html / json / anndata inline in the message stream (`components/chat/ArtifactMessage.tsx`); the backend enum `MessageType` currently does not emit `artifact`, so enabling it requires a backend contract change.
 
 ### General
 
@@ -398,7 +401,7 @@ Production Gunicorn config is in `gunicorn.conf.py`:
 
 - **Authentication is opt-in locally**. Set `HOMOMICS_AUTH_ENABLED=true` in production and provide `HOMOMICS_API_KEY` / JWT secret / OIDC config.
 - **Sandbox all code execution**. `HOMOMICS_FORCE_SANDBOX=true` routes `shell_exec` and CodeAct through `local`, `bubblewrap`, or `container` sandboxes. The production compose file enables this and requires a capable container runtime.
-- **Skill trust model**. Four tiers (`skills/trust.py`): `official` (builtin) / `verified` (trusted) / `community` / `experimental` (untrusted). They differentiate sandbox backend (community/experimental never use the local sandbox), CodeAct cache (excluded for experimental), and HITL. Experimental skills do not execute in non-interactive mode; trust toggles via `POST /api/skills/{id}/trust`.
+- **Skill trust model**. Four tiers (`skills/trust.py`): `official` (builtin) / `verified` (trusted) / `community` / `experimental` (untrusted). They differentiate sandbox backend (community/experimental never use the local sandbox), CodeAct cache (excluded for experimental), and HITL. Experimental skills do not execute in non-interactive mode; in interactive mode they now raise a real skill-level HITL checkpoint via `PersistentApprovalStore` (`skills/runtime.py`) instead of only logging a warning. Trust toggles via `POST /api/skills/{id}/trust`.
 - **High-risk tool approval**. When `HOMOMICS_INTERACTIVE_MODE=true`, `shell_exec`, `file_write`, and `file_edit` calls pause for explicit approval.
 - **Secrets**. API keys, DB passwords, S3 credentials, and JWT secrets live in `.env` only. `config.py` provides `masked_dump()` for logs/health output. Never commit `.env`.
 - **CORS / trusted hosts**. Production should set `HOMOMICS_CORS_ORIGINS` and `HOMOMICS_TRUSTED_HOSTS` explicitly. Debug mode allows `localhost:5173` and `localhost:3000`.
@@ -426,5 +429,6 @@ Production Gunicorn config is in `gunicorn.conf.py`:
 - Prefer editing `domain.yaml` over Python code when adding or modifying analysis strategies, intents, roles, or SOPs.
 - When adding a new skill, follow the `SKILL.md + scripts/` convention and place it in the correct domain `skills/` directory or use the skill import API.
 - Subagent progress events follow the contract in `agent/progress_events.py`: sub-execution states carry top-level `actor: "subagent:<skill_id>"` and `parent_id`; top-level executions omit both keys. The frontend (`utils/subagentLogs.ts`, `ExecutionLogPanel`) relies on this to group nested logs — keep both ends in sync when changing the event shape.
+- `agent/turn_runner.py` is no longer a god class; it delegates to `turn_result_assembler`, `turn_context_formatter`, `turn_file_resolver`, `turn_risk_assessor`, `turn_clarification`, `turn_intent_router`, `turn_response_generator`, `turn_self_correction`, and `turn_workflow_handler`. Do not add new large methods directly to `turn_runner.py` — place them in the appropriate collaborator module and add a thin delegating method only when necessary.
 - Run `make lint-backend` / `make test-backend` after backend changes and `npm test -- --run` / `npm run build` after frontend changes.
 - Do not run `git commit`, `git push`, or destructive production actions unless explicitly asked.
