@@ -4,7 +4,7 @@ import { fileApi } from '@/sdk'
 import type { Artifact } from './types'
 import type { ArtifactRendererProps } from './registry'
 
-function artifactUrl(projectId: string | undefined, artifact: Artifact): string | null {
+export function artifactUrl(projectId: string | undefined, artifact: Artifact): string | null {
   if (artifact.url) return artifact.url
   if (artifact.preview_url) return artifact.preview_url
   if (artifact.path && projectId) {
@@ -19,7 +19,7 @@ function artifactUrl(projectId: string | undefined, artifact: Artifact): string 
   return null
 }
 
-function downloadName(artifact: Artifact): string {
+export function downloadName(artifact: Artifact): string {
   return artifact.name || artifact.path?.split('/').pop() || 'download'
 }
 

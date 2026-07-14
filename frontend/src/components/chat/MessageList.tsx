@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { MessageBubble } from './MessageBubble'
 import { EmptyState } from '@/components/ui'
-import { Sparkles } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/shadcn/avatar'
+import { Bot, Sparkles } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import { chatApi } from '@/services/api'
 import { toastError } from '@/stores/toastStore'
@@ -40,6 +42,7 @@ function _extractProgress(tasks: { status: string }[]): TaskProgress {
 export function MessageList() {
   const { t } = useTranslation()
   const messages = useChatStore((state) => state.messages)
+  const isTyping = useChatStore((state) => state.isTyping)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
   const currentProjectId = useChatStore((state) => state.currentProjectId)
   const setMessages = useChatStore((state) => state.setMessages)
@@ -108,8 +111,8 @@ export function MessageList() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      <div className="mx-auto max-w-3xl space-y-2">
+    <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[780px] space-y-6 px-4 py-6">
         {messages.map((message, index) => (
           <MessageBubble
             key={message.id}
@@ -123,6 +126,29 @@ export function MessageList() {
             }
           />
         ))}
+        {isTyping && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+            className="flex gap-3 sm:gap-4"
+          >
+            <Avatar className="mt-0.5 h-8 w-8 shrink-0 border border-border">
+              <AvatarFallback className="bg-muted text-muted-foreground">
+                <Bot className="h-4 w-4" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex items-center gap-1.5 pt-2.5" aria-label={t('chat.agentThinking')}>
+              {[0, 150, 300].map((delay) => (
+                <span
+                  key={delay}
+                  className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/50"
+                  style={{ animationDelay: `${delay}ms` }}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
         <div ref={bottomRef} />
       </div>
     </div>

@@ -287,48 +287,51 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   return (
     <div
       {...getRootProps()}
-      className={clsx(
-        'border-t border-border bg-card p-4 transition-colors',
-        isDragActive && 'bg-primary/5'
-      )}
+      className={clsx('px-4 pb-4 pt-2 transition-colors', isDragActive && 'bg-primary/5')}
     >
       <input {...getInputProps()} />
 
-      {isDragActive && (
-        <div className="mb-3 rounded-lg border-2 border-dashed border-primary bg-primary/5 p-4 text-center text-sm text-primary">
-          {t('chat.dropToUpload')}
-        </div>
-      )}
+      <div className="mx-auto w-full max-w-[780px]">
+        {isDragActive && (
+          <div className="mb-3 rounded-lg border-2 border-dashed border-primary bg-primary/5 p-4 text-center text-sm text-primary">
+            {t('chat.dropToUpload')}
+          </div>
+        )}
 
-      {pendingFiles.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {pendingFiles.map((pending) => (
-            <div
-              key={pending.id}
-              className={clsx(
-                'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs',
-                pending.error
-                  ? 'border-error/30 bg-error/10 text-error'
-                  : pending.uploaded
-                  ? 'border-success/30 bg-success/10 text-success'
-                  : 'border-border bg-muted'
-              )}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span className="max-w-[120px] truncate">{pending.file.name}</span>
-              {pending.uploading && <Loader2 className="h-3 w-3 animate-spin" />}
-              {!pending.uploading && (
-                <button onClick={() => removeFile(pending.id)} className="rounded p-0.5 hover:bg-black/5">
-                  <X className="h-3 w-3" />
-                </button>
-              )}
+        <div
+          className={clsx(
+            'rounded-2xl border bg-card shadow-lg transition-all duration-fast',
+            'focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/30',
+            isDragActive ? 'border-primary' : 'border-border'
+          )}
+        >
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {pendingFiles.map((pending) => (
+                <div
+                  key={pending.id}
+                  className={clsx(
+                    'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs',
+                    pending.error
+                      ? 'border-error/30 bg-error/10 text-error'
+                      : pending.uploaded
+                      ? 'border-success/30 bg-success/10 text-success'
+                      : 'border-border bg-muted'
+                  )}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="max-w-[120px] truncate">{pending.file.name}</span>
+                  {pending.uploading && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {!pending.uploading && (
+                    <button onClick={() => removeFile(pending.id)} className="rounded p-0.5 hover:bg-black/5">
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
           <textarea
             ref={textareaRef}
             value={input}
@@ -337,49 +340,53 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
             placeholder={t('chat.placeholder')}
             rows={1}
             className={clsx(
-              'min-h-[48px] w-full resize-none rounded-xl border border-border bg-muted px-4 py-3 pr-20 text-sm',
+              'max-h-[200px] min-h-[48px] w-full resize-none bg-transparent px-4 py-3 text-sm',
               'text-foreground placeholder:text-muted-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+              'focus-visible:outline-none'
             )}
-            style={{ maxHeight: '200px' }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement
               target.style.height = 'auto'
               target.style.height = `${Math.min(target.scrollHeight, 200)}px`
             }}
           />
-          <div className="absolute bottom-2 right-2 flex items-center gap-1">
-            <Button
-              variant={planMode ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => setPlanMode((prev) => !prev)}
-              title={planMode ? t('chat.planModeActive') : t('chat.planMode')}
-            >
-              <Map className={clsx('h-4 w-4', planMode && 'text-primary')} />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={open} title={t('chat.uploadFile')}>
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            {onOpenCommandPalette && (
-              <Button variant="ghost" size="icon" onClick={onOpenCommandPalette} title={t('chat.commandPalette')}>
-                <Command className="h-4 w-4" />
+
+          <div className="flex items-center justify-between px-2 pb-2">
+            <div className="flex items-center gap-1">
+              <Button
+                variant={planMode ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setPlanMode((prev) => !prev)}
+                title={planMode ? t('chat.planModeActive') : t('chat.planMode')}
+              >
+                <Map className={clsx('h-4 w-4', planMode && 'text-primary')} />
               </Button>
-            )}
+              <Button variant="ghost" size="icon" onClick={open} title={t('chat.uploadFile')}>
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              {onOpenCommandPalette && (
+                <Button variant="ghost" size="icon" onClick={onOpenCommandPalette} title={t('chat.commandPalette')}>
+                  <Command className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <Button
+              onClick={handleSend}
+              disabled={isLoading || !input.trim()}
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full"
+              title={t('chat.sendHint')}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
 
-        <Button
-          onClick={handleSend}
-          disabled={isLoading || !input.trim()}
-          className="h-12 w-12 shrink-0 rounded-xl p-0"
-        >
-          {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-        </Button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{t('chat.sendHint')}</span>
-        <span>{t('chat.formatHint')}</span>
+        <div className="mt-1.5 flex items-center justify-between px-1 text-2xs text-muted-foreground">
+          <span>{t('chat.sendHint')}</span>
+          <span>{t('chat.formatHint')}</span>
+        </div>
       </div>
     </div>
   )

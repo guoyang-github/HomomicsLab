@@ -31,6 +31,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'common.inputs': 'Inputs',
     'common.output': 'Output',
     'common.saved': 'Saved',
+    'common.download': 'Download',
 
     // Navigation
     'nav.chat': 'Chat',
@@ -42,6 +43,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'nav.domains': 'Domains',
     'nav.mcp': 'MCP Servers',
     'nav.settings': 'Settings',
+
+    // Overlay titles
+    'overlay.reportTitle': 'Reports',
+    'overlay.figureTitle': 'Figures',
+    'overlay.workflowTitle': 'Workflow',
 
     // TopBar
     'topbar.searchCommands': 'Search commands...',
@@ -107,12 +113,33 @@ const resources: Record<Locale, Record<string, string>> = {
     'chat.sendFailedShort': 'Failed to send message',
     'chat.emptyTitle': 'Start a new analysis chat',
     'chat.emptyDesc': 'Describe your bioinformatics analysis needs, for example: "Help me normalize and cluster PBMC single-cell data"',
+    'chat.openReports': 'Reports',
+    'chat.openWorkflow': 'Workflow',
+    'chat.openFigures': 'Figures',
+    'chat.openFiles': 'Files',
 
     // Message
     'message.copy': 'Copy',
     'message.regenerate': 'Regenerate',
     'message.useful': 'Useful',
     'message.notUseful': 'Not useful',
+    'message.you': 'You',
+    'message.agent': 'Homomics Agent',
+    'message.system': 'System',
+    'message.viewReport': 'View report',
+    'message.fullscreenPlot': 'Fullscreen',
+
+    // Reasoning block
+    'reasoning.title': 'Thinking',
+
+    // Tool call card
+    'toolCall.running': 'Running',
+    'toolCall.showFullOutput': 'Show full output',
+    'toolCall.collapseOutput': 'Collapse output',
+
+    // Artifact message
+    'artifact.untitled': 'Artifact',
+    'artifact.expand': 'Fullscreen',
 
     // Plan
     'plan.approved': 'Plan approved, executing',
@@ -134,6 +161,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.estimatedCost': 'Estimated cost',
     'plan.estimatedTokens': 'Estimated tokens',
     'followUp.title': 'You may also ask',
+    'todoList.viewWorkflow': 'View full workflow',
+    'executionPlan.viewWorkflow': 'View full workflow',
 
     // Plan history
     'planHistory.title': 'Plan Version History',
@@ -281,6 +310,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.reconnectFailed': 'SSE connection lost and reconnect limit reached.',
     'executionLog.subagentCompleted': '{{actor}} completed',
     'executionLog.subagentFailed': '{{actor}} failed',
+    'executionLog.finishedSummary': 'Finished · {{count}} steps',
 
     // Domain Marketplace
     'domain.title': 'Domain Marketplace',
@@ -621,6 +651,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'nav.mcp': 'MCP 服务器',
     'nav.settings': '设置',
 
+    // Overlay titles
+    'overlay.reportTitle': '报告',
+    'overlay.figureTitle': '作图',
+    'overlay.workflowTitle': '工作流',
+
     // TopBar
     'topbar.searchCommands': '搜索命令...',
     'topbar.notifications': '通知',
@@ -685,17 +720,40 @@ const resources: Record<Locale, Record<string, string>> = {
     'chat.sendFailedShort': '发送消息失败',
     'chat.emptyTitle': '开始新的分析对话',
     'chat.emptyDesc': '描述您的生物信息分析需求，例如："帮我完成 PBMC 单细胞数据的标准化与聚类分析"',
+    'chat.openReports': '报告',
+    'chat.openWorkflow': '流程',
+    'chat.openFigures': '图库',
+    'chat.openFiles': '文件',
 
     // Message
     'message.copy': '复制',
     'message.regenerate': '重新生成',
     'message.useful': '有用',
     'message.notUseful': '无用',
+    'message.you': '你',
+    'message.agent': 'Homomics Agent',
+    'message.system': '系统',
+    'message.viewReport': '查看报告',
+    'message.fullscreenPlot': '全屏查看',
+
+    // Reasoning block
+    'reasoning.title': '思考过程',
+
+    // Tool call card
+    'toolCall.running': '运行中',
+    'toolCall.showFullOutput': '显示全部输出',
+    'toolCall.collapseOutput': '收起输出',
+
+    // Artifact message
+    'artifact.untitled': '产物',
+    'artifact.expand': '全屏查看',
+
     'common.hide': '隐藏',
     'common.details': '详情',
     'common.inputs': '输入',
     'common.output': '输出',
     'common.saved': '已保存',
+    'common.download': '下载',
 
     // Plan
     'plan.approved': '计划已批准，开始执行',
@@ -717,6 +775,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.estimatedCost': '预计成本',
     'plan.estimatedTokens': '预计 Token',
     'followUp.title': '你可能还想问',
+    'todoList.viewWorkflow': '查看完整流程图',
+    'executionPlan.viewWorkflow': '查看完整流程图',
 
     // Plan history
     'planHistory.title': '计划版本历史',
@@ -864,6 +924,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.reconnectFailed': 'SSE 连接丢失，已达到最大重试次数。',
     'executionLog.subagentCompleted': '{{actor}} 已完成',
     'executionLog.subagentFailed': '{{actor}} 失败',
+    'executionLog.finishedSummary': '执行完成 · {{count}} 步',
 
     // Domain Marketplace
     'domain.title': 'Domain 市场',

@@ -8,7 +8,13 @@ import { useTranslation } from '@/i18n'
 import { formatActorLabel, groupSubagentLogs } from '@/utils/subagentLogs'
 import type { SubagentLogGroup, SubagentStatus } from '@/utils/subagentLogs'
 
-export function ExecutionLogPanel() {
+interface Props {
+  /** Card-style variant for embedding above the chat input. Auto-expands
+   * while running and collapses to a one-line summary on terminal states. */
+  compact?: boolean
+}
+
+export function ExecutionLogPanel({ compact = false }: Props) {
   const { t } = useTranslation()
   const logs = useExecutionStore((state) => state.logs)
   const status = useExecutionStore((state) => state.status)
@@ -16,6 +22,7 @@ export function ExecutionLogPanel() {
   const clearLogs = useExecutionStore((state) => state.clearLogs)
   const [expanded, setExpanded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const prevStatusRef = useRef(status)
 
   const items = useMemo(() => groupSubagentLogs(logs), [logs])
   // Per-group open state; groups default to expanded while running and
@@ -25,6 +32,24 @@ export function ExecutionLogPanel() {
     openGroups[group.key] ?? group.status === 'running'
   const toggleGroup = (group: SubagentLogGroup) =>
     setOpenGroups((prev) => ({ ...prev, [group.key]: !isGroupOpen(group) }))
+
+  const isTerminal = status === 'completed' || status === 'failed' || status === 'aborted'
+  const stepCount = useMemo(
+    () => logs.filter((log) => log.level === 'tool' || log.level === 'success').length || logs.length,
+    [logs]
+  )
+
+  // Compact mode: auto-expand while running, auto-collapse when the job
+  // reaches a terminal state.
+  useEffect(() => {
+    if (!compact) return
+    if (status === 'running') {
+      setExpanded(true)
+    } else if (prevStatusRef.current === 'running' && isTerminal) {
+      setExpanded(false)
+    }
+    prevStatusRef.current = status
+  }, [compact, status, isTerminal])
 
   useEffect(() => {
     if (expanded) {
@@ -142,17 +167,29 @@ export function ExecutionLogPanel() {
   return (
     <div
       className={clsx(
-        'border-t border-border bg-card transition-all duration-200',
-        expanded ? 'h-64' : 'h-10'
+        'bg-card transition-all duration-200',
+        compact
+          ? 'overflow-hidden rounded-xl border border-border shadow-sm'
+          : clsx('border-t border-border', expanded ? 'h-64' : 'h-10')
       )}
     >
-      <div className="flex h-10 items-center justify-between border-b border-border px-4">
-        <div className="flex items-center gap-3">
-          <Terminal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">{t('executionLog.title')}</span>
+      <div
+        className={clsx(
+          'flex h-10 items-center justify-between px-4',
+          (!compact || expanded) && 'border-b border-border'
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <Terminal className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="shrink-0 text-xs font-medium text-foreground">{t('executionLog.title')}</span>
           {renderStatusBadge()}
+          {compact && !expanded && isTerminal && (
+            <span className="truncate text-xs text-muted-foreground">
+              {t('executionLog.finishedSummary', { count: stepCount })}
+            </span>
+          )}
           {isConnected && (
-            <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
+            <span className="flex h-2 w-2 shrink-0 rounded-full bg-success animate-pulse" />
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -173,9 +210,20 @@ export function ExecutionLogPanel() {
       </div>
 
       {expanded && (
-        <div ref={scrollRef} className="h-[216px] overflow-y-auto p-3 font-mono text-xs">
+        <div
+          ref={scrollRef}
+          className={clsx(
+            'overflow-y-auto p-3 font-mono text-xs',
+            compact ? 'max-h-64' : 'h-[216px]'
+          )}
+        >
           {logs.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
+            <div
+              className={clsx(
+                'flex items-center justify-center text-muted-foreground',
+                compact ? 'h-16' : 'h-full'
+              )}
+            >
               {t('executionLog.empty')}
             </div>
           ) : (

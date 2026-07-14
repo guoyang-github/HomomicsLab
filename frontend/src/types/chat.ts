@@ -12,6 +12,7 @@ export type MessageType =
   | 'file_reference'
   | 'plot'
   | 'plot_data'
+  | 'artifact'
   | 'error'
   | 'system'
 
@@ -137,6 +138,14 @@ export interface PlotDataContent {
   caption?: string
 }
 
+export interface ChatMessageMetadata {
+  /** Chain-of-thought / reasoning text rendered in a collapsible block. */
+  reasoning?: string
+  /** Alias some backends use instead of `reasoning`. */
+  thinking?: string
+  [key: string]: unknown
+}
+
 export interface ChatMessage {
   id: string
   type: MessageType
@@ -146,4 +155,5 @@ export interface ChatMessage {
   task_id?: string
   skill_id?: string
   related_files?: string[]
+  metadata?: ChatMessageMetadata
 }
