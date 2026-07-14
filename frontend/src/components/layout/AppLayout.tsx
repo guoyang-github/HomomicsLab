@@ -7,6 +7,7 @@ import { CommandPalette } from '@/components/ui/CommandPalette'
 import { ToastContainer } from '@/components/ui/Toast'
 import { useToastStore } from '@/stores/toastStore'
 import { CollabLayer } from '@/components/collab'
+import { OverlayManager } from '@/components/overlay'
 
 interface AppLayoutProps {
   activeItem: NavItem
@@ -34,12 +35,11 @@ export function AppLayout({ activeItem, onNavigate, children }: AppLayoutProps) 
       if (isMeta) {
         const navMap: Record<string, NavItem> = {
           '1': 'chat',
-          '2': 'workflow',
-          '3': 'reports',
-          '4': 'files',
-          '5': 'skills',
-          '6': 'domains',
-          '7': 'figures',
+          '2': 'files',
+          '3': 'skills',
+          '4': 'domains',
+          '5': 'mcp',
+          '6': 'settings',
         }
         if (navMap[e.key]) {
           e.preventDefault()
@@ -89,6 +89,7 @@ export function AppLayout({ activeItem, onNavigate, children }: AppLayoutProps) 
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <CollabLayer />
+      <OverlayManager />
     </div>
   )
 }

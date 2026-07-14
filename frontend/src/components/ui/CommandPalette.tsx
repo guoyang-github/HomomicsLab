@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
-import { Search, X, Command, MessageSquare, Workflow, FlaskConical, Settings, FileText, FolderOpen, Image } from 'lucide-react'
+import { Search, X, Command, MessageSquare, FlaskConical, Settings, FolderOpen, Folder, Plug } from 'lucide-react'
 import { Modal } from './Modal'
 import { useTranslation } from '@/i18n'
 
@@ -40,12 +40,11 @@ export function CommandPalette({ open, onClose, items = [], onNavigate }: Comman
     }
     return [
       { id: 'new-chat', title: t('commandPalette.newChat'), icon: MessageSquare, shortcut: '⌘N', onSelect: () => nav('chat') },
-      { id: 'workflow', title: t('commandPalette.openWorkflow'), icon: Workflow, shortcut: '⌘1', onSelect: () => nav('workflow') },
-      { id: 'skills', title: t('commandPalette.browseSkills'), icon: FlaskConical, shortcut: '⌘2', onSelect: () => nav('skills') },
-      { id: 'reports', title: t('commandPalette.viewReports'), icon: FileText, shortcut: '⌘3', onSelect: () => nav('reports') },
-      { id: 'figures', title: t('commandPalette.openFigures'), icon: Image, shortcut: '⌘7', onSelect: () => nav('figures') },
+      { id: 'files', title: t('nav.files'), icon: Folder, shortcut: '⌘2', onSelect: () => nav('files') },
+      { id: 'skills', title: t('commandPalette.browseSkills'), icon: FlaskConical, shortcut: '⌘3', onSelect: () => nav('skills') },
       { id: 'domains', title: t('commandPalette.domainMarketplace'), icon: FolderOpen, shortcut: '⌘4', onSelect: () => nav('domains') },
-      { id: 'settings', title: t('commandPalette.openSettings'), icon: Settings, shortcut: '⌘,', onSelect: () => nav('settings') },
+      { id: 'mcp', title: t('nav.mcp'), icon: Plug, shortcut: '⌘5', onSelect: () => nav('mcp') },
+      { id: 'settings', title: t('commandPalette.openSettings'), icon: Settings, shortcut: '⌘6', onSelect: () => nav('settings') },
     ]
   }, [onNavigate, onClose, t])
 

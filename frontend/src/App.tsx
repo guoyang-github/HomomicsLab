@@ -1,11 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import type { NavItem } from '@/components/layout/Sidebar'
 import { ChatPanel } from '@/components/chat/ChatPanel'
-import { Workspace } from '@/components/workspace/Workspace'
-import { ReportPanel } from '@/components/reports/ReportPanel'
 import { FileBrowser } from '@/components/files/FileBrowser'
-import { FigureWorkbench } from '@/components/Figures'
 import { SkillSearch } from '@/components/skills/SkillSearch'
 import { SkillManager } from '@/components/skills/SkillManager'
 import { SkillGenerator } from '@/components/skills/SkillGenerator'
@@ -15,22 +12,39 @@ import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 
+const NAV_ITEMS: readonly NavItem[] = ['chat', 'files', 'skills', 'domains', 'mcp', 'settings']
+
+// Hash routing: the active view is mirrored to window.location.hash
+// (e.g. #/skills) so refreshes keep the view and links are shareable.
+function navItemFromHash(): NavItem {
+  const slug = window.location.hash.replace(/^#\/?/, '')
+  return (NAV_ITEMS as readonly string[]).includes(slug) ? (slug as NavItem) : 'chat'
+}
+
 function App() {
-  const [activeItem, setActiveItem] = useState<NavItem>('chat')
+  const [activeItem, setActiveItem] = useState<NavItem>(navItemFromHash)
   const { t } = useTranslation()
+
+  useEffect(() => {
+    const handleHashChange = () => setActiveItem(navItemFromHash())
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  const handleNavigate = useCallback((item: NavItem) => {
+    setActiveItem(item)
+    const nextHash = `#/${item}`
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash
+    }
+  }, [])
 
   const renderContent = () => {
     switch (activeItem) {
       case 'chat':
         return <ChatPanel />
-      case 'workflow':
-        return <Workspace />
-      case 'reports':
-        return <ReportPanel />
       case 'files':
         return <FileBrowser />
-      case 'figures':
-        return <FigureWorkbench />
       case 'skills':
         return (
           <div className="h-full p-4">
@@ -68,7 +82,7 @@ function App() {
   }
 
   return (
-    <AppLayout activeItem={activeItem} onNavigate={setActiveItem}>
+    <AppLayout activeItem={activeItem} onNavigate={handleNavigate}>
       {renderContent()}
     </AppLayout>
   )

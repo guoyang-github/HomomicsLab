@@ -1,7 +1,8 @@
-import { Download, FileText, Square } from 'lucide-react'
+import { Download, FileText, Square, Workflow } from 'lucide-react'
 import { useState } from 'react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
+import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskProgress } from '@/types/tasks'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
@@ -207,6 +208,8 @@ export function TodoList({ content }: Props) {
         </div>
       )}
 
+      {(tasks?.length ?? 0) > 0 && <ViewWorkflowButton />}
+
       <ul className="space-y-1">
         {tasks?.map((task) => (
           <li
@@ -314,6 +317,24 @@ export function TodoList({ content }: Props) {
           </p>
         </div>
       )}
+    </div>
+  )
+}
+
+function ViewWorkflowButton() {
+  const { t } = useTranslation()
+  const openWorkflow = useOverlayStore((state) => state.openWorkflow)
+
+  return (
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={() => openWorkflow()}
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+      >
+        <Workflow className="h-3.5 w-3.5" />
+        {t('todoList.viewWorkflow')}
+      </button>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Check, X, Pencil, Layers, Clock, DollarSign } from 'lucide-react'
+import { Check, X, Pencil, Layers, Clock, DollarSign, Workflow } from 'lucide-react'
 import { clsx } from 'clsx'
 import { planApi } from '@/services/api'
 import { usePlanStore } from '@/stores/planStore'
 import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
+import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
 import { Button, Badge, Card, CardHeader, CardDescription, CardContent } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
@@ -21,6 +22,7 @@ export function ExecutionPlan({ content }: Props) {
   const { addMessage, currentSessionId } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { startJob } = useExecutionStore()
+  const openWorkflow = useOverlayStore((state) => state.openWorkflow)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editing, setEditing] = useState(false)
   const [params, setParams] = useState<Record<string, Record<string, unknown>>>(() => {
@@ -262,6 +264,10 @@ export function ExecutionPlan({ content }: Props) {
               {editing ? t('plan.finishEdit') : t('plan.editParams')}
             </Button>
           )}
+          <Button variant="outline" onClick={() => openWorkflow()} disabled={isSubmitting}>
+            <Workflow className="mr-1.5 h-4 w-4" />
+            {t('executionPlan.viewWorkflow')}
+          </Button>
           <Button variant="outline" onClick={openInEditor} disabled={isSubmitting}>
             <Layers className="mr-1.5 h-4 w-4" />
             {t('plan.canvasEdit')}

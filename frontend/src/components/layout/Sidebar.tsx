@@ -2,30 +2,18 @@ import { clsx } from 'clsx'
 import { useEffect, useState } from 'react'
 import {
   MessageSquare,
-  Workflow,
   FlaskConical,
   FolderOpen,
   Folder,
-  FileText,
   Settings,
   Command,
-  Image,
   Plug,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import { healthApi } from '@/sdk'
 
-export type NavItem =
-  | 'chat'
-  | 'workflow'
-  | 'reports'
-  | 'files'
-  | 'figures'
-  | 'skills'
-  | 'domains'
-  | 'mcp'
-  | 'settings'
+export type NavItem = 'chat' | 'files' | 'skills' | 'domains' | 'mcp' | 'settings'
 
 interface SidebarItem {
   id: NavItem
@@ -36,14 +24,11 @@ interface SidebarItem {
 
 const navItems: SidebarItem[] = [
   { id: 'chat', labelKey: 'nav.chat', icon: MessageSquare, shortcut: '⌘1' },
-  { id: 'workflow', labelKey: 'nav.workflow', icon: Workflow, shortcut: '⌘2' },
-  { id: 'reports', labelKey: 'nav.reports', icon: FileText, shortcut: '⌘3' },
-  { id: 'files', labelKey: 'nav.files', icon: Folder, shortcut: '⌘4' },
-  { id: 'figures', labelKey: 'nav.figures', icon: Image, shortcut: '⌘7' },
-  { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘5' },
-  { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘6' },
-  { id: 'mcp', labelKey: 'nav.mcp', icon: Plug, shortcut: '⌘8' },
-  { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘,' },
+  { id: 'files', labelKey: 'nav.files', icon: Folder, shortcut: '⌘2' },
+  { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘3' },
+  { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘4' },
+  { id: 'mcp', labelKey: 'nav.mcp', icon: Plug, shortcut: '⌘5' },
+  { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘6' },
 ]
 
 interface SidebarProps {
