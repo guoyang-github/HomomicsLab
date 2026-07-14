@@ -27,18 +27,25 @@ Decision rules (defaults in parentheses, overridable via constructor):
      (no curated pipeline exists to fix).
   3. Any standalone / no-domain phase -> ``codeact``
      (curated pipeline cannot cover it).
-  4. coverage >= fixed_pipeline_coverage (0.8)
+  4. If historical mode-selection lore exists for this plan's intent
+     features and the historical confidence is high enough, use the
+     recorded best mode.
+  5. coverage >= fixed_pipeline_coverage (0.8)
      AND gap_count <= max_gaps_for_fixed (0)
      AND risk_level != "high"
      -> ``fixed_pipeline``.
-  5. coverage < codeact_coverage (0.5)
+  6. coverage < codeact_coverage (0.5)
      OR gap_count >= codeact_gap_count (2)
      -> ``codeact``.
-  6. Otherwise -> ``auto`` (middle ground: per-phase routing).
+  7. Otherwise -> ``auto`` (middle ground: per-phase routing).
 """
 
-from typing import List
+from typing import List, Optional
 
+from homomics_lab.agent.plan.mode_selection_lore import (
+    IntentFeatures,
+    ModeSelectionLore,
+)
 from homomics_lab.agent.plan.models import PlanResult
 
 VALID_EXECUTION_MODES = ("auto", "fixed_pipeline", "codeact")
@@ -49,10 +56,12 @@ _NON_PIPELINE_DERIVATIONS = ("standalone-skill", "llm-fallback")
 
 
 class ModeSelector:
-    """Rule-based plan-level execution mode selection.
+    """Rule-based plan-level execution mode selection with learned prior.
 
     Thresholds can be overridden via constructor arguments, e.g. per
-    project configuration.
+    project configuration.  When ``lore`` is provided (or left as the
+    default), historically recorded mode observations are consulted before
+    the hard-coded heuristic.
     """
 
     def __init__(
@@ -61,6 +70,10 @@ class ModeSelector:
         codeact_coverage: float = 0.5,
         max_gaps_for_fixed: int = 0,
         codeact_gap_count: int = 2,
+        lore: Optional[ModeSelectionLore] = None,
+        lore_confidence_threshold: float = 0.7,
+        lore_min_samples: float = 3.0,
+        use_lore: bool = True,
     ):
         if not 0.0 <= codeact_coverage <= fixed_pipeline_coverage <= 1.0:
             raise ValueError(
@@ -70,6 +83,24 @@ class ModeSelector:
         self.codeact_coverage = codeact_coverage
         self.max_gaps_for_fixed = max_gaps_for_fixed
         self.codeact_gap_count = codeact_gap_count
+        self.lore_confidence_threshold = lore_confidence_threshold
+        self.lore_min_samples = lore_min_samples
+        if lore is not None:
+            self.lore = lore
+        elif use_lore:
+            self.lore = ModeSelectionLore()
+        else:
+            self.lore = None
+
+    @staticmethod
+    def extract_intent_features(plan: PlanResult) -> IntentFeatures:
+        """Extract stable, hashable intent features from a plan.
+
+        The features are used as the lookup key for historical mode-selection
+        lore.  Domain and intent are recovered from the reproducibility
+        context when available, otherwise from the strategy name.
+        """
+        return IntentFeatures.from_plan(plan)
 
     def select(self, plan: PlanResult) -> str:
         """Return the execution mode for a plan.
@@ -85,8 +116,6 @@ class ModeSelector:
         if plan.is_fallback or not plan.phases:
             return "codeact"
 
-        coverage = self._skill_coverage(plan)
-        gap_count = self._gap_count(plan)
         has_non_pipeline_phase = any(
             (phase.derivation or "") in _NON_PIPELINE_DERIVATIONS
             for phase in plan.phases
@@ -97,7 +126,23 @@ class ModeSelector:
         if has_non_pipeline_phase:
             return "codeact"
 
-        # 4. High coverage, few gaps, acceptable risk -> fixed pipeline.
+        # 4. Consult historical lore before the heuristic.  The prior only
+        # wins when we have enough observations and the winning mode is
+        # clearly dominant.
+        if self.lore is not None:
+            features = self.extract_intent_features(plan)
+            recommended, confidence = self.lore.get_recommendation(
+                features,
+                min_samples=self.lore_min_samples,
+                confidence_threshold=self.lore_confidence_threshold,
+            )
+            if recommended is not None:
+                return recommended
+
+        coverage = self._skill_coverage(plan)
+        gap_count = self._gap_count(plan)
+
+        # 5. High coverage, few gaps, acceptable risk -> fixed pipeline.
         if (
             coverage >= self.fixed_pipeline_coverage
             and gap_count <= self.max_gaps_for_fixed
@@ -105,11 +150,11 @@ class ModeSelector:
         ):
             return "fixed_pipeline"
 
-        # 5. Low coverage or many gaps -> codeact.
+        # 6. Low coverage or many gaps -> codeact.
         if coverage < self.codeact_coverage or gap_count >= self.codeact_gap_count:
             return "codeact"
 
-        # 6. Middle ground: let the phase-level ExecutionRouter decide.
+        # 7. Middle ground: let the phase-level ExecutionRouter decide.
         return "auto"
 
     @staticmethod
@@ -127,10 +172,24 @@ class ModeSelector:
 
     def explain(self, plan: PlanResult) -> List[str]:
         """Return the signal values behind ``select`` for audit output."""
-        return [
+        lines = [
             f"coverage={self._skill_coverage(plan):.2f}",
             f"gaps={self._gap_count(plan)}",
             f"risk_level={plan.risk_level}",
             f"is_fallback={plan.is_fallback}",
-            f"selected_mode={self.select(plan)}",
         ]
+        if self.lore is not None:
+            features = self.extract_intent_features(plan)
+            recommended, confidence = self.lore.get_recommendation(
+                features,
+                min_samples=self.lore_min_samples,
+                confidence_threshold=self.lore_confidence_threshold,
+            )
+            lore_note = (
+                f"lore_recommendation={recommended},confidence={confidence:.2f}"
+                if recommended is not None
+                else f"lore_confidence={confidence:.2f}"
+            )
+            lines.append(lore_note)
+        lines.append(f"selected_mode={self.select(plan)}")
+        return lines

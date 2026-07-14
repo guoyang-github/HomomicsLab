@@ -37,6 +37,7 @@ from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.llm_fallback import LLMFallbackPlanner
 from homomics_lab.agent.plan.mode_selector import ModeSelector
+from homomics_lab.agent.plan.mode_selection_lore import ModeSelectionLore
 from homomics_lab.agent.plan.models import DataState, PlannedGap, PlanResult
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, Phase, StrategyLibrary
 from homomics_lab.agent.retrieval import RetrievalContext, SkillRetriever
@@ -355,16 +356,50 @@ def standard_tasks() -> List[BenchmarkTask]:
     ]
 
 
+# ── Feedback helpers ────────────────────────────────────────────────────
+
+
+def _measured_best_mode(row: BenchmarkRow) -> Tuple[str, float]:
+    """Derive the measured-best mode and a win margin for a benchmark row.
+
+    The benchmark itself does not execute plans, so the "measured best" is
+    approximated from the task label and the estimated mode costs:
+
+      - ``expected_mode`` is treated as the best mode for the task.
+      - ``win_margin`` is the absolute cost difference between the two
+        concrete modes, used to weight the observation in the lore.
+    """
+    margin = abs(row.codeact_cost_usd - row.fixed_cost_usd)
+    return row.expected_mode, margin
+
+
+def _record_row_feedback(
+    lore: ModeSelectionLore,
+    plan: PlanResult,
+    row: BenchmarkRow,
+) -> None:
+    """Write one benchmark observation into the mode-selection lore."""
+    features = ModeSelector.extract_intent_features(plan)
+    measured_mode, margin = _measured_best_mode(row)
+    # Weight the observation by a baseline 1.0 plus the cost win margin so
+    # larger savings contribute more to the learned prior.
+    lore.record(features, measured_mode, outcome_score=1.0 + margin)
+
+
 # ── Runner ──────────────────────────────────────────────────────────────
 
 
-async def _run_task(task: BenchmarkTask) -> BenchmarkRow:
+async def _run_task(
+    task: BenchmarkTask,
+    selector: Optional[ModeSelector] = None,
+    lore: Optional[ModeSelectionLore] = None,
+) -> BenchmarkRow:
     if task.build_plan is not None:
         # Synthetic plan: measure the selector directly, the same way
         # PlanEngine fills the field for engine-built plans.
         plan = task.build_plan()
         start = time.perf_counter()
-        plan.execution_mode = ModeSelector().select(plan)
+        plan.execution_mode = (selector or ModeSelector()).select(plan)
         elapsed_ms = (time.perf_counter() - start) * 1000.0
     elif task.build_engine is not None:
         engine, intent, strategy_name = task.build_engine()
@@ -381,7 +416,7 @@ async def _run_task(task: BenchmarkTask) -> BenchmarkRow:
         if plan.phases
         else 0.0
     )
-    return BenchmarkRow(
+    row = BenchmarkRow(
         task=task.name,
         expected_mode=task.expected_mode,
         selected_mode=selected,
@@ -392,14 +427,26 @@ async def _run_task(task: BenchmarkTask) -> BenchmarkRow:
         fixed_cost_usd=fixed_cost,
         codeact_cost_usd=codeact_cost,
     )
+    if lore is not None:
+        _record_row_feedback(lore, plan, row)
+    return row
 
 
-def run_benchmark(tasks: Optional[List[BenchmarkTask]] = None) -> List[BenchmarkRow]:
-    """Run every task and return the per-task rows."""
+def run_benchmark(
+    tasks: Optional[List[BenchmarkTask]] = None,
+    selector: Optional[ModeSelector] = None,
+    lore: Optional[ModeSelectionLore] = None,
+) -> List[BenchmarkRow]:
+    """Run every task and return the per-task rows.
+
+    When ``lore`` is provided, each row is also recorded as a
+    ``(intent_features -> measured_best_mode)`` observation so the
+    ``ModeSelector`` prior evolves with benchmark runs.
+    """
     tasks = tasks if tasks is not None else standard_tasks()
 
     async def _run_all() -> List[BenchmarkRow]:
-        return [await _run_task(task) for task in tasks]
+        return [await _run_task(task, selector=selector, lore=lore) for task in tasks]
 
     return asyncio.run(_run_all())
 
@@ -437,8 +484,15 @@ def exit_code(rows: List[BenchmarkRow]) -> int:
 
 
 def main() -> int:
-    rows = run_benchmark()
+    selector = ModeSelector()
+    lore = ModeSelectionLore()
+    rows = run_benchmark(selector=selector, lore=lore)
     print(render_markdown(rows))
+    stats = lore.get_stats()
+    print(
+        f"\nMode-selection lore updated: {stats['keys']} feature keys, "
+        f"{stats['total_weight']:.2f} total observation weight."
+    )
     return exit_code(rows)
 
 

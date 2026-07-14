@@ -1,5 +1,7 @@
 """Smoke tests for the mode benchmark harness (P3-2)."""
 
+from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
+from homomics_lab.agent.plan.mode_selection_lore import ModeSelectionLore
 from homomics_lab.evaluation.mode_benchmark import (
     BenchmarkRow,
     estimate_mode_costs,
@@ -8,7 +10,6 @@ from homomics_lab.evaluation.mode_benchmark import (
     run_benchmark,
     standard_tasks,
 )
-from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 
 
 def _row(task: str, expected: str, selected: str) -> BenchmarkRow:
@@ -57,3 +58,15 @@ def test_codeact_cost_exceeds_fixed_pipeline():
     fixed, codeact = estimate_mode_costs(plan)
     assert codeact > fixed
     assert fixed == 0.0  # no per-phase estimates on synthetic phases
+
+
+def test_benchmark_records_mode_lore(tmp_path):
+    """Benchmark writes one (intent_features -> measured_best_mode) entry per row."""
+    lore = ModeSelectionLore(db_path=tmp_path / "mode_lore.db")
+    tasks = [t for t in standard_tasks() if t.build_plan is not None]
+    assert len(tasks) >= 4
+    rows = run_benchmark(tasks, lore=lore)
+    assert all(row.consistent for row in rows)
+    stats = lore.get_stats()
+    assert stats["keys"] > 0
+    assert stats["total_weight"] >= len(tasks)
