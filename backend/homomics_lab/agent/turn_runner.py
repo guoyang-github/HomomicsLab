@@ -77,6 +77,7 @@ from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.store import PlanStore
 from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
+from homomics_lab.knowledge.seed import record_observed_seed_edges
 from homomics_lab.tasks.models import TaskStatus
 from homomics_lab.tasks.task_tree import TaskTree
 
@@ -1389,6 +1390,7 @@ class TurnRunner:
 
                 prev_skill: Optional[str] = None
                 prev_ok = True
+                observed_pairs: List[Tuple[str, str]] = []
                 for task in tree.tasks:
                     if not task.skills_required:
                         continue
@@ -1404,8 +1406,19 @@ class TurnRunner:
                             prev_ok and ok,
                             context=f"Turn execution in project {project_id}",
                         )
+                        if prev_ok and ok:
+                            observed_pairs.append((prev_skill, skill_id))
                     prev_skill = skill_id
                     prev_ok = ok
+
+                # Promote high-confidence observed transitions to observed seed
+                # edges (G4). This is best-effort and never blocks the turn.
+                if observed_pairs:
+                    record_observed_seed_edges(
+                        self.skill_dag,
+                        observed_pairs,
+                        threshold=settings.seed_observed_promotion_threshold,
+                    )
             except Exception:
                 logger.warning(
                     "Failed to record SkillDAG observations", exc_info=True

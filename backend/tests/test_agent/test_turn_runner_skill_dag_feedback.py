@@ -1,6 +1,6 @@
 """Tests for SkillDAG observation recording in TurnRunner execution feedback."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -115,3 +115,52 @@ async def test_no_skill_dag_is_noop():
     )
 
     await runner._record_execution_feedback(tree, {}, "proj_1")
+
+
+@pytest.mark.asyncio
+async def test_promotes_observed_seed_edges_for_successful_pairs():
+    skill_dag = MagicMock()
+    runner = TurnRunner(skill_dag=skill_dag)
+    tree = _make_tree(
+        ("t1", "scanpy_qc", TaskStatus.COMPLETED),
+        ("t2", "scanpy_norm", TaskStatus.COMPLETED),
+    )
+
+    with patch("homomics_lab.agent.turn_runner.record_observed_seed_edges") as mock:
+        await runner._record_execution_feedback(tree, {}, "proj_1")
+
+    mock.assert_called_once()
+    args = mock.call_args.args
+    assert args[0] is skill_dag
+    assert args[1] == [("scanpy_qc", "scanpy_norm")]
+
+
+@pytest.mark.asyncio
+async def test_failed_pairs_are_not_submitted_as_observed_seeds():
+    skill_dag = MagicMock()
+    runner = TurnRunner(skill_dag=skill_dag)
+    tree = _make_tree(
+        ("t1", "scanpy_qc", TaskStatus.COMPLETED),
+        ("t2", "scanpy_norm", TaskStatus.FAILED),
+    )
+
+    with patch("homomics_lab.agent.turn_runner.record_observed_seed_edges") as mock:
+        await runner._record_execution_feedback(tree, {}, "proj_1")
+
+    mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_observed_seed_errors_never_break_feedback():
+    skill_dag = MagicMock()
+    runner = TurnRunner(skill_dag=skill_dag)
+    tree = _make_tree(
+        ("t1", "scanpy_qc", TaskStatus.COMPLETED),
+        ("t2", "scanpy_norm", TaskStatus.COMPLETED),
+    )
+
+    with patch(
+        "homomics_lab.agent.turn_runner.record_observed_seed_edges",
+        side_effect=RuntimeError("observed seed broken"),
+    ):
+        await runner._record_execution_feedback(tree, {}, "proj_1")

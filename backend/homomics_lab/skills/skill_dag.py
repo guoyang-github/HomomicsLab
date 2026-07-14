@@ -64,6 +64,7 @@ class SkillDAGEdge:
     execution_count: int = 0
     success_count: int = 0
     failure_count: int = 0
+    consecutive_success_count: int = 0
     last_validated: Optional[str] = None
 
     context: str = ""  # human-readable explanation
@@ -130,6 +131,7 @@ class SkillDAG:
                     execution_count INTEGER NOT NULL DEFAULT 0,
                     success_count INTEGER NOT NULL DEFAULT 0,
                     failure_count INTEGER NOT NULL DEFAULT 0,
+                    consecutive_success_count INTEGER NOT NULL DEFAULT 0,
                     last_validated TEXT,
                     context TEXT,
                     schema_compatibility_score REAL,
@@ -142,6 +144,14 @@ class SkillDAG:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_to_skill ON skill_dag_edges(to_skill)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_edge_type ON skill_dag_edges(edge_type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON skill_dag_edges(status)")
+            # Backward-compatible migration for databases created before G4.
+            try:
+                conn.execute(
+                    "ALTER TABLE skill_dag_edges ADD COLUMN consecutive_success_count "
+                    "INTEGER NOT NULL DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass  # column already exists
             conn.commit()
 
     def _load_from_db(self) -> None:
@@ -165,6 +175,7 @@ class SkillDAG:
                     execution_count=row["execution_count"],
                     success_count=row["success_count"],
                     failure_count=row["failure_count"],
+                    consecutive_success_count=row["consecutive_success_count"],
                     last_validated=row["last_validated"],
                     context=row["context"] or "",
                     schema_compatibility_score=row["schema_compatibility_score"],
@@ -183,8 +194,9 @@ class SkillDAG:
                 INSERT OR REPLACE INTO skill_dag_edges
                 (id, from_skill, to_skill, edge_type, confidence, status, source,
                  proposed_by, execution_count, success_count, failure_count,
-                 last_validated, context, schema_compatibility_score, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 consecutive_success_count, last_validated, context,
+                 schema_compatibility_score, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     edge.id,
@@ -198,6 +210,7 @@ class SkillDAG:
                     edge.execution_count,
                     edge.success_count,
                     edge.failure_count,
+                    edge.consecutive_success_count,
                     edge.last_validated,
                     edge.context,
                     edge.schema_compatibility_score,
@@ -527,14 +540,55 @@ class SkillDAG:
         edge.execution_count += 1
         if success:
             edge.success_count += 1
+            edge.consecutive_success_count += 1
             edge.confidence = min(1.0, edge.confidence + 0.1)
         else:
             edge.failure_count += 1
+            edge.consecutive_success_count = 0
             edge.confidence = max(0.0, edge.confidence - 0.2)
 
         edge.last_validated = datetime.now(timezone.utc).isoformat()
         self._transition_status(edge)
         self._persist_edge(edge)
+        return edge
+
+    def promote_observed_edge(
+        self,
+        skill_a: str,
+        skill_b: str,
+        edge_type: EdgeType = EdgeType.FOLLOWED_BY,
+        threshold: int = 3,
+    ) -> Optional[SkillDAGEdge]:
+        """Promote a runtime-observed edge to CONFIRMED.
+
+        The edge must have at least ``threshold`` consecutive successes and
+        zero failures. Promoted edges are tagged ``source="observed"`` so they
+        are clearly distinguishable from hand-crafted ``source="seed"``
+        baselines. Strong manual/domain/seed edges are never downgraded or
+        retagged.
+        """
+        edge_id = f"{skill_a}_{edge_type.value}_{skill_b}"
+        edge = self.edges.get(edge_id)
+        if edge is None:
+            return None
+
+        # Never pollute strong seed baselines.
+        if edge.source in ("manual_seed", "domain_seed", "seed"):
+            return edge
+        if edge.proposed_by == "seed" and edge.status == EdgeStatus.CONFIRMED:
+            return edge
+
+        if (
+            edge.status == EdgeStatus.CANDIDATE
+            and edge.consecutive_success_count >= threshold
+            and edge.failure_count == 0
+        ):
+            edge.status = EdgeStatus.CONFIRMED
+            edge.confidence = 1.0
+            edge.source = "observed"
+            edge.last_validated = datetime.now(timezone.utc).isoformat()
+            self._persist_edge(edge)
+
         return edge
 
     def _transition_status(self, edge: SkillDAGEdge) -> None:

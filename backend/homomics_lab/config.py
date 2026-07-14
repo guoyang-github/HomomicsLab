@@ -218,6 +218,11 @@ class Settings(BaseSettings):
     evolution_enabled: bool = False
     evolution_schedule: str = "0 2 * * *"
     scheduler_timezone: str = "UTC"
+
+    # Observed seed self-update (G4): number of consecutive successful runs
+    # required for an observed skill transition to be promoted to a CONFIRMED
+    # SkillDAG edge with source="observed".
+    seed_observed_promotion_threshold: int = 3
     scheduler_run_at_startup: bool = False
 
     # Skill sandbox / security settings

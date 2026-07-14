@@ -19,7 +19,7 @@ Isolation guarantees:
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -146,13 +146,15 @@ def seed_baselines(
             report["skipped"] += 1
             continue
 
-        skill_dag.propose_edge(
+        edge = skill_dag.propose_edge(
             from_skill=from_skill,
             to_skill=to_skill,
             edge_type=edge_type,
             context=context,
             proposed_by=SEED_PROPOSED_BY,
         )
+        edge.source = "seed"
+        skill_dag._persist_edge(edge)
         for _ in range(SEED_EDGE_SUCCESSES):
             edge = skill_dag.record_observation(
                 from_skill, to_skill, edge_type, success=True, context=context
@@ -176,3 +178,31 @@ def is_store_empty(cbkb: CBKB, skill_dag: SkillDAG) -> bool:
     if node_count > 0:
         return False
     return not any(e.status == EdgeStatus.CONFIRMED for e in skill_dag.edges.values())
+
+
+def record_observed_seed_edges(
+    skill_dag: SkillDAG,
+    pairs: List[Tuple[str, str]],
+    threshold: int = 3,
+) -> Dict[str, Any]:
+    """Promote high-confidence observed skill transitions to seed edges.
+
+    ``pairs`` should contain adjacent skill transitions that were both executed
+    successfully in a single run. Each pair is evaluated against
+    ``SkillDAG.promote_observed_edge``; when an edge reaches ``threshold``
+    consecutive successes with zero failures it is promoted to CONFIRMED and
+    tagged ``source="observed"``.
+
+    Hand-crafted ``source="seed"`` / ``source="manual_seed"`` /
+    ``source="domain_seed"`` baselines are never retagged or downgraded.
+
+    Returns a report dict with keys ``pairs_evaluated`` and ``promoted``.
+    """
+    promoted: List[str] = []
+    for from_skill, to_skill in pairs:
+        edge = skill_dag.promote_observed_edge(
+            from_skill, to_skill, EdgeType.FOLLOWED_BY, threshold=threshold
+        )
+        if edge is not None and edge.status == EdgeStatus.CONFIRMED and edge.source == "observed":
+            promoted.append(edge.id)
+    return {"pairs_evaluated": len(pairs), "promoted": promoted}
