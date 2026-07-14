@@ -23,6 +23,7 @@ from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.runtime import SkillRuntimeExecutor, UntrustedSkillError
 from homomics_lab.skills.skill_store import SkillStore
 from homomics_lab.skills.trust import TrustLevel, policy_for, resolve_trust_level
+from homomics_lab.tools.approval_store import PersistentApprovalStore
 
 
 def make_skill(**metadata) -> SkillDefinition:
@@ -149,14 +150,16 @@ class RecordingScheduler:
         return {"ok": True}
 
 
-def build_executor(external_skill_dir, tmp_path, monkeypatch, interactive=False, **metadata):
+def build_executor(external_skill_dir, tmp_path, monkeypatch, interactive=False, approval_store=None, **metadata):
     monkeypatch.setattr(settings, "interactive_mode", interactive)
     registry = SkillRegistry()
     loader = SkillLoader(registry=registry)
     skill = loader.load_discovery(external_skill_dir)
     skill.metadata.update(metadata)
     registry.register(skill)
-    executor = SkillRuntimeExecutor(registry=registry, working_dir=tmp_path)
+    executor = SkillRuntimeExecutor(
+        registry=registry, working_dir=tmp_path, approval_store=approval_store
+    )
     # These tests assert on dispatch behaviour (scheduler call, HITL tagging);
     # the memoization cache would short-circuit dispatch with cross-test cache
     # hits (same skill content + inputs), so disable it.
@@ -182,14 +185,28 @@ class TestRuntimeTrustGate:
     async def test_experimental_allowed_interactive_with_hitl_marker(
         self, external_skill_dir, tmp_path, monkeypatch
     ):
+        approval_store = PersistentApprovalStore(db_path=tmp_path / "approvals.db")
         executor, scheduler = build_executor(
             external_skill_dir, tmp_path, monkeypatch,
-            interactive=True, source="external", trusted=False,
+            interactive=True, approval_store=approval_store,
+            source="external", trusted=False,
         )
-        result = await executor.execute("external-skill", {"value": 5})
+        # Without approval the true HITL gate pauses before dispatch.
+        pending = await executor.execute(
+            "external-skill", {"value": 5, "_approval_call_id": "hitl-1"}
+        )
+        assert pending["status"] == "awaiting_human"
+        assert pending["mode"] == "awaiting_skill_approval"
+        assert scheduler.allow_local_sandbox_calls == []
 
+        # After explicit approval the skill runs and is tagged.
+        approval_store.approve(pending["hitl"]["task_id"])
+        result = await executor.execute(
+            "external-skill", {"value": 5, "_approval_call_id": "hitl-1"}
+        )
         assert scheduler.allow_local_sandbox_calls == [False]
         assert result["hitl_required"] is True
+        assert result["hitl_approved"] is True
         assert result["trust_level"] == "experimental"
 
     @pytest.mark.asyncio
@@ -220,11 +237,22 @@ class TestSandboxAllowLocalByLevel:
         self, external_skill_dir, tmp_path, monkeypatch,
         metadata, interactive, expected_allow_local,
     ):
+        approval_store = PersistentApprovalStore(db_path=tmp_path / "approvals.db")
         executor, scheduler = build_executor(
             external_skill_dir, tmp_path, monkeypatch,
-            interactive=interactive, **metadata,
+            interactive=interactive, approval_store=approval_store, **metadata,
         )
-        await executor.execute("external-skill", {"value": 5})
+        # EXPERIMENTAL skills in interactive mode must be approved before dispatch.
+        if interactive and metadata.get("trusted") is False:
+            pending = await executor.execute(
+                "external-skill", {"value": 5, "_approval_call_id": "hitl-sandbox"}
+            )
+            assert pending["status"] == "awaiting_human"
+            approval_store.approve(pending["hitl"]["task_id"])
+
+        await executor.execute(
+            "external-skill", {"value": 5, "_approval_call_id": "hitl-sandbox"}
+        )
         assert scheduler.allow_local_sandbox_calls == [expected_allow_local]
 
 

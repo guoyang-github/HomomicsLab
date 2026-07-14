@@ -29,8 +29,9 @@ from homomics_lab.skills.trust import TrustLevel, policy_for, resolve_trust_leve
 from homomics_lab.hpc.scheduler import get_scheduler, BaseScheduler
 from homomics_lab.hpc.router import select_execution_backend
 from homomics_lab.llm_client import LLMClient
+from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
 from homomics_lab.stability.schema_validator import SchemaValidator
-from homomics_lab.tools.approval import ToolApprovalRequired
+from homomics_lab.tools.approval import ToolApprovalRequired, get_default_approval_store
 from homomics_lab.tools.registry import ToolRegistry, get_default_tool_registry
 from homomics_lab.workspace.context import current_workspace
 
@@ -61,6 +62,7 @@ class SkillRuntimeExecutor:
         llm_client: Optional[LLMClient] = None,
         provenance_recorder = None,
         progress_callback: Optional[Callable[[Any], None]] = None,
+        approval_store = None,
     ):
         self.registry = registry or get_default_registry()
         self.working_dir = working_dir
@@ -72,6 +74,7 @@ class SkillRuntimeExecutor:
         self.llm_client = llm_client
         self.provenance_recorder = provenance_recorder
         self.progress_callback = progress_callback
+        self.approval_store = approval_store or get_default_approval_store()
         self.parent_job_id: Optional[str] = None
         self._agent_executor: Optional[AgentSkillExecutor] = None
         self.data_store = DataStore(
@@ -360,16 +363,9 @@ class SkillRuntimeExecutor:
                 f"to execute in non-interactive mode. "
                 f"Run 'homomics trust {skill_id}' or POST /skills/{skill_id}/trust first."
             )
-        if policy.require_hitl:
-            # No skill-level approval hook exists in this runtime; record the
-            # HITL requirement in the log and on the execution result instead
-            # of inventing a new approval UI.
-            logger.warning(
-                "Skill '%s' at trust level '%s' requires HITL review; "
-                "proceeding because interactive mode is enabled",
-                skill_id,
-                level.value,
-            )
+        # EXPERIMENTAL skills are allowed in interactive mode, but they must
+        # receive explicit human approval before they actually run. The gate
+        # below uses the same PersistentApprovalStore as high-risk tool calls.
 
         # Schema validation (if validator configured)
         if self.schema_validator is not None:
@@ -390,6 +386,19 @@ class SkillRuntimeExecutor:
                 validated["_timeout_seconds"] = inputs[override_key]
                 break
 
+        # Skill-level HITL gate (G1): require explicit approval for EXPERIMENTAL
+        # skills before execution or cache retrieval. The same call_id is used
+        # across retries/resumes so approval is durable per task.
+        hitl_call_id: Optional[str] = None
+        hitl_approved = False
+        if policy.require_hitl:
+            approved, hitl_call_id, hitl_response = self._ensure_skill_approved(
+                skill_id, inputs, validated, level
+            )
+            if not approved:
+                return hitl_response
+            hitl_approved = True
+
         start_time = time.time()
         workspace = self._bind_workspace()
         # For agentic/declarative skills, surface the workspace and any
@@ -402,6 +411,8 @@ class SkillRuntimeExecutor:
             cached = self.cache.get(skill_id, validated, fingerprint=fingerprint)
             if cached is not None:
                 result = self._unwrap_cached(cached, skill_id=skill_id)
+                if hitl_approved and isinstance(result, dict):
+                    result["hitl_approved"] = True
                 if policy.require_hitl:
                     self._tag_hitl(result, level)
                 if self.tracker is not None:
@@ -457,6 +468,8 @@ class SkillRuntimeExecutor:
             if self._is_cacheable(skill) and self.cache is not None:
                 self.cache.put(skill_id, validated, stored, fingerprint=fingerprint)
             final_result = self._unwrap_reference(stored, skill_id=skill_id)
+            if hitl_approved and isinstance(final_result, dict):
+                final_result["hitl_approved"] = True
             if policy.require_hitl:
                 self._tag_hitl(final_result, level)
             return final_result
@@ -680,6 +693,71 @@ class SkillRuntimeExecutor:
         if skill.metadata.get("code_act") is True or skill.metadata.get("agent") is True:
             return False
         return skill.runtime.type.lower() in {"python", "r", "mixed"} and skill.has_entrypoint
+
+    def _ensure_skill_approved(
+        self,
+        skill_id: str,
+        inputs: Dict[str, Any],
+        validated: Dict[str, Any],
+        level: TrustLevel,
+    ) -> tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Check or request human approval for an EXPERIMENTAL skill.
+
+        Returns a tuple ``(approved, call_id, response)``. When ``approved`` is
+        False, ``response`` is the HITL payload the caller should surface.
+        """
+        call_id = (
+            inputs.get("_approval_call_id")
+            or inputs.get("_task_id")
+            or str(uuid.uuid4())
+        )
+        resolution = inputs.get("resolution", {})
+        if resolution.get("choice") == "approve" or self.approval_store.is_approved(call_id):
+            return True, call_id, None
+
+        self.approval_store.create_request(
+            tool_name=skill_id,
+            arguments=validated,
+            risk_level=level.value,
+            metadata={
+                "skill_id": skill_id,
+                "trust_level": level.value,
+                "call_id": call_id,
+            },
+            call_id=call_id,
+        )
+        checkpoint = HITLCheckpoint(
+            id=call_id,
+            trigger_reason=HITLTrigger.POLICY,
+            context_summary=(
+                f"Skill '{skill_id}' is at trust level '{level.value}' and "
+                "requires explicit human approval before execution."
+            ),
+            options=[
+                Option(
+                    id="approve",
+                    label="Approve",
+                    description="Run this skill once",
+                ),
+                Option(
+                    id="decline",
+                    label="Decline",
+                    description="Cancel this skill execution",
+                ),
+            ],
+            metadata={"skill_id": skill_id, "trust_level": level.value},
+        )
+        return (
+            False,
+            call_id,
+            {
+                "status": "awaiting_human",
+                "hitl": {"task_id": call_id, "checkpoint": checkpoint.model_dump()},
+                "skill_id": skill_id,
+                "success": False,
+                "mode": "awaiting_skill_approval",
+            },
+        )
 
     @staticmethod
     def _tag_hitl(result: Any, level: TrustLevel) -> None:

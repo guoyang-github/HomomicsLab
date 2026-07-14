@@ -4,6 +4,7 @@ Replaces hardcoded BioinfoAgent, VizAgent, ExperimentAgent, etc.
 Each instance is configured by a RoleDefinition loaded at runtime.
 """
 
+import copy
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.base_agent import BaseAgent
@@ -47,7 +48,14 @@ class DynamicAgent(BaseAgent):
 
         result = None
         if skill_id and self.skill_executor:
-            result = await self.skill_executor.execute(skill_id, getattr(task, "parameters", {}))
+            params = copy.deepcopy(getattr(task, "parameters", {}) or {})
+            task_id = getattr(task, "id", None)
+            if task_id is None:
+                # Tests and ad-hoc callers may pass task-like objects without an id.
+                task_id = f"anon_{skill_id or 'task'}"
+            params["_approval_call_id"] = task_id
+            params["_task_id"] = task_id
+            result = await self.skill_executor.execute(skill_id, params)
         else:
             result = {"message": f"Agent {self.name} executed {task.name}"}
 
