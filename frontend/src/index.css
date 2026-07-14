@@ -6,26 +6,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 30 25% 99%;
     --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
+    --card: 30 20% 98%;
     --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
+    --popover: 30 20% 98%;
     --popover-foreground: 222 47% 11%;
     --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
+    --secondary: 30 15% 94%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
+    --muted: 30 15% 94%;
     --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 15 65% 59%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --border: 30 12% 90%;
+    --border-faint: 30 15% 92%;
+    --input: 30 12% 90%;
+    --ring: 15 65% 59%;
     --radius: 0.5rem;
+
+    /* Surface hierarchy */
+    --surface: 30 20% 98%;
+    --surface-foreground: 222 47% 11%;
+    --surface-2: 30 12% 94%;
+    --surface-2-foreground: 222 47% 11%;
 
     /* Phase 1 design tokens (additive; legacy tokens above stay untouched) */
     /* Spacing scale */
@@ -51,23 +58,30 @@
   .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
+    --card: 222 40% 9%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 8%;
+    --popover: 222 40% 9%;
     --popover-foreground: 210 40% 98%;
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
+    --secondary: 222 25% 16%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
+    --muted: 222 25% 16%;
     --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 15 60% 55%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 224 76% 48%;
+    --border: 222 20% 18%;
+    --border-faint: 222 20% 15%;
+    --input: 222 20% 18%;
+    --ring: 15 60% 55%;
+
+    /* Surface hierarchy */
+    --surface: 222 40% 9%;
+    --surface-foreground: 210 40% 98%;
+    --surface-2: 222 25% 14%;
+    --surface-2-foreground: 210 40% 98%;
 
     /* Elevation — stronger shadows on dark surfaces */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
@@ -141,6 +155,21 @@
   }
   .ring-ring {
     --tw-ring-color: hsl(var(--ring));
+  }
+  .bg-surface {
+    background-color: hsl(var(--surface));
+  }
+  .text-surface-foreground {
+    color: hsl(var(--surface-foreground));
+  }
+  .bg-surface-2 {
+    background-color: hsl(var(--surface-2));
+  }
+  .text-surface-2-foreground {
+    color: hsl(var(--surface-2-foreground));
+  }
+  .border-border-faint {
+    border-color: hsl(var(--border-faint));
   }
 }
 

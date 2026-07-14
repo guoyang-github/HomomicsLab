@@ -287,22 +287,22 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   return (
     <div
       {...getRootProps()}
-      className={clsx('px-4 pb-4 pt-2 transition-colors', isDragActive && 'bg-primary/5')}
+      className={clsx('px-6 pb-5 pt-3 transition-colors', isDragActive && 'bg-accent/5')}
     >
       <input {...getInputProps()} />
 
       <div className="mx-auto w-full max-w-[780px]">
         {isDragActive && (
-          <div className="mb-3 rounded-lg border-2 border-dashed border-primary bg-primary/5 p-4 text-center text-sm text-primary">
+          <div className="mb-3 rounded-lg border-2 border-dashed border-accent bg-accent/5 p-4 text-center text-sm text-accent">
             {t('chat.dropToUpload')}
           </div>
         )}
 
         <div
           className={clsx(
-            'rounded-2xl border bg-card shadow-lg transition-all duration-fast',
-            'focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/30',
-            isDragActive ? 'border-primary' : 'border-border'
+            'rounded-2xl border bg-surface shadow-lg transition-all duration-fast',
+            'focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/20',
+            isDragActive ? 'border-accent' : 'border-border-faint'
           )}
         >
           {pendingFiles.length > 0 && (
@@ -316,7 +316,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
                       ? 'border-error/30 bg-error/10 text-error'
                       : pending.uploaded
                       ? 'border-success/30 bg-success/10 text-success'
-                      : 'border-border bg-muted'
+                      : 'border-border-faint bg-surface-2'
                   )}
                 >
                   <FileText className="h-3.5 w-3.5" />
@@ -340,7 +340,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
             placeholder={t('chat.placeholder')}
             rows={1}
             className={clsx(
-              'max-h-[200px] min-h-[48px] w-full resize-none bg-transparent px-4 py-3 text-sm',
+              'max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 py-3.5 text-[15px] leading-relaxed',
               'text-foreground placeholder:text-muted-foreground',
               'focus-visible:outline-none'
             )}
@@ -375,7 +375,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-full"
+              className="h-9 w-9 shrink-0 rounded-full !bg-accent !text-accent-foreground hover:!bg-accent/90"
               title={t('chat.sendHint')}
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

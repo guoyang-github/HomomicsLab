@@ -56,7 +56,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-faint bg-surface px-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onToggleSidebar} title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}>
           <PanelLeft className="h-5 w-5" />
@@ -64,7 +64,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
         <button
           onClick={onOpenCommandPalette}
           className={clsx(
-            'hidden items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted sm:flex',
+            'hidden items-center gap-2 rounded-lg border border-border-faint bg-surface-2/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2 sm:flex',
             'w-64'
           )}
         >
@@ -105,7 +105,7 @@ export function TopBar({ onOpenCommandPalette, collapsed, onToggleSidebar }: Top
           )}
         </Button>
 
-        <div className="flex items-center rounded-lg border border-border p-0.5">
+        <div className="flex items-center rounded-lg border border-border-faint p-0.5">
           <Button
             variant={theme === 'light' ? 'secondary' : 'ghost'}
             size="icon"

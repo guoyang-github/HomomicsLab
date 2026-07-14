@@ -22,7 +22,6 @@ export function ExecutionLogPanel({ compact = false }: Props) {
   const clearLogs = useExecutionStore((state) => state.clearLogs)
   const [expanded, setExpanded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const prevStatusRef = useRef(status)
 
   const items = useMemo(() => groupSubagentLogs(logs), [logs])
   // Per-group open state; groups default to expanded while running and
@@ -38,18 +37,6 @@ export function ExecutionLogPanel({ compact = false }: Props) {
     () => logs.filter((log) => log.level === 'tool' || log.level === 'success').length || logs.length,
     [logs]
   )
-
-  // Compact mode: auto-expand while running, auto-collapse when the job
-  // reaches a terminal state.
-  useEffect(() => {
-    if (!compact) return
-    if (status === 'running') {
-      setExpanded(true)
-    } else if (prevStatusRef.current === 'running' && isTerminal) {
-      setExpanded(false)
-    }
-    prevStatusRef.current = status
-  }, [compact, status, isTerminal])
 
   useEffect(() => {
     if (expanded) {
@@ -138,7 +125,7 @@ export function ExecutionLogPanel({ compact = false }: Props) {
   const renderGroup = (group: SubagentLogGroup) => {
     const open = isGroupOpen(group)
     return (
-      <div key={group.key} className="rounded border border-border bg-muted/20">
+      <div key={group.key} className="rounded border border-border-faint bg-surface-2/40">
         <button
           type="button"
           onClick={() => toggleGroup(group)}
@@ -167,10 +154,10 @@ export function ExecutionLogPanel({ compact = false }: Props) {
   return (
     <div
       className={clsx(
-        'bg-card transition-all duration-200',
+        'bg-surface transition-all duration-200',
         compact
-          ? 'overflow-hidden rounded-xl border border-border shadow-sm'
-          : clsx('border-t border-border', expanded ? 'h-64' : 'h-10')
+          ? 'overflow-hidden rounded-xl border border-border-faint shadow-sm'
+          : clsx('border-t border-border-faint', expanded ? 'h-64' : 'h-10')
       )}
     >
       <div

@@ -156,6 +156,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.canvasEdit': 'Canvas Edit',
     'plan.openedInEditor': 'Plan editor opened in canvas. Drag to adjust structure and parameters.',
     'plan.progress': 'Progress',
+    'progress.steps': '{{count}} steps',
     'plan.versionLabel': 'Version {{version}}',
     'plan.estimatedDuration': 'Estimated duration',
     'plan.estimatedCost': 'Estimated cost',
@@ -282,6 +283,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'workspace.loadingProvenance': 'Loading provenance graph...',
     'workspace.noProvenanceData': 'No provenance data',
     'workspace.noProvenanceDataDesc': 'Run an analysis workflow to generate a lineage graph.',
+    'workspace.provenanceHint': 'Provenance shows how analysis steps, data and files are linked. It is useful for tracing the origin of a result.',
 
     // Detail Panel
     'detail.selectHint': 'Click a node to view details, or upload data to start analysis',
@@ -572,6 +574,10 @@ const resources: Record<Locale, Record<string, string>> = {
     'figures.detectedTableType': 'Type: {{type}}',
     'figures.groupColumns': 'Groups',
 
+    // Inline figure card
+    'figureCard.editPlaceholder': 'Describe the change you want...',
+    'figureCard.editSubmit': 'Send edit request',
+
     // MCP Marketplace
     'mcp.title': 'MCP Server Marketplace',
     'mcp.subtitle': 'Enable or install external MCP servers; their tools appear alongside native tools',
@@ -770,6 +776,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'plan.canvasEdit': '画布编辑',
     'plan.openedInEditor': '已在画布中打开计划编辑器，您可以拖拽调整结构与参数。',
     'plan.progress': '进度',
+    'progress.steps': '{{count}} 步',
     'plan.versionLabel': '版本 {{version}}',
     'plan.estimatedDuration': '预计耗时',
     'plan.estimatedCost': '预计成本',
@@ -896,6 +903,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'workspace.loadingProvenance': '加载血缘图...',
     'workspace.noProvenanceData': '暂无血缘数据',
     'workspace.noProvenanceDataDesc': '运行分析流程以生成血缘图。',
+    'workspace.provenanceHint': '血缘图展示分析步骤、数据与文件之间的溯源关系，可用于追踪结果的来源。',
 
     // Detail Panel
     'detail.selectHint': '点击节点查看详情，或上传数据开始分析',
@@ -1185,6 +1193,10 @@ const resources: Record<Locale, Record<string, string>> = {
     'figures.detectedStructure': '检测到的数据结构',
     'figures.detectedTableType': '类型：{{type}}',
     'figures.groupColumns': '分组',
+
+    // Inline figure card
+    'figureCard.editPlaceholder': '描述你想要的修改…',
+    'figureCard.editSubmit': '发送改图请求',
 
     // MCP Marketplace
     'mcp.title': 'MCP 服务器市场',

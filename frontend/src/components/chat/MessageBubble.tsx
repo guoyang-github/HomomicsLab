@@ -13,26 +13,24 @@ import {
   Eye,
   Quote,
   User,
-  Maximize2,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/shadcn/avatar'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
-import { TodoList } from './TodoList'
+import { ExecutionResult } from './ExecutionResult'
 import { ExecutionPlan } from './ExecutionPlan'
 import { HITLRequest } from './HITLRequest'
 import { PlanApproval } from './PlanApproval'
 import { DebateRequest } from './DebateRequest'
-import { PlotChart } from '../shared/PlotChart'
 import { ResultPreview, type ResultPreviewContent } from './ResultPreview'
 import { FollowUpSuggestions } from './FollowUpSuggestions'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ArtifactMessage, type ArtifactMessageContent } from './ArtifactMessage'
+import { FigureCard } from './FigureCard'
 import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
 import { toastSuccess } from '@/stores/toastStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useChatStore } from '@/stores/chatStore'
-import { useOverlayStore } from '@/stores/overlayStore'
 import type { Artifact } from '@/components/artifacts'
 import type {
   ChatMessage,
@@ -152,7 +150,6 @@ export function MessageBubble({ message, onRegenerate }: Props) {
   const isSystem = message.sender === 'system'
   const currentProjectId = useProjectStore((state) => state.currentProjectId)
   const setDraftInput = useChatStore((state) => state.setDraftInput)
-  const openFigure = useOverlayStore((state) => state.openFigure)
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null)
 
@@ -205,7 +202,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
     switch (message.type) {
       case 'todo_list':
         if (isTodoListContent(message.content)) {
-          return <TodoList content={message.content} />
+          return <ExecutionResult content={message.content} />
         }
         return null
       case 'execution_plan':
@@ -235,74 +232,12 @@ export function MessageBubble({ message, onRegenerate }: Props) {
         return null
       case 'plot':
         if (isPlotContent(message.content)) {
-          return (
-            <div className="space-y-2">
-              {message.content.title && (
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {message.content.title}
-                </div>
-              )}
-              <div className="relative inline-block max-w-full">
-                <img
-                  src={`data:image/png;base64,${message.content.image_base64}`}
-                  alt={message.content.plot_type}
-                  className="max-w-full rounded-lg border border-border shadow-card"
-                  style={{ maxHeight: '320px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    openFigure({ plot: { type: 'plot' as const, content: message.content } })
-                  }
-                  className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card/90 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
-                  title={t('message.fullscreenPlot')}
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {message.content.caption && (
-                <div className="text-xs italic text-muted-foreground">{message.content.caption}</div>
-              )}
-            </div>
-          )
+          return <FigureCard content={message.content} type="plot" />
         }
         return null
       case 'plot_data':
         if (isPlotDataContent(message.content)) {
-          return (
-            <div className="w-full space-y-2">
-              {message.content.title && (
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {message.content.title}
-                </div>
-              )}
-              <div className="relative w-full">
-                <PlotChart
-                  request={{
-                    plot_type: message.content.plot_type as any,
-                    data: message.content.data,
-                    title: message.content.title,
-                    width: 700,
-                    height: 450,
-                  }}
-                  className="w-full rounded-lg border border-border"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    openFigure({ plot: { type: 'plot_data' as const, content: message.content } })
-                  }
-                  className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card/90 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
-                  title={t('message.fullscreenPlot')}
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {message.content.caption && (
-                <div className="text-xs italic text-muted-foreground">{message.content.caption}</div>
-              )}
-            </div>
-          )
+          return <FigureCard content={message.content} type="plot_data" />
         }
         return null
       case 'result_preview':
@@ -356,14 +291,23 @@ export function MessageBubble({ message, onRegenerate }: Props) {
       transition={MESSAGE_ENTER_TRANSITION}
       className="group flex gap-3 sm:gap-4"
     >
-      <Avatar className="mt-0.5 h-8 w-8 shrink-0 border border-border">
+      <Avatar
+        className={clsx(
+          'mt-0.5 h-8 w-8 shrink-0 border-2',
+          isUser
+            ? 'border-primary/20'
+            : isSystem
+            ? 'border-warning/30'
+            : 'border-accent/30'
+        )}
+      >
         <AvatarFallback
           className={clsx(
             isUser
               ? 'bg-primary/10 text-primary'
               : isSystem
               ? 'bg-warning/10 text-warning'
-              : 'bg-muted text-muted-foreground'
+              : 'bg-accent/10 text-accent'
           )}
         >
           <RoleIcon className="h-4 w-4" />
@@ -378,20 +322,20 @@ export function MessageBubble({ message, onRegenerate }: Props) {
             <div className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 onClick={handleCopy}
-                className="rounded p-1 hover:bg-muted"
+                className="rounded p-1 hover:bg-surface-2"
                 title={t('message.copy')}
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               {onRegenerate && (
-                <button onClick={onRegenerate} className="rounded p-1 hover:bg-muted" title={t('message.regenerate')}>
+                <button onClick={onRegenerate} className="rounded p-1 hover:bg-surface-2" title={t('message.regenerate')}>
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               )}
               <button
                 onClick={() => handleFeedback('positive')}
                 className={clsx(
-                  'rounded p-1 hover:bg-muted',
+                  'rounded p-1 hover:bg-surface-2',
                   feedback === 'positive' && 'text-success'
                 )}
                 title={t('message.useful')}
@@ -401,7 +345,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
               <button
                 onClick={() => handleFeedback('negative')}
                 className={clsx(
-                  'rounded p-1 hover:bg-muted',
+                  'rounded p-1 hover:bg-surface-2',
                   feedback === 'negative' && 'text-error'
                 )}
                 title={t('message.notUseful')}
@@ -415,11 +359,11 @@ export function MessageBubble({ message, onRegenerate }: Props) {
         {reasoning && <ReasoningBlock reasoning={reasoning} />}
 
         {isUser ? (
-          <div className="inline-block max-w-full rounded-2xl bg-muted/70 px-4 py-2.5 text-sm">
+          <div className="inline-block max-w-full rounded-2xl bg-surface px-4 py-2.5 text-[15px] leading-relaxed">
             {renderContent()}
           </div>
         ) : (
-          <div className="text-sm">{renderContent()}</div>
+          <div className="text-[15px] leading-relaxed">{renderContent()}</div>
         )}
 
         {message.related_files && message.related_files.length > 0 && (
@@ -429,7 +373,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
               return (
                 <div
                   key={path}
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+                  className="flex items-center gap-1.5 rounded-md border border-border-faint bg-surface px-2 py-1 text-xs"
                 >
                   <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="max-w-[160px] truncate" title={path}>

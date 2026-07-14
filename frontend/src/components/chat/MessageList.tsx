@@ -112,7 +112,7 @@ export function MessageList() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[780px] space-y-6 px-4 py-6">
+      <div className="mx-auto w-full max-w-[780px] space-y-8 px-6 py-8">
         {messages.map((message, index) => (
           <MessageBubble
             key={message.id}

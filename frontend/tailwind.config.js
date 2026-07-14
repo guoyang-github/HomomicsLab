@@ -11,6 +11,7 @@ export default {
         // shadcn semantic tokens (CSS variables defined in src/index.css).
         // Keep in sync with the :root / .dark blocks there.
         border: 'hsl(var(--border))',
+        'border-faint': 'hsl(var(--border-faint))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
@@ -41,6 +42,14 @@ export default {
         accent: {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
+        },
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          foreground: 'hsl(var(--surface-foreground))',
+        },
+        'surface-2': {
+          DEFAULT: 'hsl(var(--surface-2))',
+          foreground: 'hsl(var(--surface-2-foreground))',
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',

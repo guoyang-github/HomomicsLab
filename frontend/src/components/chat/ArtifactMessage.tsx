@@ -122,32 +122,38 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
   const url = artifactUrl(projectId, artifact)
   const isHtml = kind === 'html'
   const reportId = (artifact as unknown as Record<string, unknown>).report_id as string | undefined
+  const summary =
+    (artifact as unknown as Record<string, unknown>).summary ||
+    (artifact.data && typeof artifact.data === 'object'
+      ? (artifact.data as Record<string, unknown>).summary
+      : undefined)
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+    <div className="overflow-hidden rounded-xl border border-border-faint bg-surface shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border-faint px-3 py-2 text-xs">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
         <span className="flex-1 truncate font-medium text-foreground" title={name}>
           {name || t('artifact.untitled')}
         </span>
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-2xs uppercase text-muted-foreground">
+        <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-2xs uppercase text-muted-foreground">
           {kind}
         </span>
         {reportId && (
           <button
             type="button"
             onClick={() => openReport({ reportId })}
-            className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-medium text-accent-foreground transition-opacity hover:opacity-90"
             title={t('message.viewReport')}
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-3 w-3" />
+            {t('message.viewReport')}
           </button>
         )}
         {isHtml && (
           <button
             type="button"
             onClick={() => setFullscreen(true)}
-            className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
             title={t('artifact.expand')}
           >
             <Maximize2 className="h-3.5 w-3.5" />
@@ -159,13 +165,20 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
             target="_blank"
             rel="noreferrer"
             download
-            className="inline-flex shrink-0 items-center rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex shrink-0 items-center rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
             title={t('common.download')}
           >
             <Download className="h-3.5 w-3.5" />
           </a>
         )}
       </div>
+
+      {typeof summary === 'string' && summary && (
+        <div className="border-b border-border-faint px-3 py-2 text-xs text-muted-foreground">
+          {summary}
+        </div>
+      )}
+
       <div className={clsx('p-2', kind === 'table' && 'p-0')}>
         {kind === 'plotly' ? (
           <PlotlyBody artifact={artifact} />
@@ -183,7 +196,7 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
                 src={url}
                 title={name}
                 sandbox=""
-                className="min-h-0 flex-1 rounded border border-border bg-white"
+                className="min-h-0 flex-1 rounded border border-border-faint bg-white"
               />
             ) : (
               <ArtifactRenderer artifact={artifact} projectId={projectId} />
