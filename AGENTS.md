@@ -253,6 +253,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs:
 - Keep domain-specific configuration out of Python when possible — put it in `domain.yaml`.
 - Use Pydantic models for API contracts and config; use SQLAlchemy for persistence.
 - All environment-driven config belongs in `backend/homomics_lab/config.py`.
+- Self-improvement data:
+  - `agent/plan/mode_selection_lore.py` stores `(intent_features → execution_mode)` statistics learned from `evaluation/mode_benchmark.py`; `ModeSelector` uses them as a prior when confidence and sample thresholds are met.
+  - `knowledge/seed.py` / `skills/skill_dag.py` distinguish `source="seed"` (hand-curated YAML) from `source="observed"` (auto-promoted from consecutive successful skill transitions via `_record_execution_feedback`). Observed edges are promoted to `CONFIRMED` only after `seed_observed_promotion_threshold` consecutive successes and zero failures.
 
 ## Project conventions
 
