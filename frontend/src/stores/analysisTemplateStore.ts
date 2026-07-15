@@ -20,7 +20,10 @@ export const useAnalysisTemplateStore = create<AnalysisTemplateState>((set) => (
     set({ loading: true, error: null })
     try {
       const response = await analysisTemplateApi.listTemplates()
-      set({ templates: response.data, loading: false })
+      const templates = Array.isArray(response.data)
+        ? response.data
+        : response.data?.templates ?? []
+      set({ templates, loading: false })
     } catch (err) {
       set({
         loading: false,

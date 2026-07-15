@@ -102,7 +102,7 @@ export const projectApi = {
 
 export const analysisTemplateApi = {
   listTemplates: () =>
-    api.get<AnalysisTemplate[]>('/templates'),
+    api.get<{ templates: AnalysisTemplate[] }>('/templates'),
 }
 
 export interface FileEntry {

@@ -378,7 +378,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
               disabled={templatesLoading}
               options={[
                 { value: '', label: t('sessionList.noTemplate') },
-                ...templates.map((t) => ({ value: t.template_id, label: t.name })),
+                ...(Array.isArray(templates) ? templates : []).map((t) => ({ value: t.template_id, label: t.name })),
               ]}
             />
             {selectedTemplateId && (
