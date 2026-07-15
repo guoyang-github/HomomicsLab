@@ -1,4 +1,5 @@
-import { Download, FileText, Workflow } from 'lucide-react'
+import { clsx } from 'clsx'
+import { Download, FileText, Workflow, CheckCircle2, Circle } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
@@ -79,6 +80,43 @@ function formatSize(bytes: unknown): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
 }
 
+interface DisplaySubtask {
+  id: string
+  description: string
+  analysis_type?: string
+}
+
+function collectSubtasks(tasks: TaskNode[] | undefined): { id: string; description: string; status: TaskNode['status'] }[] {
+  if (!tasks) return []
+  const items: { id: string; description: string; status: TaskNode['status'] }[] = []
+  for (const task of tasks) {
+    const raw = task.parameters?.display_subtasks
+    if (Array.isArray(raw) && raw.length >= 2) {
+      for (const sub of raw) {
+        if (typeof sub === 'object' && sub !== null && typeof (sub as DisplaySubtask).description === 'string') {
+          items.push({
+            id: (sub as DisplaySubtask).id || `${task.id}_sub_${items.length}`,
+            description: (sub as DisplaySubtask).description,
+            status: task.status,
+          })
+        }
+      }
+    }
+  }
+  return items
+}
+
+function isRichSummary(text: string): boolean {
+  // Rich summaries produced by the backend result_summary module contain
+  // section headers, tables, or sourced findings. Generic fallbacks like
+  // "分析已完成" are not rich.
+  if (!text || text.length < 30) return false
+  const hasSection = /\*\*(关键指标|关键发现|解读|下一步建议|CellTypist|注释结果|一致性比较|结果|来源)\*\*/.test(text)
+  const hasTable = /\n\|[^\n]+\|\n\|[-:| ]+\|/.test(text)
+  const hasFinding = /^\d+\.\s+/m.test(text)
+  return hasSection || hasTable || hasFinding
+}
+
 export function ExecutionResult({ content }: Props) {
   const { t } = useTranslation()
   const executionStatus = useExecutionStore((state) => state.status)
@@ -101,8 +139,12 @@ export function ExecutionResult({ content }: Props) {
   const failureMessage =
     normalizedResult?.error || normalizedResult?.error_message || normalizedResult?.detail
 
-  const summaryText =
-    normalizedResult?.final_output?.summary || normalizedResult?.summary || content.text
+  // Prefer the deterministic rich summary the backend embeds in the TODO card.
+  // Only fall back to the skill's own summary when the backend did not produce
+  // a rich one, so the chat always shows sourced tables/metrics when available.
+  const summaryText = isRichSummary(content.text)
+    ? content.text
+    : normalizedResult?.final_output?.summary || normalizedResult?.summary || content.text
 
   const messageArtifacts: Artifact[] = Array.isArray(normalizedResult?.artifacts)
     ? (normalizedResult!.artifacts as Artifact[])
@@ -111,10 +153,36 @@ export function ExecutionResult({ content }: Props) {
     : []
 
   const outputFiles = collectOutputFiles(normalizedResult)
+  const subtaskItems = collectSubtasks(content.tasks)
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed">
       {summaryText && <MarkdownRenderer content={summaryText} />}
+
+      {subtaskItems.length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-border-faint bg-surface/50 p-3">
+          {subtaskItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 text-sm">
+              {item.status === 'completed' ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+              ) : item.status === 'failed' ? (
+                <FileText className="h-4 w-4 shrink-0 text-error" />
+              ) : (
+                <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+              <span
+                className={clsx(
+                  'flex-1',
+                  item.status === 'completed' && 'text-muted-foreground line-through',
+                  item.status === 'failed' && 'text-error'
+                )}
+              >
+                {item.description}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {content.tasks?.length > 0 && (
         <div className="flex justify-end">

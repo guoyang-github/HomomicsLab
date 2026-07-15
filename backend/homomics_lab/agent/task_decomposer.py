@@ -58,6 +58,13 @@ _SUB_INTENT_KEYWORDS: List[Tuple[str, str]] = [
     ("annotation", "cell annotation"),
     ("annotation", "annotate"),
     ("annotation", "注释"),
+    ("label_comparison", "比较"),
+    ("label_comparison", "对比"),
+    ("label_comparison", "一致性"),
+    ("label_comparison", "all_celltype"),
+    ("label_comparison", "compare"),
+    ("label_comparison", "agreement"),
+    ("label_comparison", "consistency"),
     ("visualization", "可视化"),
     ("visualization", "visualization"),
     ("visualization", "plot"),
@@ -303,6 +310,84 @@ class TaskDecomposer:
             return intent
         return dataclasses.replace(intent, sub_intents=combined)
 
+    @staticmethod
+    def _build_display_subtasks(
+        intent: UserIntent,
+        skills: List[SkillDefinition],
+    ) -> List[Dict[str, Any]]:
+        """Build user-facing semantic sub-steps from intent.sub_intents.
+
+        A standalone skill may execute several logically distinct actions in
+        one run (e.g. CellTypist annotates cells AND compares the predicted
+        labels with an existing column). Rather than artificially splitting
+        the skill into multiple execution tasks, we surface the user's own
+        sub-goals as display items in the TODO checklist.
+        """
+        sub_intents = intent.sub_intents or []
+        if len(sub_intents) < 2:
+            return []
+
+        # Keep only concrete, distinct analysis sub-intents. Drop broad domain
+        # containers so the list stays focused on what the user asked for.
+        broad = {"general", "builtin_analysis", "analysis", "unknown", "single_cell_analysis"}
+        seen: set[str] = set()
+        concrete: List[UserIntent] = []
+        for sub in sub_intents:
+            atype = sub.analysis_type
+            if atype in broad or atype in seen:
+                continue
+            seen.add(atype)
+            concrete.append(sub)
+
+        if len(concrete) < 2:
+            return []
+
+        skill_name = skills[0].name if skills else ""
+        skill_id = skills[0].id if skills else ""
+        user_msg = (intent.original_message or "").lower()
+        has_comparison = any(kw in user_msg for kw in ("比较", "对比", "一致性", "compare", "agreement", "consistency"))
+
+        subtasks: List[Dict[str, Any]] = []
+        for idx, sub in enumerate(concrete, start=1):
+            atype = sub.analysis_type
+            if atype == "annotation":
+                desc = f"Automated cell type annotation using {skill_name or 'selected skill'}"
+            elif atype == "label_comparison":
+                desc = "Compare predicted labels with existing annotations"
+                if "all_celltype" in user_msg:
+                    desc = "Compare predicted labels with existing all_celltype annotations"
+            elif atype == "clustering":
+                desc = "Cluster cells into subpopulations"
+            elif atype == "dim_reduction":
+                desc = "Dimensionality reduction (PCA/UMAP)"
+            elif atype == "differential_expression":
+                desc = "Differential expression analysis"
+            elif atype == "visualization":
+                desc = "Generate visualization"
+            elif atype == "qc":
+                desc = "Quality control"
+            elif atype == "normalization":
+                desc = "Normalization"
+            else:
+                desc = atype.replace("_", " ").title()
+            subtasks.append({
+                "id": f"{skill_id or 'step'}_sub_{idx}",
+                "description": desc,
+                "analysis_type": atype,
+            })
+
+        # If the user explicitly asked for a comparison but no comparison
+        # sub-intent was derived, add it as a second display step tied to the
+        # skill's natural output.
+        if has_comparison and not any(s["analysis_type"] == "label_comparison" for s in subtasks):
+            subtasks.append({
+                "id": f"{skill_id or 'step'}_sub_compare",
+                "description": "Compare predicted labels with existing annotations",
+                "analysis_type": "label_comparison",
+            })
+
+        return subtasks if len(subtasks) >= 2 else []
+
     def _has_domain_strategy(self, analysis_type: str) -> bool:
         """Return True if a non-generic strategy explicitly claims this intent."""
         plan_engine = self._get_plan_engine()
@@ -390,6 +475,10 @@ class TaskDecomposer:
             return plan, self._plan_result_to_task_tree(plan)
 
         if assembly.route == "standalone_skill":
+            # Derive semantic sub-intents (e.g. annotate + compare consistency) from
+            # the user message so the standalone skill plan can surface them as
+            # distinct TODO items even when a single skill executes the work.
+            intent = self._merge_derived_sub_intents(intent)
             if assembly.prebuilt_skills:
                 standalone_plan = self._plan_from_prebuilt_skills(
                     assembly.prebuilt_skills, intent
@@ -533,20 +622,30 @@ class TaskDecomposer:
         """Build a linear plan directly from explicitly selected skills.
 
         This avoids re-running semantic search when the assembler has already
-        resolved the user's request to one or more concrete skills.
+        resolved the request to one or more concrete skills. When the user
+        message implies multiple semantic sub-steps (e.g. annotate + compare
+        consistency), they are stored as ``display_subtasks`` on the phase so
+        the TODO list can surface them without forcing a single skill to be
+        executed more than once.
         """
         from homomics_lab.agent.plan.standalone_planner import (
             StandaloneSkillPlanner,
         )
 
+        display_subtasks = self._build_display_subtasks(intent, skills)
+
         phases: List[Phase] = []
         for skill in skills:
+            parameters: Dict[str, Any] = {}
+            if display_subtasks:
+                parameters["display_subtasks"] = display_subtasks
             phases.append(
                 Phase(
                     phase_type=skill.id,
                     description=skill.description or f"Execute skill {skill.name}",
                     required=True,
                     selected_skill=skill,
+                    parameters=parameters,
                     derivation=StandaloneSkillPlanner.DERIVATION,
                     risk_level=StandaloneSkillPlanner.RISK_LEVEL,
                 )

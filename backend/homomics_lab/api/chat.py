@@ -570,14 +570,14 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             if result.agent_message is not None:
                 await websocket.send_json({
                     "type": result.agent_message.type.value,
-                    "message": result.agent_message.model_dump(),
+                    "message": result.agent_message.model_dump(mode="json"),
                 })
 
             # Push any plot attachments separately so the frontend can render them
             for attachment in result.attachments:
                 await websocket.send_json({
                     "type": attachment.type.value,
-                    "message": attachment.model_dump(),
+                    "message": attachment.model_dump(mode="json"),
                 })
 
     except WebSocketDisconnect:

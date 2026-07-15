@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { clsx } from 'clsx'
 import { Loader2, Workflow, X } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
-import type { TaskNode } from '@/types/tasks'
+import type { TaskNode, TaskStatus } from '@/types/tasks'
 
 const statusIcons: Record<TaskNode['status'], string> = {
   pending: '⬜',
@@ -14,6 +14,56 @@ const statusIcons: Record<TaskNode['status'], string> = {
   failed: '❌',
   awaiting_human: '⏸️',
   aborted: '🚫',
+}
+
+interface DisplaySubtask {
+  id: string
+  description: string
+  analysis_type?: string
+}
+
+interface FlattenedItem {
+  id: string
+  description: string
+  status: TaskStatus
+  isSubtask: boolean
+}
+
+function getDisplaySubtasks(task: TaskNode): DisplaySubtask[] | null {
+  const raw = task.parameters?.display_subtasks
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  return raw.filter(
+    (s): s is DisplaySubtask =>
+      typeof s === 'object' &&
+      s !== null &&
+      typeof (s as DisplaySubtask).id === 'string' &&
+      typeof (s as DisplaySubtask).description === 'string'
+  )
+}
+
+function flattenTasks(tasks: TaskNode[]): FlattenedItem[] {
+  const items: FlattenedItem[] = []
+  for (const task of tasks) {
+    const subtasks = getDisplaySubtasks(task)
+    if (subtasks && subtasks.length >= 2) {
+      for (const sub of subtasks) {
+        items.push({
+          id: sub.id,
+          description: sub.description,
+          status: task.status,
+          isSubtask: true,
+        })
+      }
+    } else {
+      items.push({
+        id: task.id,
+        description: task.description,
+        status: task.status,
+        isSubtask: false,
+      })
+    }
+  }
+  return items
 }
 
 export function TodoChecklist() {
@@ -31,13 +81,15 @@ export function TodoChecklist() {
     setHidden(false)
   }, [status])
 
+  const items = useMemo(() => flattenTasks(tasks), [tasks])
+
   if (hidden) return null
-  if (tasks.length === 0 && status === 'idle') return null
+  if (items.length === 0 && status === 'idle') return null
 
   const isTerminal = status === 'completed' || status === 'aborted' || status === 'failed'
-  const completedCount = tasks.filter((task) => task.status === 'completed').length
-  const failedCount = tasks.filter((task) => task.status === 'failed').length
-  const visibleTasks = tasks.slice(0, 5)
+  const completedCount = items.filter((item) => item.status === 'completed').length
+  const failedCount = items.filter((item) => item.status === 'failed').length
+  const visibleItems = items.slice(0, 6)
 
   return (
     <div className="mx-auto w-full max-w-[780px] px-6 pb-2">
@@ -48,10 +100,10 @@ export function TodoChecklist() {
             <span className="text-xs font-medium text-foreground">
               {isTerminal
                 ? t('executionLog.completed')
-                : `${t('executionLog.running')} · ${completedCount}/${tasks.length}`}
+                : `${t('executionLog.running')} · ${completedCount}/${items.length}`}
             </span>
             {failedCount > 0 && (
-              <span className="text-xs text-error">{failedCount} {failedCount === 1 ? 'failed' : 'failed'}</span>
+              <span className="text-xs text-error">{failedCount} failed</span>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -77,24 +129,25 @@ export function TodoChecklist() {
         </div>
 
         <div className="mt-1.5 space-y-0.5">
-          {visibleTasks.map((task) => (
-            <div key={task.id} className="flex items-center gap-2 text-xs">
-              <span className="shrink-0">{statusIcons[task.status]}</span>
+          {visibleItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 text-xs">
+              <span className="shrink-0">{statusIcons[item.status]}</span>
               <span
                 className={clsx(
                   'flex-1 truncate',
-                  task.status === 'completed' && 'text-muted-foreground line-through',
-                  task.status === 'failed' && 'text-error'
+                  item.status === 'completed' && 'text-muted-foreground line-through',
+                  item.status === 'failed' && 'text-error',
+                  item.isSubtask && 'pl-2'
                 )}
-                title={task.description}
+                title={item.description}
               >
-                {task.description}
+                {item.description}
               </span>
             </div>
           ))}
-          {tasks.length > visibleTasks.length && (
+          {items.length > visibleItems.length && (
             <div className="pl-5 text-[10px] text-muted-foreground">
-              +{tasks.length - visibleTasks.length} more
+              +{items.length - visibleItems.length} more
             </div>
           )}
         </div>

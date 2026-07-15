@@ -74,26 +74,43 @@ class ResultAssembler:
 
     @staticmethod
     def envelopes_from_results(results: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Harvest artifact envelopes from an orchestrator ``run_tree`` result map."""
+        """Harvest artifact envelopes from an orchestrator ``run_tree`` result map.
+
+        The orchestrator returns a per-task wrapper like
+        ``{task_id: {"result": <skill-output>, "skill": ..., "status": ...}}``.
+        We look for artifact declarations both in the wrapper and inside the
+        nested ``result`` so summaries work regardless of which layer produced
+        the output keys.
+        """
         if not results:
             return []
-        collected: List[Dict[str, Any]] = []
-        for raw in results.values():
-            if not isinstance(raw, dict):
-                continue
-            arts = raw.get("artifacts")
+
+        def _collect_from(obj: Any) -> List[Dict[str, Any]]:
+            if not isinstance(obj, dict):
+                return []
+            collected: List[Dict[str, Any]] = []
+            arts = obj.get("artifacts")
             if isinstance(arts, list) and arts:
                 collected.extend(ResultAssembler.envelopes_from_artifacts(arts))
-                continue
             paths: List[Any] = []
-            for key in ("output_files", "output_paths"):
-                val = raw.get(key)
+            for key in ("output_files", "output_paths", "output_csv", "output_h5ad"):
+                val = obj.get(key)
                 if isinstance(val, (list, tuple)):
                     paths.extend(val)
                 elif isinstance(val, (str, Path)):
                     paths.append(val)
             if paths:
                 collected.extend(ResultAssembler.envelopes_from_artifacts(paths))
+            return collected
+
+        collected: List[Dict[str, Any]] = []
+        for raw in results.values():
+            if not isinstance(raw, dict):
+                continue
+            collected.extend(_collect_from(raw))
+            nested = raw.get("result")
+            if isinstance(nested, dict):
+                collected.extend(_collect_from(nested))
         # de-dup by path
         seen: set = set()
         out: List[Dict[str, Any]] = []
