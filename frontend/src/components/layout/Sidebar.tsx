@@ -161,7 +161,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
       <div
         className={clsx(
           'relative flex shrink-0 items-center border-b border-border-faint',
-          collapsed ? 'h-12 justify-center px-1' : 'h-12 justify-between px-3'
+          collapsed ? 'h-12 justify-between px-1' : 'h-12 justify-between px-3'
         )}
       >
         <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -195,16 +195,14 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
             <span className="truncate text-[10px] text-muted-foreground">Bioinfo Agent</span>
           </div>
         )}
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-            title={t('topbar.collapseSidebar')}
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+          title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
+        >
+          <PanelLeft className={clsx('h-4 w-4', collapsed && 'rotate-180')} />
+        </button>
       </div>
 
       <nav className="shrink-0 space-y-0.5 p-2">
@@ -285,23 +283,12 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
       <SidebarSessions collapsed={collapsed} />
 
       <div className="shrink-0 border-t border-border-faint p-2">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-center gap-2">
           {!collapsed && (
             <div className="rounded-lg bg-surface-2/60 px-2.5 py-1.5 text-[10px] text-muted-foreground">
               HomomicsLab {versionLabel}
             </div>
           )}
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className={clsx(
-              'rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
-              collapsed && 'mx-auto'
-            )}
-            title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
-          >
-            <PanelLeft className={clsx('h-4 w-4', !collapsed && 'rotate-180')} />
-          </button>
         </div>
       </div>
 
