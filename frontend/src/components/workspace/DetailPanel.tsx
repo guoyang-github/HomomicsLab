@@ -1,13 +1,8 @@
 import { useTaskStore } from '@/stores/taskStore'
-import { DataUploader } from '@/components/shared/DataUploader'
 import { PlanHistory } from './PlanHistory'
-import { Button, Badge, Card, CardHeader, CardTitle, CardContent, Separator } from '@/components/ui'
+import { Badge, Card, CardHeader, CardTitle, CardContent, Separator } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 import {
-  Play,
-  RotateCcw,
-  SkipForward,
-  Square,
   Clock,
   Layers,
   Wrench,
@@ -32,10 +27,9 @@ export function DetailPanel() {
   if (!task) {
     return (
       <div className="w-80 overflow-y-auto border-l border-border bg-card p-4">
-        <div className="mb-4 rounded-lg border border-border bg-muted/50 p-4 text-center">
+        <div className="rounded-lg border border-border bg-muted/50 p-4 text-center">
           <p className="text-sm text-muted-foreground">{t('detail.selectHint')}</p>
         </div>
-        <DataUploader />
         <div className="mt-6">
           <PlanHistory />
         </div>
@@ -56,25 +50,6 @@ export function DetailPanel() {
       </div>
 
       <p className="mb-4 text-sm text-muted-foreground">{task.description}</p>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" disabled aria-label={t('workflow.run')}>
-          <Play className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.run')}
-        </Button>
-        <Button size="sm" variant="outline" disabled aria-label={t('workflow.retry')}>
-          <RotateCcw className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.retry')}
-        </Button>
-        <Button size="sm" variant="outline" disabled aria-label={t('workflow.skip')}>
-          <SkipForward className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.skip')}
-        </Button>
-        <Button size="sm" variant="outline" disabled aria-label={t('workflow.abort')}>
-          <Square className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.abort')}
-        </Button>
-      </div>
 
       <Card className="mb-4">
         <CardHeader className="pb-3">

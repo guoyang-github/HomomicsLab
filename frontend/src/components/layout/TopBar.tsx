@@ -75,8 +75,8 @@ export function TopBar({ onOpenCommandPalette }: TopBarProps) {
         <button
           onClick={onOpenCommandPalette}
           className={clsx(
-            'hidden items-center gap-2 rounded-lg border border-border-faint bg-surface-2/60 px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-surface-2 sm:flex',
-            'w-64'
+            'hidden items-center gap-2 rounded-lg border border-border-faint bg-surface-2/60 px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-surface-2 sm:flex',
+            'w-44'
           )}
         >
           <Search className="h-4 w-4" />

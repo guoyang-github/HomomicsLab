@@ -30,6 +30,31 @@ function normalizeResult(raw: Record<string, any> | null | undefined): Record<st
   return raw
 }
 
+function collectOutputFiles(normalized: Record<string, any> | null): string[] {
+  if (!normalized) return []
+  const out: string[] = []
+  for (const key of ['output_files', 'output_paths', 'output_csv', 'output_h5ad']) {
+    const val = normalized[key]
+    if (typeof val === 'string' && val) {
+      out.push(val)
+    } else if (Array.isArray(val)) {
+      val.forEach((v) => typeof v === 'string' && v && out.push(v))
+    }
+  }
+  return [...new Set(out)]
+}
+
+function fileLink(projectId: string | undefined, path: string): string | null {
+  if (!projectId || !path) return null
+  const marker = `/workspaces/${projectId}/`
+  const idx = path.indexOf(marker)
+  const rel =
+    idx >= 0
+      ? path.slice(idx + marker.length)
+      : path.replace(/^.*\/(outputs|results|data)\//, '$1/')
+  return fileApi.fileUrl(projectId, rel)
+}
+
 function artifactLink(projectId: string | undefined, artifact: Artifact): string | null {
   if (artifact.url) return artifact.url
   if (artifact.preview_url) return artifact.preview_url
@@ -69,8 +94,10 @@ export function ExecutionResult({ content }: Props) {
     )?.result || null
   const rawResult = content.result || taskResult || executionResult
   const normalizedResult = normalizeResult(rawResult)
-  const isSuccess = normalizedResult?.success === true
-  const isFailure = normalizedResult?.success === false || normalizedResult?.status === 'failure'
+  const isFailure =
+    normalizedResult?.success === false ||
+    normalizedResult?.status === 'failure' ||
+    content.status === 'failed'
   const failureMessage =
     normalizedResult?.error || normalizedResult?.error_message || normalizedResult?.detail
 
@@ -82,6 +109,8 @@ export function ExecutionResult({ content }: Props) {
     : Array.isArray(content.artifacts)
     ? content.artifacts
     : []
+
+  const outputFiles = collectOutputFiles(normalizedResult)
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed">
@@ -107,7 +136,10 @@ export function ExecutionResult({ content }: Props) {
         </div>
       )}
 
-      {isSuccess && messageArtifacts.length > 0 && renderArtifactLinks(messageArtifacts, content.project_id, t)}
+      {messageArtifacts.length > 0 && renderArtifactLinks(messageArtifacts, content.project_id, t, isFailure)}
+
+      {outputFiles.length > 0 && messageArtifacts.length === 0 &&
+        renderFileLinks(outputFiles, content.project_id, t)}
 
       {isFailure && (
         <div className="rounded-lg border border-error/30 bg-error/5 p-3">
@@ -121,11 +153,16 @@ export function ExecutionResult({ content }: Props) {
   )
 }
 
-function renderArtifactLinks(items: Artifact[], projectId: string | undefined, t: (key: string) => string) {
+function renderArtifactLinks(
+  items: Artifact[],
+  projectId: string | undefined,
+  t: (key: string) => string,
+  failed?: boolean
+) {
   return (
     <div className="mt-2 space-y-1">
       <p className="text-xs font-medium text-foreground/80">
-        {t('common.output')} ({items.length})
+        {failed ? t('common.output') : t('common.output')} ({items.length})
       </p>
       {items.map((artifact, idx) => {
         const href = artifactLink(projectId, artifact)
@@ -141,6 +178,41 @@ function renderArtifactLinks(items: Artifact[], projectId: string | undefined, t
               {name}
             </span>
             {size && <span className="text-[10px] text-muted-foreground">{size}</span>}
+            {href && (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:underline"
+              >
+                <Download className="h-3.5 w-3.5" /> {t('common.download')}
+              </a>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function renderFileLinks(paths: string[], projectId: string | undefined, t: (key: string) => string) {
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-xs font-medium text-foreground/80">
+        {t('common.output')} ({paths.length})
+      </p>
+      {paths.map((path, idx) => {
+        const href = fileLink(projectId, path)
+        const name = path.split('/').pop() || `file-${idx}`
+        return (
+          <div
+            key={`${path}-${idx}`}
+            className="flex items-center gap-2 rounded border border-border-faint bg-surface px-3 py-1.5 text-xs"
+          >
+            <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+            <span className="flex-1 truncate" title={name}>
+              {name}
+            </span>
             {href && (
               <a
                 href={href}

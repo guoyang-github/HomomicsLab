@@ -12,9 +12,6 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import {
-  Play,
-  RotateCcw,
-  SkipForward,
   Square,
   AlertCircle,
   CheckCircle2,
@@ -22,8 +19,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
-import { useExecutionStore } from '@/stores/executionStore'
-import { Badge, Button } from '@/components/ui'
+import { Badge } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
 
@@ -126,10 +122,8 @@ const nodeTypes = {
 }
 
 export function FlowCanvas() {
-  const { t } = useTranslation()
   const tasks = useTaskStore((state) => state.tasks)
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
-  const jobId = useExecutionStore((state) => state.jobId)
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -202,30 +196,6 @@ export function FlowCanvas() {
 
   return (
     <div className="h-full w-full">
-      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-border bg-card/90 p-1.5 shadow-card backdrop-blur">
-        <Button variant="ghost" size="sm" title={t('workflow.run')} disabled aria-label={t('workflow.run')}>
-          <Play className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.run')}
-        </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.retry')} disabled aria-label={t('workflow.retry')}>
-          <RotateCcw className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.retry')}
-        </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.skip')} disabled aria-label={t('workflow.skip')}>
-          <SkipForward className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.skip')}
-        </Button>
-        <Button variant="ghost" size="sm" title={t('workflow.abort')} disabled aria-label={t('workflow.abort')}>
-          <Square className="mr-1 h-3.5 w-3.5" />
-          {t('workflow.abort')}
-        </Button>
-        {jobId && (
-          <Badge variant="outline" size="sm" className="ml-2">
-            Job: {jobId.slice(0, 8)}...
-          </Badge>
-        )}
-      </div>
-
       <ReactFlow
         nodes={nodes}
         edges={edges}

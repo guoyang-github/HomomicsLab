@@ -160,8 +160,8 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
     >
       <div
         className={clsx(
-          'flex shrink-0 items-center border-b border-border-faint',
-          collapsed ? 'h-12 justify-center px-1' : 'h-12 justify-between px-3'
+          'relative flex shrink-0 items-center border-b border-border-faint',
+          collapsed ? 'h-12 justify-between px-2' : 'h-12 justify-between px-3'
         )}
       >
         <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -198,17 +198,44 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         <button
           type="button"
           onClick={onToggleCollapse}
-          className={clsx(
-            'rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
-            collapsed && 'absolute right-1 top-3'
-          )}
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
           title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
         >
           <PanelLeft className={clsx('h-4 w-4', collapsed && 'rotate-180')} />
         </button>
       </div>
 
-      <div className="shrink-0 border-b border-border-faint p-2">
+      <nav className="shrink-0 space-y-0.5 p-2">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          const label = t(item.labelKey)
+          const isActive = activeItem === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={clsx(
+                'group flex items-center gap-2.5 rounded-lg py-1.5 text-[13px] font-medium transition-colors',
+                collapsed ? 'w-full justify-center px-0' : 'w-full px-2',
+                isActive
+                  ? 'bg-surface-2 text-accent'
+                  : 'text-muted-foreground hover:bg-surface-2/60 hover:text-foreground'
+              )}
+              title={collapsed ? label : undefined}
+            >
+              <Icon className={clsx('h-4 w-4 shrink-0', isActive && 'text-accent')} />
+              {!collapsed && <span className="flex-1 text-left">{label}</span>}
+              {!collapsed && item.shortcut && (
+                <kbd className="hidden rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground group-hover:inline-block">
+                  {item.shortcut}
+                </kbd>
+              )}
+            </button>
+          )
+        })}
+      </nav>
+
+      <div className="shrink-0 border-t border-border-faint p-2">
         {collapsed ? (
           <button
             type="button"
@@ -251,36 +278,6 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
           </>
         )}
       </div>
-
-      <nav className="shrink-0 space-y-0.5 p-2">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const label = t(item.labelKey)
-          const isActive = activeItem === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={clsx(
-                'group flex items-center gap-2.5 rounded-lg py-1.5 text-[13px] font-medium transition-colors',
-                collapsed ? 'w-full justify-center px-0' : 'w-full px-2',
-                isActive
-                  ? 'bg-surface-2 text-accent'
-                  : 'text-muted-foreground hover:bg-surface-2/60 hover:text-foreground'
-              )}
-              title={collapsed ? label : undefined}
-            >
-              <Icon className={clsx('h-4 w-4 shrink-0', isActive && 'text-accent')} />
-              {!collapsed && <span className="flex-1 text-left">{label}</span>}
-              {!collapsed && item.shortcut && (
-                <kbd className="hidden rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground group-hover:inline-block">
-                  {item.shortcut}
-                </kbd>
-              )}
-            </button>
-          )
-        })}
-      </nav>
 
       <SidebarSessions collapsed={collapsed} />
 

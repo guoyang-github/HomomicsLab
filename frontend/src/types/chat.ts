@@ -17,12 +17,17 @@ export type MessageType =
   | 'system'
 
 import type { TaskNode, TaskProgress } from './tasks'
+import type { Artifact } from '@/components/artifacts'
 
 export interface TodoListContent {
   text: string
   tasks: TaskNode[]
   progress?: TaskProgress
   job_id?: string
+  project_id?: string
+  status?: 'pending' | 'running' | 'completed' | 'failed'
+  result?: Record<string, any>
+  artifacts?: Artifact[]
 }
 
 export interface PlanEstimates {
