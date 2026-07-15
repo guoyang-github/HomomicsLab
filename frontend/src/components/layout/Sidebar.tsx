@@ -160,16 +160,18 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
     >
       <div
         className={clsx(
-          'relative flex h-12 shrink-0 items-center border-b border-border-faint',
-          collapsed ? 'justify-center px-1' : 'justify-between px-3'
+          'relative flex h-10 shrink-0 items-center border-b border-border-faint',
+          collapsed ? 'justify-center px-1' : 'justify-between px-2'
         )}
       >
-        <div className="flex items-center gap-0.5">
-          <div className={clsx(
-            'relative flex shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground',
-            collapsed ? 'h-7 w-7' : 'h-8 w-8'
-          )}>
-            <Command className={clsx(collapsed ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+        <div className="flex items-center gap-2">
+          <div
+            className={clsx(
+              'relative flex shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground',
+              collapsed ? 'h-7 w-7' : 'h-7 w-7'
+            )}
+          >
+            <Command className="h-4 w-4" />
             {collapsed && (
               <span
                 className={clsx(
@@ -183,34 +185,32 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
             )}
           </div>
           {!collapsed && (
-            <div className="flex flex-1 flex-col overflow-hidden px-2">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-bold text-foreground">HomomicsLab</span>
-                <span
-                  className={clsx(
-                    'h-2.5 w-2.5 shrink-0 rounded-full shadow-sm',
-                    llmConfigured === true && 'bg-green-500',
-                    llmConfigured === false && 'animate-pulse bg-red-500',
-                    llmConfigured === null && 'bg-muted-foreground/50'
-                  )}
-                  title={llmTooltip}
-                />
-              </div>
-              <span className="truncate text-[10px] text-muted-foreground">Bioinfo Agent</span>
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-bold text-foreground">HomomicsLab</span>
+              <span
+                className={clsx(
+                  'h-2.5 w-2.5 shrink-0 rounded-full shadow-sm',
+                  llmConfigured === true && 'bg-green-500',
+                  llmConfigured === false && 'animate-pulse bg-red-500',
+                  llmConfigured === null && 'bg-muted-foreground/50'
+                )}
+                title={llmTooltip}
+              />
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className={clsx(
-            'rounded text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
-            collapsed ? 'p-0.5' : 'p-1'
-          )}
-          title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
-        >
-          <PanelLeft className={clsx(collapsed ? 'h-3.5 w-3.5' : 'h-4 w-4', collapsed && 'rotate-180')} />
-        </button>
+        {!collapsed && (
+          <div className="flex items-center rounded-md border border-border-faint bg-surface-2/40 p-0.5">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+              title={t('topbar.collapseSidebar')}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <nav className="shrink-0 space-y-0.5 p-2">
@@ -241,6 +241,19 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
             </button>
           )
         })}
+        {collapsed && (
+          <>
+            <div className="my-1 border-t border-border-faint" />
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="group flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface-2/60 hover:text-foreground"
+              title={t('topbar.expandSidebar')}
+            >
+              <PanelLeft className="h-4 w-4 rotate-180" />
+            </button>
+          </>
+        )}
       </nav>
 
       <div className={clsx('shrink-0 border-t border-border-faint p-2', collapsed ? 'mt-0' : 'mt-3')}>
