@@ -13,7 +13,7 @@ from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
 from homomics_lab.metrics import set_active_jobs
-from homomics_lab.models.common import ArtifactEnvelope, ChatMessage, MessageType
+from homomics_lab.models.common import MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
@@ -362,56 +362,9 @@ class BackgroundJobRunner:
                     updated = True
                 return updated
 
-            def _append_result_text(messages):
-                related = [e.get("path") for e in envelopes if e.get("path")]
-                # Only append a separate TEXT message when the summary actually
-                # carries detail beyond the generic fallback. This prevents empty
-                # or duplicated "分析已完成。" messages.
-                detail = summary_text.strip()
-                if detail and detail != "分析已完成。" and len(detail) > 20:
-                    messages.append(
-                        ChatMessage(
-                            id=f"msg_{len(messages)}",
-                            type=MessageType.TEXT,
-                            content=summary_text,
-                            sender="agent",
-                            related_files=related,
-                        )
-                    )
-                return True
-
-            def _append_artifact_messages(messages):
-                # Plot images and ready-made Plotly figures are already streamed
-                # as dedicated PLOT/PLOT_DATA messages by TurnRunner; skip them
-                # here to avoid duplicate inline cards.
-                skip_kinds = {"image", "plotly"}
-                for env in envelopes:
-                    kind = env.get("kind")
-                    if kind in skip_kinds:
-                        continue
-                    path = env.get("path")
-                    try:
-                        payload = ArtifactEnvelope.model_validate(env).model_dump(
-                            mode="json", exclude_none=True
-                        )
-                    except Exception:
-                        payload = dict(env)
-                    messages.append(
-                        ChatMessage(
-                            id=f"msg_{len(messages)}",
-                            type=MessageType.ARTIFACT,
-                            content=payload,
-                            sender="agent",
-                            related_files=[path] if path else [],
-                        )
-                    )
-                return True
-
             # Update the in-memory copy carried by the job.
             in_memory_messages = getattr(job.working_memory, "messages", [])
-            if _apply_update(in_memory_messages):
-                _append_result_text(in_memory_messages)
-                _append_artifact_messages(in_memory_messages)
+            _apply_update(in_memory_messages)
 
             # Persist the update so reloads / other processes see the summary.
             if self._memory_manager is not None and job.session_id:
@@ -420,8 +373,6 @@ class BackgroundJobRunner:
                         job.session_id, job.project_id or "default"
                     )
                     if _apply_update(working_memory.messages):
-                        _append_result_text(working_memory.messages)
-                        _append_artifact_messages(working_memory.messages)
                         await self._memory_manager._save_session(
                             job.session_id,
                             job.project_id or "default",
