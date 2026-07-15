@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { Download, FileText, Workflow, CheckCircle2, Circle } from 'lucide-react'
+import { Download, FileText, Workflow, CheckCircle2, XCircle, Circle } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
@@ -154,6 +154,8 @@ export function ExecutionResult({ content }: Props) {
 
   const outputFiles = collectOutputFiles(normalizedResult)
   const subtaskItems = collectSubtasks(content.tasks)
+  const isCompleted = content.status === 'completed' || executionStatus === 'completed'
+  const isFailed = content.status === 'failed' || executionStatus === 'failed'
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed">
@@ -161,26 +163,29 @@ export function ExecutionResult({ content }: Props) {
 
       {subtaskItems.length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-border-faint bg-surface/50 p-3">
-          {subtaskItems.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 text-sm">
-              {item.status === 'completed' ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-              ) : item.status === 'failed' ? (
-                <FileText className="h-4 w-4 shrink-0 text-error" />
-              ) : (
-                <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
-              )}
-              <span
-                className={clsx(
-                  'flex-1',
-                  item.status === 'completed' && 'text-muted-foreground line-through',
-                  item.status === 'failed' && 'text-error'
+          {subtaskItems.map((item) => {
+            const itemStatus = isCompleted ? 'completed' : isFailed ? 'failed' : item.status
+            return (
+              <div key={item.id} className="flex items-center gap-2 text-sm">
+                {itemStatus === 'completed' ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                ) : itemStatus === 'failed' ? (
+                  <XCircle className="h-4 w-4 shrink-0 text-error" />
+                ) : (
+                  <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
-              >
-                {item.description}
-              </span>
-            </div>
-          ))}
+                <span
+                  className={clsx(
+                    'flex-1',
+                    itemStatus === 'completed' && 'text-muted-foreground line-through',
+                    itemStatus === 'failed' && 'text-error'
+                  )}
+                >
+                  {item.description}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
 

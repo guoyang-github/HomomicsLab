@@ -6,7 +6,7 @@ import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { toastError } from '@/stores/toastStore'
-import type { TaskProgress } from '@/types/tasks'
+import type { TaskProgress, TaskNode } from '@/types/tasks'
 import type { PlanRequestContent } from '@/types/chat'
 
 export interface ChatSession {
@@ -42,6 +42,49 @@ interface ChatState {
   deleteSession: (id: string) => void
   getCurrentSession: () => ChatSession | undefined
   sendMessage: (text: string) => Promise<void>
+}
+
+function _extractProgress(tasks: { status: string }[]): TaskProgress {
+  const total = tasks.length
+  const counts = {
+    pending: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    awaiting_human: 0,
+  }
+  tasks.forEach((task) => {
+    if (task.status in counts) {
+      counts[task.status as keyof typeof counts]++
+    }
+  })
+  return {
+    total,
+    ...counts,
+    percent: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
+  }
+}
+
+function _extractTasksFromMessages(messages: ChatMessage[]): TaskNode[] | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    const type = typeof msg.type === 'string' ? msg.type.toLowerCase() : ''
+    if (type !== 'todo_list' && type !== 'execution_plan') continue
+    const content = typeof msg.content === 'object' && msg.content !== null ? (msg.content as Record<string, unknown>) : {}
+    const rawTasks: unknown = Array.isArray(content.tasks)
+      ? content.tasks
+      : Array.isArray((content.plan as Record<string, unknown> | undefined)?.tasks)
+      ? (content.plan as Record<string, unknown>).tasks
+      : null
+    const tasks = Array.isArray(rawTasks) ? rawTasks : null
+    if (!tasks || tasks.length === 0) continue
+    const topStatus = typeof content.status === 'string' ? content.status : undefined
+    if (topStatus === 'completed' || topStatus === 'failed') {
+      return tasks.map((t: unknown) => ({ ...(t as TaskNode), status: topStatus })) as TaskNode[]
+    }
+    return tasks as TaskNode[]
+  }
+  return null
 }
 
 function normalizeSession(raw: Record<string, unknown>): ChatSession {
@@ -102,7 +145,13 @@ export const useChatStore = create<ChatState>()(
       loadSessionMessages: async (sessionId) => {
         try {
           const response = await chatApi.getMessages(sessionId)
-          set({ messages: response.data })
+          const messages = response.data
+          set({ messages })
+          const tasks = _extractTasksFromMessages(messages)
+          if (tasks && tasks.length > 0) {
+            useTaskStore.getState().setTaskTree(tasks)
+            useTaskStore.getState().setProgress(_extractProgress(tasks))
+          }
         } catch (err) {
           // eslint-disable-next-line no-console
           console.error('Failed to load session messages', err)
@@ -222,27 +271,6 @@ export const useChatStore = create<ChatState>()(
         }
         get().addMessage(userMessage)
         get().setIsTyping(true)
-
-        const _extractProgress = (tasks: { status: string }[]): TaskProgress => {
-          const total = tasks.length
-          const counts = {
-            pending: 0,
-            running: 0,
-            completed: 0,
-            failed: 0,
-            awaiting_human: 0,
-          }
-          tasks.forEach((task) => {
-            if (task.status in counts) {
-              counts[task.status as keyof typeof counts]++
-            }
-          })
-          return {
-            total,
-            ...counts,
-            percent: total > 0 ? Math.round((counts.completed / total) * 100) : 0,
-          }
-        }
 
         try {
           const response = await chatApi.sendMessage({

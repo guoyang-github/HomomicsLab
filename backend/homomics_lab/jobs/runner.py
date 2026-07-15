@@ -347,6 +347,9 @@ class BackgroundJobRunner:
                         content["text"] = todo_text
                         if envelopes:
                             content["artifacts"] = envelopes
+                        for task in content.get("tasks", []) or []:
+                            if isinstance(task, dict):
+                                task["status"] = content["status"]
                         updated = True
                         break
                     # Remember the most recent pending todo as a fallback target.
@@ -359,6 +362,9 @@ class BackgroundJobRunner:
                     content["text"] = todo_text
                     if envelopes:
                         content["artifacts"] = envelopes
+                    for task in content.get("tasks", []) or []:
+                        if isinstance(task, dict):
+                            task["status"] = content["status"]
                     updated = True
                 return updated
 
