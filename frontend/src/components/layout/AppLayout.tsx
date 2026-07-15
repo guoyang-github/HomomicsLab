@@ -73,11 +73,7 @@ export function AppLayout({ activeItem, onNavigate, children }: AppLayoutProps) 
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar
-          onOpenCommandPalette={() => setCommandOpen(true)}
-          collapsed={collapsed}
-          onToggleSidebar={toggleSidebar}
-        />
+        <TopBar onOpenCommandPalette={() => setCommandOpen(true)} />
         <main className={clsx('flex-1 overflow-hidden bg-background')}>{children}</main>
       </div>
 

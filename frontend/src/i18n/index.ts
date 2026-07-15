@@ -32,6 +32,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'common.output': 'Output',
     'common.saved': 'Saved',
     'common.download': 'Download',
+    'common.logout': 'Sign out',
 
     // Navigation
     'nav.chat': 'Chat',
@@ -98,6 +99,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'chat.openExplorationActive': 'Open exploration',
     'chat.placeholder': 'Describe your analysis... Type @file:path or @skill:id to reference',
     'chat.sendHint': 'Enter to send, Shift+Enter for new line',
+    'chat.stop': 'Stop execution',
+    'chat.stopping': 'Stopping...',
     'chat.formatHint': 'Supports Markdown, LaTeX and code highlighting',
     'chat.referenceSkill': 'Quote skill in chat',
     'chat.toggleSidebarHide': 'Hide session list',
@@ -619,6 +622,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'mcp.healthFailed': 'Health check failed',
     'mcp.empty': 'No MCP servers',
     'mcp.emptyDesc': 'Add an external MCP server or enable the built-in bio server',
+    'mcp.notEnabled': 'MCP is not enabled or requires admin rights',
     'mcp.removeConfirm': 'Remove MCP server "{{name}}"?',
     'mcp.idRequired': 'Server ID is required',
     'mcp.nameRequired': 'Name is required',
@@ -711,6 +715,8 @@ const resources: Record<Locale, Record<string, string>> = {
     'chat.openExplorationActive': '开放探索',
     'chat.placeholder': '描述您的分析需求... 输入 @file:路径 或 @skill:技能ID 引用',
     'chat.sendHint': 'Enter 发送，Shift+Enter 换行',
+    'chat.stop': '停止执行',
+    'chat.stopping': '停止中...',
     'chat.formatHint': '支持 Markdown、LaTeX、代码高亮',
     'chat.referenceSkill': '引用到对话',
     'chat.toggleSidebarHide': '收起会话列表',
@@ -760,6 +766,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'common.output': '输出',
     'common.saved': '已保存',
     'common.download': '下载',
+    'common.logout': '退出',
 
     // Plan
     'plan.approved': '计划已批准，开始执行',
@@ -1239,6 +1246,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'mcp.healthFailed': '健康检查失败',
     'mcp.empty': '暂无 MCP 服务器',
     'mcp.emptyDesc': '添加外部 MCP 服务器或启用内置生物服务器',
+    'mcp.notEnabled': 'MCP 未启用或需要管理员权限',
     'mcp.removeConfirm': '确定要移除 MCP 服务器 "{{name}}" 吗？',
     'mcp.idRequired': '服务器 ID 必填',
     'mcp.nameRequired': '名称必填',

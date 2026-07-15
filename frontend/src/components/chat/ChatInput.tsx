@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { clsx } from 'clsx'
-import { Send, Paperclip, Loader2, X, FileText, Command, Map } from 'lucide-react'
+import { Send, Paperclip, Loader2, X, FileText, Command, Map, Square } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
@@ -8,6 +8,7 @@ import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
+import { executionApi } from '@/sdk'
 import { Button } from '@/components/ui'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import type { ChatMessage, PlanRequestContent } from '@/types/chat'
@@ -31,6 +32,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [planMode, setPlanMode] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -47,7 +49,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { loadPlan, discardDraft } = usePlanStore()
-  const { startJob } = useExecutionStore()
+  const { startJob, status: executionStatus, jobId: activeJobId } = useExecutionStore()
 
   useEffect(() => {
     if (!draftInput || consumedDraftRef.current === draftInput) return
@@ -205,6 +207,18 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
     }
   }
 
+  const handleStop = async () => {
+    if (!activeJobId || executionStatus !== 'running') return
+    setIsStopping(true)
+    try {
+      await executionApi.cancel(activeJobId)
+    } catch {
+      // ignore; SSE will reflect terminal state
+    } finally {
+      setIsStopping(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -287,7 +301,7 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   return (
     <div
       {...getRootProps()}
-      className={clsx('px-6 pb-5 pt-3 transition-colors', isDragActive && 'bg-accent/5')}
+      className={clsx('px-6 pb-3 pt-3 transition-colors', isDragActive && 'bg-accent/5')}
     >
       <input {...getInputProps()} />
 
@@ -371,15 +385,27 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
               )}
             </div>
 
-            <Button
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              size="icon"
-              className="h-9 w-9 shrink-0 rounded-full !bg-accent !text-accent-foreground hover:!bg-accent/90"
-              title={t('chat.sendHint')}
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
+            {activeJobId && executionStatus === 'running' ? (
+              <Button
+                onClick={handleStop}
+                disabled={isStopping}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-full !bg-error !text-error-foreground hover:!bg-error/90"
+                title={t('chat.stop')}
+              >
+                {isStopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 fill-current" />}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-full !bg-accent !text-accent-foreground hover:!bg-accent/90"
+                title={t('chat.sendHint')}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         </div>
 

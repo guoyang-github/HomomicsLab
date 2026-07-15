@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import {
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   Download,
   Eye,
   FileJson2,
@@ -112,6 +114,15 @@ function PlotlyBody({ artifact }: { artifact: Artifact }) {
   return <ArtifactRenderer artifact={{ ...artifact, kind: 'json' }} />
 }
 
+function tableRowCount(artifact: Artifact): number | null {
+  if (Array.isArray(artifact.data)) return artifact.data.length
+  if (artifact.data && typeof artifact.data === 'object') {
+    const rows = (artifact.data as Record<string, unknown>).rows
+    if (Array.isArray(rows)) return rows.length
+  }
+  return null
+}
+
 function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?: string }) {
   const { t } = useTranslation()
   const openReport = useOverlayStore((state) => state.openReport)
@@ -121,12 +132,15 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
   const name = downloadName(artifact)
   const url = artifactUrl(projectId, artifact)
   const isHtml = kind === 'html'
+  const isTable = kind === 'table'
+  const [expanded, setExpanded] = useState(!isTable)
   const reportId = (artifact as unknown as Record<string, unknown>).report_id as string | undefined
   const summary =
     (artifact as unknown as Record<string, unknown>).summary ||
     (artifact.data && typeof artifact.data === 'object'
       ? (artifact.data as Record<string, unknown>).summary
       : undefined)
+  const rows = isTable ? tableRowCount(artifact) : null
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-faint bg-surface shadow-sm">
@@ -135,6 +149,11 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
         <span className="flex-1 truncate font-medium text-foreground" title={name}>
           {name || t('artifact.untitled')}
         </span>
+        {isTable && rows !== null && (
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {rows} {rows === 1 ? 'row' : 'rows'}
+          </span>
+        )}
         <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-2xs uppercase text-muted-foreground">
           {kind}
         </span>
@@ -147,6 +166,16 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
           >
             <Eye className="h-3 w-3" />
             {t('message.viewReport')}
+          </button>
+        )}
+        {isTable && (
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            title={expanded ? t('executionLog.collapse') : t('executionLog.expand')}
+          >
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
         )}
         {isHtml && (
@@ -179,13 +208,15 @@ function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId?:
         </div>
       )}
 
-      <div className={clsx('p-2', kind === 'table' && 'p-0')}>
-        {kind === 'plotly' ? (
-          <PlotlyBody artifact={artifact} />
-        ) : (
-          <ArtifactRenderer artifact={artifact} projectId={projectId} />
-        )}
-      </div>
+      {expanded && (
+        <div className={clsx('p-2', kind === 'table' && 'p-0')}>
+          {kind === 'plotly' ? (
+            <PlotlyBody artifact={artifact} />
+          ) : (
+            <ArtifactRenderer artifact={artifact} projectId={projectId} />
+          )}
+        </div>
+      )}
 
       {isHtml && (
         <Dialog open={fullscreen} onOpenChange={setFullscreen}>

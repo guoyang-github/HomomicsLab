@@ -6,7 +6,7 @@ import { useExecutionStore } from '@/stores/executionStore'
 import { useTranslation } from '@/i18n'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
-import { ExecutionProgressBar } from './ExecutionProgressBar'
+import { TodoChecklist } from './TodoChecklist'
 import { CommandPalette } from '@/components/ui/CommandPalette'
 import { ExecutionSSEConnector } from '@/components/workspace/ExecutionSSEConnector'
 import { ExecutionLogPanel } from '@/components/workspace/ExecutionLogPanel'
@@ -41,8 +41,8 @@ export function ChatPanel() {
       </div>
 
       <ExecutionSSEConnector />
-      <ExecutionProgressBar />
       <MessageList />
+      <TodoChecklist />
       {showExecutionLogs && (
         <div className="px-4 pb-2">
           <div className="mx-auto w-full max-w-[780px]">

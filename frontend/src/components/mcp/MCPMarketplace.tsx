@@ -92,14 +92,23 @@ export function MCPMarketplace() {
   const [formError, setFormError] = useState<string | null>(null)
   const [healthResults, setHealthResults] = useState<Record<string, MCPServerHealthResponse>>({})
   const [pending, setPending] = useState<Record<string, string>>({})
+  const [mcpNotEnabled, setMcpNotEnabled] = useState(false)
 
   const fetchServers = useCallback(async () => {
     setLoading(true)
     try {
       const res = await mcpApi.listServers()
       setServers(res.data)
+      setMcpNotEnabled(false)
     } catch (err: any) {
-      toastError(err?.response?.data?.detail || t('mcp.loadFailed'))
+      const status = err?.response?.status
+      const detail = err?.response?.data?.detail || err?.message || ''
+      if (status === 404 || /not found/i.test(detail)) {
+        setServers([])
+        setMcpNotEnabled(true)
+      } else {
+        toastError(detail || t('mcp.loadFailed'))
+      }
     } finally {
       setLoading(false)
     }
@@ -252,8 +261,8 @@ export function MCPMarketplace() {
           <EmptyState
             icon={Plug}
             title={t('mcp.empty')}
-            description={t('mcp.emptyDesc')}
-            action={{ label: t('mcp.addServer'), onClick: () => setShowAdd(true) }}
+            description={mcpNotEnabled ? t('mcp.notEnabled') : t('mcp.emptyDesc')}
+            action={mcpNotEnabled ? undefined : { label: t('mcp.addServer'), onClick: () => setShowAdd(true) }}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
