@@ -69,8 +69,8 @@ export function TopBar({ onOpenCommandPalette }: TopBarProps) {
   }
 
   return (
-    <header className="flex h-10 shrink-0 items-center justify-between border-b border-border-faint bg-surface px-3">
-      <div className="flex items-center gap-2">
+    <header className="flex h-10 shrink-0 items-center justify-end border-b border-border-faint bg-surface px-3">
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon"
@@ -81,9 +81,7 @@ export function TopBar({ onOpenCommandPalette }: TopBarProps) {
         >
           <Search className="h-4 w-4" />
         </Button>
-      </div>
 
-      <div className="flex items-center gap-1">
         <div className="flex items-center rounded-lg border border-border-faint p-0.5">
           <Button
             variant={theme === 'light' ? 'secondary' : 'ghost'}

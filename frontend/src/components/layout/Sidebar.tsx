@@ -195,17 +195,16 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
             <span className="truncate text-[10px] text-muted-foreground">Bioinfo Agent</span>
           </div>
         )}
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className={clsx(
-            'rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
-            collapsed ? 'absolute right-0.5 top-3' : 'relative'
-          )}
-          title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
-        >
-          <PanelLeft className={clsx('h-4 w-4', collapsed && 'rotate-180')} />
-        </button>
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            title={t('topbar.collapseSidebar')}
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <nav className="shrink-0 space-y-0.5 p-2">
@@ -238,7 +237,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-border-faint p-2">
+      <div className={clsx('shrink-0 border-t border-border-faint p-2', collapsed ? 'mt-0' : 'mt-3')}>
         {collapsed ? (
           <button
             type="button"
@@ -251,7 +250,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         ) : (
           <>
             <div className="mb-2 flex items-center justify-between px-1">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground">
                 <FolderKanban className="h-3 w-3" />
                 {t('common.project')}
               </span>
@@ -269,6 +268,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
               onChange={(e) => handleProjectChange(e.target.value)}
               options={projectOptions}
               disabled={loadingProjects}
+              className="h-8 text-xs"
             />
             {projectError && (
               <div className="mt-2 flex items-center gap-2 rounded-md bg-error/10 px-2 py-1.5">
@@ -284,13 +284,26 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
 
       <SidebarSessions collapsed={collapsed} />
 
-      {!collapsed && (
-        <div className="shrink-0 border-t border-border-faint p-2">
-          <div className="rounded-lg bg-surface-2/60 px-2.5 py-1.5 text-[10px] text-muted-foreground">
-            HomomicsLab {versionLabel}
-          </div>
+      <div className="shrink-0 border-t border-border-faint p-2">
+        <div className="flex items-center justify-between gap-2">
+          {!collapsed && (
+            <div className="rounded-lg bg-surface-2/60 px-2.5 py-1.5 text-[10px] text-muted-foreground">
+              HomomicsLab {versionLabel}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={clsx(
+              'rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
+              collapsed && 'mx-auto'
+            )}
+            title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
+          >
+            <PanelLeft className={clsx('h-4 w-4', !collapsed && 'rotate-180')} />
+          </button>
         </div>
-      )}
+      </div>
 
       <Modal
         open={projectModalOpen}

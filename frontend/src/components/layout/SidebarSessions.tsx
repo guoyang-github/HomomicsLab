@@ -81,7 +81,7 @@ export function SidebarSessions({ collapsed = false }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-t border-border-faint px-3 py-2">
-        <span className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="px-1 text-[11px] font-semibold tracking-wider text-muted-foreground">
           {t('sessionList.sessions')}
         </span>
         <button
