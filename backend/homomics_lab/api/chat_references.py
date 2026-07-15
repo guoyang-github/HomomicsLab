@@ -52,8 +52,27 @@ _SKILL_REF_RE = re.compile(r"@skill:([A-Za-z0-9_\-]+)")
 _FILE_REF_RE = re.compile(r"@file:([^\s]+)")
 
 
-def _project_root(project_id: str) -> Path:
-    return (settings.data_dir / "raw" / project_id).resolve()
+def _resolve_project_file(path: str, project_id: str) -> Path:
+    """Resolve a project-relative path against the canonical workspace first.
+
+    Files managed by the project live under ``workspaces/{project_id}/``.
+    Legacy uploads via the file API may still reside under ``raw/{project_id}/``,
+    so we fall back there if the workspace lookup fails.
+    """
+    roots = [
+        settings.data_dir / "workspaces" / project_id,
+        settings.data_dir / "raw" / project_id,
+    ]
+    last_error: Exception | None = None
+    for root in roots:
+        try:
+            return safe_path(path, root=root.resolve(), must_exist=True)
+        except (ValueError, FileNotFoundError) as exc:
+            last_error = exc
+            continue
+    raise FileNotFoundError(
+        f"File not found: {path}"
+    ) from last_error
 
 
 def _describe_skill(skill) -> str:
@@ -104,10 +123,9 @@ async def resolve_chat_references(
 
     file_paths = set(_FILE_REF_RE.findall(message))
     if file_paths:
-        root = _project_root(project_id)
         for path in file_paths:
             try:
-                target = safe_path(path, root=root, must_exist=True)
+                target = _resolve_project_file(path, project_id)
             except (ValueError, FileNotFoundError) as exc:
                 appendix_parts.append(
                     f"<file path=\"{path}\">[File not accessible: {exc}]</file>"

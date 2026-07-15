@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { clsx } from 'clsx'
 import {
   Search,
   Bell,
@@ -72,17 +71,16 @@ export function TopBar({ onOpenCommandPalette }: TopBarProps) {
   return (
     <header className="flex h-10 shrink-0 items-center justify-between border-b border-border-faint bg-surface px-3">
       <div className="flex items-center gap-2">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onOpenCommandPalette}
-          className={clsx(
-            'hidden items-center gap-2 rounded-lg border border-border-faint bg-surface-2/60 px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-surface-2 sm:flex',
-            'w-44'
-          )}
+          title={`${t('topbar.searchCommands')} (⌘K)`}
+          aria-label={t('topbar.searchCommands')}
+          className="h-8 w-8"
         >
           <Search className="h-4 w-4" />
-          <span className="flex-1 text-left">{t('topbar.searchCommands')}</span>
-          <kbd className="rounded bg-card px-1.5 py-0.5 text-[10px]">⌘K</kbd>
-        </button>
+        </Button>
       </div>
 
       <div className="flex items-center gap-1">

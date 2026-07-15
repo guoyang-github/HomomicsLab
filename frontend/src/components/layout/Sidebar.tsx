@@ -161,7 +161,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
       <div
         className={clsx(
           'relative flex shrink-0 items-center border-b border-border-faint',
-          collapsed ? 'h-12 justify-between px-2' : 'h-12 justify-between px-3'
+          collapsed ? 'h-12 justify-center px-1' : 'h-12 justify-between px-3'
         )}
       >
         <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
@@ -198,7 +198,10 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+          className={clsx(
+            'rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground',
+            collapsed ? 'absolute right-0.5 top-3' : 'relative'
+          )}
           title={collapsed ? t('topbar.expandSidebar') : t('topbar.collapseSidebar')}
         >
           <PanelLeft className={clsx('h-4 w-4', collapsed && 'rotate-180')} />
