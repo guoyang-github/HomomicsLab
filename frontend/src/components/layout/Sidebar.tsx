@@ -69,6 +69,7 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
   const fetchTemplates = useAnalysisTemplateStore((state) => state.fetchTemplates)
 
   const [projectModalOpen, setProjectModalOpen] = useState(false)
+  const [projectModalMode, setProjectModalMode] = useState<'manage' | 'create'>('create')
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -241,28 +242,18 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
             </button>
           )
         })}
-        {collapsed && (
-          <>
-            <div className="my-1 border-t border-border-faint" />
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="group flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface-2/60 hover:text-foreground"
-              title={t('topbar.expandSidebar')}
-            >
-              <PanelLeft className="h-4 w-4 rotate-180" />
-            </button>
-          </>
-        )}
       </nav>
 
       <div className={clsx('shrink-0 border-t border-border-faint p-2', collapsed ? 'mt-0' : 'mt-3')}>
         {collapsed ? (
           <button
             type="button"
-            onClick={() => setProjectModalOpen(true)}
-            className="flex h-9 w-full items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-            title={currentProjectName}
+            onClick={() => {
+              setProjectModalMode('manage')
+              setProjectModalOpen(true)
+            }}
+            className="group flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface-2/60 hover:text-foreground"
+            title={`${t('common.project')}: ${currentProjectName}`}
           >
             <FolderKanban className="h-4 w-4" />
           </button>
@@ -275,7 +266,10 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
               </span>
               <button
                 type="button"
-                onClick={() => setProjectModalOpen(true)}
+                onClick={() => {
+                  setProjectModalMode('create')
+                  setProjectModalOpen(true)
+                }}
                 className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                 title={t('sessionList.createProject')}
               >
@@ -301,6 +295,19 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         )}
       </div>
 
+      {collapsed && (
+        <div className="shrink-0 border-t border-border-faint p-2">
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="group flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-surface-2/60 hover:text-foreground"
+            title={t('topbar.expandSidebar')}
+          >
+            <PanelLeft className="h-4 w-4 rotate-180" />
+          </button>
+        </div>
+      )}
+
       <SidebarSessions collapsed={collapsed} />
 
       <div className="shrink-0 border-t border-border-faint p-2">
@@ -320,8 +327,8 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
           clearProjectError()
           setSelectedTemplateId('')
         }}
-        title={t('sessionList.createProject')}
-        description={t('sessionList.createProjectDesc')}
+        title={projectModalMode === 'create' ? t('sessionList.createProject') : t('sessionList.manageProject')}
+        description={projectModalMode === 'create' ? t('sessionList.createProjectDesc') : t('sessionList.manageProjectDesc')}
         footer={
           <>
             <Button
