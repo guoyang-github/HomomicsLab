@@ -86,9 +86,10 @@ export function TodoChecklist() {
   if (hidden) return null
   if (items.length === 0 && status === 'idle') return null
 
-  const isTerminal = status === 'completed' || status === 'aborted' || status === 'failed'
-  const completedCount = items.filter((item) => item.status === 'completed').length
   const failedCount = items.filter((item) => item.status === 'failed').length
+  const completedCount = items.filter((item) => item.status === 'completed').length
+  const allTerminal = items.length > 0 && items.every((item) => item.status === 'completed' || item.status === 'failed')
+  const isTerminal = status === 'completed' || status === 'aborted' || status === 'failed' || allTerminal
   const visibleItems = items.slice(0, 6)
 
   return (
@@ -99,7 +100,9 @@ export function TodoChecklist() {
             {!isTerminal && <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />}
             <span className="text-xs font-medium text-foreground">
               {isTerminal
-                ? t('executionLog.completed')
+                ? failedCount > 0
+                  ? t('executionLog.failed')
+                  : t('executionLog.completed')
                 : `${t('executionLog.running')} · ${completedCount}/${items.length}`}
             </span>
             {failedCount > 0 && (

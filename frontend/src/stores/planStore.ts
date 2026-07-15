@@ -24,6 +24,7 @@ export interface PlanTransition {
 
 interface PlanDraftState {
   draftPlan: PlanRequestContent | null
+  viewMode: 'draft' | 'approved' | null
   originalPhases: PlanPhase[]
   originalTransitions: PlanTransition[]
   transitions: PlanTransition[]
@@ -36,6 +37,7 @@ interface PlanDraftState {
 
 interface PlanState extends PlanDraftState {
   loadPlan: (content: PlanRequestContent) => void
+  loadApprovedPlan: (content: PlanRequestContent, executionStatus?: 'idle' | 'running' | 'completed' | 'failed' | 'aborted') => void
   discardDraft: () => void
   selectTask: (taskId: string | null) => void
   setPositions: (positions: Record<string, { x: number; y: number }>) => void
@@ -155,6 +157,7 @@ function replacePhaseInTransitions(
 
 export const usePlanStore = create<PlanState>((set, get) => ({
   draftPlan: null,
+  viewMode: null,
   originalPhases: [],
   originalTransitions: [],
   transitions: [],
@@ -172,6 +175,29 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const tasks = tasksFromPhases(phases, transitions)
     set({
       draftPlan: content,
+      viewMode: 'draft',
+      originalPhases: content.plan.phases.map((p) => ({ ...p })),
+      originalTransitions: transitions.map((t) => ({ ...t })),
+      transitions,
+      tasks,
+      selectedTaskId: null,
+      isDirty: false,
+      isSaving: false,
+      positions: layoutPositions(tasks),
+    })
+  },
+
+  loadApprovedPlan: (content, executionStatus = 'idle') => {
+    const phases = content.plan.phases.map((p) => ({ ...p }))
+    const transitions = content.plan.transitions?.length
+      ? content.plan.transitions.map((t) => ({ ...t }))
+      : buildTransitions(phases)
+    const terminalStatus: TaskNode['status'] =
+      executionStatus === 'completed' ? 'completed' : executionStatus === 'failed' ? 'failed' : 'pending'
+    const tasks = tasksFromPhases(phases, transitions).map((t) => ({ ...t, status: terminalStatus }))
+    set({
+      draftPlan: null,
+      viewMode: 'approved',
       originalPhases: content.plan.phases.map((p) => ({ ...p })),
       originalTransitions: transitions.map((t) => ({ ...t })),
       transitions,
@@ -186,6 +212,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   discardDraft: () =>
     set({
       draftPlan: null,
+      viewMode: null,
       originalPhases: [],
       originalTransitions: [],
       transitions: [],

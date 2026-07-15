@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { FlowCanvas } from './FlowCanvas'
 import { ProvenanceGraph } from './ProvenanceGraph'
@@ -7,25 +7,78 @@ import { ExecutionLogPanel } from './ExecutionLogPanel'
 import { PlanEditor } from './PlanEditor'
 import { ExecutionSSEConnector } from './ExecutionSSEConnector'
 import { usePlanStore } from '@/stores/planStore'
+import { useChatStore } from '@/stores/chatStore'
+import { useExecutionStore } from '@/stores/executionStore'
 import { useTranslation } from '@/i18n'
+import { planApi } from '@/services/api'
 import { Info } from 'lucide-react'
+import type { PlanRequestContent } from '@/types/chat'
 
 type WorkspaceTab = 'workflow' | 'provenance'
 
 export function Workspace() {
   const { t } = useTranslation()
-  const hasDraftPlan = usePlanStore((state) => state.draftPlan !== null)
+  const viewMode = usePlanStore((state) => state.viewMode)
+  const loadApprovedPlan = usePlanStore((state) => state.loadApprovedPlan)
+  const discardDraft = usePlanStore((state) => state.discardDraft)
+  const currentSessionId = useChatStore((state) => state.currentSessionId)
+  const executionStatus = useExecutionStore((state) => state.status)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('workflow')
 
-  // When a draft plan appears, keep the workflow tab in focus.
-  const showPlanEditor = hasDraftPlan && activeTab === 'workflow'
+  // Load the latest approved plan for this session so the workflow view shows
+  // the full phase graph even when execution was delegated to a single skill.
+  useEffect(() => {
+    if (viewMode === 'draft' || !currentSessionId) return
+    let cancelled = false
+    planApi
+      .listPlans(currentSessionId)
+      .then((res) => {
+        if (cancelled) return
+        const plans = (res.data.plans || []) as Array<{
+          plan_id: string
+          status: string
+          version: number
+          intent_analysis_type: string
+          created_at: string
+        }>
+        if (plans.length === 0) return
+        // Pick the most recent approved/completed plan.
+        const latest = plans
+          .filter((p) => p.status === 'approved' || p.status === 'completed')
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        if (!latest) return
+        return planApi.getPlan(latest.plan_id)
+      })
+      .then((res) => {
+        if (cancelled || !res) return
+        loadApprovedPlan(res.data as PlanRequestContent, executionStatus)
+      })
+      .catch(() => {
+        // Fail silently; the task tree fallback will still render.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [currentSessionId, viewMode, loadApprovedPlan, executionStatus])
+
+  // When the overlay closes and there is no draft, clear any approved plan view.
+  useEffect(() => {
+    return () => {
+      if (viewMode === 'approved') {
+        discardDraft()
+      }
+    }
+  }, [viewMode, discardDraft])
+
+  const isDraft = viewMode === 'draft'
+  const showPlanEditor = isDraft && activeTab === 'workflow'
 
   return (
     <div className="flex h-full flex-col">
       <ExecutionSSEConnector />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
-          {!hasDraftPlan && (
+          {!isDraft && (
             <div className="flex items-center justify-between border-b border-border-faint bg-surface px-4 py-2">
               <div className="flex items-center gap-1">
                 <button
@@ -53,7 +106,7 @@ export function Workspace() {
             </div>
           )}
 
-          {activeTab === 'provenance' && !hasDraftPlan && (
+          {activeTab === 'provenance' && !isDraft && (
             <div className="shrink-0 border-b border-border-faint bg-surface px-4 py-2">
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
@@ -67,7 +120,7 @@ export function Workspace() {
               <ReactFlowProvider>
                 <PlanEditor />
               </ReactFlowProvider>
-            ) : activeTab === 'provenance' && !hasDraftPlan ? (
+            ) : activeTab === 'provenance' && !isDraft ? (
               <ProvenanceGraph />
             ) : (
               <FlowCanvas />
@@ -75,7 +128,7 @@ export function Workspace() {
           </div>
           <ExecutionLogPanel />
         </div>
-        {!hasDraftPlan && <DetailPanel />}
+        {!isDraft && <DetailPanel />}
       </div>
     </div>
   )

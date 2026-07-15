@@ -65,7 +65,7 @@ function _extractProgress(tasks: { status: string }[]): TaskProgress {
   }
 }
 
-function _extractTasksFromMessages(messages: ChatMessage[]): TaskNode[] | null {
+function _extractTasksFromMessages(messages: ChatMessage[]): { tasks: TaskNode[]; status?: string } | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     const type = typeof msg.type === 'string' ? msg.type.toLowerCase() : ''
@@ -78,13 +78,28 @@ function _extractTasksFromMessages(messages: ChatMessage[]): TaskNode[] | null {
       : null
     const tasks = Array.isArray(rawTasks) ? rawTasks : null
     if (!tasks || tasks.length === 0) continue
-    const topStatus = typeof content.status === 'string' ? content.status : undefined
-    if (topStatus === 'completed' || topStatus === 'failed') {
-      return tasks.map((t: unknown) => ({ ...(t as TaskNode), status: topStatus })) as TaskNode[]
-    }
-    return tasks as TaskNode[]
+    const topStatus = typeof content.status === 'string' ? content.status.toLowerCase() : undefined
+    const normalized =
+      topStatus === 'completed' || topStatus === 'failed'
+        ? tasks.map((t: unknown) => ({ ...(t as TaskNode), status: topStatus }))
+        : tasks
+    return { tasks: normalized as TaskNode[], status: topStatus }
   }
   return null
+}
+
+function _syncExecutionStateFromMessages(messages: ChatMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    const type = typeof msg.type === 'string' ? msg.type.toLowerCase() : ''
+    if (type !== 'todo_list') continue
+    const content = typeof msg.content === 'object' && msg.content !== null ? (msg.content as Record<string, unknown>) : {}
+    const status = typeof content.status === 'string' ? content.status.toLowerCase() : undefined
+    if (status === 'completed' || status === 'failed') {
+      useExecutionStore.getState().setStatus(status, status === 'completed' ? 100 : 0)
+      return
+    }
+  }
 }
 
 function normalizeSession(raw: Record<string, unknown>): ChatSession {
@@ -147,11 +162,12 @@ export const useChatStore = create<ChatState>()(
           const response = await chatApi.getMessages(sessionId)
           const messages = response.data
           set({ messages })
-          const tasks = _extractTasksFromMessages(messages)
-          if (tasks && tasks.length > 0) {
-            useTaskStore.getState().setTaskTree(tasks)
-            useTaskStore.getState().setProgress(_extractProgress(tasks))
+          const extracted = _extractTasksFromMessages(messages)
+          if (extracted && extracted.tasks.length > 0) {
+            useTaskStore.getState().setTaskTree(extracted.tasks)
+            useTaskStore.getState().setProgress(_extractProgress(extracted.tasks))
           }
+          _syncExecutionStateFromMessages(messages)
         } catch (err) {
           // eslint-disable-next-line no-console
           console.error('Failed to load session messages', err)

@@ -19,6 +19,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
+import { usePlanStore } from '@/stores/planStore'
 import { Badge } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
@@ -74,12 +75,13 @@ const statusConfig: Record<
 function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
   const { t } = useTranslation()
   const selectTask = useTaskStore((state) => state.selectTask)
+  const isApprovedPlan = usePlanStore((state) => state.viewMode) === 'approved'
   const config = statusConfig[data.status]
   const Icon = config.icon
 
   return (
     <div
-      onClick={() => selectTask(data.id)}
+      onClick={() => !isApprovedPlan && selectTask(data.id)}
       className={clsx(
         'relative min-w-[180px] max-w-[260px] cursor-pointer rounded-xl border-2 bg-card p-4 shadow-card transition-all',
         selected ? 'ring-2 ring-primary ring-offset-2' : '',
@@ -122,8 +124,12 @@ const nodeTypes = {
 }
 
 export function FlowCanvas() {
-  const tasks = useTaskStore((state) => state.tasks)
+  const taskStoreTasks = useTaskStore((state) => state.tasks)
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
+  const planTasks = usePlanStore((state) => state.tasks)
+  const viewMode = usePlanStore((state) => state.viewMode)
+  const isApprovedPlan = viewMode === 'approved'
+  const tasks = isApprovedPlan && planTasks.length > 0 ? planTasks : taskStoreTasks
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -177,7 +183,7 @@ export function FlowCanvas() {
       type: 'task',
       position: layoutNodes[task.id] || { x: 100, y: 100 },
       data: task,
-      selected: task.id === selectedTaskId,
+      selected: !isApprovedPlan && task.id === selectedTaskId,
     }))
 
     const newEdges = tasks.flatMap((task) =>
