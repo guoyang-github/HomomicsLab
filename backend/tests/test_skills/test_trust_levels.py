@@ -294,7 +294,7 @@ class TestCodeActCacheSwitch:
 
         async def fake_generate(task, language, context, llm_client=None,
                                 skill_registry=None, retrieval_context=None,
-                                use_cache=None):
+                                use_cache=None, max_tokens=4000):
             captured["use_cache"] = use_cache
             return "result = None"
 

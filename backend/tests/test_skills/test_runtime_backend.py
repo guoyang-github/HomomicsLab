@@ -19,11 +19,11 @@ class TestSkillRuntimeExecutorBackend:
         )
         executor = SkillRuntimeExecutor(executor_type="local")
         plan = PlanResult(
-            phases=[Phase(phase_type=f"step_{i}", required=True) for i in range(6)],
+            phases=[Phase(phase_type=f"step_{i}", required=True) for i in range(8)],
             strategy_name="test",
             data_state=DataState(),
         )
-        backend = executor.select_backend_for(plan, DataState())
+        backend = executor.select_backend_for(plan, DataState(n_cells=200))
         assert backend == "nextflow"
         assert executor._executor_type == "nextflow"
         assert executor._scheduler is None
