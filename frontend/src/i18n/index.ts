@@ -391,6 +391,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'files.size': 'Size',
     'files.reference': 'Quote in chat',
     'files.referenceSuccess': 'File reference added to input',
+    'files.tableTruncated': 'Showing first {{shown}} of {{total}} rows. Download the file to view the rest.',
 
     // App skill tabs
     'skills.tabs.search': 'Search Skills',
@@ -1042,6 +1043,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'files.size': '大小',
     'files.reference': '引用到对话',
     'files.referenceSuccess': '已添加文件引用到输入框',
+    'files.tableTruncated': '仅显示前 {{shown}} 行（共 {{total}} 行），下载文件可查看完整内容。',
 
     // App skill tabs
     'skills.tabs.search': '搜索 Skills',

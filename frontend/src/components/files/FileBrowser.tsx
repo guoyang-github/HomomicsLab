@@ -16,7 +16,7 @@ const _MAX_READ_BYTES = 5 * 1024 * 1024
 
 function isBinaryMimeType(mimeType: string): boolean {
   if (!mimeType) return false
-  const binaryPrefixes = ['image/', 'video/', 'audio/', 'application/pdf', 'application/zip']
+  const binaryPrefixes = ['video/', 'audio/', 'application/pdf', 'application/zip']
   if (binaryPrefixes.some((prefix) => mimeType.startsWith(prefix))) return true
   // Application types other than known text formats are treated as binary.
   if (mimeType.startsWith('application/')) {
@@ -25,6 +25,87 @@ function isBinaryMimeType(mimeType: string): boolean {
   }
   return false
 }
+
+function isImageFile(mimeType: string, name: string): boolean {
+  if (mimeType && mimeType.startsWith('image/')) return true
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
+}
+
+function isSpreadsheetFile(mimeType: string, name: string): boolean {
+  if (mimeType) {
+    if (mimeType === 'text/csv' || mimeType === 'text/tab-separated-values') return true
+  }
+  return /\.(csv|tsv)$/i.test(name)
+}
+
+function detectDelimiter(mimeType: string, name: string): string {
+  if (mimeType === 'text/tab-separated-values' || /\.tsv$/i.test(name)) return '\t'
+  return ','
+}
+
+/**
+ * Lightweight CSV/TSV parser that respects double-quoted fields and escaped
+ * quotes (""). Returns an empty array for empty content.
+ */
+function parseDelimited(content: string, delimiter: string): string[][] {
+  if (!content) return []
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let inQuotes = false
+
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i]
+    const next = content[i + 1]
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (next === '"') {
+          cell += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        cell += char
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true
+      } else if (char === delimiter) {
+        row.push(cell)
+        cell = ''
+      } else if (char === '\r') {
+        if (next === '\n') i++
+        row.push(cell)
+        rows.push(row)
+        row = []
+        cell = ''
+      } else if (char === '\n') {
+        row.push(cell)
+        rows.push(row)
+        row = []
+        cell = ''
+      } else {
+        cell += char
+      }
+    }
+  }
+
+  if (cell || row.length > 0) {
+    row.push(cell)
+    rows.push(row)
+  }
+
+  // Drop a trailing empty row that often appears after a trailing newline.
+  if (rows.length > 0 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') {
+    rows.pop()
+  }
+
+  return rows
+}
+
+const _MAX_TABLE_ROWS = 500
 
 export function FileBrowser() {
   const { t } = useTranslation()
@@ -56,6 +137,7 @@ export function FileBrowser() {
   useEffect(() => {
     setSelectedFile(null)
     setFileContent(null)
+    setFileMimeType('')
     // Default to the outputs directory so users immediately see analysis
     // results; they can still navigate up to the workspace root if needed.
     fetchEntries('outputs')
@@ -65,6 +147,7 @@ export function FileBrowser() {
     if (entry.type === 'directory') {
       setSelectedFile(null)
       setFileContent(null)
+      setFileMimeType('')
       await fetchEntries(entry.path)
       return
     }
@@ -72,8 +155,13 @@ export function FileBrowser() {
     setReading(true)
     try {
       const res = await fileApi.readFile(currentProjectId, entry.path)
-      setFileMimeType(res.data.mime_type)
-      if (res.data.encoding === 'base64') {
+      const mime = res.data.mime_type
+      setFileMimeType(mime)
+      if (isImageFile(mime, entry.name)) {
+        // Images are rendered from the authenticated file URL; no need to keep
+        // the base64 payload in React state.
+        setFileContent(null)
+      } else if (res.data.encoding === 'base64') {
         setFileContent(`[Binary file: ${entry.name}]\nSize: ${res.data.size} bytes`)
       } else {
         setFileContent(res.data.content)
@@ -81,6 +169,7 @@ export function FileBrowser() {
     } catch (err: any) {
       toastError(err?.response?.data?.detail || t('files.readFailed'))
       setFileContent(null)
+      setFileMimeType('')
     } finally {
       setReading(false)
     }
@@ -91,6 +180,7 @@ export function FileBrowser() {
     fetchEntries(parent)
     setSelectedFile(null)
     setFileContent(null)
+    setFileMimeType('')
   }
 
   const breadcrumbs: BreadcrumbSegment[] = [
@@ -100,6 +190,98 @@ export function FileBrowser() {
       path: parts.slice(0, idx + 1).join('/'),
     })),
   ]
+
+  const renderPreview = () => {
+    if (reading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )
+    }
+
+    if (!selectedFile) return null
+
+    // Image preview
+    if (isImageFile(fileMimeType, selectedFile.name)) {
+      return (
+        <div className="flex items-start justify-center">
+          <img
+            src={fileApi.fileUrl(currentProjectId, selectedFile.path)}
+            alt={selectedFile.name}
+            className="max-h-full max-w-full rounded-lg border border-border object-contain shadow-sm"
+          />
+        </div>
+      )
+    }
+
+    // CSV / TSV table preview
+    if (fileContent !== null && isSpreadsheetFile(fileMimeType, selectedFile.name)) {
+      const delimiter = detectDelimiter(fileMimeType, selectedFile.name)
+      const rows = parseDelimited(fileContent, delimiter)
+      if (rows.length === 0) {
+        return (
+          <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-foreground">
+            {fileContent}
+          </pre>
+        )
+      }
+
+      const headers = rows[0]
+      const body = rows.slice(1)
+      const displayed = body.slice(0, _MAX_TABLE_ROWS)
+      const truncated = body.length > _MAX_TABLE_ROWS
+
+      return (
+        <div className="w-full overflow-auto">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead className="sticky top-0 z-10 bg-muted">
+              <tr>
+                {headers.map((h, idx) => (
+                  <th
+                    key={idx}
+                    className="border-b border-border px-3 py-2 font-semibold text-foreground"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.map((row, rIdx) => (
+                <tr key={rIdx} className="hover:bg-muted/50">
+                  {headers.map((_, cIdx) => (
+                    <td
+                      key={cIdx}
+                      className="border-b border-border px-3 py-1.5 text-muted-foreground"
+                    >
+                      {row[cIdx] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {truncated && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t('files.tableTruncated', { shown: _MAX_TABLE_ROWS, total: body.length })}
+            </p>
+          )}
+        </div>
+      )
+    }
+
+    // Fallback text / binary preview
+    if (fileContent !== null) {
+      return (
+        <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-foreground">
+          {fileContent}
+        </pre>
+      )
+    }
+
+    return null
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background p-4">
@@ -219,17 +401,7 @@ export function FileBrowser() {
                   </Button>
                 </div>
               </div>
-              <div className="flex-1 overflow-auto p-4">
-                {reading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : fileContent !== null ? (
-                  <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-foreground">
-                    {fileContent}
-                  </pre>
-                ) : null}
-              </div>
+              <div className="flex-1 overflow-auto p-4">{renderPreview()}</div>
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
