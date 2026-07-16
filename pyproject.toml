@@ -7,7 +7,7 @@ name = "homomics-lab"
 version = "0.5.0"
 description = "A general-purpose agent for bioinformatics analysis"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "AGPL-3.0"}
 authors = [{name = "HomomicsLab Team"}]
 requires-python = ">=3.10,<3.14"
 dependencies = [
