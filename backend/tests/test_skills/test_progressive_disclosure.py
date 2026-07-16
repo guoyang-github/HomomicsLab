@@ -41,7 +41,7 @@ This is the full body that should only appear after activation.
     )
     scripts = skill_dir / "scripts" / "python"
     scripts.mkdir(parents=True)
-    (scripts / "run.py").write_text("result = {'doubled': value * 2}\n")
+    (scripts / "core_analysis.py").write_text("result = {'doubled': value * 2}\n")
     (skill_dir / "requirements.txt").write_text("numpy\n")
     return skill_dir
 
@@ -345,25 +345,4 @@ Just use CodeAct.
         assert report.valid is True
         assert not any("scripts/" in w.lower() for w in report.warnings)
 
-    def test_missing_declared_entrypoint_warns(self, tmp_path):
-        skill_dir = tmp_path / "entrypoint_skill"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            """\
----
-name: entrypoint-skill
-description: Skill with missing entrypoint.
-tool_type: python
-entrypoint: scripts/missing.py
----
 
-# Instructions
-Run the entrypoint.
-""",
-            encoding="utf-8",
-        )
-
-        report = SkillStore.validate_skill(skill_dir)
-
-        assert report.valid is True
-        assert any("entrypoint" in w.lower() for w in report.warnings)

@@ -84,7 +84,7 @@ class SkillTemplateBuilder:
         inputs: List[Dict[str, str]],
         outputs: List[str],
     ) -> str:
-        """Generate a Python script skeleton."""
+        """Generate a Python reference script skeleton (no fixed entrypoint)."""
         input_reads = []
         for inp in inputs:
             default = inp.get("default", "None")
@@ -103,6 +103,10 @@ class SkillTemplateBuilder:
         lines = [
             "\"\"\"",
             description,
+            "",
+            "Reference implementation for the skill. The runtime may concatenate",
+            "this file with other scripts in scripts/python/; do not assume a fixed",
+            "entrypoint such as core_analysis.py or run.py exists.",
             "\"\"\"",
             "",
             "import json",
@@ -140,6 +144,24 @@ class SkillTemplateBuilder:
 
         return "\n".join(lines)
 
+    def build_python_utils(self, name: str) -> str:
+        """Generate a Python helper utilities module skeleton."""
+        return f'''"""Shared helpers for {name.replace("-", " ")}."""
+
+
+def load_inputs(skill_inputs: dict) -> dict:
+    """Validate and normalize skill inputs."""
+    return dict(skill_inputs)
+
+
+def save_result(result: dict, path: str = "result.json") -> None:
+    """Persist a result dict as JSON."""
+    import json
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+'''
+
     def build_r_script(
         self,
         name: str,
@@ -147,7 +169,7 @@ class SkillTemplateBuilder:
         inputs: List[Dict[str, str]],
         outputs: List[str],
     ) -> str:
-        """Generate an R script skeleton."""
+        """Generate an R reference script skeleton (no fixed entrypoint)."""
         input_reads = []
         for inp in inputs:
             default = inp.get("default", "NULL")
@@ -159,6 +181,10 @@ class SkillTemplateBuilder:
         lines = [
             "#",
             f"# {description}",
+            "#",
+            "# Reference implementation for the skill. The runtime may concatenate",
+            "# this file with other scripts in scripts/r/; do not assume a fixed",
+            "# entrypoint such as core_analysis.R or run.R exists.",
             "#",
             "",
             'library(jsonlite)',

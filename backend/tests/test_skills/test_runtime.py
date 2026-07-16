@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
@@ -18,7 +16,7 @@ async def test_execute_builtin_skill(executor, tmp_path):
     """Test executing a skill from a scripts directory (unified path)."""
     scripts_dir = tmp_path / "scripts" / "python"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.py").write_text("""
+    (scripts_dir / "core_analysis.py").write_text("""
 result = {"sum": a + b}
 """)
 
@@ -31,7 +29,6 @@ result = {"sum": a + b}
         metadata={
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/python/run.py",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(
@@ -61,7 +58,7 @@ async def test_execute_file_based_python_skill(executor, tmp_path):
     """Test executing a file-based Python skill."""
     scripts_dir = tmp_path / "scripts" / "python"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.py").write_text("""
+    (scripts_dir / "core_analysis.py").write_text("""
 result = {"product": x * y}
 """)
 
@@ -74,7 +71,6 @@ result = {"product": x * y}
         metadata={
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/python/run.py",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(
@@ -97,7 +93,7 @@ async def test_execute_file_based_r_skill(executor, tmp_path):
     """Test executing a file-based R skill."""
     scripts_dir = tmp_path / "scripts" / "r"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.R").write_text("""
+    (scripts_dir / "core_analysis.R").write_text("""
 result <- list(sum = a + b)
 """)
 
@@ -110,7 +106,6 @@ result <- list(sum = a + b)
         metadata={
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/r/run.R",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(
@@ -133,7 +128,7 @@ async def test_execute_mixed_skill_chooses_python(executor, tmp_path):
     """Test that mixed skill with Python primary_tool uses Python."""
     scripts_dir = tmp_path / "scripts" / "python"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.py").write_text("""
+    (scripts_dir / "core_analysis.py").write_text("""
 result = {"lang": "python"}
 """)
 
@@ -147,7 +142,6 @@ result = {"lang": "python"}
             "primary_tool": "scanpy",
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/python/run.py",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(),
@@ -163,7 +157,7 @@ async def test_execute_mixed_skill_chooses_r(executor, tmp_path):
     """Test that mixed skill with R primary_tool uses R."""
     scripts_dir = tmp_path / "scripts" / "r"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.R").write_text("""
+    (scripts_dir / "core_analysis.R").write_text("""
 result <- list(lang = "r")
 """)
 
@@ -177,7 +171,6 @@ result <- list(lang = "r")
             "primary_tool": "Seurat",
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/r/run.R",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(),
@@ -193,7 +186,7 @@ async def test_execute_file_skill_from_metadata(executor, tmp_path):
     """Test executing a skill that has scripts_dir in metadata."""
     scripts_dir = tmp_path / "scripts" / "python"
     scripts_dir.mkdir(parents=True)
-    (scripts_dir / "run.py").write_text("""
+    (scripts_dir / "core_analysis.py").write_text("""
 result = {"greeting": "hello"}
 """)
 
@@ -206,7 +199,6 @@ result = {"greeting": "hello"}
         metadata={
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/python/run.py",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(),
@@ -289,66 +281,26 @@ async def test_execute_python_skill_without_scripts_returns_knowledge(executor):
 
 
 @pytest.mark.asyncio
-async def test_external_skill_without_entrypoint_uses_agent(tmp_path, monkeypatch):
-    """A python skill with scripts/ but no entrypoint routes to the agent executor."""
-    skill_dir = tmp_path / "external-agent-skill"
+async def test_script_skill_concatenates_all_scripts(tmp_path):
+    """All .py files in the scripts directory are concatenated and executed."""
+    skill_dir = tmp_path / "concat-skill"
     skill_dir.mkdir()
     (skill_dir / "SKILL.md").write_text(
         """\
 ---
-name: external-agent-skill
-description: Agent-first python skill without entrypoint.
+name: concat-skill
+description: Concatenate all scripts.
 tool_type: python
 ---
 
 # Instructions
-Use the helper functions in scripts/ if needed.
+Run the concatenated scripts.
 """,
         encoding="utf-8",
     )
     scripts = skill_dir / "scripts" / "python"
     scripts.mkdir(parents=True)
-    (scripts / "helper.py").write_text("def helper(x): return x * 2\n")
-
-    registry = SkillRegistry()
-    loader = SkillLoader(registry=registry)
-    skill = loader.load_discovery(skill_dir)
-    skill.metadata["source"] = "external"
-    skill.metadata["trusted"] = True
-    registry.register(skill)
-
-    executor = SkillRuntimeExecutor(registry=registry, working_dir=tmp_path)
-    mock_agent = MagicMock()
-    mock_agent.execute = AsyncMock(return_value={"success": True, "mode": "agent"})
-    monkeypatch.setattr(executor, "_get_agent_executor", lambda: mock_agent)
-
-    result = await executor.execute("external-agent-skill", {"value": 5})
-    assert result["success"] is True
-    assert result["mode"] == "agent"
-    mock_agent.execute.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_script_skill_uses_entrypoint_only(tmp_path):
-    """Only the entrypoint script runs, not all .py files in the scripts directory."""
-    skill_dir = tmp_path / "entrypoint-only"
-    skill_dir.mkdir()
-    (skill_dir / "SKILL.md").write_text(
-        """\
----
-name: entrypoint-only
-description: Only run.py should execute.
-tool_type: python
----
-
-# Instructions
-Run the entrypoint.
-""",
-        encoding="utf-8",
-    )
-    scripts = skill_dir / "scripts" / "python"
-    scripts.mkdir(parents=True)
-    (scripts / "run.py").write_text("result = {'source': 'run.py'}\n")
+    (scripts / "core_analysis.py").write_text("result = {'source': 'core_analysis.py'}\n")
     (scripts / "helper.py").write_text("result = {'source': 'helper.py'}\n")
 
     registry = SkillRegistry()
@@ -358,5 +310,6 @@ Run the entrypoint.
     registry.register(skill)
 
     executor = SkillRuntimeExecutor(registry=registry, working_dir=tmp_path)
-    result = await executor.execute("entrypoint-only", {})
-    assert result["source"] == "run.py"
+    result = await executor.execute("concat-skill", {})
+    # helper.py runs after core_analysis.py alphabetically, so its assignment wins.
+    assert result["source"] == "helper.py"

@@ -8,7 +8,7 @@ Note on "CodeAct" terminology in this module:
 - ``metadata["code_act"] == True`` skills are routed to ``execution/code_act.py``
   via ``_execute_code_act``.
 - Declarative/agent skills (``cli/workflow/container/agent/knowledge`` or
-  ``python/r/mixed`` without an entrypoint) are executed by ``AgentSkillExecutor``,
+  ``python/r/mixed`` without scripts) are executed by ``AgentSkillExecutor``,
   which runs an LLM tool-calling loop; this is CodeAct-style but a separate path.
 - The orchestrator-level CodeAct fallback (``Orchestrator._try_codeact_fallback``)
   lives in ``agent/orchestrator.py`` and is invoked when a skill fails.
@@ -21,7 +21,6 @@ import subprocess
 import sys
 import time
 import uuid
-import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -473,7 +472,7 @@ class SkillRuntimeExecutor:
                 data=result,
             )
             if workspace is not None:
-                workspace.create_git_snapshot(f"skill:{skill_id}", self.parent_job_id or skill_id)
+                await workspace.create_git_snapshot(f"skill:{skill_id}", self.parent_job_id or skill_id)
             if self._is_cacheable(skill) and self.cache is not None:
                 self.cache.put(skill_id, validated, stored, fingerprint=fingerprint)
             final_result = self._unwrap_reference(stored, skill_id=skill_id)
@@ -664,15 +663,19 @@ class SkillRuntimeExecutor:
 
     @staticmethod
     def _is_declarative(skill: SkillDefinition) -> bool:
-        """Return True when a skill should be executed by the agent/knowledge path."""
+        """Return True when a skill should be executed by the agent/knowledge path.
+
+        Script-based skills (python/r/mixed) are declarative reference material
+        unless they carry an explicit legacy ``code_act`` flag.  There is no
+        fixed entrypoint contract; the runtime reads SKILL.md + scripts/ as
+        references and lets the agent generate task-specific code.
+        """
         runtime_type = skill.runtime.type.lower()
         if runtime_type in {"cli", "workflow", "container", "agent", "knowledge"}:
             return True
         if skill.metadata.get("agent") is True:
             return True
-        # python/r/mixed skills are declarative unless they have a concrete
-        # executable entrypoint (explicit entrypoint or scripts_dir/run.py).
-        if runtime_type in {"python", "r", "mixed"} and not skill.has_entrypoint:
+        if runtime_type in {"python", "r", "mixed"} and not skill.has_scripts:
             return True
         return False
 
@@ -701,7 +704,7 @@ class SkillRuntimeExecutor:
         """Return True for deterministic script-based skills that may be memoized."""
         if skill.metadata.get("code_act") is True or skill.metadata.get("agent") is True:
             return False
-        return skill.runtime.type.lower() in {"python", "r", "mixed"} and skill.has_entrypoint
+        return skill.runtime.type.lower() in {"python", "r", "mixed"} and skill.has_scripts
 
     def _ensure_skill_approved(
         self,
@@ -1022,11 +1025,11 @@ class SkillRuntimeExecutor:
         exec_type: str,
         inputs: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Execute a skill by reading its entrypoint script.
+        """Execute a script-based skill by concatenating all its reference scripts.
 
-        Only the configured entrypoint is executed. Concatenating every
-        ``.py``/``.R`` file in the scripts directory is retained as a
-        deprecated fallback for backward compatibility.
+        There is no fixed entrypoint contract. The runtime loads SKILL.md as
+        reference material and concatenates every ``.py``/``.R`` file under
+        ``scripts_dir`` so the agent/sandbox sees the complete helper library.
         """
         # Dependency preparation is now handled by the scheduler's EnvironmentManager,
         # which creates isolated venvs/project libraries and installs dependencies when
@@ -1034,36 +1037,19 @@ class SkillRuntimeExecutor:
         task_override = inputs.get("timeout_seconds") or inputs.get("_timeout_seconds")
         timeout = self._parse_timeout(task_override or skill.runtime.resources.time)
 
-        entrypoint_path = self._resolve_entrypoint(skill, scripts_dir)
-        if entrypoint_path is not None:
-            code = entrypoint_path.read_text(encoding="utf-8")
-            # For Python entrypoints that expose a ``main(skill_inputs)`` function,
-            # call it with the injected inputs dict and publish ``result``.
-            if exec_type != "r":
-                # Ensure sibling helper modules (e.g. core_analysis.py) are on
-                # sys.path when the script is executed in a different working dir.
-                path_prefix = (
-                    "import sys\n"
-                    f"sys.path.insert(0, {repr(str(scripts_dir))})\n\n"
-                )
-                code = (
-                    f"{path_prefix}{code}\n\n"
-                    "# Skill entrypoint wrapper\n"
-                    "if 'main' in dir() and callable(main):\n"
-                    "    result = main(__inputs__)\n"
-                )
-        elif settings.skill_fallback_concatenation:
-            code = self._concatenate_scripts(scripts_dir, exec_type)
-            warnings.warn(
-                f"Skill '{skill.id}' has no entrypoint; falling back to concatenating "
-                f"all {exec_type} scripts. This is deprecated.",
-                DeprecationWarning,
-                stacklevel=2,
+        code = self._concatenate_scripts(scripts_dir, exec_type)
+        if exec_type != "r":
+            # Ensure sibling helper modules are importable when the script is
+            # executed in a different working directory.
+            path_prefix = (
+                "import sys\n"
+                f"sys.path.insert(0, {repr(str(scripts_dir))})\n\n"
             )
-        else:
-            raise RuntimeError(
-                f"Script-based skill '{skill.id}' has no executable entrypoint. "
-                f"Set metadata['entrypoint'] or place run.py in {scripts_dir}."
+            code = (
+                f"{path_prefix}{code}\n\n"
+                "# Skill execution wrapper\n"
+                "if 'main' in dir() and callable(main):\n"
+                "    result = main(__inputs__)\n"
             )
 
         scheduler = self._get_scheduler()
@@ -1081,25 +1067,8 @@ class SkillRuntimeExecutor:
         )
 
     @staticmethod
-    def _resolve_entrypoint(
-        skill: SkillDefinition, scripts_dir: Path
-    ) -> Optional[Path]:
-        """Resolve the single script file that should be executed."""
-        source_dir = skill.source_dir
-        if source_dir and skill.metadata.get("entrypoint"):
-            candidate = source_dir / skill.metadata["entrypoint"]
-            if candidate.is_file():
-                return candidate
-
-        run_py = scripts_dir / "run.py"
-        if run_py.is_file():
-            return run_py
-
-        return None
-
-    @staticmethod
     def _concatenate_scripts(scripts_dir: Path, exec_type: str) -> str:
-        """Concatenate all scripts in a directory (deprecated fallback)."""
+        """Concatenate all scripts in a directory into a single executable."""
         if exec_type == "r":
             script_files = sorted(scripts_dir.glob("*.R"))
             if not script_files:

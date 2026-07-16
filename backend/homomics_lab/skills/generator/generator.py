@@ -62,28 +62,30 @@ class SkillGenerator:
 
         if tool_type == "python":
             script_dir = f"{skill_id}/scripts/python"
-            files[f"{script_dir}/run.py"] = self.builder.build_python_script(
+            files[f"{script_dir}/core_analysis.py"] = self.builder.build_python_script(
                 name=skill_id,
                 description=description,
                 inputs=inputs,
                 outputs=outputs,
             )
+            files[f"{script_dir}/utils.py"] = self.builder.build_python_utils(skill_id)
         elif tool_type == "r":
             script_dir = f"{skill_id}/scripts/r"
-            files[f"{script_dir}/run.R"] = self.builder.build_r_script(
+            files[f"{script_dir}/core_analysis.R"] = self.builder.build_r_script(
                 name=skill_id,
                 description=description,
                 inputs=inputs,
                 outputs=outputs,
             )
         elif tool_type == "mixed":
-            files[f"{skill_id}/scripts/python/run.py"] = self.builder.build_python_script(
+            files[f"{skill_id}/scripts/python/core_analysis.py"] = self.builder.build_python_script(
                 name=skill_id,
                 description=description,
                 inputs=inputs,
                 outputs=outputs,
             )
-            files[f"{skill_id}/scripts/r/run.R"] = self.builder.build_r_script(
+            files[f"{skill_id}/scripts/python/utils.py"] = self.builder.build_python_utils(skill_id)
+            files[f"{skill_id}/scripts/r/core_analysis.R"] = self.builder.build_r_script(
                 name=skill_id,
                 description=description,
                 inputs=inputs,

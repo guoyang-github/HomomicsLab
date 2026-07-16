@@ -20,7 +20,7 @@ def _register_mock_qc_skill(executor: SkillRuntimeExecutor, tmp_path):
     (skill_dir / "SKILL.md").write_text(
         "---\nname: mock_qc\nversion: \"1.0.0\"\n---\n\n# Mock QC\n", encoding="utf-8"
     )
-    (scripts / "run.py").write_text("result = {'output_cells': 2531}\n")
+    (scripts / "core_analysis.py").write_text("result = {'output_cells': 2531}\n")
 
     skill = SkillDefinition(
         id="mock_qc",
@@ -31,7 +31,6 @@ def _register_mock_qc_skill(executor: SkillRuntimeExecutor, tmp_path):
         metadata={
             "source_dir": str(skill_dir),
             "scripts_dir": str(scripts),
-            "entrypoint": "scripts/python/run.py",
             "trusted": True,
         },
         input_schema=SkillInputSchema(),

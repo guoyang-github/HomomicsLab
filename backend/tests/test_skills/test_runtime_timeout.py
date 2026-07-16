@@ -15,9 +15,9 @@ def executor(tmp_path):
 
 @pytest.fixture
 def script_skill(tmp_path):
-    scripts_dir = tmp_path / "scripts"
-    scripts_dir.mkdir()
-    (scripts_dir / "run.py").write_text("result = {'ok': True}\n")
+    scripts_dir = tmp_path / "scripts" / "python"
+    scripts_dir.mkdir(parents=True)
+    (scripts_dir / "core_analysis.py").write_text("result = {'ok': True}\n")
     return SkillDefinition(
         id="timeout_test",
         name="Timeout Test",
@@ -31,7 +31,6 @@ def script_skill(tmp_path):
         metadata={
             "scripts_dir": str(scripts_dir),
             "source_dir": str(tmp_path),
-            "entrypoint": "scripts/run.py",
             "disclosure_level": "activated",
         },
         input_schema=SkillInputSchema(),
@@ -76,10 +75,10 @@ async def test_per_task_timeout_override(executor, script_skill, tmp_path):
     executor._scheduler = scheduler_mock
 
     await executor._execute_from_dir(
-        script_skill,
-        tmp_path / "scripts",
-        "python",
-        {"timeout_seconds": "15m"},
+        skill=script_skill,
+        scripts_dir=tmp_path / "scripts" / "python",
+        exec_type="python",
+        inputs={"timeout_seconds": "15m"},
     )
 
     call_kwargs = scheduler_mock.execute.call_args.kwargs
@@ -94,10 +93,10 @@ async def test_per_task_timeout_override_clamped(executor, script_skill, tmp_pat
     executor._scheduler = scheduler_mock
 
     await executor._execute_from_dir(
-        script_skill,
-        tmp_path / "scripts",
-        "python",
-        {"_timeout_seconds": f"{int(settings.max_skill_timeout_seconds + 3600)}s"},
+        skill=script_skill,
+        scripts_dir=tmp_path / "scripts" / "python",
+        exec_type="python",
+        inputs={"_timeout_seconds": f"{int(settings.max_skill_timeout_seconds + 3600)}s"},
     )
 
     call_kwargs = scheduler_mock.execute.call_args.kwargs

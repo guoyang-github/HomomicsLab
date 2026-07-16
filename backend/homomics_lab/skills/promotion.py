@@ -76,12 +76,12 @@ class TransientSkillPromoter:
         if package_dir.exists():
             shutil.rmtree(package_dir)
         package_dir.mkdir(parents=True)
-        scripts_dir = package_dir / "scripts"
+        scripts_dir = package_dir / "scripts" / "python"
         scripts_dir.mkdir(parents=True)
 
-        # Use run.py so SkillLoader/SkillRuntimeExecutor pick up the entrypoint
-        # without requiring an explicit ``entrypoint`` declaration in SKILL.md.
-        main_script = scripts_dir / "run.py"
+        # New-spec skill: SKILL.md + scripts/python/core_analysis.py. There is
+        # no fixed entrypoint; the runtime concatenates scripts as reference.
+        main_script = scripts_dir / "core_analysis.py"
         main_script.write_text(self._wrap_as_skill(code), encoding="utf-8")
 
         skill_md = package_dir / "SKILL.md"
@@ -135,7 +135,7 @@ class TransientSkillPromoter:
             except json.JSONDecodeError:
                 pass
 
-        main_script = package_dir / "scripts" / "run.py"
+        main_script = package_dir / "scripts" / "python" / "core_analysis.py"
         sha256 = self._hash_file(main_script)
 
         skill = SkillDefinition(
@@ -158,7 +158,7 @@ class TransientSkillPromoter:
             ),
             metadata={
                 "source": "generated",
-                "scripts_dir": str(package_dir / "scripts"),
+                "scripts_dir": str(package_dir / "scripts" / "python"),
                 "sha256": sha256,
                 "promoted_from": str(source_dir),
                 "promoted_at": datetime.now(timezone.utc).isoformat(),

@@ -465,9 +465,6 @@ class Settings(BaseSettings):
     result_inline_size_limit_bytes: int = 10 * 1024 * 1024
     skill_cache_enabled: bool = True
     skill_cache_dir: Path = Field(default_factory=lambda: Path("./data/skill_cache"))
-    skill_fallback_concatenation: bool = (
-        True  # deprecated: concat all .py/.R when no entrypoint
-    )
 
     # Literature / RAP settings
     literature_retrieval_enabled: bool = False  # requires network; disabled by default

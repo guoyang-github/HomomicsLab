@@ -35,7 +35,7 @@ Return the doubled value.
     )
     scripts = skill_dir / "scripts" / "python"
     scripts.mkdir(parents=True)
-    (scripts / "run.py").write_text("result = {'doubled': value * 2}\n")
+    (scripts / "core_analysis.py").write_text("result = {'doubled': value * 2}\n")
     return skill_dir
 
 

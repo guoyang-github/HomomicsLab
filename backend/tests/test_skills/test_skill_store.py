@@ -37,7 +37,7 @@ Test skill.
 """)
     scripts = skill_dir / "scripts" / "python"
     scripts.mkdir(parents=True)
-    (scripts / "run.py").write_text("print('ok')\n")
+    (scripts / "core_analysis.py").write_text("print('ok')\n")
     return skill_dir
 
 

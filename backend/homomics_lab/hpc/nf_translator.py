@@ -14,9 +14,10 @@ class SimpleNFTranslator:
     """Generate a linear DSL2 Nextflow script from a PlanResult.
 
     Each required phase becomes a process. Processes are wired sequentially via
-    channels. When a phase has a selected skill with a script entrypoint, the
-    generated process stages the script and its inputs and executes it. Otherwise
-    a placeholder process is emitted so the workflow can still be validated.
+    channels. When a phase has a selected skill with reference scripts, the
+    generated process concatenates the scripts, stages them with inputs, and
+    executes them. Otherwise a placeholder process is emitted so the workflow
+    can still be validated.
     """
 
     def __init__(self, working_dir: Path = None):
@@ -107,23 +108,24 @@ class SimpleNFTranslator:
         """Write the executable script for a phase.
 
         Returns:
-            Tuple of (script_path, exec_type) or (None, "") when no entrypoint
-            could be resolved.
+            Tuple of (script_path, exec_type) or (None, "") when the skill has
+            no reference scripts.
         """
-        if skill is None or skill.source_dir is None or not skill.has_entrypoint:
+        if skill is None or skill.source_dir is None or not skill.has_scripts:
             return None, ""
 
-        entrypoint = self._resolve_entrypoint_path(skill)
-        if entrypoint is None:
+        scripts_dir = self._resolve_scripts_dir(skill)
+        if scripts_dir is None:
             return None, ""
 
-        code = entrypoint.read_text(encoding="utf-8")
-        exec_type = "python" if entrypoint.suffix.lower() == ".py" else "r"
+        exec_type = "python" if scripts_dir.name == "python" else "r"
+        code = self._concatenate_scripts(scripts_dir, exec_type)
 
         if exec_type == "python":
             script_path = phase_dir / "script.py"
             wrapper = (
                 "import json, sys\n"
+                f"sys.path.insert(0, {repr(str(scripts_dir))})\n"
                 "__inputs__ = json.load(open('inputs.json', encoding='utf-8'))\n"
                 "\n"
                 f"{code}\n"
@@ -158,27 +160,57 @@ class SimpleNFTranslator:
         return script_path, exec_type
 
     @staticmethod
-    def _resolve_entrypoint_path(skill: SkillDefinition) -> Optional[Path]:
-        """Resolve the single executable script for a skill."""
+    def _resolve_scripts_dir(skill: SkillDefinition) -> Optional[Path]:
+        """Resolve the language-specific scripts directory for a skill."""
         source_dir = skill.source_dir
         if source_dir is None:
             return None
 
-        entrypoint = skill.metadata.get("entrypoint")
-        if isinstance(entrypoint, (str, Path)):
-            candidate = source_dir / entrypoint
-            if candidate.is_file():
-                return candidate
+        # Prefer the runtime-resolved scripts_dir if available.
+        scripts_dir_meta = skill.metadata.get("scripts_dir")
+        if isinstance(scripts_dir_meta, (str, Path)):
+            scripts_dir = Path(scripts_dir_meta)
+            if scripts_dir.is_dir():
+                return scripts_dir
 
-        for candidate in (
-            source_dir / "scripts" / "run.py",
-            source_dir / "scripts" / "python" / "run.py",
-            source_dir / "scripts" / "r" / "run.R",
-        ):
-            if candidate.is_file():
+        # Fall back to discovery under scripts/python or scripts/r.
+        runtime_type = skill.runtime.type.lower()
+        if runtime_type == "r":
+            candidates = [source_dir / "scripts" / "r", source_dir / "scripts"]
+        elif runtime_type == "mixed":
+            primary = skill.metadata.get("primary_tool", "").lower()
+            r_tools = {
+                "seurat", "monocle3", "archr", "signac", "harmony",
+                "cellchat", "nichenet", "singleR", "scvi", "scran",
+            }
+            if primary in r_tools:
+                candidates = [source_dir / "scripts" / "r", source_dir / "scripts"]
+            else:
+                candidates = [source_dir / "scripts" / "python", source_dir / "scripts"]
+        else:
+            candidates = [source_dir / "scripts" / "python", source_dir / "scripts"]
+
+        for candidate in candidates:
+            if candidate.is_dir():
                 return candidate
 
         return None
+
+    @staticmethod
+    def _concatenate_scripts(scripts_dir: Path, exec_type: str) -> str:
+        """Concatenate all reference scripts in a directory."""
+        if exec_type == "r":
+            script_files = sorted(scripts_dir.glob("*.R")) or sorted(scripts_dir.glob("*.r"))
+            if not script_files:
+                raise RuntimeError(f"No .R files found in {scripts_dir}")
+        else:
+            script_files = sorted(scripts_dir.glob("*.py"))
+            if not script_files:
+                raise RuntimeError(f"No .py files found in {scripts_dir}")
+
+        parts = [f"# --- {f.name} ---" for f in script_files]
+        parts.extend(f.read_text(encoding="utf-8") for f in script_files)
+        return "\n".join(parts)
 
     @staticmethod
     def _sanitize_process_name(skill_id: str) -> str:

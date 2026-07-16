@@ -65,12 +65,12 @@ class TestSimpleNFTranslator:
         assert "process qc" in script
 
 
-    def test_emits_real_python_process_from_skill_entrypoint(self, tmp_path):
-        """A phase with a selected skill that has scripts/run.py gets a real process."""
+    def test_emits_real_python_process_from_skill_scripts(self, tmp_path):
+        """A phase with a selected skill that has reference scripts gets a real process."""
         skill_dir = tmp_path / "skills" / "scanpy_qc"
-        scripts_dir = skill_dir / "scripts"
+        scripts_dir = skill_dir / "scripts" / "python"
         scripts_dir.mkdir(parents=True)
-        (scripts_dir / "run.py").write_text(
+        (scripts_dir / "core_analysis.py").write_text(
             "def main(inputs):\n"
             "    return {'passed': inputs.get('min_genes', 200)}\n",
             encoding="utf-8",

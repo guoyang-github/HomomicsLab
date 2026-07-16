@@ -577,29 +577,12 @@ class SkillStore:
             errors.append("Missing SKILL.md")
 
         # Scripts are optional for all skill types (OpenClaw-style). Only warn
-        # when the skill explicitly declares an entrypoint that is missing, or
         # when a scripts/ directory is present but empty.
-        entrypoint = None
-        if skill_md.exists():
-            from homomics_lab.skills.loader import _parse_frontmatter
-
-            frontmatter, _ = _parse_frontmatter(skill_md.read_text(encoding="utf-8"))
-            entrypoint = frontmatter.get("entrypoint") or frontmatter.get("script")
-
-        if entrypoint:
-            entrypoint_path = skill_dir / entrypoint
-            if not entrypoint_path.exists():
-                warnings.append(f"Declared entrypoint not found: {entrypoint}")
-
         scripts_dir = skill_dir / "scripts"
         if scripts_dir.exists():
             script_files = [p for p in scripts_dir.rglob("*") if p.is_file()]
             if not script_files:
                 warnings.append("scripts/ directory is empty")
-        elif entrypoint and str(entrypoint).startswith("scripts/"):
-            warnings.append(
-                f"Entrypoint references missing scripts/ directory: {entrypoint}"
-            )
 
         requirements = skill_dir / "requirements.txt"
         environment = skill_dir / "environment.yml"

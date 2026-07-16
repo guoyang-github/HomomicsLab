@@ -35,16 +35,16 @@ def registry_with_external_skills():
 
 
 @pytest.mark.parametrize(
-    "skill_id, expected_runtime_type, expected_has_scripts, expected_has_entrypoint",
+    "skill_id, expected_runtime_type, expected_has_scripts",
     [
-        # NanoResearch skills: tool_type python/mixed, scripts with helper functions, no entrypoint
-        ("bio-single-cell-doublet-scrublet", "python", True, False),
+        # NanoResearch skills: tool_type python/mixed, scripts with helper functions
+        ("bio-single-cell-doublet-scrublet", "python", True),
         # These NanoResearch skills have no scripts/ dir; they are pure documentation/agent skills
-        ("bio-single-cell-preprocessing", "mixed", False, False),
-        ("bio-single-cell-clustering", "mixed", False, False),
+        ("bio-single-cell-preprocessing", "mixed", False),
+        ("bio-single-cell-clustering", "mixed", False),
         # paperwriting skills: no tool_type, defaults to python but acts as agent
-        ("scientific-manuscript", "python", True, False),
-        ("scientific-research-design", "python", False, False),
+        ("scientific-manuscript", "python", True),
+        ("scientific-research-design", "python", False),
     ],
 )
 def test_external_skill_classification(
@@ -52,7 +52,6 @@ def test_external_skill_classification(
     skill_id,
     expected_runtime_type,
     expected_has_scripts,
-    expected_has_entrypoint,
 ):
     """Imported external skills are classified according to the agent-first rules."""
     skill = registry_with_external_skills.get(skill_id)
@@ -61,26 +60,27 @@ def test_external_skill_classification(
 
     assert skill.runtime.type == expected_runtime_type
     assert skill.has_scripts is expected_has_scripts
-    assert skill.has_entrypoint is expected_has_entrypoint
 
 
 @pytest.mark.parametrize(
-    "skill_id",
+    "skill_id, expected_declarative",
     [
-        "bio-single-cell-doublet-scrublet",
-        "bio-single-cell-preprocessing",
-        "bio-single-cell-clustering",
+        # Skills with reference scripts are executed by script concatenation.
+        ("bio-single-cell-doublet-scrublet", False),
+        # Skills without scripts are agentic/declarative.
+        ("bio-single-cell-preprocessing", True),
+        ("bio-single-cell-clustering", True),
     ],
 )
 def test_nanoresearch_python_skills_are_declarative(
-    registry_with_external_skills, skill_id
+    registry_with_external_skills, skill_id, expected_declarative
 ):
-    """NanoResearch python skills without entrypoints should route to agent/knowledge."""
+    """NanoResearch python skills route based on whether they have scripts."""
     skill = registry_with_external_skills.get(skill_id)
     if skill is None:
         pytest.skip(f"Skill {skill_id} not found in imported skill store")
 
-    assert SkillRuntimeExecutor._is_declarative(skill) is True
+    assert SkillRuntimeExecutor._is_declarative(skill) is expected_declarative
 
 
 def test_doublet_scrublet_body_loaded_on_activation(registry_with_external_skills):

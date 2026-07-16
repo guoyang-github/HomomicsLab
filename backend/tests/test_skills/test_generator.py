@@ -41,6 +41,12 @@ class TestSkillTemplateBuilder:
         assert 'n_neighbors = skill_inputs.get("n_neighbors", 15)' in script
         assert "json.dumps" in script
 
+    def test_build_python_utils(self):
+        builder = SkillTemplateBuilder()
+        utils = builder.build_python_utils("test-skill")
+        assert "def load_inputs(skill_inputs: dict)" in utils
+        assert "def save_result(result: dict" in utils
+
     def test_build_r_script(self):
         builder = SkillTemplateBuilder()
         script = builder.build_r_script(
@@ -80,7 +86,8 @@ class TestSkillGenerator:
             dependencies=["scanpy", "anndata"],
         )
         assert "qc-analysis/SKILL.md" in files
-        assert "qc-analysis/scripts/python/run.py" in files
+        assert "qc-analysis/scripts/python/core_analysis.py" in files
+        assert "qc-analysis/scripts/python/utils.py" in files
         assert "qc-analysis/scripts/python/requirements.txt" in files
         assert "scanpy" in files["qc-analysis/scripts/python/requirements.txt"]
 
@@ -95,7 +102,7 @@ class TestSkillGenerator:
             outputs=["clusters"],
         )
         assert "seurat-clustering/SKILL.md" in files
-        assert "seurat-clustering/scripts/r/run.R" in files
+        assert "seurat-clustering/scripts/r/core_analysis.R" in files
 
     def test_generate_mixed_skill(self):
         gen = SkillGenerator()
@@ -106,8 +113,9 @@ class TestSkillGenerator:
             inputs=[{"name": "input_file"}],
             outputs=["result"],
         )
-        assert "mixed-analysis/scripts/python/run.py" in files
-        assert "mixed-analysis/scripts/r/run.R" in files
+        assert "mixed-analysis/scripts/python/core_analysis.py" in files
+        assert "mixed-analysis/scripts/python/utils.py" in files
+        assert "mixed-analysis/scripts/r/core_analysis.R" in files
 
     def test_suggest_from_description_python(self):
         gen = SkillGenerator()
@@ -132,8 +140,8 @@ class TestSkillGenerator:
         gen = SkillGenerator(output_dir=tmp_path)
         files = {
             "test-skill/SKILL.md": "# Test",
-            "test-skill/scripts/python/run.py": "print('hello')",
+            "test-skill/scripts/python/core_analysis.py": "print('hello')",
         }
         base = gen.save(files)
         assert (base / "test-skill" / "SKILL.md").exists()
-        assert (base / "test-skill" / "scripts" / "python" / "run.py").exists()
+        assert (base / "test-skill" / "scripts" / "python" / "core_analysis.py").exists()
