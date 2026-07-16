@@ -60,7 +60,7 @@ class KnowledgeGraphBuilder:
     ) -> IngestionResult:
         result = IngestionResult(document_id=document_id, source=parsed.source)
 
-        await self._add_document_node(document_id, parsed, summary, project_id)
+        await self._add_document_node(document_id, parsed, summary, project_id, len(chunks))
 
         chunk_texts = [c.text for c in chunks]
         embeddings = await self._embed(chunk_texts) if self.options.enable_vector_index else None
@@ -160,6 +160,7 @@ class KnowledgeGraphBuilder:
         parsed: ParsedDocument,
         summary: str,
         project_id: Optional[str],
+        chunk_count: int = 0,
     ) -> None:
         if self.graph_backend is None:
             return
@@ -176,6 +177,7 @@ class KnowledgeGraphBuilder:
                     "content_hash": parsed.source.content_hash,
                     "summary": summary,
                     "project_id": project_id,
+                    "chunk_count": chunk_count,
                 },
             )
             if project_id:

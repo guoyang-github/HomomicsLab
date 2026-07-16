@@ -23,7 +23,7 @@ Two invariants override every strategy:
    HITL path and are never bypassed here.
 """
 
-from typing import Any, Optional, Set
+from typing import Any, List, Optional
 
 APPROVAL_STRATEGIES = ("always", "first_time", "risky_only", "never")
 DEFAULT_STRATEGY = "risky_only"
@@ -59,14 +59,26 @@ def resolve_strategy(
     return normalize_strategy(global_strategy)
 
 
-def plan_signature(tree: Any) -> str:
-    """Stable identity for a plan shape, used by the ``first_time`` strategy."""
+def plan_signature(tree: Any, strategy_name: Optional[str] = None) -> str:
+    """Stable identity for a plan shape, used by the ``first_time`` strategy.
+
+    The signature includes the ordered skill/task identities and the planning
+    strategy so that the same set of skills produced by different planners
+    (e.g. domain template vs. standalone skill) are treated as distinct plans.
+    """
     if tree is None or not getattr(tree, "tasks", None):
         return ""
     parts = sorted(
-        (getattr(task, "skill_id", None) or getattr(task, "name", "") or "")
+        (
+            getattr(task, "skill_id", None)
+            or (task.skills_required[0] if getattr(task, "skills_required", None) else None)
+            or getattr(task, "name", "")
+            or ""
+        )
         for task in tree.tasks
     )
+    if strategy_name:
+        parts.append(f"strategy={strategy_name}")
     return "|".join(parts)
 
 
@@ -78,37 +90,44 @@ def should_require_approval(
     is_high_risk: bool,
     is_single_task_tree: bool,
     plan_mode: bool = False,
-    seen_signatures: Optional[Set[str]] = None,
-) -> bool:
-    """Decide whether the plan gate should pause for human confirmation."""
+    seen_signatures: Optional[List[str]] = None,
+) -> tuple[bool, List[str]]:
+    """Decide whether the plan gate should pause for human confirmation.
+
+    Returns a tuple ``(needs_approval, updated_signatures)``.  The updated list
+    should be persisted by the caller so the ``first_time`` strategy remembers
+    approved plan shapes across restarts.
+    """
     strategy = normalize_strategy(strategy)
+    signatures = list(seen_signatures or [])
+    signatures_set = set(signatures)
 
     # Invariant 1: explicit plan mode always reviews the plan.
     if plan_mode:
-        return True
+        return True, signatures
     # Invariant 2: uncertainty/risk always gates, regardless of strategy.
     if is_high_risk:
-        return True
+        return True, signatures
     if plan is None:
-        return False
+        return False, signatures
     # A single, dependency-free, low-risk named task is an unambiguous
     # instruction (e.g. "use CellTypist on sample.h5ad"); run it directly.
     if is_single_task_tree:
-        return False
+        return False, signatures
 
     if strategy == "never":
-        return False
+        return False, signatures
     if strategy == "always":
-        return True
+        return True, signatures
     if strategy == "first_time":
-        signature = plan_signature(tree)
-        if seen_signatures is None:
-            return True
-        if signature and signature in seen_signatures:
-            return False
-        if signature:
-            seen_signatures.add(signature)
-        return True
+        strategy_name = getattr(plan, "strategy_name", None) or ""
+        signature = plan_signature(tree, strategy_name=strategy_name)
+        if signature and signature in signatures_set:
+            return False, signatures
+        # The caller records the signature only after the plan is actually
+        # approved and executed.  We do not mutate ``signatures`` here because
+        # the user may still reject this plan.
+        return True, signatures
 
     # risky_only (default): curated low-risk plans auto-execute.
-    return False
+    return False, signatures

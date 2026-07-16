@@ -34,8 +34,14 @@ phases:
     default_skill: bio-single-cell-fastq2mtx
 
   - id: data_io
-    required: true
+    required: false
     description: Load single-cell data into AnnData/Seurat objects and prepare metadata.
+    skills: [bio-single-cell-data-io]
+    default_skill: bio-single-cell-data-io
+
+  - id: descriptive_statistics
+    required: false
+    description: Load single-cell data and compute descriptive statistics (n_cells, n_genes, metadata summary, layer overview).
     skills: [bio-single-cell-data-io]
     default_skill: bio-single-cell-data-io
 
@@ -197,6 +203,9 @@ phase_transitions:
     to: data_io
   - from: data_io
     to: qc
+  - from: data_io
+    to: descriptive_statistics
+    type: depends_on
   - from: qc
     to: doublet_removal
   - from: doublet_removal
@@ -268,10 +277,26 @@ intents:
       - 细胞类型注释
       - 聚类
       - UMAP
+      - h5ad
+      - .h5ad
     examples:
       - 帮我分析单细胞数据
       - 做一个scRNA-seq质控和聚类
       - 单细胞转录组差异分析
+
+  - analysis_type: descriptive_statistics
+    keywords:
+      - 描述性统计
+      - descriptive statistics
+      - describe the data
+      - 统计概要
+      - 数据概览
+      - overview
+      - summary statistics
+      - 基本统计
+    examples:
+      - 读取这个h5ad文件并做描述性统计
+      - 给出数据的基本统计信息
 
 roles:
   - role_id: single_cell_specialist

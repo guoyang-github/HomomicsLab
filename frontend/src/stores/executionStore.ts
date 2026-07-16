@@ -26,6 +26,7 @@ interface ExecutionState {
   setJobId: (id: string | null) => void
   setJobSessionId: (id: string | null) => void
   startJob: (jobId: string, sessionId: string) => void
+  restoreJob: (jobId: string, sessionId: string, logs?: LogEntry[], status?: ExecutionState['status'], percent?: number) => void
   setConnected: (connected: boolean) => void
   setStatus: (status: ExecutionState['status'], percent?: number) => void
   addLog: (entry: Omit<LogEntry, 'id'>) => void
@@ -55,6 +56,16 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       logs: [],
       status: 'running',
       percent: 0,
+      result: null,
+    }),
+  restoreJob: (jobId, jobSessionId, logs, status, percent) =>
+    set({
+      jobId,
+      jobSessionId,
+      isConnected: false,
+      logs: logs || [],
+      status: status || 'running',
+      percent: percent ?? 0,
       result: null,
     }),
   setConnected: (isConnected) => set({ isConnected }),

@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useOverlayStore } from '@/stores/overlayStore'
+import { usePlanStore } from '@/stores/planStore'
 import { useTranslation } from '@/i18n'
-import type { TaskNode, TaskProgress } from '@/types/tasks'
+import type { TaskNode } from '@/types/tasks'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { fileApi, executionApi } from '@/sdk'
 import type { Artifact } from '@/components/artifacts'
@@ -13,7 +14,6 @@ interface Props {
   content: {
     text: string
     tasks: TaskNode[]
-    progress?: TaskProgress
     job_id?: string
     project_id?: string
     result?: Record<string, any>
@@ -50,15 +50,6 @@ function isRichSummary(text: string): boolean {
   return typeof text === 'string' && /\*\*(关键指标|关键发现|解读|CellTypist|注释结果|一致性比较|结果)\*\*/.test(text)
 }
 
-const statusIcons: Record<TaskNode['status'], string> = {
-  pending: '⬜',
-  running: '▶️',
-  completed: '✅',
-  failed: '❌',
-  awaiting_human: '⏸️',
-  aborted: '🚫',
-}
-
 function normalizeResult(raw: Record<string, any> | null | undefined): Record<string, any> | null {
   if (!raw) return null
   if (raw.success !== undefined || raw.status === 'failure') {
@@ -80,17 +71,13 @@ function fileLink(projectId: string | undefined, path: string): string | null {
 }
 
 export function TodoList({ content }: Props) {
-  const { t } = useTranslation()
-  const selectTask = useTaskStore((state) => state.selectTask)
   const liveTasks = useTaskStore((state) => state.tasks)
-  const liveProgress = useTaskStore((state) => state.progress)
   const executionStatus = useExecutionStore((state) => state.status)
   const executionLogs = useExecutionStore((state) => state.logs)
   const isConnected = useExecutionStore((state) => state.isConnected)
   const executionResult = useExecutionStore((state) => state.result)
   const hasLiveTasks = liveTasks.length > 0 && content.job_id
   const tasks = hasLiveTasks ? liveTasks : content.tasks
-  const progress = hasLiveTasks ? liveProgress : content.progress
 
   const isRunning = executionStatus === 'running' && content.job_id
   const recentLogs = executionLogs.slice(-5)
@@ -191,38 +178,7 @@ export function TodoList({ content }: Props) {
       {summaryText && <MarkdownRenderer content={summaryText} />}
       {showPlaceholder && content.text && <MarkdownRenderer content={content.text} />}
 
-      {progress && progress.total > 0 && (
-        <div className="mb-3">
-          <div className="mb-1 flex justify-between text-xs text-slate-600">
-            <span>{t('plan.progress')}</span>
-            <span>
-              {progress.completed}/{progress.total}
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-slate-200">
-            <div
-              className="h-2 rounded-full bg-success transition-all"
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {(tasks?.length ?? 0) > 0 && <ViewWorkflowButton />}
-
-      <ul className="space-y-1">
-        {tasks?.map((task) => (
-          <li
-            key={task.id}
-            onClick={() => selectTask(task.id)}
-            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-100"
-          >
-            <span>{statusIcons[task.status]}</span>
-            <span className="flex-1">{task.description}</span>
-            <span className="text-xs text-slate-500">{task.phase}</span>
-          </li>
-        ))}
-      </ul>
 
       {content.job_id && (
         <div className="rounded border border-border bg-card/50 p-2">
@@ -324,12 +280,16 @@ export function TodoList({ content }: Props) {
 function ViewWorkflowButton() {
   const { t } = useTranslation()
   const openWorkflow = useOverlayStore((state) => state.openWorkflow)
+  const discardDraft = usePlanStore((state) => state.discardDraft)
 
   return (
     <div className="flex justify-end">
       <button
         type="button"
-        onClick={() => openWorkflow()}
+        onClick={() => {
+          discardDraft()
+          openWorkflow()
+        }}
         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
       >
         <Workflow className="h-3.5 w-3.5" />

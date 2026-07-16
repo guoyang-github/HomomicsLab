@@ -9,8 +9,8 @@ from homomics_lab.agent.approval_policy import (
 )
 
 
-def _task(skill_id=None, name=""):
-    return SimpleNamespace(skill_id=skill_id, name=name)
+def _task(skill_id=None, name="", skills_required=None):
+    return SimpleNamespace(skill_id=skill_id, name=name, skills_required=skills_required)
 
 
 def _tree(*tasks):
@@ -56,97 +56,123 @@ def test_plan_signature_is_order_independent():
     assert plan_signature(_tree()) == ""
 
 
+def test_plan_signature_includes_strategy_name():
+    tree = _tree(_task("bio-x"))
+    assert plan_signature(tree, strategy_name="standalone") == "bio-x|strategy=standalone"
+
+
+def test_plan_signature_prefers_skill_id_then_first_required_skill():
+    tree = _tree(_task(skills_required=["bio-z"]))
+    assert plan_signature(tree) == "bio-z"
+
+
 def test_plan_mode_always_requires_approval():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="never",
         plan=object(),
         tree=_tree(_task("bio-x")),
         is_high_risk=False,
         is_single_task_tree=True,
         plan_mode=True,
-    ) is True
+    )
+    assert needs is True
 
 
 def test_high_risk_always_requires_approval_even_when_never():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="never",
         plan=object(),
         tree=_tree(_task("bio-x"), _task("bio-y")),
         is_high_risk=True,
         is_single_task_tree=False,
         plan_mode=False,
-    ) is True
+    )
+    assert needs is True
 
 
 def test_single_task_tree_runs_under_every_strategy():
     for strategy in ("always", "first_time", "risky_only", "never"):
-        assert should_require_approval(
+        needs, _ = should_require_approval(
             strategy=strategy,
             plan=object(),
             tree=_tree(_task("bio-x")),
             is_high_risk=False,
             is_single_task_tree=True,
-        ) is False
+        )
+        assert needs is False
 
 
 def test_never_strategy_skips_gate_for_low_risk_plans():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="never",
         plan=object(),
         tree=_tree(_task("bio-x"), _task("bio-y")),
         is_high_risk=False,
         is_single_task_tree=False,
-    ) is False
+    )
+    assert needs is False
 
 
 def test_always_strategy_gates_non_trivial_plans():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="always",
         plan=object(),
         tree=_tree(_task("bio-x"), _task("bio-y")),
         is_high_risk=False,
         is_single_task_tree=False,
-    ) is True
+    )
+    assert needs is True
 
 
 def test_risky_only_runs_low_risk_plans_without_confirmation():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="risky_only",
         plan=object(),
         tree=_tree(_task("bio-x"), _task("bio-y")),
         is_high_risk=False,
         is_single_task_tree=False,
-    ) is False
+    )
+    assert needs is False
 
 
 def test_first_time_confirms_once_then_remembers():
-    seen = set()
+    seen = ["existing-signature"]
     tree = _tree(_task("bio-x"), _task("bio-y"))
-    first = should_require_approval(
+    plan = SimpleNamespace(strategy_name="test-strategy")
+
+    first, updated = should_require_approval(
         strategy="first_time",
-        plan=object(),
+        plan=plan,
         tree=tree,
         is_high_risk=False,
         is_single_task_tree=False,
         seen_signatures=seen,
     )
-    second = should_require_approval(
-        strategy="first_time",
-        plan=object(),
-        tree=tree,
-        is_high_risk=False,
-        is_single_task_tree=False,
-        seen_signatures=seen,
-    )
+    # The signature should NOT be recorded yet (user may reject).
     assert first is True
+    assert updated == seen
+
+    # Simulate caller recording the signature after execution.
+    sig = plan_signature(tree, strategy_name=plan.strategy_name)
+    seen.append(sig)
+
+    second, _ = should_require_approval(
+        strategy="first_time",
+        plan=plan,
+        tree=tree,
+        is_high_risk=False,
+        is_single_task_tree=False,
+        seen_signatures=seen,
+    )
     assert second is False
 
 
 def test_no_plan_never_gates():
-    assert should_require_approval(
+    needs, _ = should_require_approval(
         strategy="always",
         plan=None,
         tree=_tree(_task("bio-x")),
         is_high_risk=False,
         is_single_task_tree=False,
-    ) is False
+    )
+    assert needs is False

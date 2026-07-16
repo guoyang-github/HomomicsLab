@@ -30,7 +30,13 @@ class RelevanceFilter:
         if self._embedding_model is None and self.use_dense_embeddings:
             try:
                 from sentence_transformers import SentenceTransformer
-                self._embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+                try:
+                    self._embedding_model = SentenceTransformer(
+                        "all-MiniLM-L6-v2", local_files_only=True
+                    )
+                except Exception:
+                    self._embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
             except ImportError:
                 self.use_dense_embeddings = False
         return self._embedding_model

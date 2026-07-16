@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import type { NavItem } from '@/components/layout/Sidebar'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { FileBrowser } from '@/components/files/FileBrowser'
+import { KnowledgePanel } from '@/components/knowledge/KnowledgePanel'
 import { SkillSearch } from '@/components/skills/SkillSearch'
 import { SkillManager } from '@/components/skills/SkillManager'
 import { SkillGenerator } from '@/components/skills/SkillGenerator'
@@ -12,7 +13,7 @@ import { SettingsPanel } from '@/components/settings/SettingsPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 
-const NAV_ITEMS: readonly NavItem[] = ['chat', 'files', 'skills', 'domains', 'mcp', 'settings']
+const NAV_ITEMS: readonly NavItem[] = ['chat', 'files', 'knowledge', 'skills', 'domains', 'mcp', 'settings']
 
 // Hash routing: the active view is mirrored to window.location.hash
 // (e.g. #/skills) so refreshes keep the view and links are shareable.
@@ -45,6 +46,8 @@ function App() {
         return <ChatPanel />
       case 'files':
         return <FileBrowser />
+      case 'knowledge':
+        return <KnowledgePanel />
       case 'skills':
         return (
           <div className="h-full p-4">

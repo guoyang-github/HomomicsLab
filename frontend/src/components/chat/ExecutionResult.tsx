@@ -1,5 +1,4 @@
-import { clsx } from 'clsx'
-import { Download, FileText, Workflow, CheckCircle2, XCircle, Circle } from 'lucide-react'
+import { Download, FileText, Workflow, XCircle } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
@@ -34,7 +33,7 @@ function normalizeResult(raw: Record<string, any> | null | undefined): Record<st
 function collectOutputFiles(normalized: Record<string, any> | null): string[] {
   if (!normalized) return []
   const out: string[] = []
-  for (const key of ['output_files', 'output_paths', 'output_csv', 'output_h5ad']) {
+  for (const key of ['output_files', 'output_paths', 'output_csv', 'output_h5ad', 'output_summary', 'comparison_csv']) {
     const val = normalized[key]
     if (typeof val === 'string' && val) {
       out.push(val)
@@ -80,36 +79,7 @@ function formatSize(bytes: unknown): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
 }
 
-interface DisplaySubtask {
-  id: string
-  description: string
-  analysis_type?: string
-}
-
-function collectSubtasks(tasks: TaskNode[] | undefined): { id: string; description: string; status: TaskNode['status'] }[] {
-  if (!tasks) return []
-  const items: { id: string; description: string; status: TaskNode['status'] }[] = []
-  for (const task of tasks) {
-    const raw = task.parameters?.display_subtasks
-    if (Array.isArray(raw) && raw.length >= 2) {
-      for (const sub of raw) {
-        if (typeof sub === 'object' && sub !== null && typeof (sub as DisplaySubtask).description === 'string') {
-          items.push({
-            id: (sub as DisplaySubtask).id || `${task.id}_sub_${items.length}`,
-            description: (sub as DisplaySubtask).description,
-            status: task.status,
-          })
-        }
-      }
-    }
-  }
-  return items
-}
-
 function isRichSummary(text: string): boolean {
-  // Rich summaries produced by the backend result_summary module contain
-  // section headers, tables, or sourced findings. Generic fallbacks like
-  // "分析已完成" are not rich.
   if (!text || text.length < 30) return false
   const hasSection = /\*\*(关键指标|关键发现|解读|下一步建议|CellTypist|注释结果|一致性比较|结果|来源)\*\*/.test(text)
   const hasTable = /\n\|[^\n]+\|\n\|[-:| ]+\|/.test(text)
@@ -117,9 +87,39 @@ function isRichSummary(text: string): boolean {
   return hasSection || hasTable || hasFinding
 }
 
+function isGenericPlaceholder(text: string): boolean {
+  if (!text) return true
+  const lowered = text.trim().toLowerCase()
+  return (
+    lowered === '分析已完成。' ||
+    lowered === '分析已完成' ||
+    lowered.startsWith('执行结束') ||
+    lowered.startsWith('抱歉，处理您的请求时出现了问题')
+  )
+}
+
+function formatObjectSummary(obj: Record<string, any>): string {
+  const lines: string[] = []
+  const scalarKeys = Object.keys(obj).filter((k) => {
+    const v = obj[k]
+    if (v === null || v === undefined) return false
+    if (typeof v === 'string' && v.startsWith('/')) return false
+    if (Array.isArray(v)) return false
+    if (typeof v === 'object') return false
+    return true
+  })
+  if (scalarKeys.length > 0) {
+    lines.push('**关键指标**')
+    scalarKeys.forEach((k) => {
+      const value = obj[k]
+      lines.push(`- ${k}：${typeof value === 'number' ? (Number.isInteger(value) ? value : value.toFixed(3)) : value}`)
+    })
+  }
+  return lines.join('\n')
+}
+
 export function ExecutionResult({ content }: Props) {
   const { t } = useTranslation()
-  const executionStatus = useExecutionStore((state) => state.status)
   const executionResult = useExecutionStore((state) => state.result)
   const openWorkflow = useOverlayStore((state) => state.openWorkflow)
 
@@ -139,12 +139,24 @@ export function ExecutionResult({ content }: Props) {
   const failureMessage =
     normalizedResult?.error || normalizedResult?.error_message || normalizedResult?.detail
 
-  // Prefer the deterministic rich summary the backend embeds in the TODO card.
-  // Only fall back to the skill's own summary when the backend did not produce
-  // a rich one, so the chat always shows sourced tables/metrics when available.
-  const summaryText = isRichSummary(content.text)
-    ? content.text
-    : normalizedResult?.final_output?.summary || normalizedResult?.summary || content.text
+  // Prefer deterministic rich summaries; otherwise use any explicit summary/text
+  // the skill returned. If the backend placeholder is generic and we have a result,
+  // fall back to a structured key-value rendering instead of "分析已完成。"
+  let summaryText = ''
+  if (isRichSummary(content.text)) {
+    summaryText = content.text
+  } else {
+    const explicitSummary =
+      normalizedResult?.final_output?.summary ||
+      normalizedResult?.summary ||
+      normalizedResult?.text ||
+      content.text
+    if (explicitSummary && typeof explicitSummary === 'string' && !isGenericPlaceholder(explicitSummary)) {
+      summaryText = explicitSummary
+    } else if (normalizedResult && !isFailure) {
+      summaryText = formatObjectSummary(normalizedResult)
+    }
+  }
 
   const messageArtifacts: Artifact[] = Array.isArray(normalizedResult?.artifacts)
     ? (normalizedResult!.artifacts as Artifact[])
@@ -153,41 +165,10 @@ export function ExecutionResult({ content }: Props) {
     : []
 
   const outputFiles = collectOutputFiles(normalizedResult)
-  const subtaskItems = collectSubtasks(content.tasks)
-  const isCompleted = content.status === 'completed' || executionStatus === 'completed'
-  const isFailed = content.status === 'failed' || executionStatus === 'failed'
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed">
-      {summaryText && <MarkdownRenderer content={summaryText} />}
-
-      {subtaskItems.length > 0 && (
-        <div className="space-y-1.5 rounded-lg border border-border-faint bg-surface/50 p-3">
-          {subtaskItems.map((item) => {
-            const itemStatus = isCompleted ? 'completed' : isFailed ? 'failed' : item.status
-            return (
-              <div key={item.id} className="flex items-center gap-2 text-sm">
-                {itemStatus === 'completed' ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-                ) : itemStatus === 'failed' ? (
-                  <XCircle className="h-4 w-4 shrink-0 text-error" />
-                ) : (
-                  <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-                <span
-                  className={clsx(
-                    'flex-1',
-                    itemStatus === 'completed' && 'text-muted-foreground line-through',
-                    itemStatus === 'failed' && 'text-error'
-                  )}
-                >
-                  {item.description}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {summaryText ? <MarkdownRenderer content={summaryText} /> : null}
 
       {content.tasks?.length > 0 && (
         <div className="flex justify-end">
@@ -202,21 +183,17 @@ export function ExecutionResult({ content }: Props) {
         </div>
       )}
 
-      {executionStatus === 'running' && content.job_id && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-success" />
-          <span>{t('executionLog.running')}</span>
-        </div>
-      )}
-
-      {messageArtifacts.length > 0 && renderArtifactLinks(messageArtifacts, content.project_id, t, isFailure)}
+      {messageArtifacts.length > 0 && renderArtifactLinks(messageArtifacts, content.project_id, t)}
 
       {outputFiles.length > 0 && messageArtifacts.length === 0 &&
         renderFileLinks(outputFiles, content.project_id, t)}
 
       {isFailure && (
         <div className="rounded-lg border border-error/30 bg-error/5 p-3">
-          <div className="mb-1 text-sm font-medium text-error">{t('executionLog.failed')}</div>
+          <div className="mb-1 flex items-center gap-2 text-sm font-medium text-error">
+            <XCircle className="h-4 w-4" />
+            {t('executionLog.failed')}
+          </div>
           <p className="text-xs text-foreground/80">
             {failureMessage || '请查看执行日志了解详情。'}
           </p>
@@ -229,13 +206,12 @@ export function ExecutionResult({ content }: Props) {
 function renderArtifactLinks(
   items: Artifact[],
   projectId: string | undefined,
-  t: (key: string) => string,
-  failed?: boolean
+  t: (key: string) => string
 ) {
   return (
     <div className="mt-2 space-y-1">
       <p className="text-xs font-medium text-foreground/80">
-        {failed ? t('common.output') : t('common.output')} ({items.length})
+        {t('common.output')} ({items.length})
       </p>
       {items.map((artifact, idx) => {
         const href = artifactLink(projectId, artifact)

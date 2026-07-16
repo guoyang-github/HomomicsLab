@@ -491,6 +491,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
         default_model=settings.context_engine_model or settings.llm_model or "default",
         embedding_model_name=settings.semantic_search_model,
         enable_llm_summary=enable_llm_summary,
+        knowledge_index=knowledge_index,
     )
     project_state_manager = ProjectStateManager(cbkb=cbkb)
 

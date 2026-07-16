@@ -1,6 +1,12 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Prevent Hugging Face libraries from blocking startup with network HEAD/etag
+# checks when models are already cached locally.  This affects sentence-transformers
+# and transformers code paths throughout the backend.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

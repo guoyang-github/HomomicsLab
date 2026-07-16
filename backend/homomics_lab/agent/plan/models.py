@@ -3,6 +3,7 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
+from homomics_lab.agent.plan.display_plan import DisplayStep
 from homomics_lab.skills.models import SkillDefinition
 
 
@@ -294,6 +295,13 @@ class PlanResult:
     # Filled by ModeSelector in PlanEngine when left at the default.
     execution_mode: str = "auto"
 
+    # User-facing display plan, separate from the execution plan.  Each step
+    # corresponds to a clear user-intent fragment and drives the TODO checklist.
+    display_steps: List[DisplayStep] = field(default_factory=list)
+
+    # Audit trail for the routing decision that produced this plan.
+    routing_trace: List[Dict[str, Any]] = field(default_factory=list)
+
     @property
     def skill_sequence(self) -> List[str]:
         """Extract the sequence of selected skill IDs."""
@@ -334,6 +342,8 @@ class PlanResult:
             "risk_level": self.risk_level,
             "approval_required": self.approval_required,
             "execution_mode": self.execution_mode,
+            "display_steps": [s.to_dict() for s in self.display_steps],
+            "routing_trace": self.routing_trace,
         }
         if self.strategy_trace is not None:
             result["strategy_trace"] = self.strategy_trace.to_dict()
@@ -359,4 +369,6 @@ class PlanResult:
             risk_level=data.get("risk_level", "low"),
             approval_required=data.get("approval_required", False),
             execution_mode=data.get("execution_mode", "auto"),
+            display_steps=[DisplayStep.from_dict(s) for s in data.get("display_steps", [])],
+            routing_trace=list(data.get("routing_trace", [])),
         )

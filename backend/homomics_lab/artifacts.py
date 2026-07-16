@@ -11,7 +11,7 @@ fall back to ``kind="file"`` so the UI can still offer a download.
 
 import mimetypes
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Extension -> canonical renderer kind. Checked before the MIME guess so that
 # domain-specific formats (e.g. .h5ad) route correctly even without a MIME type.
@@ -42,7 +42,7 @@ _MIME_KIND: Dict[str, str] = {
 }
 
 
-def classify(path: Path) -> (str, str):
+def classify(path: Path) -> Tuple[str, str]:
     """Return ``(kind, mime)`` for a file path (extension-first, then MIME)."""
     name = path.name if isinstance(path, Path) else str(path)
     ext = Path(name).suffix.lower()

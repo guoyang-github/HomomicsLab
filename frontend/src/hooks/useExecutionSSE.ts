@@ -6,6 +6,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useTranslation } from '@/i18n'
 import { executionApi } from '@/sdk'
 import type { TaskNode, TaskProgress, TaskStatus } from '@/types/tasks'
+import type { ChatMessage } from '@/types/chat'
 
 interface ExecutionStatePayload {
   job_id: string
@@ -18,6 +19,8 @@ interface ExecutionStatePayload {
   result?: Record<string, any> | null
   logs?: string[]
   resource_usage?: Record<string, any> | null
+  /** Chat messages injected by the backend (e.g. final result summary). */
+  messages?: ChatMessage[]
   /** Present when the event originates from a sub-executor, e.g. "subagent:<skill_id>". */
   actor?: string
   /** Parent job/task id of the sub-executor; absent for top-level events. */
@@ -71,6 +74,12 @@ export function useExecutionSSE(jobId: string | null) {
   useEffect(() => {
     tasksRef.current = tasks
   }, [tasks])
+  const addMessage = useChatStore((state) => state.addMessage)
+  const messagesRef = useRef<ChatMessage[]>([])
+  const chatMessages = useChatStore((state) => state.messages)
+  useEffect(() => {
+    messagesRef.current = chatMessages
+  }, [chatMessages])
 
   useEffect(() => {
     if (!jobId) {
@@ -117,7 +126,20 @@ export function useExecutionSSE(jobId: string | null) {
           console.log('[useExecutionSSE] setResult from task', JSON.parse(JSON.stringify(completedTask.result)))
           setResult(completedTask.result as Record<string, any>)
         }
-      } else if (!isSubagentEvent && (data.active_task_id || isTerminal)) {
+      }
+
+      // Inject any chat messages broadcast by the backend (e.g. the final
+      // result summary).  Skip messages already in the conversation.
+      if (!isSubagentEvent && data.messages && data.messages.length > 0) {
+        const existingIds = new Set(messagesRef.current.map((m) => m.id))
+        data.messages.forEach((msg) => {
+          if (!existingIds.has(msg.id)) {
+            addMessage(msg)
+          }
+        })
+      }
+
+      if (!isSubagentEvent && (data.active_task_id || isTerminal)) {
         // Agentic skills stream state events without a full task tree.
         // Drive the active task's status from the job state so the
         // TODO list and progress bar update in real time.

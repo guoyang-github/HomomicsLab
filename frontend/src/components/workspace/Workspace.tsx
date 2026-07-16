@@ -42,16 +42,31 @@ export function Workspace() {
           created_at: string
         }>
         if (plans.length === 0) return
-        // Pick the most recent approved/completed plan.
-        const latest = plans
-          .filter((p) => p.status === 'approved' || p.status === 'completed')
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        if (!latest) return
+        // Pick the most recent plan for this session.
+        const latest = plans.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
         return planApi.getPlan(latest.plan_id)
       })
       .then((res) => {
         if (cancelled || !res) return
-        loadApprovedPlan(res.data as PlanRequestContent, executionStatus)
+        const payload = res.data
+        const content: PlanRequestContent = {
+          plan_id: payload.plan_id,
+          response_text: payload.suggestion_text || payload.rationale_summary || '',
+          plan: {
+            plan_id: payload.plan_id,
+            status: payload.status,
+            is_fallback: payload.is_fallback,
+            intent_analysis_type: payload.intent_analysis_type,
+            phases: payload.phases || [],
+            transitions: payload.transitions || [],
+            gaps: payload.gaps,
+            suggestion_text: payload.suggestion_text,
+            version: payload.version,
+          },
+        }
+        loadApprovedPlan(content, executionStatus)
       })
       .catch(() => {
         // Fail silently; the task tree fallback will still render.

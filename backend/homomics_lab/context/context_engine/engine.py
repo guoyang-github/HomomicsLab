@@ -3,9 +3,11 @@
 Builds a token-safe, relevance-ranked prompt from layered memory sources.
 """
 
+from __future__ import annotations
+
 import logging
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.context.cbkb_retriever import CBKBRetriever
 from homomics_lab.context.context_engine.compressor import DynamicContextCompressor
@@ -25,6 +27,9 @@ from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.metrics import record_context_build
 
+if TYPE_CHECKING:
+    from homomics_lab.knowledge.ingestion import KnowledgeIndex
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +47,7 @@ class ContextEngine:
         default_model: str = "default",
         enable_llm_summary: bool = True,
         llm_client: Optional[LLMClient] = None,
+        knowledge_index: Optional[KnowledgeIndex] = None,
     ):
         self.cbkb = cbkb
         self.semantic_memory = semantic_memory
@@ -55,6 +61,7 @@ class ContextEngine:
         self.default_model = default_model
         self.enable_llm_summary = enable_llm_summary
         self.llm_client = llm_client
+        self.knowledge_index = knowledge_index
 
     async def build(
         self,
@@ -126,7 +133,36 @@ class ContextEngine:
         except Exception as exc:
             logger.warning("CBKB retrieval failed: %s", exc)
 
-        # 4. Semantic memory
+        # 4. Project knowledge base (user-uploaded documents)
+        if self.knowledge_index is not None:
+            try:
+                kb_chunks = await self.knowledge_index.search_chunks(
+                    query=user_message,
+                    project_id=project_id,
+                    top_k=5,
+                )
+                for chunk in kb_chunks:
+                    text = chunk.get("text", "")
+                    if not text:
+                        continue
+                    parts.append(
+                        ContextPart(
+                            content=text,
+                            source=ContextSource.KNOWLEDGE_BASE,
+                            priority=6,
+                            tokens=budget_manager.count(text),
+                            metadata={
+                                "document_id": chunk.get("metadata", {}).get("document_id")
+                                or chunk.get("id"),
+                                "score": chunk.get("score"),
+                                "source": chunk.get("metadata", {}).get("source"),
+                            },
+                        )
+                    )
+            except Exception as exc:
+                logger.warning("Knowledge base retrieval failed: %s", exc)
+
+        # 5. Semantic memory
         if self.semantic_memory is not None:
             try:
                 memories = await self.semantic_memory.search(
@@ -241,7 +277,9 @@ class ContextEngine:
         return (
             "You are HomomicsLab, an AI assistant specialized in bioinformatics analysis. "
             "You help researchers design experiments, analyze omics data, and interpret results. "
-            "Be concise, accurate, and ask for clarification when needed."
+            "Be concise, accurate, and ask for clarification when needed. "
+            "If knowledge-base excerpts are provided, base your answer on them and cite the source document when possible. "
+            "If the excerpts are insufficient, say so explicitly rather than inventing details."
         )
 
     def _assemble_messages(

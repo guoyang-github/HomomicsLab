@@ -25,11 +25,41 @@ from homomics_lab.agent.plan.models import DataState
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
 from homomics_lab.config import Settings, settings as default_settings
+from homomics_lab.agent.intent.alias_registry import AliasRegistry
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
 
 logger = logging.getLogger(__name__)
+
+# Generic file-format / biology terms that should not trigger explicit skill
+# selection when a domain is already known.
+_GENERIC_KEYWORDS = {
+    "h5ad",
+    ".h5ad",
+    "rds",
+    ".rds",
+    "csv",
+    ".csv",
+    "tsv",
+    ".tsv",
+    "mtx",
+    ".mtx",
+    "fastq",
+    "bam",
+    "cell",
+    "cells",
+    "gene",
+    "genes",
+    "rna",
+    "seq",
+    "data",
+    "file",
+    "read",
+    "读取",
+    "文件",
+    "数据",
+}
 
 
 @dataclass
@@ -78,33 +108,6 @@ class CapabilityAssembler:
         "epigenomics",
     ]
 
-    # Keywords that must appear in the original message for a domain to count
-    # toward cross-domain composition.  This prevents an LLM-decomposed sub-intent
-    # from silently promoting a request to cross-domain when the user only talked
-    # about one domain.
-    _DOMAIN_KEYWORDS: Dict[str, List[str]] = {
-        "single-cell-transcriptomics": [
-            "single-cell",
-            "single cell",
-            "scRNA",
-            "scrna",
-            "单细胞",
-            "免疫细胞",
-        ],
-        "spatial-transcriptomics": [
-            "spatial",
-            "visium",
-            "xenium",
-            "空间",
-            "空间转录组",
-        ],
-        "metagenomics": ["metagenomics", "宏基因组", "16s", "16S", "amplicon"],
-        "genomics": ["genomics", "基因组", "wgs", "whole genome"],
-        "transcriptomics": ["transcriptomics", "转录组", "bulk rna", "rnaseq"],
-        "proteomics": ["proteomics", "蛋白质组", "蛋白组"],
-        "epigenomics": ["epigenomics", "表观基因组", "chip-seq", "atac-seq"],
-    }
-
     def __init__(
         self,
         capability_index: Optional[CapabilityIndex] = None,
@@ -113,6 +116,7 @@ class CapabilityAssembler:
         settings: Optional[Settings] = None,
         template_coverage_threshold: Optional[float] = None,
         standalone_score_threshold: Optional[float] = None,
+        alias_registry: Optional[AliasRegistry] = None,
     ) -> None:
         self.settings = settings or default_settings
         self.capability_index = capability_index
@@ -128,6 +132,18 @@ class CapabilityAssembler:
             if standalone_score_threshold is not None
             else self.DEFAULT_STANDALONE_SCORE_THRESHOLD
         )
+        self._alias_registry = alias_registry
+
+    def _ensure_alias_registry(self) -> AliasRegistry:
+        """Return the alias registry, building it from current registries if needed."""
+        if self._alias_registry is None:
+            from homomics_lab.domain.registry import get_domain_registry
+
+            self._alias_registry = AliasRegistry.build(
+                domains=get_domain_registry().list_all(),
+                skills=self.skill_registry.list_all(),
+            )
+        return self._alias_registry
 
     async def assemble(
         self,
@@ -136,11 +152,17 @@ class CapabilityAssembler:
     ) -> CapabilityAssembly:
         """Return the best routing decision for ``intent``."""
         data_state = data_state or DataState()
+        is_phase_level = self._ensure_alias_registry().is_phase_level(intent.analysis_type)
 
         # 0. Explicit skill target. When the user names a concrete skill (or the
         # classifier resolves the request to a registered skill_id), use it directly
         # instead of building a full domain pipeline or searching again.
-        explicit_skill = self._resolve_explicit_target_skill(intent)
+        # Skip this shortcut when the intent is already narrowed to a domain phase
+        # (e.g. descriptive_statistics): in that case the domain template or open
+        # agent should decide how to fulfil the phase, not a keyword-matched skill.
+        explicit_skill = None
+        if not is_phase_level:
+            explicit_skill = self._resolve_explicit_target_skill(intent)
         if explicit_skill is not None:
             return CapabilityAssembly(
                 route="standalone_skill",
@@ -152,17 +174,19 @@ class CapabilityAssembler:
         # 1. Multi-domain composition.
         domains = self._detect_domains(intent)
         if len(domains) >= 2 and self._message_confirms_cross_domain(intent, domains):
-            return CapabilityAssembly(
+            result = CapabilityAssembly(
                 route="cross_domain",
                 domains=domains,
                 reason=f"Multiple domains detected: {', '.join(domains)}",
             )
+            logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+            return result
 
         # 2. Domain template match.
         template, coverage = await self._match_template(intent, data_state)
         if template is not None:
             if coverage >= self.template_coverage_threshold:
-                return CapabilityAssembly(
+                result = CapabilityAssembly(
                     route="domain_template",
                     domains=[template.domain] if template.domain else [],
                     template=template,
@@ -171,6 +195,8 @@ class CapabilityAssembler:
                         f"Template '{template.name}' covers {coverage:.0%} of intent signals"
                     ),
                 )
+                logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+                return result
             # Open exploration mode weakens the domain gate so borderline
             # requests are handled by the open agent instead of forcing a
             # domain pipeline.
@@ -178,7 +204,7 @@ class CapabilityAssembler:
                 self.settings.open_exploration_mode_enabled
                 and coverage >= self.OPEN_EXPLORATION_TEMPLATE_THRESHOLD
             ):
-                return CapabilityAssembly(
+                result = CapabilityAssembly(
                     route="open_agent",
                     domains=domains,
                     reason=(
@@ -186,6 +212,8 @@ class CapabilityAssembler:
                         "routing to open agent"
                     ),
                 )
+                logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+                return result
 
         # 3. Standalone / domain-agnostic skill match.
         # Only consider standalone skills when the intent lacks a concrete domain
@@ -201,7 +229,7 @@ class CapabilityAssembler:
                     self.settings.open_exploration_mode_enabled
                     and score < self.OPEN_EXPLORATION_CLEAR_STANDALONE_THRESHOLD
                 ):
-                    return CapabilityAssembly(
+                    result = CapabilityAssembly(
                         route="open_agent",
                         domains=domains,
                         reason=(
@@ -209,19 +237,25 @@ class CapabilityAssembler:
                             "routing to open agent"
                         ),
                     )
-                return CapabilityAssembly(
+                    logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+                    return result
+                result = CapabilityAssembly(
                     route="standalone_skill",
                     prebuilt_skills=skills,
                     score=score,
                     reason=f"Standalone skill match score {score:.2f}",
                 )
+                logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+                return result
 
         # 4. Open agent (with domain strategy as implicit fallback).
-        return CapabilityAssembly(
+        result = CapabilityAssembly(
             route="open_agent",
             domains=domains,
             reason="No strong template or standalone skill match; delegating to open agent",
         )
+        logger.info("CapabilityAssembler route=%s reason=%s", result.route, result.reason)
+        return result
 
     @classmethod
     def _detect_domains(cls, intent: UserIntent) -> List[str]:
@@ -288,12 +322,13 @@ class CapabilityAssembler:
             # No original message to verify against; be conservative.
             return False
 
+        registry = self._ensure_alias_registry()
         confirmed = 0
         for domain in domains:
-            keywords = self._DOMAIN_KEYWORDS.get(domain, [domain])
-            if any(kw.lower() in message for kw in keywords):
-                confirmed += 1
-            elif domain.replace("-", " ").lower() in message:
+            keywords = registry.get_domain_keywords(domain)
+            keywords.add(domain.replace("-", " ").lower())
+            keywords.add(domain.lower())
+            if any(kw in message for kw in keywords):
                 confirmed += 1
 
         # Require every detected domain to be confirmed by the message.
@@ -312,10 +347,17 @@ class CapabilityAssembler:
         for requests without a domain signal, or declared keywords/aliases for
         tool names like CellTypist even within a domain).
         """
-        # 1. Strongest signal: the classifier resolved the request to a skill_id.
+        # 1. Strongest signal: a concrete skill_id or skill alias in intent.target.
+        # If the classifier or caller explicitly names a registered skill, route
+        # directly to it without requiring the id to appear in the user message.
+        registry = self._ensure_alias_registry()
         target = intent.target
         if target:
-            skill = self.skill_registry.get(target)
+            skill_id = registry.resolve_skill(target)
+            if skill_id is None:
+                # Allow raw skill ids that are not registered as aliases.
+                skill_id = target
+            skill = self.skill_registry.get(skill_id)
             if skill is not None:
                 return skill
 
@@ -325,12 +367,15 @@ class CapabilityAssembler:
 
         has_domain_signal = self._has_domain_signal(intent)
 
-        # 2. Message-based matching. Track each skill and the keywords that matched
-        # so we can disambiguate when several skills share generic tokens.
+        # 2. Message-based matching via the canonical alias registry.
+        # The registry already indexes skill ids, names, keywords, tags, and any
+        # declared aliases, so we only need to disambiguate here.
+        matched_keywords = registry.match_skills(message)
         matches: Dict[str, SkillDefinition] = {}
-        matched_keywords: Dict[str, Set[str]] = {}
-
-        for skill in self.skill_registry.list_all():
+        for skill_id, aliases in matched_keywords.items():
+            skill = self.skill_registry.get(skill_id)
+            if skill is None:
+                continue
             sid = skill.id.lower()
             sname = skill.name.lower()
 
@@ -340,23 +385,34 @@ class CapabilityAssembler:
             # whose id happens to be "single_cell_qc".
             if not has_domain_signal and (sid in message or sname in message):
                 matches[skill.id] = skill
-                matched_keywords.setdefault(skill.id, set()).add(sid if sid in message else sname)
                 continue
 
             # Declared keywords/aliases (e.g. "celltypist") are distinctive tool
-            # names and work even when a domain is present.
-            keywords: Set[str] = set()
-            for tag in skill.metadata.get("tags", []):
-                if isinstance(tag, str) and len(tag) > 2:
-                    keywords.add(tag.lower())
-            for kw in skill.metadata.get("keywords", []):
-                if isinstance(kw, str) and len(kw) > 2:
-                    keywords.add(kw.lower())
+            # names and work even when a domain is present.  When a domain signal
+            # is present we are much more conservative: ignore generic file-format
+            # or biology terms and require the keyword to be part of the skill's
+            # own identity (id/name) so we do not route a phase-level request
+            # (e.g. descriptive_statistics) to an unrelated skill just because it
+            # lists "h5ad" or "cell" as a keyword.
+            hit_keywords: Set[str] = set()
+            for kw in aliases:
+                if has_domain_signal:
+                    if kw in _GENERIC_KEYWORDS:
+                        continue
+                    if len(kw) < 5:
+                        continue
+                    # A domain-level request should not be hijacked by a skill
+                    # whose id/name happens to appear literally in the message.
+                    # Declared keywords/aliases (e.g. "celltypist") are still
+                    # allowed because they are intentional tool references.
+                    if kw == sid or kw == sname:
+                        continue
+                    if not (kw in sid or kw in sname):
+                        continue
+                hit_keywords.add(kw)
 
-            hit_keywords = {kw for kw in keywords if kw in message}
             if hit_keywords:
                 matches[skill.id] = skill
-                matched_keywords.setdefault(skill.id, set()).update(hit_keywords)
 
         if not matches:
             return None
@@ -372,12 +428,12 @@ class CapabilityAssembler:
         # tokens (e.g. "h5ad", "data"). A clear winner is returned only when its
         # best keyword is substantially more specific than the runner-up.
         def _skill_score(skill: SkillDefinition) -> int:
-            sid = skill.id.lower()
-            sname = skill.name.lower()
+            skill_id = skill.id.lower()
+            skill_name = skill.name.lower()
             best = 0
             for kw in matched_keywords.get(skill.id, set()):
                 # Bonus when the keyword is part of the skill's own id/name.
-                in_identity = kw in sid or kw in sname
+                in_identity = kw in skill_id or kw in skill_name
                 score = len(kw) + (3 if in_identity else 0)
                 best = max(best, score)
             return best

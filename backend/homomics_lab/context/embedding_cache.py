@@ -30,7 +30,21 @@ class SharedEmbeddingModel:
             try:
                 from sentence_transformers import SentenceTransformer
 
-                self._model = SentenceTransformer(self._model_name)
+                try:
+                    self._model = SentenceTransformer(
+                        self._model_name, local_files_only=True
+                    )
+                    logger.info(
+                        "Loaded embedding model from local cache: %s",
+                        self._model_name,
+                    )
+                except Exception:
+                    logger.info(
+                        "Local cache miss for %s; falling back to online load",
+                        self._model_name,
+                        exc_info=True,
+                    )
+                    self._model = SentenceTransformer(self._model_name)
             except Exception as exc:
                 logger.warning("Could not load embedding model %s: %s", self._model_name, exc)
                 raise

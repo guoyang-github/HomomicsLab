@@ -1,6 +1,0 @@
-{
-  "key": "fed913f486ccdc585f963ff5458c782595cbc64d6b92668cc12cb20652890572",
-  "task": "simple computation",
-  "language": "python",
-  "code": "print(\"Executing generic task: simple computation\")\nprint(\"Context:\", {})\nresult = {\"task\": \"simple computation\"}\n"
-}

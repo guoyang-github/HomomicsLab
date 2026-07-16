@@ -1,6 +1,0 @@
-{
-  "key": "62d6e6674bd8fbcd88ca405ccb83defc738e077fa25d6559b7b45bc8533d8ac0",
-  "task": "load pbmc h5ad",
-  "language": "python",
-  "code": "import scanpy as sc\nadata = sc.read_h5ad(\"/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/mock_pbmc.h5ad\")\nprint(f\"Loaded {adata.n_obs} cells x {adata.n_vars} genes\")\nresult = {\"cells\": int(adata.n_obs), \"genes\": int(adata.n_vars), \"output_path\": \"/mnt/c/Users/guoyang/Desktop/TEST/HomomicsLab/backend/data/mock_pbmc.h5ad\"}\n"
-}

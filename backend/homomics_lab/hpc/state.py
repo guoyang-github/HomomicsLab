@@ -24,6 +24,8 @@ class ExecutionState:
     active_task_id: Optional[str] = None
     # Optional result summary for terminal states.
     result: Optional[Dict[str, Any]] = None
+    # Optional chat messages to inject into the conversation (e.g. final result).
+    messages: Optional[List[Dict[str, Any]]] = None
     # Subagent attribution (see homomics_lab.agent.progress_events). Present
     # only when this state was produced by a child execution; top-level
     # executions leave both unset and the keys are omitted from to_dict().
@@ -50,6 +52,7 @@ class ExecutionState:
             tasks=data.get("tasks"),
             active_task_id=data.get("active_task_id"),
             result=data.get("result"),
+            messages=data.get("messages"),
             actor=data.get("actor"),
             parent_id=data.get("parent_id"),
         )
@@ -75,6 +78,8 @@ class ExecutionState:
             "active_task_id": self.active_task_id,
             "result": self.result,
         }
+        if self.messages is not None:
+            payload["messages"] = self.messages
         # Top-level executions must not carry these keys at all (contract).
         if self.actor is not None and self.parent_id is not None:
             payload["actor"] = self.actor

@@ -89,6 +89,38 @@ function tasksFromPhases(phases: PlanPhase[], transitions: PlanTransition[]): Ta
   return phases.map((p) => phaseToTask(p, transitions))
 }
 
+function expandSubtaskNodes(tasks: TaskNode[]): TaskNode[] {
+  const out: TaskNode[] = []
+  const idMapping: Record<string, string> = {}
+  for (const task of tasks) {
+    const subs = task.parameters?.display_subtasks
+    if (Array.isArray(subs) && subs.length > 1) {
+      let lastSubId = ''
+      subs.forEach((sub: unknown, idx: number) => {
+        const s = sub as { id?: string; description?: string; analysis_type?: string }
+        const id = s.id || `${task.id}_sub_${idx}`
+        const deps = idx === 0 ? task.dependencies.map((d) => idMapping[d] || d) : [lastSubId]
+        out.push({
+          ...task,
+          id,
+          name: s.description || id,
+          description: s.description || id,
+          phase: task.phase,
+          dependencies: deps,
+          skills_required: idx === 0 ? task.skills_required : [],
+          parameters: { ...task.parameters, parent_phase: task.id },
+        })
+        lastSubId = id
+      })
+      idMapping[task.id] = lastSubId
+    } else {
+      out.push({ ...task, dependencies: task.dependencies.map((d) => idMapping[d] || d) })
+      idMapping[task.id] = task.id
+    }
+  }
+  return out
+}
+
 function layoutPositions(
   tasks: TaskNode[],
   existing: Record<string, { x: number; y: number }> = {}
@@ -194,7 +226,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       : buildTransitions(phases)
     const terminalStatus: TaskNode['status'] =
       executionStatus === 'completed' ? 'completed' : executionStatus === 'failed' ? 'failed' : 'pending'
-    const tasks = tasksFromPhases(phases, transitions).map((t) => ({ ...t, status: terminalStatus }))
+    const tasks = expandSubtaskNodes(
+      tasksFromPhases(phases, transitions).map((t) => ({ ...t, status: terminalStatus }))
+    )
     set({
       draftPlan: null,
       viewMode: 'approved',

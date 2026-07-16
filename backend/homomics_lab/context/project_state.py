@@ -34,6 +34,7 @@ class ProjectState:
     last_parameters: Dict[str, Any] = field(default_factory=dict)
     open_hitl: List[Dict[str, Any]] = field(default_factory=list)
     recent_errors: List[str] = field(default_factory=list)
+    approved_plan_signatures: List[str] = field(default_factory=list)
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_prompt_text(self) -> str:
@@ -74,6 +75,7 @@ class ProjectState:
             "last_parameters": self.last_parameters,
             "open_hitl": self.open_hitl,
             "recent_errors": self.recent_errors,
+            "approved_plan_signatures": self.approved_plan_signatures,
             "updated_at": self.updated_at,
         }
 
@@ -97,6 +99,7 @@ class ProjectState:
             last_parameters=dict(data.get("last_parameters", {})),
             open_hitl=list(data.get("open_hitl", [])),
             recent_errors=list(data.get("recent_errors", [])),
+            approved_plan_signatures=list(data.get("approved_plan_signatures", [])),
             updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
         )
 

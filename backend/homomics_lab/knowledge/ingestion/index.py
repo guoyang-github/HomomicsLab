@@ -228,6 +228,99 @@ class KnowledgeIndex:
             logger.warning("Failed to retrieve document graph: %s", exc)
             return {}
 
+    async def update_document(
+        self,
+        document_id: str,
+        properties: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update editable properties of a Document node.
+
+        Only a safe allow-list of fields can be changed. The node is re-written
+        with merged properties so existing graph links are preserved.
+        """
+        graph = self._get_graph_backend()
+        if graph is None:
+            raise RuntimeError("Graph backend is not available")
+
+        doc_node_id = f"document:{document_id}"
+        try:
+            nodes = await graph.search_nodes(query="", labels=["Document"], top_k=1000)
+        except Exception as exc:
+            logger.warning("Failed to search document node for update: %s", exc)
+            raise RuntimeError(f"Could not locate document {document_id}") from exc
+
+        doc_node = next((n for n in nodes if n.id == doc_node_id), None)
+        if doc_node is None:
+            raise ValueError(f"Document not found: {document_id}")
+
+        allowed = {"title", "summary"}
+        merged = {**doc_node.properties}
+        for key, value in properties.items():
+            if key in allowed and value is not None:
+                merged[key] = value
+
+        await graph.add_node(
+            node_id=doc_node_id,
+            labels=doc_node.labels or ["Document"],
+            properties=merged,
+        )
+        return {
+            "document_id": document_id,
+            "title": merged.get("title"),
+            "summary": merged.get("summary"),
+        }
+
+    async def list_documents(
+        self,
+        project_id: Optional[str] = None,
+        top_k: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """List ingested documents, optionally filtered by project.
+
+        Falls back to an empty list when the graph backend is unavailable.
+        """
+        graph = self._get_graph_backend()
+        if graph is None:
+            return []
+
+        try:
+            nodes = await graph.search_nodes(query="", labels=["Document"], top_k=top_k)
+        except Exception as exc:
+            logger.warning("Failed to list document nodes: %s", exc)
+            return []
+
+        results: List[Dict[str, Any]] = []
+        for node in nodes:
+            props = node.properties or {}
+            if project_id is not None and props.get("project_id") != project_id:
+                continue
+            doc_node_id = node.id
+            document_id = doc_node_id.split(":", 1)[1] if ":" in doc_node_id else doc_node_id
+            chunk_count = props.get("chunk_count")
+            if chunk_count is None:
+                try:
+                    chunks = await graph.get_neighbors(
+                        doc_node_id,
+                        edge_types=["PART_OF"],
+                        direction="incoming",
+                    )
+                    chunk_count = len(chunks)
+                except Exception:
+                    chunk_count = 0
+            results.append(
+                {
+                    "document_id": document_id,
+                    "title": props.get("title") or document_id,
+                    "source": props.get("source"),
+                    "source_type": props.get("source_type"),
+                    "filename": props.get("filename"),
+                    "project_id": props.get("project_id"),
+                    "chunk_count": chunk_count,
+                    "summary": props.get("summary"),
+                }
+            )
+        return results
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

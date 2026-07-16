@@ -6,12 +6,12 @@ import {
   FolderOpen,
   Folder,
   Settings,
-  Command,
   Plug,
   PanelLeft,
   FolderKanban,
   Plus,
   Loader2,
+  BookOpen,
 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import { healthApi } from '@/sdk'
@@ -21,22 +21,23 @@ import { useAnalysisTemplateStore } from '@/stores/analysisTemplateStore'
 import { Button, Select, Modal, Input } from '@/components/ui'
 import { SidebarSessions } from './SidebarSessions'
 
-export type NavItem = 'chat' | 'files' | 'skills' | 'domains' | 'mcp' | 'settings'
+export type NavItem = 'chat' | 'files' | 'knowledge' | 'skills' | 'domains' | 'mcp' | 'settings'
 
 interface SidebarItem {
   id: NavItem
   labelKey: string
-  icon: typeof Command
+  icon: typeof MessageSquare
   shortcut?: string
 }
 
 const navItems: SidebarItem[] = [
   { id: 'chat', labelKey: 'nav.chat', icon: MessageSquare, shortcut: '⌘1' },
   { id: 'files', labelKey: 'nav.files', icon: Folder, shortcut: '⌘2' },
-  { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘3' },
-  { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘4' },
-  { id: 'mcp', labelKey: 'nav.mcp', icon: Plug, shortcut: '⌘5' },
-  { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘6' },
+  { id: 'knowledge', labelKey: 'nav.knowledge', icon: BookOpen, shortcut: '⌘3' },
+  { id: 'skills', labelKey: 'nav.skills', icon: FlaskConical, shortcut: '⌘4' },
+  { id: 'domains', labelKey: 'nav.domains', icon: FolderOpen, shortcut: '⌘5' },
+  { id: 'mcp', labelKey: 'nav.mcp', icon: Plug, shortcut: '⌘6' },
+  { id: 'settings', labelKey: 'nav.settings', icon: Settings, shortcut: '⌘7' },
 ]
 
 interface SidebarProps {
@@ -168,11 +169,15 @@ export function Sidebar({ activeItem, onNavigate, collapsed = false, onToggleCol
         <div className="flex items-center gap-2">
           <div
             className={clsx(
-              'relative flex shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground',
+              'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-faint bg-surface',
               collapsed ? 'h-7 w-7' : 'h-7 w-7'
             )}
           >
-            <Command className="h-4 w-4" />
+            <img
+              src="/homomics-logo.png"
+              alt="HomomicsLab"
+              className="h-full w-full object-contain"
+            />
             {collapsed && (
               <span
                 className={clsx(

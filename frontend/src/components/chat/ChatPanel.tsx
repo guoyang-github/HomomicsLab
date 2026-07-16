@@ -10,8 +10,7 @@ import { ExecutionLogPanel } from '@/components/workspace/ExecutionLogPanel'
 export function ChatPanel() {
   const [commandOpen, setCommandOpen] = useState(false)
   const executionStatus = useExecutionStore((state) => state.status)
-  const executionLogCount = useExecutionStore((state) => state.logs.length)
-  const showExecutionLogs = executionStatus !== 'idle' || executionLogCount > 0
+  const showExecutionLogs = executionStatus === 'running'
 
   return (
     <div className="flex h-full flex-col bg-background">

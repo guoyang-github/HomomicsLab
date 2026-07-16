@@ -5,9 +5,9 @@ import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { MessageBubble } from './MessageBubble'
-import { EmptyState } from '@/components/ui'
+import { WelcomeState } from './WelcomeState'
 import { Avatar, AvatarFallback } from '@/components/ui/shadcn/avatar'
-import { Bot, Sparkles } from 'lucide-react'
+import { Bot, Loader2 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import { chatApi } from '@/services/api'
 import { toastError } from '@/stores/toastStore'
@@ -42,6 +42,7 @@ function _extractProgress(tasks: { status: string }[]): TaskProgress {
 export function MessageList() {
   const { t } = useTranslation()
   const messages = useChatStore((state) => state.messages)
+  const messagesLoading = useChatStore((state) => state.messagesLoading)
   const isTyping = useChatStore((state) => state.isTyping)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
   const currentProjectId = useChatStore((state) => state.currentProjectId)
@@ -101,11 +102,14 @@ export function MessageList() {
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center overflow-y-auto p-4">
-        <EmptyState
-          icon={Sparkles}
-          title={t('chat.emptyTitle')}
-          description={t('chat.emptyDesc')}
-        />
+        {messagesLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t('common.loading')}
+          </div>
+        ) : (
+          <WelcomeState />
+        )}
       </div>
     )
   }

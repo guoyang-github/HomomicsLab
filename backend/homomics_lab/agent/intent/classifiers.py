@@ -236,10 +236,32 @@ class EmbeddingIntentClassifier(IntentClassifier):
         self._definitions: List[IntentDefinition] = []
 
     def _load_dense_model(self):
-        """Lazy-load sentence-transformers model."""
+        """Lazy-load sentence-transformers model.
+
+        Prefer the local Hugging Face cache (``local_files_only=True``) so that
+        startup never blocks on network HEAD/etag checks when the model is
+        already cached. Only fall back to an online load on a genuine cache miss.
+        """
+        import logging
+
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self._model_name or "all-MiniLM-L6-v2")
+
+            model_name = self._model_name or "all-MiniLM-L6-v2"
+            logger = logging.getLogger(__name__)
+            try:
+                self._model = SentenceTransformer(model_name, local_files_only=True)
+                logger.info(
+                    "Loaded sentence-transformers model from local cache: %s",
+                    model_name,
+                )
+            except Exception:
+                logger.info(
+                    "Local cache miss for %s; falling back to online load",
+                    model_name,
+                    exc_info=True,
+                )
+                self._model = SentenceTransformer(model_name)
 
     def _build_texts(self, definitions: List[IntentDefinition]) -> List[str]:
         """Build searchable texts from intent definitions and examples."""

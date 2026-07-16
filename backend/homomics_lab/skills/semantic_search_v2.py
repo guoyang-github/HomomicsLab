@@ -23,11 +23,33 @@ class SemanticSearchEngine:
         self._dirty = True
 
     def _load_model(self):
-        """Lazy-load the sentence-transformers model."""
+        """Lazy-load the sentence-transformers model.
+
+        Prefer the local Hugging Face cache (``local_files_only=True``) so that
+        startup never blocks on network HEAD/etag checks when the model is
+        already cached. Only fall back to an online load on a genuine cache miss.
+        """
+        import logging
+
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(self._model_name)
+            logger = logging.getLogger(__name__)
+            try:
+                self._model = SentenceTransformer(
+                    self._model_name, local_files_only=True
+                )
+                logger.info(
+                    "Loaded sentence-transformers model from local cache: %s",
+                    self._model_name,
+                )
+            except Exception:
+                logger.info(
+                    "Local cache miss for %s; falling back to online load",
+                    self._model_name,
+                    exc_info=True,
+                )
+                self._model = SentenceTransformer(self._model_name)
 
     def add(self, skill: SkillDefinition) -> None:
         """Add a skill to the index."""

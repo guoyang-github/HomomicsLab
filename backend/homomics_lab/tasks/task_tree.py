@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+from homomics_lab.agent.plan.display_plan import DisplayStep
 from homomics_lab.tasks.models import TaskNode, TaskStatus
 
 
@@ -43,6 +44,10 @@ def build_dependencies_from_phase_transitions(
 
 class TaskTree(BaseModel):
     tasks: List[TaskNode] = Field(default_factory=list)
+    # User-facing display plan, separate from the executable tasks.
+    display_steps: List[DisplayStep] = Field(default_factory=list)
+    # Plan-level execution mode propagated from PlanResult.execution_mode.
+    execution_mode: Optional[str] = Field(default=None)
 
     def __init__(self, tasks: Optional[List[TaskNode]] = None, **data):
         if tasks is not None and "tasks" not in data:

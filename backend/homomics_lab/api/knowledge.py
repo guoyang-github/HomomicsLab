@@ -41,6 +41,15 @@ class SearchResponse(BaseModel):
     results: List[Dict[str, Any]]
 
 
+class DocumentListResponse(BaseModel):
+    documents: List[Dict[str, Any]]
+
+
+class DocumentUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    summary: Optional[str] = None
+
+
 class CognifyProjectResponse(BaseModel):
     project_id: str
     processed: int
@@ -245,6 +254,57 @@ async def get_document(request: Request, document_id: str):
         raise HTTPException(status_code=503, detail="Knowledge index is not available")
 
     return await index.get_document_graph(document_id)
+
+
+@router.patch("/documents/{document_id}", response_model=Dict[str, Any])
+async def update_document(
+    request: Request,
+    document_id: str,
+    body: DocumentUpdateRequest,
+    project_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """Update editable metadata (title, summary) of an ingested document."""
+    index = _get_knowledge_index(request)
+    if index is None:
+        raise HTTPException(status_code=503, detail="Knowledge index is not available")
+
+    validated_project_id = _validate_project(project_id)
+    await require_project_permission(validated_project_id, "write", db, user_id)
+
+    try:
+        return await index.update_document(
+            document_id,
+            properties={"title": body.title, "summary": body.summary},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+async def list_documents(
+    request: Request,
+    project_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user),
+):
+    """List ingested documents for a project."""
+    index = _get_knowledge_index(request)
+    if index is None:
+        raise HTTPException(status_code=503, detail="Knowledge index is not available")
+
+    validated_project_id = _validate_project(project_id)
+    await require_project_permission(validated_project_id, "read", db, user_id)
+
+    try:
+        documents = await index.list_documents(project_id=validated_project_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return DocumentListResponse(documents=documents)
 
 
 def _validate_project(project_id: Optional[str]) -> str:

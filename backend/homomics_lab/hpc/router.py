@@ -5,6 +5,12 @@ from homomics_lab.config import settings
 from homomics_lab.hpc.scheduler import NextflowRunner, SlurmScheduler
 
 
+# Plan derivations that should never be promoted to Nextflow: they represent
+# single-skill or LLM-fallback executions that are cheaper and simpler to run
+# locally through the existing skill runtime.
+_NON_WORKFLOW_DERIVATIONS = {"standalone-skill", "llm-fallback", "hardcoded"}
+
+
 def select_execution_backend(
     plan: PlanResult,
     data_state: DataState,
@@ -12,9 +18,14 @@ def select_execution_backend(
 ) -> str:
     """Select the most appropriate execution backend for a plan.
 
-    Routing heuristics:
-      - Large/complex plans (>5 phases or >100 samples) prefer Nextflow when available.
-      - Medium workloads (>2 phases or >10 samples) prefer SLURM when available.
+    Routing heuristics (conservative by default):
+      - Nextflow is only chosen when it is enabled, the plan has at least
+        ``workflow_nextflow_min_phases`` required phases (default 8), and the
+        workload is large (>100 effective samples/cells) or the plan is a
+        curated multi-step domain pipeline.  Small interactive analyses always
+        run locally to avoid the overhead of building a Nextflow project.
+      - Medium/large local workloads (>2 phases or >10 samples) prefer SLURM
+        when available.
       - Everything else runs locally.
 
     Args:
@@ -25,14 +36,21 @@ def select_execution_backend(
     Returns:
         One of "local", "slurm", or "nextflow".
     """
+    nextflow_enabled = getattr(settings, "workflow_nextflow_enabled", True)
+
     n_phases = len([p for p in plan.phases if p.required])
     n_samples = data_state.n_samples or 1
     n_cells = data_state.n_cells or 0
     # Use cells as a proxy for samples when only cell count is available.
     effective_samples = max(n_samples, n_cells)
 
-    min_phases = getattr(settings, "workflow_nextflow_min_phases", 5)
-    if n_phases >= min_phases or effective_samples > 100:
+    derivation = getattr(plan, "derivation", None) or ""
+    is_large_workflow = (
+        n_phases >= getattr(settings, "workflow_nextflow_min_phases", 8)
+        and derivation not in _NON_WORKFLOW_DERIVATIONS
+    )
+
+    if nextflow_enabled and is_large_workflow and effective_samples > 100:
         if NextflowRunner.is_available():
             return "nextflow"
         if SlurmScheduler.is_available() and prefer_slurm:

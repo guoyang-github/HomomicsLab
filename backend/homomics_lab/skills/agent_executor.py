@@ -275,14 +275,35 @@ def _extract_r_api(path: Path) -> List[str]:
 
 
 def _extract_script_reference(source_dir: Optional[Path], max_chars: int = 6000) -> str:
-    """Build a compact API reference from helper scripts in a skill's source dir.
+    """Build a reference from helper scripts in a skill's source dir.
 
-    This replaces the temptation to dump the entire SKILL.md into the prompt.
-    Agents get just enough to call the provided helpers without reading every
-    line of source code.
+    Small helper scripts (<= 300 lines, <= 12 KB) are inlined in full so the
+    agent can use them without attempting to read files outside the workspace.
+    Larger scripts are summarized as API signatures only. This keeps the prompt
+    compact while giving the agent enough information to write a correct driver.
     """
     if not source_dir:
         return ""
+
+    def _is_small_script(path: Path) -> bool:
+        try:
+            stat = path.stat()
+            if stat.st_size > 12_000:
+                return False
+            with path.open("r", encoding="utf-8", errors="replace") as fh:
+                for i, _ in enumerate(fh):
+                    if i >= 300:
+                        return False
+            return True
+        except Exception:
+            return False
+
+    def _read_source(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            return ""
+
     sections: List[str] = []
     python_dir = Path(source_dir) / "scripts" / "python"
     r_dir = Path(source_dir) / "scripts" / "r"
@@ -290,9 +311,14 @@ def _extract_script_reference(source_dir: Optional[Path], max_chars: int = 6000)
     if python_dir.is_dir():
         entries: List[str] = []
         for py_file in sorted(python_dir.glob("*.py")):
-            api = _extract_python_api(py_file)
-            if api:
-                entries.append(f"### {py_file.name}\n" + "\n".join(api))
+            if _is_small_script(py_file):
+                source = _read_source(py_file)
+                if source:
+                    entries.append(f"### {py_file.name} (full source)\n```python\n{source}\n```")
+            else:
+                api = _extract_python_api(py_file)
+                if api:
+                    entries.append(f"### {py_file.name}\n" + "\n".join(api))
         if entries:
             sections.append(
                 "## Skill Python helpers (import these; do not read whole files)\n"
@@ -302,9 +328,14 @@ def _extract_script_reference(source_dir: Optional[Path], max_chars: int = 6000)
     if r_dir.is_dir():
         entries = []
         for r_file in sorted(r_dir.glob("*.R")):
-            api = _extract_r_api(r_file)
-            if api:
-                entries.append(f"### {r_file.name}\n" + "\n".join(api))
+            if _is_small_script(r_file):
+                source = _read_source(r_file)
+                if source:
+                    entries.append(f"### {r_file.name} (full source)\n```r\n{source}\n```")
+            else:
+                api = _extract_r_api(r_file)
+                if api:
+                    entries.append(f"### {r_file.name}\n" + "\n".join(api))
         if entries:
             sections.append(
                 "## Skill R helpers (source these; do not read whole files)\n"
@@ -494,6 +525,125 @@ def harvest_agent_artifacts(
             envelopes.append(env)
             output_files.append(str(p))
     return envelopes, output_files
+
+
+def _is_falsy(value: Any) -> bool:
+    """Return True if a metric value should be considered missing/placeholder."""
+    if value is None:
+        return True
+    if isinstance(value, (list, tuple, dict)) and len(value) == 0:
+        return True
+    if isinstance(value, (int, float)) and value == 0:
+        return True
+    if isinstance(value, str) and value.strip() == "":
+        return True
+    return False
+
+
+def _read_json_metrics(path: Path) -> Dict[str, Any]:
+    """Read a summary JSON file and flatten useful metrics."""
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            data = json.load(fh)
+    except Exception:
+        return {}
+
+    metrics: Dict[str, Any] = {}
+    shape = data.get("shape") or {}
+    if isinstance(shape, dict):
+        metrics["cell_count"] = shape.get("n_cells", shape.get("n_obs"))
+        metrics["gene_count"] = shape.get("n_genes", shape.get("n_vars"))
+    if "obs_columns" in data:
+        metrics["obs_columns"] = data["obs_columns"]
+    if "var_columns" in data:
+        metrics["var_columns"] = data["var_columns"]
+    if "layers" in data:
+        metrics["layers"] = data["layers"]
+    for key in ("nnz", "sparsity", "total_counts", "mean_counts_per_cell", "median_genes_per_cell"):
+        if key in data:
+            metrics[key] = data[key]
+    return {k: v for k, v in metrics.items() if v is not None}
+
+
+def _build_summary_from_metrics(metrics: Dict[str, Any], output_files: List[str]) -> str:
+    """Generate a concrete fallback summary from enriched metrics."""
+    lines = []
+    cell_count = metrics.get("cell_count")
+    gene_count = metrics.get("gene_count")
+    if cell_count is not None and gene_count is not None:
+        lines.append(f"Dataset shape: **{cell_count} cells × {gene_count} genes**.")
+    layers = metrics.get("layers")
+    if layers:
+        lines.append(f"Layers: {', '.join(str(x) for x in layers)}.")
+    total_counts = metrics.get("total_counts")
+    if total_counts is not None:
+        lines.append(f"Total counts: {total_counts:,.0f}.")
+    mean_counts = metrics.get("mean_counts_per_cell")
+    if mean_counts is not None:
+        lines.append(f"Mean counts per cell: {mean_counts:,.1f}.")
+    median_genes = metrics.get("median_genes_per_cell")
+    if median_genes is not None:
+        lines.append(f"Median genes per cell: {median_genes:,.0f}.")
+    obs_cols = metrics.get("obs_columns")
+    if obs_cols:
+        lines.append(f"Obs metadata columns: {', '.join(str(x) for x in obs_cols)}.")
+    if output_files:
+        lines.append("Generated files: " + ", ".join(Path(p).name for p in output_files) + ".")
+    return "\n".join(lines) if lines else ""
+
+
+def enrich_final_output_from_files(
+    final_output: Dict[str, Any],
+    output_files: List[str],
+) -> Dict[str, Any]:
+    """Back-fill final_output.metrics from generated summary/report files.
+
+    Agents sometimes return placeholder zeros or omit concrete numbers in
+    final_output.metrics even when the driver script produced a correct summary
+    JSON. This helper reads the actual output files, merges real metrics, and
+    falls back to a generated concrete summary when the agent's summary is vague.
+    """
+    if not output_files:
+        return final_output
+
+    metrics = dict(final_output.get("metrics", {}))
+
+    for path_str in output_files:
+        path = Path(path_str)
+        if not path.is_file():
+            continue
+        if path.name.lower().endswith("summary.json") or path.suffix.lower() == ".json":
+            file_metrics = _read_json_metrics(path)
+            for key, value in file_metrics.items():
+                if _is_falsy(metrics.get(key)) and not _is_falsy(value):
+                    metrics[key] = value
+
+    # Always expose core shape metrics even if the agent forgot them.
+    for path_str in output_files:
+        path = Path(path_str)
+        if not path.is_file():
+            continue
+        if path.name.lower().endswith("summary.json") or path.suffix.lower() == ".json":
+            file_metrics = _read_json_metrics(path)
+            for key in ("cell_count", "gene_count", "layers", "obs_columns", "var_columns",
+                        "total_counts", "mean_counts_per_cell", "median_genes_per_cell"):
+                if key not in metrics and not _is_falsy(file_metrics.get(key)):
+                    metrics[key] = file_metrics[key]
+
+    final_output["metrics"] = metrics
+
+    summary = final_output.get("summary", "")
+    fallback = _build_summary_from_metrics(metrics, output_files)
+    # If the agent summary is empty or lacks concrete numbers, append the fallback.
+    has_numbers = bool(re.search(r"\d", str(summary)))
+    if fallback and (not summary or not has_numbers):
+        final_output["summary"] = fallback
+
+    logger.debug(
+        "Enriched final_output from %d output files for skill execution",
+        len(output_files),
+    )
+    return final_output
 
 
 class AgentSkillExecutor:
@@ -897,6 +1047,7 @@ class AgentSkillExecutor:
                         "output_files": output_files,
                         "tool_outputs": tool_outputs,
                     }
+                final_output = enrich_final_output_from_files(final_output, output_files)
                 return {
                     "success": True,
                     "mode": "agent",
@@ -1133,24 +1284,28 @@ class AgentSkillExecutor:
                         skill, objective, output_files_now
                     )
                     if final_action and final_action.get("action") == "final":
+                        final_output = enrich_final_output_from_files(
+                            final_action.get("final_output", {}), output_files_now
+                        )
                         return {
                             "success": True,
                             "mode": "agent",
                             "skill_id": skill.id,
-                            "final_output": final_action.get("final_output", {}),
+                            "final_output": final_output,
                             "artifacts": artifacts_now,
                             "output_files": output_files_now,
                             "tool_outputs": tool_outputs,
                             "thought": final_action.get("thought", ""),
                         }
+                    final_output = enrich_final_output_from_files(
+                        {"note": "驱动脚本执行成功并生成结果文件。", "output_files": output_files_now},
+                        output_files_now,
+                    )
                     return {
                         "success": True,
                         "mode": "agent",
                         "skill_id": skill.id,
-                        "final_output": {
-                            "note": "驱动脚本执行成功并生成结果文件。",
-                            "output_files": output_files_now,
-                        },
+                        "final_output": final_output,
                         "artifacts": artifacts_now,
                         "output_files": output_files_now,
                         "tool_outputs": tool_outputs,
@@ -1217,15 +1372,16 @@ class AgentSkillExecutor:
             # The loop did not converge but real outputs exist. Surface them as
             # a partial success instead of discarding the work and reporting a
             # bare failure to the user.
+            final_output = enrich_final_output_from_files(
+                {"note": "已达到迭代上限，返回执行过程中已生成的部分结果。", "output_files": output_files},
+                output_files,
+            )
             return {
                 "success": True,
                 "mode": "agent",
                 "partial": True,
                 "skill_id": skill.id,
-                "final_output": {
-                    "note": "已达到迭代上限，返回执行过程中已生成的部分结果。",
-                    "output_files": output_files,
-                },
+                "final_output": final_output,
                 "artifacts": artifacts,
                 "output_files": output_files,
                 "tool_outputs": tool_outputs,
@@ -1768,6 +1924,9 @@ class AgentSkillExecutor:
             f"- Required outputs: annotated.h5ad, annotations.csv, celltypist_comparison.csv "
             f"(columns: all_celltype, celltypist_predicted, celltypist_conf_score), "
             f"comparison_report.txt, report.txt.\n"
+            f"- CellTypist result objects may expose predicted_labels and a separate probability_matrix. "
+            f"If predicted_labels does not contain a 'conf_score' column, derive confidence scores as "
+            f"the maximum probability per cell from the probability_matrix. Do not assume 'conf_score' exists.\n"
             f"- report.txt must include: cells x genes, model, gene overlap, mode, threshold, "
             f"Unassigned rate, preprocessing note, ARI/NMI vs all_celltype, per-label agreement.\n"
             f"- Keep under 70 lines, no plots.\n"
@@ -2011,9 +2170,9 @@ class AgentSkillExecutor:
         file_read_restriction = ""
         if source_dir and "file_read" in tools:
             file_read_restriction = (
-                f"\nWhen using file_read, you may only read files under the skill's "
-                f"source directory ({source_dir}). Read at most one short file and "
-                f"only to confirm a helper signature; do not dump entire modules.\n"
+                "\nWhen using file_read, you may only read files under the current "
+                "project workspace (input data, existing outputs, etc.). The skill helper "
+                "scripts are already provided above; do NOT file_read them.\n"
             )
 
         scripts_hint = ""
@@ -2025,9 +2184,7 @@ class AgentSkillExecutor:
                     f"\nTo use the Python helpers, write a driver script that begins with:\n"
                     f"import sys, os\n"
                     f"sys.path.insert(0, '{scripts_python}')\n"
-                    f"from core_analysis import *\n"
-                    f"from utils import *\n"
-                    f"# (import other helper modules as needed)\n"
+                    f"from <helper_module> import <function>  # import ONLY the helpers listed above; do NOT assume core_analysis.py or run.py exists\n"
                 )
             elif scripts_r.is_dir():
                 scripts_hint = (
@@ -2052,7 +2209,7 @@ class AgentSkillExecutor:
 ## Execution workflow (two phases)
 
 Phase 1 — Inspect (your FIRST turn only):
-- Read the helper API reference above and confirm the helper signatures you need.
+- Review the helper API / full source above; do NOT use file_read on helper scripts.
 - Briefly inspect input data to confirm columns, shape, and existing labels.
   For large `.h5ad` files use `anndata.read_h5ad(path, backed='r')` to read metadata
   without loading the full expression matrix into memory.
@@ -2060,22 +2217,17 @@ Phase 1 — Inspect (your FIRST turn only):
 - Do NOT write files, do NOT run a full pipeline, do NOT return action: "final" yet.
 
 Phase 2 — Execute (after Phase 1):
-- Write ONE driver script (.py or .R) that calls the helpers and satisfies the objective.
+- Write ONE driver script (.py or .R) that imports only the helpers listed in the API
+  reference above and satisfies every clause of the objective.
 - Run it with a single shell_exec call.
-- Save outputs with clear filenames (annotations.csv, report.txt, comparison_report.txt,
-  confusion.csv, per_reference.csv, figures/*.png, etc.).
-- When the objective includes comparing predictions to existing reference labels,
-  save BOTH:
-  1. a cell-level comparison CSV (e.g. celltypist_comparison.csv) with columns
-     all_celltype, celltypist_predicted, celltypist_conf_score, and optionally
-     celltypist_label_filtered;
-  2. a human-readable comparison_report.txt with a per-reference-label summary
-     including non-immune classes (Ductal, Endothelial, Stellate, CAF, etc.).
-- The report.txt MUST include: input dimensions (cells × genes), model name,
-  gene overlap count, prediction mode (best match / majority voting), confidence
-  threshold, Unassigned rate, preprocessing note, ARI/NMI vs reference, and
-  per-label agreement. Do not omit non-immune reference labels from the report.
-- Return action: "final" listing the output file paths.
+- Save outputs with clear filenames under `outputs/` (e.g. report.txt, summary.csv,
+  figures/*.png, summary.json, etc.).
+- If the objective includes comparing predictions to reference labels, save both a
+  cell-level comparison CSV and a human-readable report.
+- BEFORE returning action: "final", use file_read to read the generated report/
+  summary files and cite concrete numbers (cell counts, gene counts, accuracy,
+  ARI, top categories, etc.) in both `final_output.summary` and `final_output.metrics`.
+- Return action: "final" listing the output file paths and concrete metrics.
 
 Rules:
 - Treat `inputs.user_request` as the complete objective. Do every requested step.
@@ -2083,30 +2235,20 @@ Rules:
   label_column, ground_truth), compare results and report metrics.
 - Use the helper API reference above. Prefer high-level helpers when they satisfy the
   objective; do not reimplement helper logic in the driver script.
-- Keep the driver script compact: ≤45 lines, minimal comments, no docstrings, no blank lines.
-- Do not save `.h5ad` output unless the user explicitly requests it or asks to compare
-  predictions to existing reference labels; in the latter case save the annotated
-  AnnData as `outputs/annotated.h5ad` so the comparison can be derived deterministically.
+- Do NOT assume a fixed entrypoint such as `core_analysis.py` or `run.py` exists.
+  Import only the helper modules actually present in the API reference.
+- Keep the driver script compact and focused: no boilerplate docstrings, minimal
+  comments, no dead code.
+- Do not save `.h5ad` output unless the user explicitly requests it.
 - Satisfy every clause of the objective. If a requested deliverable fails (e.g. a
   comparison or metric), diagnose and fix it; do not return partial success prematurely.
 - Do not chase perfect accuracy with iterative manual label remapping. If predicted and
   ground-truth labels differ in granularity, report the raw comparison and note it.
-- When a helper adds columns to AnnData with a `prefix` (e.g. `celltypist_`), inspect
-  `adata.obs.columns` to find the actual column names instead of hard-coding defaults.
-- If the skill has strict input requirements (e.g. CellTypist requires log1p-normalized
-  counts with target_sum=1e4), perform that normalization in the driver script rather
-  than assuming existing layers already match.
-- When comparing CellTypist predictions to coarse reference labels (e.g. all_celltype
-  with CD8T/CD4T/NK/B/Myeloid/Plasma/Platelet), map predicted labels systematically:
-  CD8T ← "CD8", "cytotoxic T", "Temra", "Tem/Trm cytotoxic", "Trm cytotoxic",
-         "Tcm/Naive cytotoxic";
-  CD4T ← "CD4", "helper T", "Th", "Treg", "Tfh", "Tem/Effector helper",
-         "Tcm/Naive helper";
-  NK ← "NK" (exclude "NKT");  B ← "B cell", "Naive B", "Memory B",
-  "Transitional B", "Age-associated B", "Germinal center B" (exclude "Plasma");
-  Plasma ← "Plasma";  Myeloid ← "Monocyte", "Macrophage", "DC", "Dendritic",
-  "Mast", "Neutrophil", "Myeloid";  Platelet ← "Platelet", "Megakaryocyte".
-  Count unmatched labels as "Other" only when no rule applies.
+- Inspect actual `adata.obs.columns` / `adata.var.columns` to find column names instead
+  of hard-coding defaults.
+- If the skill documentation calls for strict input requirements (e.g. a specific
+  normalization), perform that step in the driver script rather than assuming existing
+  layers already match.
 - When saving `.h5ad` files, use `safe_write_h5ad` from the skill's utils if available
   instead of `adata.write_h5ad`, to avoid nullable-string errors.
 - Print the absolute paths of all output files the script creates so they can be harvested.
@@ -2121,9 +2263,9 @@ Respond ONLY with a JSON object:
 2. Final result: {{"thought": "...", "action": "final", "final_output": {{"summary": "...", "output_files": [...], "metrics": {{...}}}}}}
 
 The `final_output.summary` must be a concise but concrete markdown summary. It MUST cite
-numerical findings directly from the generated outputs (report.txt, confusion.csv, etc.):
+numerical findings directly from the generated outputs (report.txt, summary.csv, etc.):
 cell counts, key proportions, accuracy / ARI / F1 when a comparison was requested, the
-model used, and any notable disagreements. Do not give a vague high-level description.
+model or method used, and any notable disagreements. Do not give a vague high-level description.
 
 No markdown or explanation outside the JSON. Your first response MUST be a Phase 1 inspection tool call.
 """

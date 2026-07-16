@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.agent.intent import UserIntent
 from homomics_lab.agent.plan.models import DataState
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry

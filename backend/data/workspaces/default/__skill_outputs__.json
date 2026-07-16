@@ -1,9 +1,0 @@
-{
-  "outputs": [
-    "outputs/annotated.h5ad",
-    "outputs/annotations.csv",
-    "outputs/celltypist_comparison.csv",
-    "outputs/comparison_report.txt",
-    "outputs/report.txt"
-  ]
-}

@@ -1,23 +1,10 @@
-"""PlanEngine — state-driven analysis plan generation."""
+"""PlanEngine — state-driven analysis plan generation.
 
-from homomics_lab.agent.plan.engine import PlanEngine
-from homomics_lab.agent.plan.models import PlanResult, Phase, PlannedGap, DataState
-from homomics_lab.agent.plan.replanning import (
-    DynamicReplanningEngine,
-    PlanDelta,
-    ReplanningTrigger,
-)
-from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
+Import submodules directly (e.g. ``from homomics_lab.agent.plan.engine import
+PlanEngine``) to avoid pulling in the full planning graph at package load time.
+"""
 
-__all__ = [
-    "PlanEngine",
-    "PlanResult",
-    "Phase",
-    "PlannedGap",
-    "DataState",
-    "AnalysisStrategy",
-    "StrategyLibrary",
-    "DynamicReplanningEngine",
-    "ReplanningTrigger",
-    "PlanDelta",
-]
+# Intentionally empty: no eager re-exports.  The planning submodules have
+# interdependencies that can create circular imports if they are all loaded
+# through this package __init__.  Keeping this file lightweight lets callers
+# import only what they need.

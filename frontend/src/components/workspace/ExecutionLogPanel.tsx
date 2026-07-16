@@ -23,6 +23,14 @@ export function ExecutionLogPanel({ compact = false }: Props) {
   const [expanded, setExpanded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Auto-expand the compact embedded panel while a job is running so users
+  // can see live execution output without an extra click.
+  useEffect(() => {
+    if (compact && status === 'running' && !expanded) {
+      setExpanded(true)
+    }
+  }, [compact, status, expanded])
+
   const items = useMemo(() => groupSubagentLogs(logs), [logs])
   // Per-group open state; groups default to expanded while running and
   // collapse once the sub-executor reaches a terminal state.

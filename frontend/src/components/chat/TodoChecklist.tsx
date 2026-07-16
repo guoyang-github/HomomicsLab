@@ -1,9 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { clsx } from 'clsx'
-import { Loader2, Workflow, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
-import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
 
@@ -70,7 +69,6 @@ export function TodoChecklist() {
   const { t } = useTranslation()
   const tasks = useTaskStore((state) => state.tasks)
   const status = useExecutionStore((state) => state.status)
-  const openWorkflow = useOverlayStore((state) => state.openWorkflow)
   const [hidden, setHidden] = useState(false)
 
   useEffect(() => {
@@ -110,14 +108,6 @@ export function TodoChecklist() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => openWorkflow()}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
-            >
-              <Workflow className="h-3.5 w-3.5" />
-              {t('todoList.viewWorkflow')}
-            </button>
             {isTerminal && (
               <button
                 type="button"

@@ -50,16 +50,38 @@ class CrossEncoderReranker:
         self._model: Optional[Any] = None
 
     def _get_model(self) -> Optional[Any]:
-        """Lazy-load the cross-encoder model."""
+        """Lazy-load the cross-encoder model.
+
+        Prefer the local Hugging Face cache (``local_files_only=True``) so that
+        startup never blocks on network HEAD/etag checks when the model is
+        already cached. Only fall back to an online load on a genuine cache miss.
+        """
         if self._model is None:
             try:
                 from sentence_transformers import CrossEncoder
 
-                self._model = CrossEncoder(
-                    self.model_name,
-                    device=self.device,
-                    max_length=512,
-                )
+                try:
+                    self._model = CrossEncoder(
+                        self.model_name,
+                        device=self.device,
+                        max_length=512,
+                        local_files_only=True,
+                    )
+                    logger.info(
+                        "Loaded cross-encoder model from local cache: %s",
+                        self.model_name,
+                    )
+                except Exception:
+                    logger.info(
+                        "Local cache miss for %s; falling back to online load",
+                        self.model_name,
+                        exc_info=True,
+                    )
+                    self._model = CrossEncoder(
+                        self.model_name,
+                        device=self.device,
+                        max_length=512,
+                    )
             except Exception as exc:
                 logger.warning(
                     "Could not load cross-encoder model %s: %s", self.model_name, exc

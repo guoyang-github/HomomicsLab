@@ -141,6 +141,8 @@ class PlanPresenter:
             "approval_required": plan.plan_result.approval_required,
             "replanned": plan.plan_result.reproducibility_context.get("replanned", False),
             "replanning_delta": plan.plan_result.reproducibility_context.get("replanning_delta", {}),
+            "display_steps": [s.to_dict() for s in plan.plan_result.display_steps],
+            "routing_trace": plan.plan_result.routing_trace,
         }
 
     @staticmethod

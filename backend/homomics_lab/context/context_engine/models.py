@@ -12,6 +12,7 @@ class ContextSource(str, Enum):
     SYSTEM = "system"
     PROJECT_STATE = "project_state"
     CBKB = "cbkb"
+    KNOWLEDGE_BASE = "knowledge_base"
     SEMANTIC_MEMORY = "semantic_memory"
     EPISODIC_SUMMARY = "episodic_summary"
     CHAT = "chat"

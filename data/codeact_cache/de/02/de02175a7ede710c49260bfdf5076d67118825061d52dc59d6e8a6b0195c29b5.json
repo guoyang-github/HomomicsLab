@@ -1,6 +1,0 @@
-{
-  "key": "de02175a7ede710c49260bfdf5076d67118825061d52dc59d6e8a6b0195c29b5",
-  "task": "normalize counts",
-  "language": "python",
-  "code": "import scanpy as sc\nadata = sc.read_h5ad(\"data/pbmc3k_raw.h5ad\")\nsc.pp.normalize_total(adata, target_sum=1e4)\nsc.pp.log1p(adata)\nadata.write(\"output/result.h5ad\")\nresult = {\"output_path\": \"output/result.h5ad\"}\nprint(\"Normalization done\")\n"
-}

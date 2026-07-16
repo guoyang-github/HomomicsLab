@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { chatApi } from '@/services/api'
+import { chatApi, executionApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
@@ -25,6 +25,7 @@ interface ChatState {
   currentProjectId: string
   draftInput: string
   sessionsLoading: boolean
+  messagesLoading: boolean
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
@@ -88,17 +89,60 @@ function _extractTasksFromMessages(messages: ChatMessage[]): { tasks: TaskNode[]
   return null
 }
 
-function _syncExecutionStateFromMessages(messages: ChatMessage[]) {
+function _findRunningJob(messages: ChatMessage[]): { jobId: string; status: string } | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     const type = typeof msg.type === 'string' ? msg.type.toLowerCase() : ''
     if (type !== 'todo_list') continue
     const content = typeof msg.content === 'object' && msg.content !== null ? (msg.content as Record<string, unknown>) : {}
     const status = typeof content.status === 'string' ? content.status.toLowerCase() : undefined
-    if (status === 'completed' || status === 'failed') {
-      useExecutionStore.getState().setStatus(status, status === 'completed' ? 100 : 0)
-      return
+    const jobId = typeof content.job_id === 'string' ? content.job_id : undefined
+    if (jobId && (status === 'running' || status === 'awaiting_human')) {
+      return { jobId, status }
     }
+  }
+  return null
+}
+
+async function _fetchTraceLogs(jobId: string) {
+  try {
+    const res = await executionApi.getTrace(jobId)
+    const trace = res.data
+    const logs: import('@/stores/executionStore').LogEntry[] = []
+    let counter = 0
+    trace.nodes?.forEach((node: any) => {
+      const ts = node.started_at || new Date().toISOString()
+      logs.push({
+        id: `trace_${jobId.slice(0, 8)}_${++counter}`,
+        timestamp: ts,
+        level: node.status === 'failed' ? 'error' : 'info',
+        message: `${node.name || node.node_id} · ${node.status}`,
+        taskId: node.node_id,
+      })
+      if (node.error) {
+        logs.push({
+          id: `trace_${jobId.slice(0, 8)}_${++counter}`,
+          timestamp: ts,
+          level: 'error',
+          message: node.error,
+          taskId: node.node_id,
+        })
+      }
+      if (Array.isArray(node.logs) && node.logs.length > 0) {
+        node.logs.forEach((line: string) => {
+          logs.push({
+            id: `trace_${jobId.slice(0, 8)}_${++counter}`,
+            timestamp: ts,
+            level: 'stdout',
+            message: line,
+            taskId: node.node_id,
+          })
+        })
+      }
+    })
+    return logs
+  } catch {
+    return []
   }
 }
 
@@ -123,10 +167,20 @@ export const useChatStore = create<ChatState>()(
       currentProjectId: 'default',
       draftInput: '',
       sessionsLoading: false,
+      messagesLoading: false,
 
       addMessage: (message) =>
         set((state) => {
-          const newMessages = [...state.messages, message]
+          // Replace in-place when the same id already exists (e.g. TODO card update
+          // broadcast via SSE).  Otherwise append.
+          const existingIndex = state.messages.findIndex((m) => m.id === message.id)
+          let newMessages: ChatMessage[]
+          if (existingIndex >= 0) {
+            newMessages = [...state.messages]
+            newMessages[existingIndex] = message
+          } else {
+            newMessages = [...state.messages, message]
+          }
           const sessionIndex = state.sessions.findIndex((s) => s.id === state.currentSessionId)
           const newSessions = [...state.sessions]
           if (sessionIndex >= 0) {
@@ -142,7 +196,7 @@ export const useChatStore = create<ChatState>()(
       setIsTyping: (isTyping) => set({ isTyping }),
       setSessionId: (currentSessionId) => set({ currentSessionId }),
       selectSession: async (id) => {
-        set({ currentSessionId: id, messages: [] })
+        set({ currentSessionId: id, messages: [], messagesLoading: true })
         usePlanStore.getState().discardDraft()
         useExecutionStore.getState().reset()
         useTaskStore.getState().setTaskTree([])
@@ -161,14 +215,41 @@ export const useChatStore = create<ChatState>()(
         try {
           const response = await chatApi.getMessages(sessionId)
           const messages = response.data
-          set({ messages })
+          set({ messages, messagesLoading: false })
           const extracted = _extractTasksFromMessages(messages)
+
           if (extracted && extracted.tasks.length > 0) {
             useTaskStore.getState().setTaskTree(extracted.tasks)
             useTaskStore.getState().setProgress(_extractProgress(extracted.tasks))
+          } else {
+            useTaskStore.getState().setTaskTree([])
+            useTaskStore.getState().setProgress({
+              total: 0,
+              pending: 0,
+              running: 0,
+              completed: 0,
+              failed: 0,
+              awaiting_human: 0,
+              percent: 0,
+            })
           }
-          _syncExecutionStateFromMessages(messages)
+
+          const runningJob = _findRunningJob(messages)
+          if (runningJob?.jobId) {
+            const traceLogs = await _fetchTraceLogs(runningJob.jobId)
+            const executionStatus: any = runningJob.status === 'running' ? 'running' : runningJob.status
+            useExecutionStore.getState().restoreJob(
+              runningJob.jobId,
+              sessionId,
+              traceLogs,
+              executionStatus,
+              _extractProgress(extracted?.tasks || []).percent
+            )
+          } else {
+            useExecutionStore.getState().reset()
+          }
         } catch (err) {
+          set({ messagesLoading: false })
           // eslint-disable-next-line no-console
           console.error('Failed to load session messages', err)
         }
@@ -209,6 +290,18 @@ export const useChatStore = create<ChatState>()(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
+        usePlanStore.getState().discardDraft()
+        useExecutionStore.getState().reset()
+        useTaskStore.getState().setTaskTree([])
+        useTaskStore.getState().setProgress({
+          total: 0,
+          pending: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          awaiting_human: 0,
+          percent: 0,
+        })
         set((state) => ({
           sessions: [newSession, ...state.sessions],
           currentSessionId: id,

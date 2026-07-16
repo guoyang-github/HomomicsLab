@@ -221,7 +221,8 @@ class BackgroundJobRunner:
 
                     # Update the original TODO_LIST chat message with the final
                     # result so that reloading the session still shows the outcome.
-                    await self._update_queued_todo_message(job, result)
+                    # Also capture the new result message for real-time broadcast.
+                    result_messages = await self._update_queued_todo_message(job, result)
 
                     # Update plan status before persisting the job so that callers
                     # observing a completed job also see a completed plan.
@@ -257,6 +258,7 @@ class BackgroundJobRunner:
                             "Job finished",
                             result=skill_result,
                             logs=["Job finished"],
+                            messages=result_messages,
                         )
                         await trace_store.finish_trace(
                             job_id,
@@ -298,12 +300,16 @@ class BackgroundJobRunner:
             await self._update_active_jobs()
             await self._release_lock(job_id)
 
-    async def _update_queued_todo_message(self, job: Job, result) -> None:
+    async def _update_queued_todo_message(
+        self, job: Job, result
+    ) -> Optional[List[Dict[str, Any]]]:
         """Embed the final skill result into the queued TODO_LIST message.
 
         Mutates both the in-job working memory (for the current process) and the
         persisted session state so that reloading the conversation shows the
-        outcome.
+        outcome.  Also appends a fresh result message to the conversation and
+        returns it so the runner can broadcast it to connected clients in real
+        time.
         """
         try:
             task_result = None
@@ -320,7 +326,7 @@ class BackgroundJobRunner:
                             task_result = task.result
                             break
             if not task_result:
-                return
+                return None
 
             tree = getattr(result, "task_tree", None) or job.task_tree
             summary_text, envelopes = self._compose_result_message(
@@ -332,7 +338,7 @@ class BackgroundJobRunner:
 
             def _apply_update(messages):
                 fallback_msg = None
-                updated = False
+                updated_msg = None
                 for msg in reversed(messages):
                     msg_type = getattr(msg, "type", None)
                     if isinstance(msg_type, str):
@@ -350,12 +356,12 @@ class BackgroundJobRunner:
                         for task in content.get("tasks", []) or []:
                             if isinstance(task, dict):
                                 task["status"] = content["status"]
-                        updated = True
+                        updated_msg = msg
                         break
                     # Remember the most recent pending todo as a fallback target.
                     if fallback_msg is None and content.get("status") in (None, "pending", "running"):
                         fallback_msg = msg
-                if not updated and fallback_msg is not None:
+                if updated_msg is None and fallback_msg is not None:
                     content = fallback_msg.content
                     content["result"] = task_result
                     content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
@@ -365,20 +371,22 @@ class BackgroundJobRunner:
                     for task in content.get("tasks", []) or []:
                         if isinstance(task, dict):
                             task["status"] = content["status"]
-                    updated = True
-                return updated
+                    updated_msg = fallback_msg
+                return updated_msg
 
             # Update the in-memory copy carried by the job.
             in_memory_messages = getattr(job.working_memory, "messages", [])
-            _apply_update(in_memory_messages)
+            updated_in_memory = _apply_update(in_memory_messages)
 
             # Persist the update so reloads / other processes see the summary.
+            updated_persisted = None
             if self._memory_manager is not None and job.session_id:
                 try:
                     working_memory, task_tree = await self._memory_manager.load_session(
                         job.session_id, job.project_id or "default"
                     )
-                    if _apply_update(working_memory.messages):
+                    updated_persisted = _apply_update(working_memory.messages)
+                    if updated_persisted is not None:
                         await self._memory_manager._save_session(
                             job.session_id,
                             job.project_id or "default",
@@ -387,8 +395,19 @@ class BackgroundJobRunner:
                         )
                 except Exception:
                     logger.warning("Failed to persist TODO summary", exc_info=True)
+
+            # Broadcast the updated TODO card (same id as the original) so the
+            # frontend replaces it in place instead of appending a duplicate.
+            broadcast_msg = updated_persisted or updated_in_memory
+            if broadcast_msg is not None:
+                return [broadcast_msg.model_dump(mode="json")]
+            return []
         except Exception:
             logger.warning("Failed to update queued TODO message", exc_info=True)
+            return None
+        except Exception:
+            logger.warning("Failed to update queued TODO message", exc_info=True)
+            return None
 
     @staticmethod
     def _collect_artifact_envelopes(
@@ -521,9 +540,14 @@ class BackgroundJobRunner:
             return "⚠️ 执行未完全成功，但已生成部分结果（见下方文件/表格）。"
 
         # Prefer an explicit summary/text payload when the skill provides one.
-        explicit_summary = task_result.get("summary") or task_result.get("text")
+        explicit_summary = (
+            task_result.get("summary")
+            or task_result.get("text")
+            or (task_result.get("final_output") or {}).get("summary")
+            or (task_result.get("final_output") or {}).get("text")
+        )
         if isinstance(explicit_summary, str) and explicit_summary.strip():
-            return explicit_summary.strip()[:800]
+            return explicit_summary.strip()[:1200]
 
         parts = ["分析已完成"]
         cells = task_result.get("cells")
@@ -567,6 +591,7 @@ class BackgroundJobRunner:
         hitl_checkpoint: Optional[dict] = None,
         result: Optional[Dict[str, Any]] = None,
         logs: Optional[list] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         state = ExecutionState(
             job_id=job_id,
@@ -577,6 +602,7 @@ class BackgroundJobRunner:
             error_message=message if status == JobStatus.FAILED else None,
             result=result,
             logs=logs or [],
+            messages=messages,
         )
         if hitl_checkpoint:
             state.error_message = None  # not an error
@@ -712,15 +738,46 @@ class BackgroundJobRunner:
             "hitl_task_id": result.hitl_task_id,
             "error": result.error,
         }
-        # Surface the first successful task result so clients can render
-        # a concise result summary without walking the whole task tree.
+        # Surface the best successful task result so clients can render a concise
+        # summary without walking the whole task tree. Prefer the last completed
+        # task (usually the deliverable step) and, among completed tasks, the one
+        # with the richest final_output (output files + non-empty summary/metrics).
         task_result = None
         tree = getattr(result, "task_tree", None)
         if tree and getattr(tree, "tasks", None):
-            for task in tree.tasks:
-                if getattr(task, "status", None) == "completed" and getattr(task, "result", None):
-                    task_result = task.result
-                    break
+            candidates = [
+                task
+                for task in tree.tasks
+                if getattr(task, "status", None) == "completed" and getattr(task, "result", None)
+            ]
+
+            def _result_score(task):
+                res = task.result
+                if not isinstance(res, dict):
+                    return 0
+                inner = res.get("result") or res
+                if not isinstance(inner, dict):
+                    return 0
+                final_output = inner.get("final_output") or {}
+                score = 0
+                if final_output.get("summary"):
+                    score += 10
+                if final_output.get("metrics"):
+                    score += 10
+                score += len(final_output.get("output_files", [])) * 2
+                score += len(inner.get("output_files", [])) * 2
+                score += len(inner.get("artifacts", [])) * 2
+                return score
+
+            if candidates:
+                # Prefer the last completed task unless an earlier one has a much
+                # richer final_output (score >= 2x).
+                last = candidates[-1]
+                best = max(candidates, key=_result_score)
+                if best is last or _result_score(best) >= _result_score(last) * 2:
+                    task_result = best.result
+                else:
+                    task_result = last.result
         data["task_result"] = task_result
         return data
 

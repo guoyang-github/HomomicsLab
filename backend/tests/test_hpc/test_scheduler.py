@@ -231,7 +231,7 @@ class TestGetScheduler:
             classmethod(lambda cls: False),
         )
         plan = PlanResult(
-            phases=[Phase(phase_type=f"step_{i}", required=True) for i in range(6)],
+            phases=[Phase(phase_type=f"step_{i}", required=True) for i in range(10)],
             strategy_name="test",
             data_state=DataState(),
         )
@@ -239,7 +239,7 @@ class TestGetScheduler:
             "auto",
             working_dir=tmp_path,
             plan=plan,
-            data_state=DataState(),
+            data_state=DataState(n_samples=200),
         )
         assert isinstance(scheduler, NextflowRunner)
 
