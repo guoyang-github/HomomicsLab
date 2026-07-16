@@ -425,3 +425,81 @@ async def test_fixed_pipeline_mode_disables_codeact_fallback(
         await failing_orchestrator.run_tree(
             tree, context={"project_id": "proj1", "execution_mode": "fixed_pipeline"}
         )
+
+
+@pytest.mark.asyncio
+async def test_use_skill_reference_includes_skill_docs_and_scripts(tmp_path, monkeypatch):
+    """use_skill_reference feeds skill docs/scripts into CodeAct, not the skill runtime."""
+    skill_dir = tmp_path / "mock_celltypist"
+    scripts = skill_dir / "scripts" / "python"
+    scripts.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: mock-celltypist\ntool_type: python\n---\n\n"
+        "# Mock CellTypist\nUse this to annotate immune cells.\n",
+        encoding="utf-8",
+    )
+    (scripts / "core_analysis.py").write_text(
+        "def run_celltypist(adata):\n    return adata\n",
+        encoding="utf-8",
+    )
+
+    skill_registry = SkillRegistry()
+    skill = SkillDefinition(
+        id="mock-celltypist",
+        name="Mock CellTypist",
+        version="1.0.0",
+        category="single-cell",
+        runtime={"type": "python"},
+        metadata={
+            "source_dir": str(skill_dir),
+            "trusted": True,
+        },
+        input_schema=SkillInputSchema(),
+    )
+    skill_registry.register(skill)
+
+    registry = AgentRegistry()
+    orchestrator = Orchestrator(registry=registry, skill_registry=skill_registry)
+
+    captured_prompts: list[str] = []
+
+    async def fake_run_codeact_with_prompt(task, context, prompt):
+        captured_prompts.append(prompt)
+        return {
+            "success": True,
+            "result": {"cells": 42},
+            "stdout": "mock stdout",
+            "stderr": "",
+            "exit_code": 0,
+            "code": "print('mock')",
+        }
+
+    monkeypatch.setattr(
+        orchestrator, "_run_codeact_with_prompt", fake_run_codeact_with_prompt
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="annotate",
+            description="Annotate immune cells",
+            skills_required=["mock-celltypist"],
+            parameters={
+                "use_skill_reference": True,
+                "input_file": str(tmp_path / "data.h5ad"),
+            },
+        ),
+    ])
+    (tmp_path / "data.h5ad").write_text("mock h5ad")
+
+    result = await orchestrator.run_tree(tree, context={"project_id": "proj1"})
+
+    assert len(captured_prompts) == 1
+    prompt = captured_prompts[0]
+    # The prompt must contain the skill documentation and reference scripts.
+    assert "Mock CellTypist" in prompt
+    assert "run_celltypist" in prompt
+    assert "annotate immune cells" in prompt.lower() or "Annotate immune cells" in prompt
+    # Result is normalized as a CodeAct success with the originating skill noted.
+    assert result["t1"]["status"] == "success"
+    assert result["t1"].get("skill") == "mock-celltypist"
