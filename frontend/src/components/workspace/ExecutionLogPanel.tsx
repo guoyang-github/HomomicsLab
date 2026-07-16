@@ -21,15 +21,18 @@ export function ExecutionLogPanel({ compact = false }: Props) {
   const isConnected = useExecutionStore((state) => state.isConnected)
   const clearLogs = useExecutionStore((state) => state.clearLogs)
   const [expanded, setExpanded] = useState(false)
+  const [userCollapsed, setUserCollapsed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-expand the compact embedded panel while a job is running so users
-  // can see live execution output without an extra click.
+  // can see live execution output without an extra click. If the user has
+  // explicitly collapsed the panel, respect that choice until they expand it
+  // again.
   useEffect(() => {
-    if (compact && status === 'running' && !expanded) {
+    if (compact && status === 'running' && !userCollapsed && !expanded) {
       setExpanded(true)
     }
-  }, [compact, status, expanded])
+  }, [compact, status, userCollapsed, expanded])
 
   const items = useMemo(() => groupSubagentLogs(logs), [logs])
   // Per-group open state; groups default to expanded while running and
@@ -198,7 +201,16 @@ export function ExecutionLogPanel({ compact = false }: Props) {
               </Button>
             </>
           )}
-          <Button variant="ghost" size="icon" onClick={() => setExpanded((e) => !e)} title={expanded ? t('executionLog.collapse') : t('executionLog.expand')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              const next = !expanded
+              setExpanded(next)
+              setUserCollapsed(!next)
+            }}
+            title={expanded ? t('executionLog.collapse') : t('executionLog.expand')}
+          >
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </Button>
         </div>

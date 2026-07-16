@@ -143,12 +143,13 @@ export function ExecutionResult({ content, mode = 'full' }: Props) {
   // Prefer deterministic rich summaries; otherwise use any explicit summary/text
   // the skill returned. If the backend placeholder is generic and we have a result,
   // fall back to a structured key-value rendering instead of "分析已完成。"
-  // When rendered as an outputs-only card, skip the task-checklist placeholder
-  // because the floating TODO panel already shows task status.
+  // Informative status text (e.g. "已提交后台执行...") is still shown in
+  // outputs-only mode so the card is never empty; only the raw task-checklist
+  // placeholder is skipped because the floating TODO panel already shows status.
   let summaryText = ''
   if (isRichSummary(content.text)) {
     summaryText = content.text
-  } else if (!outputsOnly) {
+  } else {
     const explicitSummary =
       normalizedResult?.final_output?.summary ||
       normalizedResult?.summary ||
@@ -156,7 +157,7 @@ export function ExecutionResult({ content, mode = 'full' }: Props) {
       content.text
     if (explicitSummary && typeof explicitSummary === 'string' && !isGenericPlaceholder(explicitSummary)) {
       summaryText = explicitSummary
-    } else if (normalizedResult && !isFailure) {
+    } else if (!outputsOnly && normalizedResult && !isFailure) {
       summaryText = formatObjectSummary(normalizedResult)
     }
   }

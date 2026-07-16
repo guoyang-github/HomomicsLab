@@ -48,14 +48,32 @@ export function MessageGroup({ messages, onRegenerate, isLastGroup }: MessageGro
   // A single user/system turn is rendered as-is. Agent turns are split into
   // main content (text, plans, etc.) and an output section (files / artifacts /
   // todo_list outputs) that is pinned to the bottom of the reply.
+  // A todo_list message that only carries a status text and tasks belongs in the
+  // main flow; the floating TODO panel already shows task status. Only todo_list
+  // messages that actually produced artifacts/results are moved to the output
+  // section, so an empty "Output" box never appears before execution finishes.
+  function todoListHasRealOutput(content: TodoListContent): boolean {
+    if (Array.isArray(content.artifacts) && content.artifacts.length > 0) return true
+    if (content.result && Object.keys(content.result).length > 0) return true
+    return false
+  }
+
   let mainMessages = messages
   let outputMessages: ChatMessage[] = []
   let todoListMessages: ChatMessage[] = []
 
   if (!isUser && !isSystem) {
-    mainMessages = messages.filter((m) => !isOutputMessage(m) && !isTodoListMessage(m))
     outputMessages = messages.filter((m) => isOutputMessage(m))
-    todoListMessages = messages.filter((m) => isTodoListMessage(m))
+    todoListMessages = messages.filter(
+      (m) => isTodoListMessage(m) && todoListHasRealOutput(m.content as unknown as TodoListContent)
+    )
+    mainMessages = messages.filter((m) => !isOutputMessage(m) && !isTodoListMessage(m))
+    // todo_list messages with only status text/tasks stay in the main flow.
+    messages.forEach((m) => {
+      if (isTodoListMessage(m) && !todoListHasRealOutput(m.content as unknown as TodoListContent)) {
+        mainMessages.push(m)
+      }
+    })
   }
 
   const handleCopy = async () => {
