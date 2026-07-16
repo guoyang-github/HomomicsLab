@@ -216,78 +216,81 @@ class TaskDecomposer:
         intent: UserIntent,
         skills: List[SkillDefinition],
     ) -> List[Dict[str, Any]]:
-        """Build user-facing semantic sub-steps from intent.sub_intents.
+        """Build user-facing milestone steps from the user's actual request.
 
-        A standalone skill may execute several logically distinct actions in
-        one run (e.g. CellTypist annotates cells AND compares the predicted
-        labels with an existing column). Rather than artificially splitting
-        the skill into multiple execution tasks, we surface the user's own
-        sub-goals as display items in the TODO checklist.
+        Instead of mirroring the internal domain phases, the TODO checklist
+        shows the few logical goals the user asked for: load/check data,
+        run the requested method, compare results, and summarize. Broad
+        domain containers and implicit upstream phases (qc, normalization,
+        clustering) are intentionally hidden unless the user asked for them.
         """
-        sub_intents = intent.sub_intents or []
-        if len(sub_intents) < 2:
-            return []
-
-        # Keep only concrete, distinct analysis sub-intents. Drop broad domain
-        # containers so the list stays focused on what the user asked for.
-        broad = {"general", "builtin_analysis", "analysis", "unknown", "single_cell_analysis"}
-        seen: set[str] = set()
-        concrete: List[UserIntent] = []
-        for sub in sub_intents:
-            atype = sub.analysis_type
-            if atype in broad or atype in seen:
-                continue
-            seen.add(atype)
-            concrete.append(sub)
-
-        if len(concrete) < 2:
-            return []
-
+        user_msg = (intent.original_message or "").lower()
         skill_name = skills[0].name if skills else ""
         skill_id = skills[0].id if skills else ""
-        user_msg = (intent.original_message or "").lower()
+
+        # Extract the primary file name the user referenced.
+        import re
+        file_candidates = re.findall(r"[\w\-]+\.\w{2,8}", user_msg)
+        primary_file = file_candidates[0] if file_candidates else "input data"
+
+        # Build milestones from explicit user goals, not from sub_intents.
+        milestones: List[Dict[str, Any]] = []
+
+        # 1. Data inspection (always useful, lightweight).
+        milestones.append({
+            "id": f"{skill_id or 'step'}_inspect",
+            "description": f"Inspect {primary_file} and verify required columns/fields",
+            "analysis_type": "data_inspection",
+        })
+
+        # 2. Core analysis requested by the user.
+        method_name = skill_name or "selected method"
+        # Try to extract a friendly method name from the skill id tail.
+        if "-" in (skill_id or ""):
+            method_name = skill_id.split("-")[-1].replace("_", " ").title()
+        if "celltypist" in user_msg:
+            method_name = "CellTypist"
+        elif "singler" in user_msg:
+            method_name = "SingleR"
+
+        if "annotate" in user_msg or "annotation" in user_msg or "注释" in user_msg:
+            desc = f"Run cell type annotation with {method_name}"
+        elif "describe" in user_msg or "描述性统计" in user_msg or "统计" in user_msg:
+            desc = f"Compute descriptive statistics for {primary_file}"
+        elif "cluster" in user_msg or "聚类" in user_msg or "louvain" in user_msg or "leiden" in user_msg:
+            desc = f"Cluster cells with {method_name}"
+        elif "normalize" in user_msg or "归一化" in user_msg or "标准化" in user_msg:
+            desc = f"Normalize {primary_file}"
+        elif "qc" in user_msg or "质控" in user_msg:
+            desc = f"Quality control on {primary_file}"
+        else:
+            desc = f"Run {method_name} analysis on {primary_file}"
+        milestones.append({
+            "id": f"{skill_id or 'step'}_core",
+            "description": desc,
+            "analysis_type": "core_analysis",
+        })
+
+        # 3. Comparison / downstream goal if explicitly requested.
         has_comparison = any(kw in user_msg for kw in ("比较", "对比", "一致性", "compare", "agreement", "consistency"))
-
-        subtasks: List[Dict[str, Any]] = []
-        for idx, sub in enumerate(concrete, start=1):
-            atype = sub.analysis_type
-            if atype == "annotation":
-                desc = f"Automated cell type annotation using {skill_name or 'selected skill'}"
-            elif atype == "label_comparison":
-                desc = "Compare predicted labels with existing annotations"
-                if "all_celltype" in user_msg:
-                    desc = "Compare predicted labels with existing all_celltype annotations"
-            elif atype == "clustering":
-                desc = "Cluster cells into subpopulations"
-            elif atype == "dim_reduction":
-                desc = "Dimensionality reduction (PCA/UMAP)"
-            elif atype == "differential_expression":
-                desc = "Differential expression analysis"
-            elif atype == "visualization":
-                desc = "Generate visualization"
-            elif atype == "qc":
-                desc = "Quality control"
-            elif atype == "normalization":
-                desc = "Normalization"
-            else:
-                desc = atype.replace("_", " ").title()
-            subtasks.append({
-                "id": f"{skill_id or 'step'}_sub_{idx}",
-                "description": desc,
-                "analysis_type": atype,
-            })
-
-        # If the user explicitly asked for a comparison but no comparison
-        # sub-intent was derived, add it as a second display step tied to the
-        # skill's natural output.
-        if has_comparison and not any(s["analysis_type"] == "label_comparison" for s in subtasks):
-            subtasks.append({
-                "id": f"{skill_id or 'step'}_sub_compare",
-                "description": "Compare predicted labels with existing annotations",
+        if has_comparison:
+            compare_target = "existing annotations"
+            if "all_celltype" in user_msg:
+                compare_target = "existing all_celltype labels"
+            milestones.append({
+                "id": f"{skill_id or 'step'}_compare",
+                "description": f"Compare results with {compare_target}",
                 "analysis_type": "label_comparison",
             })
 
-        return subtasks if len(subtasks) >= 2 else []
+        # 4. Summary.
+        milestones.append({
+            "id": f"{skill_id or 'step'}_summarize",
+            "description": "Summarize results and suggest next steps",
+            "analysis_type": "summarize",
+        })
+
+        return milestones
 
     def _has_domain_strategy(self, analysis_type: str) -> bool:
         """Return True if a non-generic strategy explicitly claims this intent."""
@@ -353,6 +356,14 @@ class TaskDecomposer:
             )
         if intent.analysis_type == "qa":
             return RoutingDecision.direct(Route.QA, "Intent classified as QA")
+
+        # Data exploration / descriptive statistics should not be forced into a
+        # domain template; generate targeted summary code instead.
+        if intent.analysis_type == "descriptive_statistics":
+            return RoutingDecision.direct(
+                Route.OPEN_AGENT,
+                "Descriptive statistics: generate targeted data summary",
+            )
 
         data_state = context.get("data_state") or DataState()
         assembly = await self._get_capability_assembler().assemble(

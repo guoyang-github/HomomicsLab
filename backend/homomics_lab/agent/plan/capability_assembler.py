@@ -365,6 +365,19 @@ class CapabilityAssembler:
         if not message:
             return None
 
+        # 1b. Fast path: the message literally names the distinctive tail of a
+        # skill id (e.g. "celltypist", "singler", "seurat"). This catches tool
+        # names even when the alias registry's keyword scoring is too conservative.
+        for skill in self.skill_registry.list_all():
+            sid = skill.id.lower()
+            # Use the most distinctive suffix of the skill id.
+            distinctive = sid.split("-")[-1] if "-" in sid else sid
+            if len(distinctive) >= 5 and distinctive in message:
+                # Require the distinctive token to be a known tool/method name,
+                # not a generic biology term.
+                if distinctive not in _GENERIC_KEYWORDS:
+                    return skill
+
         has_domain_signal = self._has_domain_signal(intent)
 
         # 2. Message-based matching via the canonical alias registry.

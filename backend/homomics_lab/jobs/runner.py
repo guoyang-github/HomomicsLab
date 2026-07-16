@@ -421,6 +421,10 @@ class BackgroundJobRunner:
         so the chat can render inline tables/images instead of bare file links.
         Any extra metadata already present in an artifact dict (e.g. ``report_id``,
         ``summary``, ``url``) is preserved.
+
+        As a fallback, the project's workspace ``outputs/`` directory is scanned
+        for recently created files so CodeAct/skills that write there are still
+        surfaced in the chat even when they do not explicitly report paths.
         """
         from pathlib import Path
 
@@ -449,6 +453,23 @@ class BackgroundJobRunner:
         for task in getattr(tree, "tasks", []) or []:
             harvest(getattr(task, "result", None))
 
+        # Fallback: collect recent files from the workspace outputs directory.
+        outputs_dir = BackgroundJobRunner._resolve_outputs_dir(tree)
+        if outputs_dir is not None and outputs_dir.exists():
+            try:
+                candidates = [
+                    p for p in outputs_dir.rglob("*")
+                    if p.is_file() and p.stat().st_size > 0
+                ]
+                # Prefer recently modified files (last 10 minutes).
+                import time
+                now = time.time()
+                recent = [p for p in candidates if (now - p.stat().st_mtime) < 600]
+                for p in recent:
+                    raw_items.append({"path": str(p)})
+            except Exception:
+                pass
+
         envelopes: List[Dict[str, Any]] = []
         seen: set = set()
         for item in raw_items:
@@ -461,6 +482,32 @@ class BackgroundJobRunner:
                 env.update({k: v for k, v in item.items() if k != "path" and v is not None})
                 envelopes.append(env)
         return envelopes
+
+    @staticmethod
+    def _resolve_outputs_dir(tree: Any) -> Optional[Path]:
+        """Return the workspace outputs directory inferred from task parameters."""
+        from pathlib import Path
+
+        for task in getattr(tree, "tasks", []) or []:
+            params = getattr(task, "parameters", None) or {}
+            if not isinstance(params, dict):
+                continue
+            project_id = params.get("project_id")
+            if project_id:
+                return Path(settings.data_dir) / "workspaces" / str(project_id) / "outputs"
+            input_file = params.get("input_file") or params.get("file_path")
+            if input_file:
+                p = Path(input_file)
+                # workspace/<project>/data/file -> workspace/<project>/outputs
+                if "workspaces" in p.parts:
+                    parts = list(p.parts)
+                    try:
+                        idx = parts.index("workspaces")
+                        project_id = parts[idx + 1]
+                        return Path(*parts[: idx + 2]) / "outputs"
+                    except (ValueError, IndexError):
+                        pass
+        return None
 
     @staticmethod
     def _derive_user_message(tree: Any) -> str:

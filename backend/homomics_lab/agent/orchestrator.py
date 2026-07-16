@@ -1171,11 +1171,20 @@ class Orchestrator:
         if working_dir is None:
             return {"success": False, "error": "No project working directory available"}
 
+        outputs_dir = working_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+
         prompt = self._fallback_task_prompt(task, original_error)
+        prompt += (
+            "\n\nImportant: write all output files (CSV, TXT, JSON, PNG, PDF, etc.) "
+            f"to the directory '{outputs_dir}'. Do not scatter outputs in the working directory."
+        )
         code_context: Dict[str, Any] = {
             "task_name": task.name,
             "task_description": task.description or task.name,
             "project_id": context.get("project_id"),
+            "output_dir": str(outputs_dir),
+            "working_dir": str(working_dir),
         }
         for key, value in task.parameters.items():
             if isinstance(value, (str, Path)):
