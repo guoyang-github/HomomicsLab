@@ -35,6 +35,7 @@ export function ExecutionProgressBar() {
   const jobId = useExecutionStore((state) => state.jobId)
   const isConnected = useExecutionStore((state) => state.isConnected)
   const logs = useExecutionStore((state) => state.logs)
+  const livePhase = useExecutionStore((state) => state.currentPhase)
 
   const openWorkflow = useOverlayStore((state) => state.openWorkflow)
 
@@ -62,10 +63,21 @@ export function ExecutionProgressBar() {
     )
   }, [tasks])
 
-  const currentPhase = currentTask?.phase || currentTask?.description || ''
+  const currentPhase = livePhase || currentTask?.phase || currentTask?.description || ''
+
+  const livePercent = useExecutionStore((state) => state.percent)
 
   const derivedProgress = useMemo(() => {
-    if (progress && progress.total > 0) return progress
+    if (progress && progress.total > 0) {
+      // Blend the task-tree percent with the live sub-step percent so a single
+      // long-running step still shows motion (e.g. 15%/60%/90% from CodeAct).
+      const base = progress.percent
+      const live = typeof livePercent === 'number' ? livePercent : base
+      return {
+        ...progress,
+        percent: Math.max(base, live),
+      }
+    }
     const total = tasks.length
     const completed = tasks.filter((t) => t.status === 'completed').length
     return {
@@ -77,7 +89,7 @@ export function ExecutionProgressBar() {
       awaiting_human: 0,
       percent: total > 0 ? Math.round((completed / total) * 100) : 0,
     }
-  }, [progress, tasks])
+  }, [progress, tasks, livePercent])
 
   if (dismissed) return null
   if (tasks.length === 0 && status === 'idle') return null

@@ -13,7 +13,7 @@ from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.backends.base import PubSubBackend, QueueBackend
 from homomics_lab.logging_config import set_correlation_id
 from homomics_lab.metrics import set_active_jobs
-from homomics_lab.models.common import MessageType
+from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.plan.models import PlanStatus
 from homomics_lab.plan.store import PlanStore
@@ -204,12 +204,12 @@ class BackgroundJobRunner:
                 if not cognify_handled:
                     project_id = job.project_id or "default"
                     workspace = WorkspaceManager(settings.data_dir, project_id)
-                    workspace.create_git_snapshot("pre-run", job_id)
+                    await workspace.create_git_snapshot("pre-run", job_id)
                     if self._skill_executor is not None and hasattr(self._skill_executor, "set_workspace"):
                         self._skill_executor.set_workspace(workspace)
                     with workspace_context(workspace):
                         result = await asyncio.wait_for(coro, timeout=timeout)
-                    workspace.create_git_snapshot("post-run", job_id)
+                    await workspace.create_git_snapshot("post-run", job_id)
 
                     # Persist mutated state
                     job.task_tree = result.task_tree
@@ -329,12 +329,20 @@ class BackgroundJobRunner:
                 return None
 
             tree = getattr(result, "task_tree", None) or job.task_tree
-            summary_text, envelopes = self._compose_result_message(
+            summary, envelopes = await self._compose_result_message(
                 task_result, tree, job.status
             )
-            # Keep the TODO card itself useful instead of a generic placeholder.
-            todo_text = summary_text or self._format_result_summary(task_result, job.status)
+            summary_text = summary.to_markdown()
+            # Keep the TODO card concise; the detailed summary goes into a
+            # separate chat message so the conversation reads naturally.
+            todo_text = self._format_result_summary(task_result, job.status)
             todo_type = {MessageType.TODO_LIST, MessageType.TODO_LIST.value, "todo_list"}
+            # Plot images and ready-made Plotly figures are already streamed as
+            # dedicated PLOT/PLOT_DATA messages by TurnRunner; keep them out of
+            # the TODO card to avoid duplicate inline cards.
+            display_envelopes = [
+                env for env in envelopes if env.get("kind") not in {"image", "plotly"}
+            ]
 
             def _apply_update(messages):
                 fallback_msg = None
@@ -351,11 +359,25 @@ class BackgroundJobRunner:
                         content["result"] = task_result
                         content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
                         content["text"] = todo_text
-                        if envelopes:
-                            content["artifacts"] = envelopes
-                        for task in content.get("tasks", []) or []:
+                        if display_envelopes:
+                            content["artifacts"] = display_envelopes
+                        elif "artifacts" in content:
+                            content["artifacts"] = []
+                        tasks = content.get("tasks", []) or []
+                        for task in tasks:
                             if isinstance(task, dict):
                                 task["status"] = content["status"]
+                        progress = content.get("progress") or {}
+                        if isinstance(progress, dict):
+                            total = len(tasks)
+                            completed = sum(1 for t in tasks if isinstance(t, dict) and t.get("status") == "completed")
+                            progress["total"] = total
+                            progress["pending"] = total - completed
+                            progress["running"] = 0
+                            progress["completed"] = completed
+                            progress["failed"] = sum(1 for t in tasks if isinstance(t, dict) and t.get("status") == "failed")
+                            progress["awaiting_human"] = 0
+                            progress["percent"] = int((completed / total) * 100) if total else 0
                         updated_msg = msg
                         break
                     # Remember the most recent pending todo as a fallback target.
@@ -366,11 +388,25 @@ class BackgroundJobRunner:
                     content["result"] = task_result
                     content["status"] = "completed" if job.status == JobStatus.COMPLETED else "failed"
                     content["text"] = todo_text
-                    if envelopes:
-                        content["artifacts"] = envelopes
-                    for task in content.get("tasks", []) or []:
+                    if display_envelopes:
+                        content["artifacts"] = display_envelopes
+                    elif "artifacts" in content:
+                        content["artifacts"] = []
+                    tasks = content.get("tasks", []) or []
+                    for task in tasks:
                         if isinstance(task, dict):
                             task["status"] = content["status"]
+                    progress = content.get("progress") or {}
+                    if isinstance(progress, dict):
+                        total = len(tasks)
+                        completed = sum(1 for t in tasks if isinstance(t, dict) and t.get("status") == "completed")
+                        progress["total"] = total
+                        progress["pending"] = total - completed
+                        progress["running"] = 0
+                        progress["completed"] = completed
+                        progress["failed"] = sum(1 for t in tasks if isinstance(t, dict) and t.get("status") == "failed")
+                        progress["awaiting_human"] = 0
+                        progress["percent"] = int((completed / total) * 100) if total else 0
                     updated_msg = fallback_msg
                 return updated_msg
 
@@ -398,10 +434,48 @@ class BackgroundJobRunner:
 
             # Broadcast the updated TODO card (same id as the original) so the
             # frontend replaces it in place instead of appending a duplicate.
+            broadcast_messages: List[Dict[str, Any]] = []
             broadcast_msg = updated_persisted or updated_in_memory
             if broadcast_msg is not None:
-                return [broadcast_msg.model_dump(mode="json")]
-            return []
+                broadcast_messages.append(broadcast_msg.model_dump(mode="json"))
+
+            # Append a separate rich summary message to the conversation when
+            # the job produced a meaningful result. This keeps the TODO card as
+            # a lightweight progress indicator and puts the detailed answer in
+            # the chat stream where the user expects it.
+            if summary_text and job.status == JobStatus.COMPLETED:
+                try:
+                    summary_chat = ChatMessage(
+                        id=f"msg_result_{job.job_id}",
+                        type=MessageType.TEXT,
+                        content=summary_text,
+                        sender="agent",
+                        related_files=[env.get("path") for env in envelopes if env.get("path")],
+                    )
+                    summary_id = summary_chat.id
+                    # Guard against appending the same summary twice when the
+                    # in-memory and persisted WorkingMemory share state.
+                    in_memory_ids = {getattr(m, "id", None) for m in in_memory_messages}
+                    if summary_id not in in_memory_ids:
+                        in_memory_messages.append(summary_chat)
+                        broadcast_messages.append(summary_chat.model_dump(mode="json"))
+                    if self._memory_manager is not None and job.session_id:
+                        working_memory, task_tree = await self._memory_manager.load_session(
+                            job.session_id, job.project_id or "default"
+                        )
+                        persisted_ids = {getattr(m, "id", None) for m in working_memory.messages}
+                        if summary_id not in persisted_ids:
+                            working_memory.messages.append(summary_chat)
+                        await self._memory_manager._save_session(
+                            job.session_id,
+                            job.project_id or "default",
+                            working_memory,
+                            task_tree,
+                        )
+                except Exception:
+                    logger.warning("Failed to append result summary message", exc_info=True)
+
+            return broadcast_messages
         except Exception:
             logger.warning("Failed to update queued TODO message", exc_info=True)
             return None
@@ -446,6 +520,8 @@ class BackgroundJobRunner:
                 val = obj.get(key)
                 if isinstance(val, (list, tuple)):
                     raw_items.extend({"path": str(x)} for x in val if x)
+                elif isinstance(val, dict):
+                    raw_items.extend({"path": str(v)} for v in val.values() if v)
                 elif isinstance(val, str):
                     raw_items.append({"path": val})
 
@@ -529,42 +605,79 @@ class BackgroundJobRunner:
         return ids[0] if len(ids) == 1 else None
 
     @classmethod
-    def _compose_result_message(
+    async def _compose_result_message(
         cls, task_result: Any, tree: Any, status: JobStatus
     ) -> tuple:
-        """Build ``(text, envelopes)`` for the queued TODO message.
+        """Build ``(ResultSummary, envelopes)`` for the queued TODO message.
 
-        On success with artifacts, the text is the deterministic, sourced
-        markdown from :mod:`homomics_lab.result_summary` (inline tables,
-        findings, interpretation, next steps). Falls back to the legacy one-line
-        summary when nothing richer is available, so the chat is never empty.
+        On success with artifacts, returns the deterministic, sourced
+        :class:`ResultSummary` from :mod:`homomics_lab.result_summary` (inline
+        tables, findings, interpretation, next steps).  When an LLM is configured,
+        the interpretation and next steps are enriched with a controlled,
+        source-grounded rewrite so the chat reads naturally without hallucinating
+        numbers.  Falls back to a legacy one-line summary when nothing richer is
+        available, so the chat is never empty.
         """
+        from homomics_lab.result_summary import (
+            Finding,
+            ResultSummary,
+            enrich_summary_with_llm,
+            summarize_artifacts,
+        )
+
         envelopes = cls._collect_artifact_envelopes(task_result, tree)
-        text = ""
         is_partial = isinstance(task_result, dict) and task_result.get("partial")
         has_error = isinstance(task_result, dict) and task_result.get("error")
         if (status == JobStatus.COMPLETED or is_partial or has_error) and envelopes:
             try:
-                from homomics_lab.result_summary import summarize_artifacts
-
-                text = summarize_artifacts(
+                summary = summarize_artifacts(
                     envelopes,
                     skill_id=cls._derive_skill_id(tree),
                     user_message=cls._derive_user_message(tree),
-                ).to_markdown()
+                )
+                if status == JobStatus.COMPLETED and not is_partial and not has_error:
+                    try:
+                        from homomics_lab.llm_client import LLMClient
+
+                        summary = await enrich_summary_with_llm(
+                            summary,
+                            user_message=cls._derive_user_message(tree),
+                            llm_client=LLMClient(),
+                        )
+                    except Exception:
+                        logger.debug("LLM summary enrichment failed", exc_info=True)
                 if is_partial:
-                    text = (
-                        "⚠️ 执行未完全成功，但已生成部分结果，仍可参考：\n\n" + text
+                    summary.interpretation.insert(
+                        0,
+                        Finding(
+                            text="⚠️ 执行未完全成功，但已生成部分结果，仍可参考：",
+                            sources=[],
+                        ),
                     )
                 elif has_error:
                     err = str(task_result.get("error", ""))[:300]
-                    text = f"❌ 执行失败：{err}\n\n已生成的部分结果仍可参考：\n\n{text}"
+                    summary.interpretation.insert(
+                        0,
+                        Finding(
+                            text=f"❌ 执行失败：{err}\n\n已生成的部分结果仍可参考：",
+                            sources=[],
+                        ),
+                    )
+                return summary, envelopes
             except Exception:
                 logger.debug("rich result summary failed", exc_info=True)
-                text = ""
-        if not text:
-            text = cls._format_result_summary(task_result, status)
-        return text, envelopes
+        fallback_summary = ResultSummary(
+            skill_id=cls._derive_skill_id(tree),
+            interpretation=[],
+            sources=[],
+        )
+        # Return a lightweight summary whose markdown is the legacy one-liner.
+        fallback_text = cls._format_result_summary(task_result, status)
+        if fallback_text:
+            fallback_summary.interpretation.append(
+                Finding(text=fallback_text, sources=[])
+            )
+        return fallback_summary, envelopes
 
     @staticmethod
     def _format_result_summary(task_result: Dict[str, Any], status: JobStatus) -> str:

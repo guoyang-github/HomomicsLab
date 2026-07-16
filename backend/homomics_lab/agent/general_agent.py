@@ -59,7 +59,9 @@ class GeneralScientificAgent:
 
         # Explore / tool_call intents delegate to the tool registry.
         structured = getattr(intent, "structured_intent", None)
-        interaction_mode = getattr(structured, "interaction_mode", intent.interaction_mode)
+        interaction_mode = getattr(
+            structured, "interaction_mode", intent.interaction_mode
+        )
         if interaction_mode == "explore":
             return await self._handle_tool_call(intent, working_memory, context)
 
@@ -108,9 +110,13 @@ class GeneralScientificAgent:
         """Generate code or scripts for general help requests."""
         from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
 
-        # If CodeAct is available, use it to produce runnable code.
+        # If CodeAct is available and the LLM is configured, use it to produce runnable code.
         code_act_skill = self.skill_registry.get("core_code_act")
-        if code_act_skill is not None and self.llm_client is not None:
+        if (
+            code_act_skill is not None
+            and self.llm_client is not None
+            and self.llm_client.is_configured()
+        ):
             from homomics_lab.execution.code_act import run_code_act
 
             user_message = intent.original_message
@@ -173,7 +179,9 @@ class GeneralScientificAgent:
 
         tool = self.tool_registry.get(tool_name)
         if tool is None:
-            response_text = f"工具 '{tool_name}' 不可用。请确认工具名称或换一种方式提问。"
+            response_text = (
+                f"工具 '{tool_name}' 不可用。请确认工具名称或换一种方式提问。"
+            )
             agent_msg = ChatMessage(
                 id=f"msg_{len(working_memory.messages)}",
                 type=MessageType.TEXT,
@@ -226,9 +234,7 @@ class GeneralScientificAgent:
                 messages.append({"role": "assistant", "content": str(msg.content)})
         # Ensure the current request is the last user message.
         if not messages or messages[-1].get("role") != "user":
-            messages.append(
-                {"role": "user", "content": intent.original_message}
-            )
+            messages.append({"role": "user", "content": intent.original_message})
         return messages
 
     async def _call_llm(self, messages: List[Dict[str, str]]) -> str:

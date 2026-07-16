@@ -91,7 +91,7 @@ def _create_artifact_files(tmp_path: Path) -> Dict[str, Path]:
 
 
 @pytest.mark.asyncio
-async def test_artifact_messages_are_appended_on_success(tmp_path: Path) -> None:
+async def test_artifact_envelopes_are_embedded_in_todo_on_success(tmp_path: Path) -> None:
     files = _create_artifact_files(tmp_path)
 
     # Build artifact list with explicit metadata (report_id, summary, url).
@@ -141,9 +141,14 @@ async def test_artifact_messages_are_appended_on_success(tmp_path: Path) -> None
 
     await runner._update_queued_todo_message(job, result)
 
-    # In-memory messages should contain artifact cards.
-    artifact_msgs = [m for m in working_memory.messages if m.type == MessageType.ARTIFACT]
-    kinds = {m.content.get("kind") for m in artifact_msgs}
+    # Artifacts are now surfaced inside the TODO_LIST card so the chat stream
+    # stays compact; standalone ARTIFACT messages are no longer emitted.
+    todo_msgs = [m for m in working_memory.messages if m.type == MessageType.TODO_LIST]
+    assert len(todo_msgs) == 1
+    todo_content = todo_msgs[0].content
+    assert isinstance(todo_content, dict)
+    embedded = todo_content.get("artifacts", [])
+    kinds = {env.get("kind") for env in embedded}
     assert "html" in kinds
     assert "table" in kinds
     assert "json" in kinds
@@ -152,20 +157,21 @@ async def test_artifact_messages_are_appended_on_success(tmp_path: Path) -> None
     assert "plotly" not in kinds, "plotly figures are streamed as PLOT_DATA messages"
 
     # Report-specific metadata preserved.
-    report_msg = next(m for m in artifact_msgs if m.content.get("kind") == "html")
-    assert report_msg.content.get("report_id") == "report_123"
-    assert report_msg.content.get("summary") == "executive summary"
-    assert report_msg.content.get("url") == "/api/reports/report_123"
+    report_env = next(env for env in embedded if env.get("kind") == "html")
+    assert report_env.get("report_id") == "report_123"
+    assert report_env.get("summary") == "executive summary"
+    assert report_env.get("url") == "/api/reports/report_123"
 
-    # Persisted working memory should be saved and also contain artifact messages.
-    assert len(store.saved) == 1
-    persisted = store.saved[0].working_memory
-    persisted_artifact_msgs = [m for m in persisted.messages if m.type == MessageType.ARTIFACT]
-    assert len(persisted_artifact_msgs) == len(artifact_msgs)
+    # A rich summary message is also appended to the conversation and persisted.
+    assert len(store.saved) == 2
+    persisted = store.saved[-1].working_memory
+    persisted_todo = [m for m in persisted.messages if m.type == MessageType.TODO_LIST]
+    assert len(persisted_todo) == 1
+    assert len(persisted_todo[0].content.get("artifacts", [])) == len(embedded)
 
 
 @pytest.mark.asyncio
-async def test_no_artifact_messages_without_artifacts(tmp_path: Path) -> None:
+async def test_no_artifact_envelopes_without_artifacts(tmp_path: Path) -> None:
     task_result: Dict[str, Any] = {"success": True}
     result, tree = _make_result(task_result, tmp_path)
 
@@ -200,6 +206,12 @@ async def test_no_artifact_messages_without_artifacts(tmp_path: Path) -> None:
 
     await runner._update_queued_todo_message(job, result)
 
-    artifact_msgs = [m for m in working_memory.messages if m.type == MessageType.ARTIFACT]
-    assert artifact_msgs == []
-    assert len(store.saved) == 1
+    todo_msgs = [m for m in working_memory.messages if m.type == MessageType.TODO_LIST]
+    assert len(todo_msgs) == 1
+    assert todo_msgs[0].content.get("artifacts", []) == []
+
+    # A concise completion summary is appended even when no artifacts exist.
+    summary_msgs = [m for m in working_memory.messages if m.type == MessageType.TEXT]
+    assert len(summary_msgs) == 1
+    assert "分析已完成" in summary_msgs[0].content
+    assert len(store.saved) == 2

@@ -15,7 +15,11 @@ from homomics_lab.skills.registry import SkillRegistry
 class FakeCapabilityIndex:
     """In-memory capability index for deterministic tests."""
 
-    def __init__(self, templates: List[CapabilityCandidate] = None, skills: List[CapabilityCandidate] = None):
+    def __init__(
+        self,
+        templates: List[CapabilityCandidate] = None,
+        skills: List[CapabilityCandidate] = None,
+    ):
         self._templates = templates or []
         self._skills = skills or []
 
@@ -33,7 +37,9 @@ class FakeCapabilityIndex:
         return []
 
 
-def _make_skill(skill_id: str, description: str = "", domains: List[str] = None) -> SkillDefinition:
+def _make_skill(
+    skill_id: str, description: str = "", domains: List[str] = None
+) -> SkillDefinition:
     return SkillDefinition(
         id=skill_id,
         name=skill_id,
@@ -54,14 +60,20 @@ def skill_registry() -> SkillRegistry:
 
 
 @pytest.mark.asyncio
-async def test_assemble_routes_cross_domain_when_multiple_domains_detected(skill_registry):
+async def test_assemble_routes_cross_domain_when_multiple_domains_detected(
+    skill_registry,
+):
     intent = UserIntent(
         analysis_type="single_cell_analysis",
         complexity="complex",
         domain="single-cell-transcriptomics",
         original_message="先做单细胞聚类，再用空间转录组做反卷积",
         sub_intents=[
-            UserIntent(analysis_type="spatial_deconvolution", complexity="single_step", domain="spatial-transcriptomics"),
+            UserIntent(
+                analysis_type="spatial_deconvolution",
+                complexity="single_step",
+                domain="spatial-transcriptomics",
+            ),
         ],
     )
     assembler = CapabilityAssembler(skill_registry=skill_registry)
@@ -91,7 +103,9 @@ async def test_assemble_routes_domain_template_when_coverage_high(skill_registry
         payload=template.to_dict(),
     )
     index = FakeCapabilityIndex(templates=[candidate])
-    assembler = CapabilityAssembler(capability_index=index, skill_registry=skill_registry)
+    assembler = CapabilityAssembler(
+        capability_index=index, skill_registry=skill_registry
+    )
 
     intent = UserIntent(
         analysis_type="single_cell_analysis",
@@ -118,7 +132,9 @@ async def test_assemble_routes_standalone_skill_when_score_high(skill_registry):
         payload={},
     )
     index = FakeCapabilityIndex(skills=[candidate])
-    assembler = CapabilityAssembler(capability_index=index, skill_registry=skill_registry)
+    assembler = CapabilityAssembler(
+        capability_index=index, skill_registry=skill_registry
+    )
 
     intent = UserIntent(
         analysis_type="general",
@@ -159,7 +175,9 @@ async def test_assemble_ignores_domain_skills_for_standalone(skill_registry):
         payload={},
     )
     index = FakeCapabilityIndex(skills=[candidate])
-    assembler = CapabilityAssembler(capability_index=index, skill_registry=skill_registry)
+    assembler = CapabilityAssembler(
+        capability_index=index, skill_registry=skill_registry
+    )
 
     intent = UserIntent(
         analysis_type="general",
@@ -190,7 +208,6 @@ async def test_assemble_returns_none_template_when_no_templates(skill_registry):
 async def test_capability_first_routing_through_task_decomposer(monkeypatch):
     """When capability-first routing is enabled, TaskDecomposer uses the assembler."""
     from homomics_lab.agent.task_decomposer import TaskDecomposer
-    from homomics_lab.config import settings
 
     reg = SkillRegistry()
     reg.register(_make_skill("text_summarizer", "Summarize long articles"))

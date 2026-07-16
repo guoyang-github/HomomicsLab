@@ -136,11 +136,14 @@ class QdrantBackend(VectorStoreBackend):
     def _build_filter(filters: Optional[Dict[str, Any]]) -> Optional[Any]:
         if not filters:
             return None
-        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
         conditions = []
         for key, value in filters.items():
-            conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+            if isinstance(value, list):
+                conditions.append(FieldCondition(key=key, match=MatchAny(any=value)))
+            else:
+                conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
         return Filter(must=conditions) if conditions else None
 
     @staticmethod

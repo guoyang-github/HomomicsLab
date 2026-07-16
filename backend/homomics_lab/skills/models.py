@@ -184,24 +184,3 @@ class SkillDefinition(BaseModel):
         # Discovery-level skills may record this hint before scripts_dir is resolved.
         return bool(self.metadata.get("has_scripts"))
 
-    @property
-    def has_entrypoint(self) -> bool:
-        """True when the skill has an executable script entrypoint.
-
-        An explicit ``entrypoint`` path relative to ``source_dir`` takes
-        precedence; otherwise ``scripts_dir/run.py`` is accepted.
-        """
-        src = self.source_dir
-        if src is not None:
-            entrypoint = self.metadata.get("entrypoint")
-            if isinstance(entrypoint, (str, Path)):
-                if (src / entrypoint).is_file():
-                    return True
-            if (src / "scripts" / "run.py").is_file():
-                return True
-            if (src / "scripts" / "python" / "run.py").is_file():
-                return True
-            if (src / "scripts" / "r" / "run.R").is_file():
-                return True
-        # Discovery-level hint.
-        return bool(self.metadata.get("has_entrypoint"))

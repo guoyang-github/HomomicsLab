@@ -4,7 +4,7 @@ import { chatApi, executionApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
-import { useExecutionStore } from '@/stores/executionStore'
+import { useExecutionStore, type LogEntry, type ExecutionState } from '@/stores/executionStore'
 import { toastError } from '@/stores/toastStore'
 import type { TaskProgress, TaskNode } from '@/types/tasks'
 import type { PlanRequestContent } from '@/types/chat'
@@ -89,15 +89,15 @@ function _extractTasksFromMessages(messages: ChatMessage[]): { tasks: TaskNode[]
   return null
 }
 
-function _findRunningJob(messages: ChatMessage[]): { jobId: string; status: string } | null {
+function _findRecentJob(messages: ChatMessage[]): { jobId: string; status: string } | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     const type = typeof msg.type === 'string' ? msg.type.toLowerCase() : ''
     if (type !== 'todo_list') continue
     const content = typeof msg.content === 'object' && msg.content !== null ? (msg.content as Record<string, unknown>) : {}
-    const status = typeof content.status === 'string' ? content.status.toLowerCase() : undefined
+    const status = typeof content.status === 'string' ? content.status.toLowerCase() : ''
     const jobId = typeof content.job_id === 'string' ? content.job_id : undefined
-    if (jobId && (status === 'running' || status === 'awaiting_human')) {
+    if (jobId && ['queued', 'pending', 'running', 'awaiting_human', 'completed', 'failed'].includes(status)) {
       return { jobId, status }
     }
   }
@@ -218,34 +218,86 @@ export const useChatStore = create<ChatState>()(
           set({ messages, messagesLoading: false })
           const extracted = _extractTasksFromMessages(messages)
 
-          if (extracted && extracted.tasks.length > 0) {
-            useTaskStore.getState().setTaskTree(extracted.tasks)
-            useTaskStore.getState().setProgress(_extractProgress(extracted.tasks))
-          } else {
-            useTaskStore.getState().setTaskTree([])
-            useTaskStore.getState().setProgress({
-              total: 0,
-              pending: 0,
-              running: 0,
-              completed: 0,
-              failed: 0,
-              awaiting_human: 0,
-              percent: 0,
-            })
-          }
+          const recentJob = _findRecentJob(messages)
+          if (recentJob?.jobId) {
+            let liveTasks: TaskNode[] | null = null
+            let liveStatus = recentJob.status
+            let livePercent = _extractProgress(extracted?.tasks || []).percent
+            let livePhase: string | null = null
+            const liveLogs: LogEntry[] = []
+            try {
+              const statusRes = await executionApi.getStatus(recentJob.jobId)
+              const latest: any = statusRes.data.latest_state
+              if (latest) {
+                if (Array.isArray(latest.tasks) && latest.tasks.length > 0) {
+                  liveTasks = latest.tasks as TaskNode[]
+                }
+                const s = String(latest.status || liveStatus).toLowerCase()
+                if (s) liveStatus = s
+                livePercent = typeof latest.progress_pct === 'number' ? latest.progress_pct : livePercent
+                livePhase = latest.current_phase || null
+                if (Array.isArray(latest.logs)) {
+                  latest.logs.forEach((line: string, idx: number) => {
+                    liveLogs.push({
+                      id: `live_${recentJob.jobId.slice(0, 8)}_${idx}`,
+                      timestamp: new Date().toISOString(),
+                      level: 'stdout',
+                      message: line,
+                    })
+                  })
+                }
+              }
+            } catch {
+              // Fallback to the persisted TODO card if status fetch fails.
+            }
 
-          const runningJob = _findRunningJob(messages)
-          if (runningJob?.jobId) {
-            const traceLogs = await _fetchTraceLogs(runningJob.jobId)
-            const executionStatus: any = runningJob.status === 'running' ? 'running' : runningJob.status
+            const finalTasks = liveTasks || extracted?.tasks || []
+            if (finalTasks.length > 0) {
+              useTaskStore.getState().setTaskTree(finalTasks)
+              useTaskStore.getState().setProgress(_extractProgress(finalTasks))
+            } else {
+              useTaskStore.getState().setTaskTree([])
+              useTaskStore.getState().setProgress({
+                total: 0,
+                pending: 0,
+                running: 0,
+                completed: 0,
+                failed: 0,
+                awaiting_human: 0,
+                percent: 0,
+              })
+            }
+
+            const traceLogs = await _fetchTraceLogs(recentJob.jobId)
+            const initialLogs = traceLogs.length > 0 ? traceLogs : liveLogs
+            const terminalStatuses = ['completed', 'failed', 'cancelled']
+            const normalizedStatus = terminalStatuses.includes(liveStatus)
+              ? (liveStatus as ExecutionState['status'])
+              : 'running'
             useExecutionStore.getState().restoreJob(
-              runningJob.jobId,
+              recentJob.jobId,
               sessionId,
-              traceLogs,
-              executionStatus,
-              _extractProgress(extracted?.tasks || []).percent
+              initialLogs,
+              normalizedStatus,
+              livePercent,
+              livePhase
             )
           } else {
+            if (extracted && extracted.tasks.length > 0) {
+              useTaskStore.getState().setTaskTree(extracted.tasks)
+              useTaskStore.getState().setProgress(_extractProgress(extracted.tasks))
+            } else {
+              useTaskStore.getState().setTaskTree([])
+              useTaskStore.getState().setProgress({
+                total: 0,
+                pending: 0,
+                running: 0,
+                completed: 0,
+                failed: 0,
+                awaiting_human: 0,
+                percent: 0,
+              })
+            }
             useExecutionStore.getState().reset()
           }
         } catch (err) {

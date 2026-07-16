@@ -11,6 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from homomics_lab.artifacts import build_artifact
 from homomics_lab.jobs.constants import JobStatus
 from homomics_lab.jobs.runner import BackgroundJobRunner
@@ -57,11 +59,13 @@ def _tree(tmp_path: Path, user_request: str):
     return task_result, tree
 
 
-def test_compose_returns_rich_markdown_and_envelopes(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_compose_returns_rich_markdown_and_envelopes(tmp_path: Path) -> None:
     task_result, tree = _tree(tmp_path, "注释并比较与 all_celltype 的一致性")
-    text, envelopes = BackgroundJobRunner._compose_result_message(
+    summary, envelopes = await BackgroundJobRunner._compose_result_message(
         task_result, tree, JobStatus.COMPLETED
     )
+    text = summary.to_markdown()
     assert envelopes, "artifact envelopes should be attached for inline rendering"
     assert all({"kind", "mime", "name", "path", "size"} <= set(e) for e in envelopes)
     assert "关键指标" in text
@@ -71,23 +75,28 @@ def test_compose_returns_rich_markdown_and_envelopes(tmp_path: Path) -> None:
     assert "NK" in text and "CD16+ NK cells" in text
 
 
-def test_compose_falls_back_without_artifacts() -> None:
-    text, envelopes = BackgroundJobRunner._compose_result_message(
+@pytest.mark.asyncio
+async def test_compose_falls_back_without_artifacts() -> None:
+    summary, envelopes = await BackgroundJobRunner._compose_result_message(
         {"success": True}, None, JobStatus.COMPLETED
     )
+    text = summary.to_markdown()
     assert envelopes == []
-    # legacy one-liner, never empty
-    assert text.startswith("分析已完成")
+    # fallback never returns empty; the legacy one-liner is surfaced as the
+    # single interpretation entry.
+    assert "分析已完成" in text
 
 
-def test_compose_failed_status_uses_legacy_summary(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_compose_failed_status_uses_legacy_summary(tmp_path: Path) -> None:
     task_result, tree = _tree(tmp_path, "比较 all_celltype")
-    text, envelopes = BackgroundJobRunner._compose_result_message(
+    summary, envelopes = await BackgroundJobRunner._compose_result_message(
         task_result, tree, JobStatus.FAILED
     )
+    text = summary.to_markdown()
     # envelopes are still harvested for inspection, but the text is the failure blurb
     assert envelopes
-    assert text == "执行结束，结果概要如下。"
+    assert "执行结束，结果概要如下。" in text
 
 
 def test_derive_helpers(tmp_path: Path) -> None:

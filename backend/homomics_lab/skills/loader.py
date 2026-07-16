@@ -399,10 +399,6 @@ class SkillLoader:
             metadata["argument_hint"] = str(frontmatter["argument-hint"])
         if "arguments" in frontmatter:
             metadata["arguments"] = self._normalize_tool_list(frontmatter["arguments"])
-        if "entrypoint" in frontmatter:
-            metadata["entrypoint"] = str(frontmatter["entrypoint"])
-        elif "script" in frontmatter:
-            metadata["entrypoint"] = str(frontmatter["script"])
 
         if "multi_sample" in frontmatter:
             metadata["multi_sample"] = frontmatter["multi_sample"]
@@ -432,14 +428,9 @@ class SkillLoader:
                     frontmatter["trust_level"],
                 )
 
-        # Lightweight progressive-disclosure hints so the runtime can decide
+        # Lightweight progressive-disclosure hint so the runtime can decide
         # agentic vs script execution without activating the full skill body.
         metadata["has_scripts"] = (skill_dir / "scripts").is_dir()
-        has_explicit_entrypoint = False
-        if metadata.get("entrypoint"):
-            has_explicit_entrypoint = (skill_dir / metadata["entrypoint"]).is_file()
-        has_run_py = scripts_dir is not None and (scripts_dir / "run.py").is_file()
-        metadata["has_entrypoint"] = has_explicit_entrypoint or has_run_py
 
         runtime_type = self._resolve_runtime_type(tool_type)
         runtime = SkillRuntime(

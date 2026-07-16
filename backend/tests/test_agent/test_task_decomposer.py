@@ -393,3 +393,47 @@ async def test_decompose_populates_routing_trace():
         entry.get("route") == "standalone_skill" for entry in plan.routing_trace
     )
     assert plan.to_dict().get("routing_trace") == plan.routing_trace
+
+
+@pytest.mark.asyncio
+async def test_preflight_single_shot_overrides_domain_template():
+    """When DataPreflight says the task is single-shot, a phase-level intent with
+    an explicit skill target should still route to standalone_skill instead of
+    the full domain pipeline.
+    """
+    registry = SkillRegistry()
+    registry.register(
+        SkillDefinition(
+            id="bio-single-cell-annotation-celltypist",
+            name="CellTypist Annotation",
+            version="1.0",
+            category="single-cell-transcriptomics",
+            description="CellTypist cell type annotation",
+            domains=["single-cell-transcriptomics"],
+            input_schema=SkillInputSchema(),
+        )
+    )
+
+    decomposer = TaskDecomposer(skill_registry=registry)
+    intent = UserIntent(
+        analysis_type="annotation",
+        complexity="single_step",
+        domain="single-cell-transcriptomics",
+        original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释并比较 all_celltype 一致性",
+    )
+    context = {
+        "preflight": {
+            "required_steps": ["prepare input", "run annotation", "compare predictions", "summarize"],
+            "skip_phases": ["qc", "doublet_removal", "dim_reduction", "clustering", "normalization"],
+            "needs_qc": False,
+            "needs_normalization": False,
+            "needs_clustering": False,
+        }
+    }
+
+    plan, tree = await decomposer.decompose_with_plan(intent, context=context)
+
+    assert plan.derivation == "standalone-skill"
+    assert len(tree.tasks) == 1
+    assert tree.tasks[0].name == "bio-single-cell-annotation-celltypist"
+    assert tree.tasks[0].parameters.get("use_skill_reference") is True

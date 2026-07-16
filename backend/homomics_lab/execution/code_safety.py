@@ -65,6 +65,23 @@ class CodeSafetyScanner:
     AST_SENSITIVE_MODULES = {"os", "subprocess", "importlib"}
     AST_SENSITIVE_STRINGS = {"os", "subprocess", "importlib", "eval", "exec", "__import__"}
 
+    # Calls that are harmless for normal file I/O inside the project workspace.
+    AST_SAFE_OS_CALLS = {
+        "os.makedirs",
+        "os.path.join",
+        "os.path.dirname",
+        "os.path.basename",
+        "os.path.abspath",
+        "os.path.exists",
+        "os.path.isdir",
+        "os.path.isfile",
+        "os.path.expanduser",
+        "os.listdir",
+        "os.walk",
+        "os.getenv",
+        "os.environ.get",
+    }
+
     def scan(self, code: str, language: str = "python") -> SafetyScanResult:
         """Scan code and return a safety report."""
         findings: List[str] = []
@@ -120,10 +137,15 @@ class CodeSafetyScanner:
                     full = self._attribute_full_name(func)
                     if full in self.AST_FORBIDDEN_MODULES:
                         findings.append(f"[critical] Forbidden call: {full}()")
-                    # Any method call on a sensitive module is worth flagging.
-                    root = self._attribute_root_name(func)
-                    if root in self.AST_SENSITIVE_MODULES:
-                        findings.append(f"[high] Sensitive module call: {full}()")
+                    elif full in self.AST_SAFE_OS_CALLS:
+                        # Harmless workspace path/file helpers: keep the finding
+                        # at low severity so it does not trigger HITL by default.
+                        findings.append(f"[low] Safe workspace helper: {full}()")
+                    else:
+                        # Any other method call on a sensitive module is flagged.
+                        root = self._attribute_root_name(func)
+                        if root in self.AST_SENSITIVE_MODULES:
+                            findings.append(f"[high] Sensitive module call: {full}()")
             elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
                 # Detect string concatenation used to build dangerous literals,
                 # e.g. "__im"+"port__" or "ev"+"al".

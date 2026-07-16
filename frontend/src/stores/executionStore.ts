@@ -14,21 +14,23 @@ export interface LogEntry {
   subStatus?: 'completed' | 'failed'
 }
 
-interface ExecutionState {
+export interface ExecutionState {
   jobId: string | null
   jobSessionId: string | null
   isConnected: boolean
   logs: LogEntry[]
   status: 'idle' | 'running' | 'completed' | 'failed' | 'aborted'
   percent: number
+  currentPhase: string | null
   result: Record<string, any> | null
 
   setJobId: (id: string | null) => void
   setJobSessionId: (id: string | null) => void
   startJob: (jobId: string, sessionId: string) => void
-  restoreJob: (jobId: string, sessionId: string, logs?: LogEntry[], status?: ExecutionState['status'], percent?: number) => void
+  restoreJob: (jobId: string, sessionId: string, logs?: LogEntry[], status?: ExecutionState['status'], percent?: number, currentPhase?: string | null) => void
   setConnected: (connected: boolean) => void
-  setStatus: (status: ExecutionState['status'], percent?: number) => void
+  setStatus: (status: ExecutionState['status'], percent?: number, currentPhase?: string | null) => void
+  setCurrentPhase: (phase: string | null) => void
   addLog: (entry: Omit<LogEntry, 'id'>) => void
   clearLogs: () => void
   setResult: (result: Record<string, any> | null) => void
@@ -44,6 +46,7 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
   logs: [],
   status: 'idle',
   percent: 0,
+  currentPhase: null,
   result: null,
 
   setJobId: (jobId) => set({ jobId }),
@@ -56,9 +59,10 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       logs: [],
       status: 'running',
       percent: 0,
+      currentPhase: null,
       result: null,
     }),
-  restoreJob: (jobId, jobSessionId, logs, status, percent) =>
+  restoreJob: (jobId, jobSessionId, logs, status, percent, currentPhase) =>
     set({
       jobId,
       jobSessionId,
@@ -66,10 +70,17 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       logs: logs || [],
       status: status || 'running',
       percent: percent ?? 0,
+      currentPhase: currentPhase ?? null,
       result: null,
     }),
   setConnected: (isConnected) => set({ isConnected }),
-  setStatus: (status, percent) => set({ status, ...(percent !== undefined && { percent }) }),
+  setStatus: (status, percent, currentPhase) =>
+    set({
+      status,
+      ...(percent !== undefined && { percent }),
+      ...(currentPhase !== undefined && { currentPhase }),
+    }),
+  setCurrentPhase: (currentPhase) => set({ currentPhase }),
   addLog: (entry) =>
     set((state) => ({
       logs: [
@@ -90,6 +101,7 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       logs: [],
       status: 'idle',
       percent: 0,
+      currentPhase: null,
       result: null,
     }),
 }))

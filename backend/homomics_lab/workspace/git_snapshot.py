@@ -9,6 +9,7 @@ Operations are best-effort: if git is unavailable or misconfigured, warnings are
 logged and the methods return empty/false results without raising.
 """
 
+import asyncio
 import json
 import logging
 import shutil
@@ -132,7 +133,7 @@ class GitWorkspaceSnapshot:
             lines.append(required_line)
             gitignore_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    def commit(self, label: str, task_id: str) -> Optional[str]:
+    async def commit(self, label: str, task_id: str) -> Optional[str]:
         """Stage all workspace files and create a snapshot commit.
 
         Args:
@@ -148,23 +149,36 @@ class GitWorkspaceSnapshot:
         self._ensure_gitignore()
 
         message = f"{task_id}: {label}"
-        add_result = self._run(["add", "-A"])
+        # Large workspaces (e.g. h5ad outputs) can take a while to stage.
+        # Run git commands in a thread so the asyncio event loop stays responsive.
+        loop = asyncio.get_running_loop()
+        add_result = await loop.run_in_executor(None, lambda: self._run(["add", "-A"], timeout=60.0))
         if add_result.returncode != 0:
-            logger.warning("Failed to stage files: %s", add_result.stderr)
-            return None
+            # A crashed prior git process often leaves index.lock behind. Remove
+            # it once and retry, since the lock is inside our own hidden repo.
+            if "index.lock" in (add_result.stderr or ""):
+                lock_file = self.git_dir / "index.lock"
+                try:
+                    lock_file.unlink(missing_ok=True)
+                    add_result = await loop.run_in_executor(None, lambda: self._run(["add", "-A"], timeout=60.0))
+                except Exception:
+                    logger.warning("Failed to remove stale index.lock", exc_info=True)
+            if add_result.returncode != 0:
+                logger.warning("Failed to stage files: %s", add_result.stderr)
+                return None
 
-        commit_result = self._run(["commit", "-m", message])
+        commit_result = await loop.run_in_executor(None, lambda: self._run(["commit", "-m", message]))
         if commit_result.returncode != 0:
             # A commit may fail because there is nothing to commit. This is fine.
             if "nothing to commit" in commit_result.stdout.lower():
                 # Return HEAD hash so callers still have a reference.
-                head_result = self._run(["rev-parse", "HEAD"])
+                head_result = await loop.run_in_executor(None, lambda: self._run(["rev-parse", "HEAD"]))
                 if head_result.returncode == 0:
                     return head_result.stdout.strip() or None
             logger.warning("Failed to commit snapshot: %s", commit_result.stderr)
             return None
 
-        head_result = self._run(["rev-parse", "HEAD"])
+        head_result = await loop.run_in_executor(None, lambda: self._run(["rev-parse", "HEAD"]))
         if head_result.returncode == 0:
             return head_result.stdout.strip() or None
         return None

@@ -233,13 +233,20 @@ class TaskDecomposer:
         file_candidates = re.findall(r"[\w\-]+\.\w{2,8}", user_msg)
         primary_file = file_candidates[0] if file_candidates else "input data"
 
+        # Detect Chinese to produce Chinese-facing milestones.
+        has_chinese = bool(re.search(r"[\u4e00-\u9fff]", user_msg))
+
         # Build milestones from explicit user goals, not from sub_intents.
         milestones: List[Dict[str, Any]] = []
 
         # 1. Data inspection (always useful, lightweight).
         milestones.append({
             "id": f"{skill_id or 'step'}_inspect",
-            "description": f"Inspect {primary_file} and verify required columns/fields",
+            "description": (
+                f"读取并检查 {primary_file} 的数据结构"
+                if has_chinese
+                else f"Inspect {primary_file} and verify required columns/fields"
+            ),
             "analysis_type": "data_inspection",
         })
 
@@ -254,17 +261,17 @@ class TaskDecomposer:
             method_name = "SingleR"
 
         if "annotate" in user_msg or "annotation" in user_msg or "注释" in user_msg:
-            desc = f"Run cell type annotation with {method_name}"
+            desc = f"使用 {method_name} 进行细胞类型注释" if has_chinese else f"Run cell type annotation with {method_name}"
         elif "describe" in user_msg or "描述性统计" in user_msg or "统计" in user_msg:
-            desc = f"Compute descriptive statistics for {primary_file}"
+            desc = f"计算 {primary_file} 的描述性统计" if has_chinese else f"Compute descriptive statistics for {primary_file}"
         elif "cluster" in user_msg or "聚类" in user_msg or "louvain" in user_msg or "leiden" in user_msg:
-            desc = f"Cluster cells with {method_name}"
+            desc = f"使用 {method_name} 对细胞进行聚类" if has_chinese else f"Cluster cells with {method_name}"
         elif "normalize" in user_msg or "归一化" in user_msg or "标准化" in user_msg:
-            desc = f"Normalize {primary_file}"
+            desc = f"对 {primary_file} 进行归一化" if has_chinese else f"Normalize {primary_file}"
         elif "qc" in user_msg or "质控" in user_msg:
-            desc = f"Quality control on {primary_file}"
+            desc = f"对 {primary_file} 进行质控" if has_chinese else f"Quality control on {primary_file}"
         else:
-            desc = f"Run {method_name} analysis on {primary_file}"
+            desc = f"使用 {method_name} 分析 {primary_file}" if has_chinese else f"Run {method_name} analysis on {primary_file}"
         milestones.append({
             "id": f"{skill_id or 'step'}_core",
             "description": desc,
@@ -274,19 +281,26 @@ class TaskDecomposer:
         # 3. Comparison / downstream goal if explicitly requested.
         has_comparison = any(kw in user_msg for kw in ("比较", "对比", "一致性", "compare", "agreement", "consistency"))
         if has_comparison:
-            compare_target = "existing annotations"
-            if "all_celltype" in user_msg:
-                compare_target = "existing all_celltype labels"
+            if has_chinese:
+                compare_target = "现有注释标签"
+                if "all_celltype" in user_msg:
+                    compare_target = "all_celltype 标签"
+                desc = f"与 {compare_target} 比较一致性"
+            else:
+                compare_target = "existing annotations"
+                if "all_celltype" in user_msg:
+                    compare_target = "existing all_celltype labels"
+                desc = f"Compare results with {compare_target}"
             milestones.append({
                 "id": f"{skill_id or 'step'}_compare",
-                "description": f"Compare results with {compare_target}",
+                "description": desc,
                 "analysis_type": "label_comparison",
             })
 
         # 4. Summary.
         milestones.append({
             "id": f"{skill_id or 'step'}_summarize",
-            "description": "Summarize results and suggest next steps",
+            "description": "总结结果并给出下一步建议" if has_chinese else "Summarize results and suggest next steps",
             "analysis_type": "summarize",
         })
 
@@ -358,17 +372,58 @@ class TaskDecomposer:
             return RoutingDecision.direct(Route.QA, "Intent classified as QA")
 
         # Data exploration / descriptive statistics should not be forced into a
-        # domain template; generate targeted summary code instead.
+        # domain template; generate targeted summary code via CodeAct with the
+        # general coding skill as reference (fast, single-shot path).
         if intent.analysis_type == "descriptive_statistics":
             return RoutingDecision.direct(
-                Route.OPEN_AGENT,
-                "Descriptive statistics: generate targeted data summary",
+                Route.DESCRIPTIVE_STATISTICS,
+                "Descriptive statistics: fast CodeAct summary",
             )
 
         data_state = context.get("data_state") or DataState()
         assembly = await self._get_capability_assembler().assemble(
             intent, data_state=data_state
         )
+
+        # DataPreflight may indicate that the user's request can be fulfilled in a
+        # single shot (e.g. "run CellTypist and compare labels" needs no qc,
+        # normalization, or clustering). In that case, prefer an explicit skill
+        # target over a full domain phase pipeline, even when the classifier
+        # mapped the request to a phase-level analysis_type.
+        preflight = context.get("preflight") or {}
+        preflight_required = preflight.get("required_steps") or []
+        is_single_shot = (
+            len(preflight_required) <= 4
+            and not preflight.get("needs_qc", False)
+            and not preflight.get("needs_normalization", False)
+            and not preflight.get("needs_clustering", False)
+        )
+        if is_single_shot:
+            explicit_skill = self._get_capability_assembler()._resolve_explicit_target_skill(
+                intent
+            )
+            if explicit_skill is not None:
+                return RoutingDecision(
+                    route=Route.STANDALONE_SKILL,
+                    reason=(
+                        f"Preflight indicates single-shot task; explicit skill target "
+                        f"'{explicit_skill.id}'"
+                    ),
+                    confidence=1.0,
+                    skills=[explicit_skill],
+                    trace=[
+                        {
+                            "route": Route.STANDALONE_SKILL.value,
+                            "reason": assembly.reason,
+                            "score": max(assembly.score, assembly.coverage),
+                        },
+                        {
+                            "route": Route.STANDALONE_SKILL.value,
+                            "reason": "Preflight single-shot override",
+                            "score": 1.0,
+                        },
+                    ],
+                )
 
         # Domain/phase-level intents declared in a domain.yaml should be planned
         # by the domain strategy, not delegated to the open agent.
@@ -457,6 +512,26 @@ class TaskDecomposer:
             )
             return self._task_tree_to_plan_result(tree, intent, strategy_name="qa"), tree
 
+        if route == Route.DESCRIPTIVE_STATISTICS:
+            has_chinese = any(
+                ord(c) > 127 for c in (intent.original_message or "")
+            )
+            tree = self._build_single_step(
+                "descriptive_statistics",
+                "生成描述性统计摘要" if has_chinese else "Generate descriptive statistics summary",
+                ["core_code_act"],
+                parameters={
+                    "use_skill_reference": True,
+                    "user_request": intent.original_message,
+                },
+            )
+            return (
+                self._task_tree_to_plan_result(
+                    tree, intent, strategy_name="descriptive_statistics"
+                ),
+                tree,
+            )
+
         if route == Route.CROSS_DOMAIN:
             composite_plan = await self._get_composite_planner().plan(intent)
             if composite_plan is not None:
@@ -470,12 +545,14 @@ class TaskDecomposer:
             effective_intent = self._merge_derived_sub_intents(intent)
             if decision.skills:
                 standalone_plan = self._plan_from_prebuilt_skills(
-                    decision.skills, effective_intent
+                    decision.skills, effective_intent, context=context
                 )
             else:
                 standalone_plan = self._get_standalone_planner().plan(effective_intent)
             if standalone_plan is not None:
-                return standalone_plan, self._plan_result_to_task_tree(standalone_plan)
+                tree = self._plan_result_to_task_tree(standalone_plan)
+                tree.display_steps = standalone_plan.display_steps
+                return standalone_plan, tree
             # Degrade to open agent if standalone planning is unavailable.
             open_plan = await self._get_open_agent_planner().plan(intent)
             if open_plan is not None:
@@ -511,6 +588,22 @@ class TaskDecomposer:
             effective_intent, plan = await self._try_promote_domain_intent(
                 effective_intent, plan, project_id, template
             )
+
+        # DataPreflight may tell us to skip phases that are not needed for the
+        # user's actual request (e.g. skip qc/clustering for CellTypist-only
+        # annotation).
+        skip_phases = set((context.get("preflight") or {}).get("skip_phases", []))
+        if skip_phases and plan.phases:
+            plan.phases = [
+                p for p in plan.phases if p.phase_type not in skip_phases
+            ]
+            if plan.phase_transitions:
+                plan.phase_transitions = [
+                    t
+                    for t in plan.phase_transitions
+                    if t.get("from") not in skip_phases
+                    and t.get("to") not in skip_phases
+                ]
 
         if effective_intent.sub_intents and not plan.is_fallback:
             plan, tree = self._filter_plan_by_sub_intents(plan, effective_intent)
@@ -559,6 +652,7 @@ class TaskDecomposer:
         name: str,
         description: str,
         skills: List[str],
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> TaskTree:
         """Build a single-step task tree."""
         task = TaskNode(
@@ -567,6 +661,7 @@ class TaskDecomposer:
             description=description,
             phase="execution",
             skills_required=skills,
+            parameters=parameters or {},
         )
         return TaskTree([task])
 
@@ -574,6 +669,7 @@ class TaskDecomposer:
         self,
         skills: List[SkillDefinition],
         intent: UserIntent,
+        context: Optional[Dict[str, Any]] = None,
     ) -> PlanResult:
         """Build a linear plan directly from explicitly selected skills.
 
@@ -589,11 +685,17 @@ class TaskDecomposer:
             StandaloneSkillPlanner,
         )
 
+        context = context or {}
+        preflight = context.get("preflight") or {}
         display_subtasks = self._build_display_subtasks(intent, skills)
 
         phases: List[Phase] = []
         for skill in skills:
-            parameters: Dict[str, Any] = {}
+            parameters: Dict[str, Any] = {
+                "use_skill_reference": True,
+                "preflight": preflight,
+                "user_request": intent.original_message,
+            }
             if display_subtasks:
                 parameters["display_subtasks"] = display_subtasks
             phases.append(

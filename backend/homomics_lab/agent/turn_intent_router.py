@@ -10,6 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
+from homomics_lab.agent.data_preflight import DataPreflight, resolve_preflight_file_paths
 from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
 from homomics_lab.config import settings
 from homomics_lab.context.project_state import ProjectStateManager
@@ -18,6 +19,7 @@ from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.jobs.constants import JobMode
 from homomics_lab.metrics import record_plan_created
 from homomics_lab.models.common import ChatMessage, MessageType
+from homomics_lab.agent.plan.models import DataState
 from homomics_lab.plan.models import Plan, PlanStatus
 from homomics_lab.plan.presenter import PlanPresenter
 from homomics_lab.plan.store import PlanStore, _new_plan_id
@@ -77,7 +79,10 @@ class IntentRouter:
         if not interaction_mode:
             if intent.analysis_type == "clarification":
                 interaction_mode = "clarify"
-            elif intent.interaction_mode == "answer" or intent.complexity == "direct_response":
+            elif (
+                intent.interaction_mode == "answer"
+                or intent.complexity == "direct_response"
+            ):
                 interaction_mode = "answer"
 
         if interaction_mode == "clarify":
@@ -108,7 +113,8 @@ class IntentRouter:
                     user_message=user_message,
                     working_memory=working_memory,
                     allowed_tools=[
-                        t.name for t in self._runner._tool_registry.list_by_source("mcp")
+                        t.name
+                        for t in self._runner._tool_registry.list_by_source("mcp")
                     ],
                     intent=intent,
                 )
@@ -125,7 +131,24 @@ class IntentRouter:
                 )
 
         # Everything else is some form of execution.
-        plan_context = {"project_id": project_id}
+        file_paths = resolve_preflight_file_paths(project_id, user_message)
+        preflight = await DataPreflight(self._runner._llm_client).run(
+            user_request=user_message,
+            file_paths=file_paths,
+            intent_type=intent.analysis_type,
+        )
+        plan_context = {
+            "project_id": project_id,
+            "preflight": preflight.to_dict(),
+            "file_paths": file_paths,
+            "data_state": DataState(
+                has_qc=not preflight.needs_qc,
+                has_normalization=not preflight.needs_normalization,
+                has_pca=not preflight.needs_clustering,
+                has_clustering=not preflight.needs_clustering,
+                has_annotation=not preflight.needs_annotation,
+            ),
+        }
         plan_result, tree = await self._runner.task_decomposer.decompose_with_plan(
             intent, context=plan_context
         )
@@ -137,8 +160,10 @@ class IntentRouter:
             and not self._runner._is_fallback_suggestion(tree)
             and getattr(settings, "open_agent_fallback_enabled", True)
         ):
-            open_plan = await self._runner.task_decomposer._get_open_agent_planner().plan(
-                intent
+            open_plan = (
+                await self._runner.task_decomposer._get_open_agent_planner().plan(
+                    intent
+                )
             )
             if open_plan is not None and not open_plan.is_fallback:
                 plan_result = open_plan
@@ -150,9 +175,11 @@ class IntentRouter:
             exec_context = {
                 "session_id": session_id,
                 "project_id": project_id,
-                "project_path": str(settings.data_dir / "workspaces" / project_id)
-                if project_id
-                else None,
+                "project_path": (
+                    str(settings.data_dir / "workspaces" / project_id)
+                    if project_id
+                    else None
+                ),
                 "trace_id": getattr(self._runner, "_trace_id", None),
             }
             exec_result = await executor.execute(
@@ -195,7 +222,11 @@ class IntentRouter:
                     "target": intent.target,
                     "scope": intent.scope,
                     "interaction_mode": intent.interaction_mode,
-                    "metadata": dict(intent.metadata) if isinstance(intent.metadata, dict) else {"_raw": intent.metadata},
+                    "metadata": (
+                        dict(intent.metadata)
+                        if isinstance(intent.metadata, dict)
+                        else {"_raw": intent.metadata}
+                    ),
                 },
                 plan_result=plan_result,
                 task_tree=tree,
@@ -285,9 +316,8 @@ class IntentRouter:
 
         is_domain = self.is_domain_template_analysis(intent)
         plan_result = plan.plan_result if plan is not None else None
-        is_high_risk = (
-            plan_result is not None
-            and (plan_result.is_fallback or plan_result.risk_level == "high")
+        is_high_risk = plan_result is not None and (
+            plan_result.is_fallback or plan_result.risk_level == "high"
         )
         # A concrete single-task execution (e.g. "use CellTypist on sample.h5ad")
         # should execute immediately even when the LLM labelled the overall intent
@@ -304,7 +334,9 @@ class IntentRouter:
         # fallback/high-risk plans always gate; a single concrete low-risk task
         # runs directly under every strategy.
         domain_def = get_domain_registry().get(intent.domain) if intent.domain else None
-        strategy = resolve_strategy(domain_def=domain_def, role_id=None, settings=settings)
+        strategy = resolve_strategy(
+            domain_def=domain_def, role_id=None, settings=settings
+        )
         # Load persisted approved plan signatures for first_time strategy.
         project_state_manager = ProjectStateManager(CBKB(settings.data_dir))
         project_state = project_state_manager.load(project_id or "default")
@@ -338,7 +370,11 @@ class IntentRouter:
             and plan is not None
             and self._runner._llm_client is not None
             and self._runner._tool_registry is not None
-            and (is_high_risk or len(tree.tasks) > 1 or intent.complexity in ("complex", "multi_step"))
+            and (
+                is_high_risk
+                or len(tree.tasks) > 1
+                or intent.complexity in ("complex", "multi_step")
+            )
         ):
             try:
                 review = await self.review_plan_with_subagents(
@@ -352,7 +388,9 @@ class IntentRouter:
                 if plan_store is not None:
                     await plan_store.update(plan)
             except Exception:
-                logger.warning("Sub-agent review failed; continuing without it", exc_info=True)
+                logger.warning(
+                    "Sub-agent review failed; continuing without it", exc_info=True
+                )
 
         if plan is not None and needs_approval:
             review_note = ""
@@ -371,7 +409,9 @@ class IntentRouter:
                     review_note = "\n\n" + "\n".join(parts)
 
             if is_domain:
-                response_text = "我为您生成了一个分析计划，请确认后再执行。" + review_note
+                response_text = (
+                    "我为您生成了一个分析计划，请确认后再执行。" + review_note
+                )
                 plan_payload = PlanPresenter.to_user_payload(plan)
                 agent_msg = ChatMessage(
                     id=f"msg_{len(working_memory.messages)}",
@@ -385,7 +425,9 @@ class IntentRouter:
                     sender="agent",
                 )
             else:
-                response_text = "我为您规划了以下执行步骤，请确认后再执行。" + review_note
+                response_text = (
+                    "我为您规划了以下执行步骤，请确认后再执行。" + review_note
+                )
                 estimates = {}
                 if plan is not None:
                     estimates = {
@@ -418,8 +460,7 @@ class IntentRouter:
         self._runner._attach_uploaded_files_to_tree(tree, user_message, project_id)
         mode = (
             JobMode.SINGLE_STEP
-            if intent.scope == "single_step"
-            or is_single_task_tree
+            if intent.scope == "single_step" or is_single_task_tree
             else JobMode.WORKFLOW
         )
         job = await job_service.create_job(
@@ -447,7 +488,9 @@ class IntentRouter:
                 project_state.approved_plan_signatures = updated_signatures
                 project_state_manager.save(project_state)
             except Exception:
-                logger.warning("Failed to persist approved plan signatures", exc_info=True)
+                logger.warning(
+                    "Failed to persist approved plan signatures", exc_info=True
+                )
 
         response_text = "已提交后台执行，完成后会通知您。"
         progress, progress_tasks = self.build_initial_progress(tree)
@@ -456,6 +499,7 @@ class IntentRouter:
             type=MessageType.TODO_LIST,
             content={
                 "text": response_text,
+                "status": "pending",
                 "tasks": progress_tasks,
                 "progress": progress,
                 "job_id": job.job_id,
@@ -500,7 +544,9 @@ class IntentRouter:
         return review.to_dict()
 
     @staticmethod
-    def build_initial_progress(tree: "TaskTree") -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    def build_initial_progress(
+        tree: "TaskTree",
+    ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Build a zero-progress dict and a task list for a freshly created plan/job.
 
         When the task tree carries finer-grained ``display_steps`` (e.g. a single
@@ -512,7 +558,8 @@ class IntentRouter:
             progress_tasks = [
                 {
                     "id": getattr(step, "id", f"step_{idx}"),
-                    "name": getattr(step, "description", "") or getattr(step, "phase_type", ""),
+                    "name": getattr(step, "description", "")
+                    or getattr(step, "phase_type", ""),
                     "description": getattr(step, "description", ""),
                     "phase_type": getattr(step, "phase_type", None),
                     "analysis_type": getattr(step, "analysis_type", None),

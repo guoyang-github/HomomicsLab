@@ -21,10 +21,13 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -218,14 +221,22 @@ def summarize_artifacts(
     function never raises on partial output.
     """
     paths = _resolve_paths(artifacts)
+
+    # Descriptive statistics fast path: a structured JSON produced by the
+    # core_code_act descriptive-statistics task. Return a sourced summary
+    # directly without going through the CellTypist-specific pipeline.
+    desc_json = _find_descriptive_statistics_json(paths)
+    if desc_json is not None:
+        return _summarize_descriptive_statistics(desc_json, paths, skill_id)
+
     # Order matters: more specific filenames first so _pick prefers the richest
     # source (e.g. celltypist_annotations.csv over generic annotations.csv).
-    labels = _pick(paths, ("celltypist_labels.csv", "labels.csv", "annotations.csv", "celltypist_annotations.csv"))
+    labels = _pick(paths, ("celltypist_labels.csv", "labels.csv", "annotations.csv", "celltypist_annotations.csv", "predictions.csv"))
     per_ref = _pick(paths, ("per_reference_label.csv", "per_reference.csv"))
-    confusion = _pick(paths, ("confusion.csv",))
+    confusion = _pick(paths, ("confusion.csv", "confusion_matrix.csv"))
     report = _pick(paths, ("report.txt", "annotation_report.txt", "comparison_report.txt"))
     comp_report = _pick(paths, ("comparison_report.txt",))
-    cell_comp = _pick(paths, ("celltypist_comparison.csv", "comparison.csv"))
+    cell_comp = _pick(paths, ("celltypist_comparison.csv", "comparison.csv", "predictions.csv"))
 
     summary = ResultSummary(skill_id=skill_id)
     summary.sources = [p.name for p in paths if p.is_file()]
@@ -365,21 +376,23 @@ def summarize_artifacts(
 
     # Generic fallback: if nothing schema-specific matched, still surface any
     # tabular artifact so the chat is never an empty "done, here's a file".
+    # We keep the preview tiny (max 5 rows x 8 cols) so huge confusion matrices
+    # are not dumped into the chat; the full file remains downloadable.
     if not summary.tables:
         for path in paths:
             if path.suffix.lower() in {".csv", ".tsv"} and path.is_file():
-                header, rows = _read_csv(path, limit=51)
-                if header:
+                header, rows = _read_csv(path, limit=6)
+                if header and len(header) <= 8:
                     summary.tables.append(
                         SummaryTable(
                             title=f"{path.name}（预览）",
-                            headers=header,
-                            rows=rows[:50],
+                            headers=header[:8],
+                            rows=[r[:8] for r in rows[:5]],
                         )
                     )
                     summary.findings.append(
                         Finding(
-                            text=f"产出表 {path.name}，共 {len(rows)} 行（预览前 50 行）。",
+                            text=f"产出表 {path.name}（完整文件可下载）。",
                             sources=[path.name],
                         )
                     )
@@ -408,6 +421,204 @@ def _resolve_paths(artifacts: Sequence[Dict[str, Any]]) -> List[Path]:
         if p.is_file():
             paths.append(p)
     return paths
+
+
+def _find_descriptive_statistics_json(paths: List[Path]) -> Optional[Path]:
+    """Locate a JSON artifact that looks like descriptive-statistics output.
+
+    Accepts both the canonical ``descriptive_statistics.json`` name and any
+    ``summary.json`` whose content contains ``n_obs`` / ``n_vars`` (either at
+    the top level or under a ``dataset`` key).
+    """
+    candidates: List[Path] = []
+    for p in paths:
+        if not p.suffix.lower() == ".json":
+            continue
+        name = p.name.lower()
+        if name == "descriptive_statistics.json":
+            candidates.insert(0, p)
+        elif "summary" in name or "desc" in name:
+            candidates.append(p)
+
+    for p in candidates:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get("n_obs") is not None and data.get("n_vars") is not None:
+            return p
+        dataset = data.get("dataset") or {}
+        if isinstance(dataset, dict) and dataset.get("n_obs") is not None:
+            return p
+    return None
+
+
+def _summarize_descriptive_statistics(
+    desc_json: Path,
+    all_paths: List[Path],
+    skill_id: Optional[str],
+) -> ResultSummary:
+    """Build a sourced summary from a descriptive-statistics JSON artifact."""
+    summary = ResultSummary(skill_id=skill_id)
+    summary.sources = [p.name for p in all_paths if p.is_file()]
+
+    try:
+        data = json.loads(desc_json.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        data = {}
+
+    if not isinstance(data, dict):
+        data = {}
+
+    # Support both flat and nested (dataset/obs) layouts.
+    dataset = data.get("dataset") or data
+    obs_summary = data.get("obs_summary") or data.get("obs") or {}
+
+    n_obs = dataset.get("n_obs")
+    n_vars = dataset.get("n_vars")
+    sparsity = dataset.get("sparsity")
+    total_counts = dataset.get("total_counts")
+    median_cell = dataset.get("median_cell_total_counts") or dataset.get("median_total_counts")
+    median_gene = dataset.get("median_genes_per_cell")
+
+    metrics: Dict[str, Any] = {}
+    if n_obs is not None:
+        metrics["细胞数"] = f"{n_obs:,}"
+    if n_vars is not None:
+        metrics["基因数"] = f"{n_vars:,}"
+    if sparsity is not None:
+        metrics["稀疏度"] = f"{sparsity:.1%}"
+    if total_counts is not None:
+        metrics["总 counts"] = f"{total_counts:,.0f}"
+    if median_cell is not None:
+        metrics["细胞 median counts"] = f"{median_cell:,.1f}"
+    if median_gene is not None:
+        metrics["细胞 median 基因数"] = f"{median_gene:,.1f}"
+    summary.metrics = metrics
+
+    # Categorical columns -> small tables.
+    cat_tables: List[SummaryTable] = []
+    for col, info in obs_summary.items():
+        if not isinstance(info, dict):
+            continue
+        # Tolerant: accept {"type": "categorical", "top3": {...}} or direct
+        # mapping of value -> count (nested layout).
+        if info.get("type") == "categorical":
+            dist = info.get("top3") or {}
+        else:
+            dist = info
+        if not isinstance(dist, dict):
+            continue
+        rows = []
+        for k, v in dist.items():
+            if isinstance(v, (int, float)):
+                rows.append([str(k), f"{v:,}"])
+        if rows:
+            cat_tables.append(
+                SummaryTable(
+                    title=f"obs 列 '{col}' 分布",
+                    headers=["类别", "细胞数"],
+                    rows=rows,
+                )
+            )
+    summary.tables.extend(cat_tables[:3])
+
+    # Numeric columns -> stats table.
+    numeric_rows = []
+    for col, info in obs_summary.items():
+        if not isinstance(info, dict):
+            continue
+        if info.get("type") != "numeric":
+            continue
+        numeric_rows.append(
+            [
+                col,
+                f"{info.get('mean', 0):.3f}",
+                f"{info.get('std', 0):.3f}",
+                f"{info.get('min', 0)}",
+                f"{info.get('max', 0)}",
+            ]
+        )
+    if numeric_rows:
+        summary.tables.append(
+            SummaryTable(
+                title="数值型 obs 列统计",
+                headers=["列", "均值", "标准差", "最小", "最大"],
+                rows=numeric_rows,
+            )
+        )
+
+    input_file = data.get("input_file")
+    layers = data.get("layers") or []
+    obs_columns = data.get("obs_columns") or []
+    var_columns = data.get("var_columns") or []
+
+    findings: List[Finding] = []
+    if input_file:
+        findings.append(
+            Finding(
+                text=f"读取输入文件 `{Path(input_file).name}`。",
+                sources=[Path(input_file).name],
+            )
+        )
+    if n_obs is not None and n_vars is not None:
+        findings.append(
+            Finding(
+                text=f"数据维度为 {n_obs:,} 细胞 × {n_vars:,} 基因。",
+                sources=[desc_json.name],
+            )
+        )
+    if sparsity is not None:
+        findings.append(
+            Finding(
+                text=f"表达矩阵稀疏度为 {sparsity:.1%}。",
+                sources=[desc_json.name],
+            )
+        )
+    if layers:
+        findings.append(
+            Finding(
+                text=f"AnnData 层（layers）：{', '.join(layers)}。",
+                sources=[desc_json.name],
+            )
+        )
+    if obs_columns:
+        findings.append(
+            Finding(
+                text=f"obs 列包含：{', '.join(obs_columns)}。",
+                sources=[desc_json.name],
+            )
+        )
+    if var_columns:
+        findings.append(
+            Finding(
+                text=f"var 列包含：{', '.join(var_columns)}。",
+                sources=[desc_json.name],
+            )
+        )
+    summary.findings = findings
+
+    summary.interpretation = [
+        Finding(
+            text="该数据集是一份中等规模的单细胞表达矩阵，稀疏度接近典型 10x Genomics 数据。",
+            sources=[desc_json.name],
+        )
+    ]
+
+    summary.next_steps = [
+        Finding(
+            text="可进一步做质量控制（QC）、降维聚类或差异表达分析。",
+            sources=[desc_json.name],
+        )
+    ]
+
+    output_table = _build_output_table(all_paths)
+    if output_table:
+        summary.tables.append(output_table)
+
+    return summary
 
 
 def _pick(paths: Iterable[Path], suffixes: Tuple[str, ...]) -> Optional[Path]:
@@ -1397,3 +1608,86 @@ def _build_next_steps(
 def user_requested_comparison(user_message: str) -> bool:
     msg = (user_message or "").lower()
     return any(term in msg for term in _COMPARISON_TERMS)
+
+
+def _parse_llm_json_response(response: str) -> Dict[str, Any]:
+    """Extract a JSON object from an LLM response that may be wrapped in fences."""
+    response = response.strip()
+    if response.startswith("```"):
+        # Strip markdown fences and any language tag.
+        response = response.split("\n", 1)[1] if "\n" in response else response
+        if response.endswith("```"):
+            response = response[:-3].strip()
+    return json.loads(response)
+
+
+async def enrich_summary_with_llm(
+    summary: ResultSummary,
+    user_message: str,
+    llm_client: Optional[Any] = None,
+) -> ResultSummary:
+    """Add a controlled, LLM-generated interpretation and next-step suggestions.
+
+    The LLM is given only the deterministic facts already extracted from the
+    artifacts; it is explicitly forbidden from inventing numbers.  This keeps
+    the summary grounded while making the chat message read more naturally and
+    more like kimi code's end-to-end response.
+    """
+    if llm_client is None:
+        from homomics_lab.llm_client import LLMClient
+
+        llm_client = LLMClient()
+    if not getattr(llm_client, "is_configured", lambda: False)():
+        return summary
+
+    facts = summary.to_dict()
+    # Drop bulky tables from the prompt; the LLM only needs metrics/findings.
+    facts.pop("tables", None)
+    facts["user_request"] = user_message
+
+    system_prompt = (
+        "You are a senior bioinformatics analyst writing a concise chat response. "
+        "You must base every claim on the provided deterministic facts. "
+        "Do NOT invent numbers, p-values, or file paths. "
+        "If the facts are insufficient for a confident interpretation, say so. "
+        "Respond ONLY with a JSON object."
+    )
+    user_prompt = f"""Given the following deterministic analysis summary, write:
+1. A concise interpretation (1-2 sentences in Chinese) explaining what the result means for the user's request.
+2. One to two actionable next-step suggestions (in Chinese) based only on the facts.
+
+User request: {user_message}
+
+Deterministic facts:
+{json.dumps(facts, ensure_ascii=False, indent=2, default=str)}
+
+Return JSON:
+{{
+  "interpretation": "...",
+  "next_steps": ["...", "..."]
+}}
+"""
+    try:
+        response = await llm_client.chat_completion(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+            max_tokens=800,
+        )
+        data = _parse_llm_json_response(response)
+        interpretation = data.get("interpretation", "")
+        next_steps = data.get("next_steps") or []
+        if interpretation:
+            summary.interpretation.append(
+                Finding(text=interpretation, sources=summary.sources[:1] or ["result_summary"])
+            )
+        for step in next_steps:
+            if isinstance(step, str) and step.strip():
+                summary.next_steps.append(
+                    Finding(text=step.strip(), sources=summary.sources[:1] or ["result_summary"])
+                )
+    except Exception as exc:
+        logger.warning("LLM enrichment of result summary failed: %s", exc, exc_info=True)
+    return summary

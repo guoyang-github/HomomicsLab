@@ -16,7 +16,7 @@ import json
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.retrieval import RetrievalContext
 from homomics_lab.llm_client import LLMClient
@@ -31,6 +31,7 @@ def generate_code(
     llm_client: Optional[LLMClient] = None,
     skill_registry: Optional[SkillRegistry] = None,
     retrieval_context: Optional[RetrievalContext] = None,
+    max_tokens: int = 4000,
 ) -> str:
     """Generate a code snippet for the task (synchronous entry point).
 
@@ -49,7 +50,7 @@ def generate_code(
 
     return asyncio.run(
         generate_code_async(
-            task, language, context, llm_client, skill_registry, retrieval_context
+            task, language, context, llm_client, skill_registry, retrieval_context, max_tokens=max_tokens
         )
     )
 
@@ -62,6 +63,7 @@ async def generate_code_async(
     skill_registry: Optional[SkillRegistry] = None,
     retrieval_context: Optional[RetrievalContext] = None,
     use_cache: Optional[bool] = None,
+    max_tokens: int = 4000,
 ) -> str:
     """Async version of ``generate_code`` for use inside async callers.
 
@@ -81,7 +83,7 @@ async def generate_code_async(
 
     if llm_client is not None and llm_client.is_configured():
         code = await _generate_code_with_llm(
-            task, language, context, llm_client, skill_registry, retrieval_context
+            task, language, context, llm_client, skill_registry, retrieval_context, max_tokens=max_tokens
         )
         if code:
             if cache is not None:
@@ -138,13 +140,17 @@ def _format_retrieval_context(retrieval_context: Optional[RetrievalContext]) -> 
     if tools:
         sections.append("Available tools (call via homomics_tool(name, ...)):")
         for t in tools:
-            sections.append(f"- {t['name']}: {t['description']} (risk: {t['risk_level']})")
+            sections.append(
+                f"- {t['name']}: {t['description']} (risk: {t['risk_level']})"
+            )
 
     data_sources = prompt_context.get("data_sources", [])
     if data_sources:
         sections.append("Available data sources:")
         for d in data_sources:
-            sections.append(f"- {d['id']} ({d['format']}): {d['path']} — {d['description']}")
+            sections.append(
+                f"- {d['id']} ({d['format']}): {d['path']} — {d['description']}"
+            )
 
     sops = prompt_context.get("sops", [])
     if sops:
@@ -177,9 +183,16 @@ async def _generate_code_with_llm(
     llm_client: LLMClient,
     skill_registry: Optional[SkillRegistry],
     retrieval_context: Optional[RetrievalContext],
+    max_tokens: int = 4000,
 ) -> Optional[str]:
     """Ask an LLM to generate code, seeded with retrieved skill context."""
-    skill_context = _retrieve_skill_context(task, skill_registry)
+    # If the caller has already pinned the skill(s) to use (e.g. skill-as-reference
+    # mode), skip the expensive semantic search over the registry. This avoids
+    # loading sentence-transformers just to retrieve related skills we do not need.
+    if context.get("skills_required"):
+        skill_context = ""
+    else:
+        skill_context = _retrieve_skill_context(task, skill_registry)
     rap_context = _format_retrieval_context(retrieval_context)
 
     system_prompt = f"""You are a senior bioinformatics engineer.
@@ -213,7 +226,7 @@ Generate the {language} code now.
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=2000,
+            max_tokens=max_tokens,
         )
     except Exception:
         return None
@@ -236,11 +249,49 @@ def _extract_code_block(text: str, language: str) -> Optional[str]:
     return None
 
 
+def _extract_input_path_from_context(context: Dict[str, Any]) -> Optional[str]:
+    """Find a concrete input file path in the execution context.
+
+    Looks for common keys first, then scans all string values for an existing
+    .h5ad (or other data) file.  This keeps the rule-based fallback from
+    defaulting to a demo path when the caller has supplied a real file.
+    """
+    candidates: List[str] = []
+    for key in ("input_path", "adata_path", "input_file", "file_path", "file", "data_path", "path"):
+        value = context.get(key)
+        if isinstance(value, (str, Path)):
+            candidates.append(str(value))
+
+    def _is_data_file(p: str) -> bool:
+        return Path(p).is_file() and any(p.lower().endswith(ext) for ext in (".h5ad", ".h5", ".csv", ".tsv", ".mtx", ".rds"))
+
+    for p in candidates:
+        if _is_data_file(p):
+            return p
+
+    # Scan every string value as a last resort.
+    for value in context.values():
+        if isinstance(value, (str, Path)):
+            p = str(value)
+            if _is_data_file(p):
+                return p
+        elif isinstance(value, dict) and "path" in value:
+            p = value["path"]
+            if isinstance(p, (str, Path)) and _is_data_file(str(p)):
+                return str(p)
+
+    return None
+
+
 def _generate_code_rule_based(task: str, language: str, context: Dict[str, Any]) -> str:
     """Fallback rule-based generator for offline / test environments."""
     task_lower = task.lower()
-    input_path = context.get("input_path") or context.get("adata_path") or "data/pbmc3k_raw.h5ad"
-    output_path = context.get("output_path") or "output/result.h5ad"
+    input_path = _extract_input_path_from_context(context)
+    if input_path is None:
+        # No concrete input found — generate a script that expects the user
+        # to supply INPUT_PATH, rather than hard-coding a demo dataset.
+        input_path = "INPUT_PATH"
+    output_path = context.get("output_path") or context.get("output_dir") or "output/result.h5ad"
 
     if language == "python":
         if any(k in task_lower for k in ("read", "load", "h5ad", "10x", "import")):
@@ -269,7 +320,9 @@ adata.write("{output_path}")
 result = {{"output_path": "{output_path}"}}
 print("Normalization done")
 """
-        if any(k in task_lower for k in ("cluster", "clustering", "leiden", "umap", "pca")):
+        if any(
+            k in task_lower for k in ("cluster", "clustering", "leiden", "umap", "pca")
+        ):
             return f"""import scanpy as sc
 import numpy as np
 adata = sc.read_h5ad("{input_path}")
@@ -306,8 +359,21 @@ result = {{"task": "{escaped}"}}
 
     if language == "bash":
         escaped = task.replace('"', '\\"')
+        # Bash tasks may target any path, not only bio data files, so read the
+        # raw input path from context before falling back to the data-only
+        # extraction used for Python/R templates.
+        raw_input_path = (
+            context.get("input_path")
+            or context.get("path")
+            or context.get("file_path")
+            or input_path
+        )
+        if raw_input_path == "INPUT_PATH" or raw_input_path is None:
+            target = "."
+        else:
+            target = str(Path(raw_input_path).parent or ".")
         return f"""echo "Executing shell task: {escaped}"
-ls -la {Path(input_path).parent}
+ls -la {target}
 result={{"status": "ok"}}
 """
 
@@ -408,7 +474,12 @@ async def execute_code(
     """
     from homomics_lab.config import settings
     from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
-    from homomics_lab.skills.sandbox import BubblewrapSandbox, ContainerSandbox, LocalSandbox, Sandbox
+    from homomics_lab.skills.sandbox import (
+        BubblewrapSandbox,
+        ContainerSandbox,
+        LocalSandbox,
+        Sandbox,
+    )
 
     # Static safety scan and optional HITL gate.
     scanner = CodeSafetyScanner()
@@ -422,10 +493,13 @@ async def execute_code(
                 f"{safety.risk_level}. Findings: {safety.findings}"
             ),
             "exit_code": -1,
-            "safety": safety.to_dict() if hasattr(safety, "to_dict") else safety.__dict__,
+            "safety": (
+                safety.to_dict() if hasattr(safety, "to_dict") else safety.__dict__
+            ),
+            "result": {},
         }
 
-    workdir = working_dir or Path(tempfile.mkdtemp())
+    workdir = Path(working_dir) if working_dir is not None else Path(tempfile.mkdtemp())
     workdir.mkdir(parents=True, exist_ok=True)
 
     if language == "python":
@@ -451,6 +525,7 @@ async def execute_code(
             "stdout": "",
             "stderr": f"Unsupported language: {language}",
             "exit_code": -1,
+            "result": {},
         }
 
     if save_artifact:
@@ -459,6 +534,7 @@ async def execute_code(
     backend = settings.skill_sandbox_backend
     if settings.force_sandbox and backend == "auto":
         from homomics_lab.skills.sandbox import BubblewrapSandbox, ContainerSandbox
+
         if not (BubblewrapSandbox.is_available() or ContainerSandbox.is_available()):
             return {
                 "success": False,
@@ -468,9 +544,12 @@ async def execute_code(
                     "isolated sandbox (bubblewrap/container) is available."
                 ),
                 "exit_code": -1,
+                "result": {},
             }
 
-    sandbox = Sandbox.create(backend, workdir, container_image=settings.skill_container_image)
+    sandbox = Sandbox.create(
+        backend, workdir, container_image=settings.skill_container_image
+    )
 
     # Map language to sandbox interpreter command.  Bubblewrap/Container bind
     # workdir to /work, while LocalSandbox uses the host path directly.
@@ -482,7 +561,9 @@ async def execute_code(
     command = f"{interpreter} {script_arg}"
 
     try:
-        output = await sandbox.run_command(command, cwd=workdir, timeout_seconds=timeout_seconds)
+        output = await sandbox.run_command(
+            command, cwd=workdir, timeout_seconds=timeout_seconds
+        )
     except TimeoutError:
         return {
             "success": False,
@@ -525,28 +606,37 @@ async def run_code_act(
     retrieval_context: Optional[RetrievalContext] = None,
     tool_registry: Optional[ToolRegistry] = None,
     use_cache: Optional[bool] = None,
+    max_tokens: int = 4000,
 ) -> Dict[str, Any]:
     """Generate and execute code for a CodeAct task."""
     context = context or {}
     code = await generate_code_async(
-        task, language, context, llm_client, skill_registry, retrieval_context,
+        task,
+        language,
+        context,
+        llm_client,
+        skill_registry,
+        retrieval_context,
         use_cache=use_cache,
+        max_tokens=max_tokens,
     )
     execution = await execute_code(
         code, language, working_dir, tool_registry=tool_registry, save_artifact=True
     )
 
     # Record a regression baseline for successful deterministic runs.
-    if execution["success"] and working_dir is not None:
-        _record_regression_baseline(task, language, context, execution["result"], working_dir)
+    if execution.get("success") and working_dir is not None:
+        _record_regression_baseline(
+            task, language, context, execution.get("result", {}), working_dir
+        )
 
     return {
         "code": code,
-        "success": execution["success"],
-        "stdout": execution["stdout"],
-        "stderr": execution["stderr"],
-        "exit_code": execution["exit_code"],
-        "result": execution["result"],
+        "success": execution.get("success", False),
+        "stdout": execution.get("stdout", ""),
+        "stderr": execution.get("stderr", ""),
+        "exit_code": execution.get("exit_code", -1),
+        "result": execution.get("result", {}),
     }
 
 
@@ -559,7 +649,12 @@ def _record_regression_baseline(
 ) -> None:
     """Record a regression baseline for a successful CodeAct execution."""
     try:
-        from homomics_lab.skills.models import SkillDefinition, SkillInputSchema, SkillOutputSchema, SkillRuntime
+        from homomics_lab.skills.models import (
+            SkillDefinition,
+            SkillInputSchema,
+            SkillOutputSchema,
+            SkillRuntime,
+        )
         from homomics_lab.stability.regression_tester import RegressionTester
 
         if not isinstance(result, dict):
@@ -573,7 +668,9 @@ def _record_regression_baseline(
             version="1.0.0",
             runtime=SkillRuntime(type="python"),
             input_schema=SkillInputSchema(properties=context),
-            output_schema=SkillOutputSchema(properties={k: {"type": "unknown"} for k in result.keys()}),
+            output_schema=SkillOutputSchema(
+                properties={k: {"type": "unknown"} for k in result.keys()}
+            ),
         )
         tester = RegressionTester(working_dir)
         tester.record_baseline(

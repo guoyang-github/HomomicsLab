@@ -470,7 +470,7 @@ class WorkspaceManager:
             self._git_snapshot = GitWorkspaceSnapshot(self.workspace_dir)
         return self._git_snapshot
 
-    def create_git_snapshot(
+    async def create_git_snapshot(
         self, label: str, task_id: str
     ) -> Optional[str]:
         """Create a git-based snapshot of the workspace.
@@ -479,7 +479,7 @@ class WorkspaceManager:
             The commit hash, or None if git is unavailable or the commit fails.
         """
         try:
-            return self.git_snapshot.commit(label=label, task_id=task_id)
+            return await self.git_snapshot.commit(label=label, task_id=task_id)
         except Exception:  # pragma: no cover - defensive
             logging.getLogger(__name__).warning(
                 "Git snapshot creation failed", exc_info=True

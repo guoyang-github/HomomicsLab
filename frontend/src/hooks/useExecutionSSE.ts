@@ -65,6 +65,7 @@ export function useExecutionSSE(jobId: string | null) {
   const addLog = useExecutionStore((state) => state.addLog)
   const setConnected = useExecutionStore((state) => state.setConnected)
   const setStatus = useExecutionStore((state) => state.setStatus)
+  const setCurrentPhase = useExecutionStore((state) => state.setCurrentPhase)
   const setResult = useExecutionStore((state) => state.setResult)
   const setTaskTree = useTaskStore((state) => state.setTaskTree)
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
@@ -162,11 +163,25 @@ export function useExecutionSSE(jobId: string | null) {
         setProgress(buildProgress(updatedTasks))
       }
 
+      if (data.current_phase) {
+        setCurrentPhase(data.current_phase)
+      }
+
+      const isRetrying = status === 'retrying'
       if (data.active_task_id || data.current_phase) {
         pushLog({
           timestamp: new Date().toISOString(),
-          level: 'info',
+          level: isRetrying ? 'warning' : 'info',
           message: `${data.current_phase || data.active_task_id}`,
+          taskId: data.active_task_id || undefined,
+        })
+      }
+
+      if (isRetrying && data.error_message) {
+        pushLog({
+          timestamp: new Date().toISOString(),
+          level: 'warning',
+          message: `自动修正中：${data.error_message}`,
           taskId: data.active_task_id || undefined,
         })
       }
@@ -240,7 +255,8 @@ export function useExecutionSSE(jobId: string | null) {
             : status === 'awaiting_human'
             ? 'running'
             : 'running',
-          data.progress_pct
+          data.progress_pct,
+          data.current_phase || null
         )
 
         if (data.result) {

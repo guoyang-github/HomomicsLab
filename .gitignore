@@ -16,6 +16,7 @@ results/
 .gitignore
 AGENTS.md
 docs/
+bak/
 
 # Virtual environments
 .venv/
