@@ -1,6 +1,5 @@
-import { Download, FileText, Workflow, XCircle } from 'lucide-react'
+import { Download, FileText, XCircle } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
-import { useOverlayStore } from '@/stores/overlayStore'
 import { useTranslation } from '@/i18n'
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { fileApi } from '@/sdk'
@@ -17,6 +16,7 @@ interface Props {
     status?: string
     artifacts?: Artifact[]
   }
+  mode?: 'full' | 'outputs-only'
 }
 
 function normalizeResult(raw: Record<string, any> | null | undefined): Record<string, any> | null {
@@ -118,10 +118,9 @@ function formatObjectSummary(obj: Record<string, any>): string {
   return lines.join('\n')
 }
 
-export function ExecutionResult({ content }: Props) {
+export function ExecutionResult({ content, mode = 'full' }: Props) {
   const { t } = useTranslation()
   const executionResult = useExecutionStore((state) => state.result)
-  const openWorkflow = useOverlayStore((state) => state.openWorkflow)
 
   const taskResult =
     content.tasks?.find(
@@ -139,13 +138,17 @@ export function ExecutionResult({ content }: Props) {
   const failureMessage =
     normalizedResult?.error || normalizedResult?.error_message || normalizedResult?.detail
 
+  const outputsOnly = mode === 'outputs-only'
+
   // Prefer deterministic rich summaries; otherwise use any explicit summary/text
   // the skill returned. If the backend placeholder is generic and we have a result,
   // fall back to a structured key-value rendering instead of "分析已完成。"
+  // When rendered as an outputs-only card, skip the task-checklist placeholder
+  // because the floating TODO panel already shows task status.
   let summaryText = ''
   if (isRichSummary(content.text)) {
     summaryText = content.text
-  } else {
+  } else if (!outputsOnly) {
     const explicitSummary =
       normalizedResult?.final_output?.summary ||
       normalizedResult?.summary ||
@@ -170,23 +173,11 @@ export function ExecutionResult({ content }: Props) {
     <div className="space-y-3 text-[15px] leading-relaxed">
       {summaryText ? <MarkdownRenderer content={summaryText} /> : null}
 
-      {content.tasks?.length > 0 && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => openWorkflow()}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
-          >
-            <Workflow className="h-3.5 w-3.5" />
-            {t('todoList.viewWorkflow')}
-          </button>
-        </div>
-      )}
-
-      {messageArtifacts.length > 0 && renderArtifactLinks(messageArtifacts, content.project_id, t)}
+      {messageArtifacts.length > 0 &&
+        renderArtifactLinks(messageArtifacts, content.project_id, t, !outputsOnly)}
 
       {outputFiles.length > 0 && messageArtifacts.length === 0 &&
-        renderFileLinks(outputFiles, content.project_id, t)}
+        renderFileLinks(outputFiles, content.project_id, t, !outputsOnly)}
 
       {isFailure && (
         <div className="rounded-lg border border-error/30 bg-error/5 p-3">
@@ -206,13 +197,16 @@ export function ExecutionResult({ content }: Props) {
 function renderArtifactLinks(
   items: Artifact[],
   projectId: string | undefined,
-  t: (key: string) => string
+  t: (key: string) => string,
+  showHeader = true
 ) {
   return (
-    <div className="mt-2 space-y-1">
-      <p className="text-xs font-medium text-foreground/80">
-        {t('common.output')} ({items.length})
-      </p>
+    <div className="space-y-1">
+      {showHeader && (
+        <p className="text-xs font-medium text-foreground/80">
+          {t('common.output')} ({items.length})
+        </p>
+      )}
       {items.map((artifact, idx) => {
         const href = artifactLink(projectId, artifact)
         const name = artifact.name || artifact.path?.split('/').pop() || `file-${idx}`
@@ -244,12 +238,14 @@ function renderArtifactLinks(
   )
 }
 
-function renderFileLinks(paths: string[], projectId: string | undefined, t: (key: string) => string) {
+function renderFileLinks(paths: string[], projectId: string | undefined, t: (key: string) => string, showHeader = true) {
   return (
-    <div className="mt-2 space-y-1">
-      <p className="text-xs font-medium text-foreground/80">
-        {t('common.output')} ({paths.length})
-      </p>
+    <div className="space-y-1">
+      {showHeader && (
+        <p className="text-xs font-medium text-foreground/80">
+          {t('common.output')} ({paths.length})
+        </p>
+      )}
       {paths.map((path, idx) => {
         const href = fileLink(projectId, path)
         const name = path.split('/').pop() || `file-${idx}`

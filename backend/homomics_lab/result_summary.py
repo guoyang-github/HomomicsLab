@@ -398,11 +398,6 @@ def summarize_artifacts(
                     )
                     break
 
-    # Output file inventory: group artifacts so the user sees what was produced.
-    output_table = _build_output_table(paths)
-    if output_table:
-        summary.tables.append(output_table)
-
     return summary
 
 
@@ -613,10 +608,6 @@ def _summarize_descriptive_statistics(
             sources=[desc_json.name],
         )
     ]
-
-    output_table = _build_output_table(all_paths)
-    if output_table:
-        summary.tables.append(output_table)
 
     return summary
 

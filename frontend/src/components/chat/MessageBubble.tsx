@@ -142,9 +142,11 @@ const MESSAGE_ENTER_TRANSITION = { duration: 0.2, ease: [0.2, 0, 0, 1] as const 
 interface Props {
   message: ChatMessage
   onRegenerate?: () => void
+  hideHeader?: boolean
+  hideRelatedFiles?: boolean
 }
 
-export function MessageBubble({ message, onRegenerate }: Props) {
+export function MessageBubble({ message, onRegenerate, hideHeader, hideRelatedFiles }: Props) {
   const { t } = useTranslation()
   const isUser = message.sender === 'user'
   const isSystem = message.sender === 'system'
@@ -284,6 +286,69 @@ export function MessageBubble({ message, onRegenerate }: Props) {
     message.type !== 'debate_request' &&
     message.type !== 'execution_plan'
 
+  const contentBody = (
+    <>
+      {reasoning && <ReasoningBlock reasoning={reasoning} />}
+
+      {isUser ? (
+        <div className="inline-block max-w-full rounded-2xl bg-surface px-4 py-2.5 text-[15px] leading-relaxed">
+          {renderContent()}
+        </div>
+      ) : (
+        <div className="text-[15px] leading-relaxed">{renderContent()}</div>
+      )}
+
+      {!hideRelatedFiles && message.related_files && message.related_files.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {message.related_files.map((path) => {
+            const name = path.split('/').pop() || path
+            return (
+              <div
+                key={path}
+                className="flex items-center gap-1.5 rounded-md border border-border-faint bg-surface px-2 py-1 text-xs"
+              >
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="max-w-[160px] truncate" title={path}>
+                  {name}
+                </span>
+                <button
+                  onClick={() => window.open(fileApi.previewUrl(currentProjectId, path), '_blank')}
+                  className="rounded p-0.5 hover:bg-muted"
+                  title={t('files.preview')}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => {
+                    setDraftInput(`@file:${path}`)
+                    toastSuccess(t('files.referenceSuccess'))
+                  }}
+                  className="rounded p-0.5 hover:bg-muted"
+                  title={t('files.reference')}
+                >
+                  <Quote className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+
+  if (hideHeader) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={MESSAGE_ENTER_TRANSITION}
+        className="w-full"
+      >
+        {contentBody}
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -356,51 +421,7 @@ export function MessageBubble({ message, onRegenerate }: Props) {
           )}
         </div>
 
-        {reasoning && <ReasoningBlock reasoning={reasoning} />}
-
-        {isUser ? (
-          <div className="inline-block max-w-full rounded-2xl bg-surface px-4 py-2.5 text-[15px] leading-relaxed">
-            {renderContent()}
-          </div>
-        ) : (
-          <div className="text-[15px] leading-relaxed">{renderContent()}</div>
-        )}
-
-        {message.related_files && message.related_files.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {message.related_files.map((path) => {
-              const name = path.split('/').pop() || path
-              return (
-                <div
-                  key={path}
-                  className="flex items-center gap-1.5 rounded-md border border-border-faint bg-surface px-2 py-1 text-xs"
-                >
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="max-w-[160px] truncate" title={path}>
-                    {name}
-                  </span>
-                  <button
-                    onClick={() => window.open(fileApi.previewUrl(currentProjectId, path), '_blank')}
-                    className="rounded p-0.5 hover:bg-muted"
-                    title={t('files.preview')}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setDraftInput(`@file:${path}`)
-                      toastSuccess(t('files.referenceSuccess'))
-                    }}
-                    className="rounded p-0.5 hover:bg-muted"
-                    title={t('files.reference')}
-                  >
-                    <Quote className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        {contentBody}
       </div>
     </motion.div>
   )

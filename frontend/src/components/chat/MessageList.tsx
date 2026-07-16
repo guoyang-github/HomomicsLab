@@ -4,14 +4,14 @@ import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
-import { MessageBubble } from './MessageBubble'
+import { MessageGroup } from './MessageGroup'
 import { WelcomeState } from './WelcomeState'
 import { Avatar, AvatarFallback } from '@/components/ui/shadcn/avatar'
 import { Bot, Loader2 } from 'lucide-react'
 import { useTranslation } from '@/i18n'
 import { chatApi } from '@/services/api'
 import { toastError } from '@/stores/toastStore'
-import type { PlanRequestContent } from '@/types/chat'
+import type { ChatMessage, PlanRequestContent } from '@/types/chat'
 import type { TaskProgress } from '@/types/tasks'
 
 function _extractProgress(tasks: { status: string }[]): TaskProgress {
@@ -114,22 +114,39 @@ export function MessageList() {
     )
   }
 
+  // Group consecutive messages by sender so a single agent turn is rendered as
+  // one card, with output files / artifacts moved to the bottom.
+  const groups: { sender: ChatMessage['sender']; messages: ChatMessage[] }[] = []
+  for (const message of messages) {
+    const lastGroup = groups[groups.length - 1]
+    if (!lastGroup || lastGroup.sender !== message.sender) {
+      groups.push({ sender: message.sender, messages: [message] })
+    } else {
+      lastGroup.messages.push(message)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-[780px] space-y-8 px-6 py-8">
-        {messages.map((message, index) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onRegenerate={
-              message.sender === 'agent' &&
-              index === messages.length - 1 &&
-              regeneratingId !== message.id
-                ? () => handleRegenerate(message.id)
-                : undefined
-            }
-          />
-        ))}
+        {groups.map((group, index) => {
+          const isLastGroup = index === groups.length - 1
+          const firstMessage = group.messages[0]
+          return (
+            <MessageGroup
+              key={firstMessage.id}
+              messages={group.messages}
+              isLastGroup={isLastGroup}
+              onRegenerate={
+                group.sender === 'agent' &&
+                isLastGroup &&
+                regeneratingId !== firstMessage.id
+                  ? () => handleRegenerate(firstMessage.id)
+                  : undefined
+              }
+            />
+          )
+        })}
         {isTyping && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}

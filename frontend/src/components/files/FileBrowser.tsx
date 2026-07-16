@@ -4,6 +4,7 @@ import { fileApi, type FileEntry } from '@/services/api'
 import { useProjectStore } from '@/stores/projectStore'
 import { useChatStore } from '@/stores/chatStore'
 import { Button, EmptyState } from '@/components/ui'
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer'
 import { toastError, toastSuccess } from '@/stores/toastStore'
 import { useTranslation } from '@/i18n'
 
@@ -36,6 +37,24 @@ function isSpreadsheetFile(mimeType: string, name: string): boolean {
     if (mimeType === 'text/csv' || mimeType === 'text/tab-separated-values') return true
   }
   return /\.(csv|tsv)$/i.test(name)
+}
+
+function isMarkdownFile(mimeType: string, name: string): boolean {
+  if (mimeType && mimeType === 'text/markdown') return true
+  return /\.(md|markdown|mdx)$/i.test(name)
+}
+
+function isJsonFile(mimeType: string, name: string): boolean {
+  if (mimeType && (mimeType === 'application/json' || mimeType === 'text/json')) return true
+  return /\.json$/i.test(name)
+}
+
+function prettyPrintJson(content: string): string {
+  try {
+    return JSON.stringify(JSON.parse(content), null, 2)
+  } catch {
+    return content
+  }
 }
 
 function detectDelimiter(mimeType: string, name: string): string {
@@ -212,6 +231,20 @@ export function FileBrowser() {
             className="max-h-full max-w-full rounded-lg border border-border object-contain shadow-sm"
           />
         </div>
+      )
+    }
+
+    // Markdown preview
+    if (fileContent !== null && isMarkdownFile(fileMimeType, selectedFile.name)) {
+      return <MarkdownRenderer content={fileContent} />
+    }
+
+    // JSON pretty-print preview
+    if (fileContent !== null && isJsonFile(fileMimeType, selectedFile.name)) {
+      return (
+        <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-foreground">
+          {prettyPrintJson(fileContent)}
+        </pre>
       )
     }
 
