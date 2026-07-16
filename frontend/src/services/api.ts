@@ -40,6 +40,9 @@ export const chatApi = {
   deleteSession: (sessionId: string) =>
     api.delete<{ deleted: boolean }>(`/chat/sessions/${sessionId}`),
 
+  renameSession: (sessionId: string, name: string) =>
+    api.patch(`/chat/sessions/${sessionId}`, { name }),
+
   respondToHITL: (data: { session_id: string; task_id: string; choice: string; parameters?: Record<string, unknown>; remember?: boolean }) =>
     api.post('/chat/hitl/respond', data),
 

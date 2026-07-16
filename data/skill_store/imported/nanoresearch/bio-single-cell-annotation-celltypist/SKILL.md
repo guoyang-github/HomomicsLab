@@ -348,6 +348,57 @@ Default is `by='predicted_labels'`. If you used majority voting, explicitly requ
 | Majority voting produces only 1–2 cell types | Over-clustering resolution too low or data is homogeneous | Try `over_clustering` with higher-resolution clusters or disable majority voting |
 | UMAP plot fails in visualization | No `X_umap` in `adata.obsm` | Run `sc.tl.umap(adata)` after `sc.pp.neighbors(adata)` |
 
+## Expected Output Artifacts
+
+For the chat summarizer to render a Claude-Code-style end-to-end report, the agent **must** persist the following artifacts. The summarizer parses the exact filenames and report sections listed below.
+
+### Required files
+
+1. `{input_basename}_celltypist.h5ad` — annotated AnnData with `celltypist_*` obs columns.
+2. `{input_basename}_celltypist_labels.csv` — per-cell labels with at least:
+   - `barcode` (or `cell_id`)
+   - `predicted_labels` or `celltypist_predicted_labels`
+   - `conf_score` or `celltypist_conf_score`
+3. `{input_basename}_celltypist_report.txt` — human-readable report containing these exact lines (Chinese preferred):
+   - `输入数据: {n_cells} 细胞 × {n_genes} 基因`
+   - `使用模型: {model_name}.pkl`
+   - `基因重叠: {n_overlap} / {n_model_genes}`
+   - `预测模式: best match + majority voting`
+   - `置信度阈值: 0.5`
+   - `平均置信度: {mean_conf}`
+   - `Unassigned 占比: {pct}%`
+   - `ARI（全部）: {ari}`
+   - `NMI（全部）: {nmi}`
+   - `数据预处理说明: {note}`
+4. `model_info.json` — `{"model": "Immune_All_Low.pkl", "n_cell_types": 28}`
+5. `gene_overlap.json` — `{"n_adata_genes": 29057, "n_model_genes": 6639, "n_overlap": 6023}`
+
+### Comparison artifacts (when the user asks to compare with a reference column)
+
+6. `{input_basename}_celltypist_per_reference.csv` — columns:
+   - `reference` or `all_celltype`
+   - `best_match`
+   - `recall`
+   - `count` / `n_cells`
+7. `{input_basename}_celltypist_confusion.csv` — confusion matrix with reference labels as rows and predicted labels as columns.
+8. `comparison_report.txt` — start with the header `CellTypist vs all_celltype comparison`, followed by:
+   - `Total cells: {n}`
+   - `Mean CellTypist confidence: {mean_conf}`
+   - `Coarse overall agreement: {agreement}`
+   - `ARI: {ari}`
+   - `NMI: {nmi}`
+   - Per-label rows: `{ref_label} n={n} recall={recall} top_pred={best_pred}`
+
+### Figures
+
+9. `figures/{input_basename}_celltypist_confidence_distribution.png`
+10. `figures/{input_basename}_celltypist_celltype_proportions.png`
+11. `figures/{input_basename}_celltypist_umap_predictions.png`
+12. `figures/{input_basename}_celltypist_summary.png`
+13. `figures/{input_basename}_celltypist_vs_all_celltype_heatmap.png` (when a reference label exists)
+
+> **Agent note:** Use the exact filenames and section headers above. The chat summarizer extracts the model name, gene overlap, ARI/NMI, and the output-inventory table from these artifacts. Missing or inconsistently named files will produce a degraded report.
+
 ## Related Skills
 
 - [bio-single-cell-annotation-sctype-r](../bio-single-cell-annotation-sctype-r/SKILL.md) — Marker-based annotation (R, good for any tissue with marker lists)

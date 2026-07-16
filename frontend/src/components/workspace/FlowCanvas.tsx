@@ -123,13 +123,60 @@ const nodeTypes = {
   task: TaskNodeComponent,
 }
 
+interface SubtaskSpec {
+  id: string
+  description: string
+  analysis_type?: string
+}
+
+function collectSubtasks(task: TaskNode): SubtaskSpec[] | null {
+  const raw = task.parameters?.display_subtasks
+  if (!Array.isArray(raw) || raw.length < 2) return null
+  return raw.filter(
+    (s): s is SubtaskSpec =>
+      typeof s === 'object' &&
+      s !== null &&
+      typeof (s as SubtaskSpec).id === 'string' &&
+      typeof (s as SubtaskSpec).description === 'string'
+  )
+}
+
+function expandTasks(tasks: TaskNode[]): TaskNode[] {
+  const out: TaskNode[] = []
+  for (const task of tasks) {
+    const subtasks = collectSubtasks(task)
+    if (!subtasks || subtasks.length === 0) {
+      out.push(task)
+      continue
+    }
+    // Replace a parent task with its display subtasks chained sequentially so
+    // the workflow view reflects the real execution steps.
+    let previousId: string | null = null
+    for (const sub of subtasks) {
+      const id = `${task.id}::${sub.id}`
+      const dependencies = previousId ? [previousId] : task.dependencies
+      out.push({
+        ...task,
+        id,
+        name: sub.description,
+        description: sub.description,
+        dependencies,
+        parameters: { ...task.parameters, analysis_type: sub.analysis_type },
+      })
+      previousId = id
+    }
+  }
+  return out
+}
+
 export function FlowCanvas() {
   const taskStoreTasks = useTaskStore((state) => state.tasks)
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
   const planTasks = usePlanStore((state) => state.tasks)
   const viewMode = usePlanStore((state) => state.viewMode)
   const isApprovedPlan = viewMode === 'approved'
-  const tasks = isApprovedPlan && planTasks.length > 0 ? planTasks : taskStoreTasks
+  const rawTasks = isApprovedPlan && planTasks.length > 0 ? planTasks : taskStoreTasks
+  const tasks = useMemo(() => expandTasks(rawTasks), [rawTasks])
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])

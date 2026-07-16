@@ -17,6 +17,34 @@ export interface ChatSession {
   updatedAt: string
 }
 
+const GENERIC_SESSION_NAMES = new Set([
+  '',
+  'Default Session',
+  'New Session',
+  '默认会话',
+  '新会话',
+])
+
+function isGenericSessionName(name: string): boolean {
+  const trimmed = name.trim()
+  if (GENERIC_SESSION_NAMES.has(trimmed)) return true
+  // Raw @-file references make poor titles; replace them with content-derived names.
+  if (trimmed.startsWith('@file:') || trimmed.startsWith('@skill:')) return true
+  return false
+}
+
+function deriveSessionName(message: string): string {
+  // Strip file/skill references and collapse whitespace so the title reflects
+  // the actual user intent rather than the raw @-mention payload.
+  const cleaned = message
+    .replace(/@file:[^\s]+/g, '')
+    .replace(/@skill:[^\s]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return ''
+  return cleaned.length > 35 ? `${cleaned.slice(0, 35)}…` : cleaned
+}
+
 interface ChatState {
   sessions: ChatSession[]
   messages: ChatMessage[]
@@ -337,7 +365,7 @@ export const useChatStore = create<ChatState>()(
         const resolvedProjectId = projectId || get().currentProjectId || 'default'
         const newSession: ChatSession = {
           id,
-          name: name || `Session ${new Date().toLocaleString()}`,
+          name: name || '',
           projectId: resolvedProjectId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -363,12 +391,21 @@ export const useChatStore = create<ChatState>()(
         return id
       },
 
-      renameSession: (id, name) =>
+      renameSession: async (id, name) => {
+        const trimmed = name.trim()
+        if (!trimmed) return
         set((state) => ({
           sessions: state.sessions.map((s) =>
-            s.id === id ? { ...s, name, updatedAt: new Date().toISOString() } : s
+            s.id === id ? { ...s, name: trimmed, updatedAt: new Date().toISOString() } : s
           ),
-        })),
+        }))
+        try {
+          await chatApi.renameSession(id, trimmed)
+        } catch (err: any) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to rename session', err)
+        }
+      },
 
       deleteSession: async (id) => {
         const previous = get().sessions
@@ -414,10 +451,11 @@ export const useChatStore = create<ChatState>()(
         }
         const currentSession = get().getCurrentSession()
         if (currentSession) {
-          const isGenericName =
-            currentSession.name === 'Default Session' || currentSession.name.startsWith('Session ')
-          if (isGenericName) {
-            get().renameSession(currentSession.id, trimmed.slice(0, 40))
+          if (isGenericSessionName(currentSession.name)) {
+            const title = deriveSessionName(trimmed)
+            if (title) {
+              get().renameSession(currentSession.id, title)
+            }
           }
         }
 

@@ -121,8 +121,10 @@ class ResultSummary:
         lines: List[str] = []
         if self.metrics:
             lines.append("**关键指标**")
+            lines.append("| 项目 | 结果 |")
+            lines.append("|------|------|")
             for key, value in self.metrics.items():
-                lines.append(f"- {key}：{value}")
+                lines.append(f"| {key} | {value} |")
         for table in self.tables:
             lines.append("")
             lines.append(f"**{table.title}**")
@@ -398,6 +400,13 @@ def summarize_artifacts(
                     )
                     break
 
+    # When a known skill produced artifacts, append an output-inventory table
+    # so the chat message matches Claude Code's end-to-end report style.
+    if skill_id:
+        output_table = _build_output_table(paths)
+        if output_table:
+            summary.tables.append(output_table)
+
     return summary
 
 
@@ -608,6 +617,11 @@ def _summarize_descriptive_statistics(
             sources=[desc_json.name],
         )
     ]
+
+    # List produced artifacts so the chat message feels like a complete report.
+    output_table = _build_output_table(all_paths)
+    if output_table:
+        summary.tables.append(output_table)
 
     return summary
 

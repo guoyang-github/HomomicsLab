@@ -153,7 +153,7 @@ export function SidebarSessions({ collapsed = false }: Props) {
                       className="flex flex-1 flex-col overflow-hidden text-left"
                     >
                       <span className={clsx('truncate text-[13px]', isActive ? 'font-medium text-foreground' : 'text-foreground/90')}>
-                        {session.name}
+                        {session.name || t('sessionList.defaultSession')}
                       </span>
                       <span className="truncate text-[10px] text-muted-foreground/80">
                         {new Date(session.updatedAt).toLocaleDateString()}

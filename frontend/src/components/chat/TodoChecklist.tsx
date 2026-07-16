@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { clsx } from 'clsx'
-import { Loader2, X, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Workflow } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Workflow } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useExecutionStore } from '@/stores/executionStore'
 import { useChatStore } from '@/stores/chatStore'
@@ -82,8 +82,7 @@ export function TodoChecklist() {
   const status = useExecutionStore((state) => state.status)
   const jobSessionId = useExecutionStore((state) => state.jobSessionId)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
-  const [expanded, setExpanded] = useState(true)
-  const [manuallyClosed, setManuallyClosed] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const openWorkflow = useOverlayStore((state) => state.openWorkflow)
   const discardDraft = usePlanStore((state) => state.discardDraft)
 
@@ -91,20 +90,20 @@ export function TodoChecklist() {
   // old session's task list from flashing when the user switches sessions.
   const isJobForCurrentSession = !jobSessionId || jobSessionId === currentSessionId
 
-  useEffect(() => {
-    if (status === 'running') {
-      setManuallyClosed(false)
-      setExpanded(true)
-    }
-  }, [status])
-
   const items = useMemo(() => flattenTasks(tasks), [tasks])
   const groupStatus = useMemo(() => deriveGroupStatus(tasks), [tasks])
 
-  // Show the floating TODO whenever the current session has tasks. When a job
-  // is running it stays expanded; for completed/failed sessions it collapses to
-  // a compact summary so the user can still review milestones without clutter.
-  if (manuallyClosed) return null
+  // Auto-expand while running so the user sees live progress; collapse by
+  // default when done to avoid covering the chat content.
+  useEffect(() => {
+    if (status === 'running' || groupStatus === 'running') {
+      setExpanded(true)
+    } else if (groupStatus === 'completed' || groupStatus === 'failed') {
+      setExpanded(false)
+    }
+  }, [status, groupStatus])
+
+  // Show the floating TODO whenever the current session has tasks.
   if (!isJobForCurrentSession) return null
   if (items.length === 0) return null
 
@@ -117,7 +116,7 @@ export function TodoChecklist() {
   const isCompleted = groupStatus === 'completed'
 
   return (
-    <div className="absolute right-4 top-4 z-30 w-72 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+    <div data-testid="todo-checklist" className="absolute right-3 top-3 z-30 w-60 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 shadow-md backdrop-blur-sm">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -146,23 +145,12 @@ export function TodoChecklist() {
             <span className="text-xs text-error">{failedCount} failed</span>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center">
           {expanded ? (
             <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
           ) : (
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setManuallyClosed(true)
-            }}
-            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            title={t('common.close')}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
         </div>
       </button>
 

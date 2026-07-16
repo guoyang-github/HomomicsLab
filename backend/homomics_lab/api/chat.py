@@ -94,6 +94,10 @@ class ChatSessionSummary(BaseModel):
     created_at: str
 
 
+class RenameSessionRequest(BaseModel):
+    name: str
+
+
 class FeedbackResponse(BaseModel):
     status: str
 
@@ -223,6 +227,32 @@ async def delete_session(session_id: str, http_request: Request) -> Dict[str, bo
     memory_manager: MemoryManager = http_request.app.state.memory_manager
     await memory_manager.delete_session(session_id)
     return {"deleted": True}
+
+
+@router.patch("/sessions/{session_id}", dependencies=[Depends(require_auth)])
+async def rename_session(
+    session_id: str,
+    request: RenameSessionRequest,
+    http_request: Request,
+) -> ChatSessionSummary:
+    """Rename a persisted chat session."""
+    memory_manager: MemoryManager = http_request.app.state.memory_manager
+    session = await memory_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.name = request.name.strip() or session.name
+    await memory_manager.save_session(
+        session_id,
+        session.project_id or "default",
+        getattr(session, "working_memory", None),
+    )
+    return ChatSessionSummary(
+        id=session_id,
+        project_id=session.project_id,
+        name=session.name,
+        updated_at=session.updated_at.isoformat() if hasattr(session, "updated_at") else "",
+        created_at=session.created_at.isoformat() if hasattr(session, "created_at") else "",
+    )
 
 
 @router.post("/regenerate", response_model=SendMessageResponse, dependencies=[Depends(require_auth)])
