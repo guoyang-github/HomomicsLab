@@ -47,6 +47,31 @@ data/memory_graph.json
 # - Legacy path used when backend was launched from backend/ (auto-imported)
 backend/skills/
 
+# Runtime data / caches / debug artifacts
+tmp_dbg/
+tmp_repos/
+data/codeact_cache/
+backend/data/codeact_cache/
+backend/data/llm_cache/
+backend/data/memory_graph.json
+backend/data/skill_store/skills.json
+backend/data/raw/default/*.txt
+
+# Workspace runtime outputs (keep data/ and .metadata)
+backend/data/workspaces/*/outputs/
+backend/data/workspaces/*/output/
+backend/data/workspaces/*/outputs_*/
+backend/data/workspaces/*/intermediate/
+backend/data/workspaces/*/logs/
+backend/data/workspaces/*/results/
+backend/data/workspaces/*/scripts/
+backend/data/workspaces/*/__skill_*
+backend/data/workspaces/*/run_*.py
+backend/data/workspaces/*/driver_*.py
+backend/data/workspaces/*/*.csv
+backend/data/workspaces/*/*.txt
+backend/data/workspaces/*/annotated.h5ad
+
 # OS / Editors
 .DS_Store
 .idea/
