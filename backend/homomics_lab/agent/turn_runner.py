@@ -1282,11 +1282,15 @@ class TurnRunner:
         intent: Optional[UserIntent] = None,
         user_message: Optional[str] = None,
         working_memory: Optional[WorkingMemory] = None,
+        execution_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Build the context dict passed to the orchestrator and HITL detector."""
         context: Dict[str, Any] = {"project_id": project_id}
         if getattr(self, "_trace_id", None):
             context["trace_id"] = self._trace_id
+
+        if execution_mode is not None:
+            context["execution_mode"] = execution_mode
 
         confidence = getattr(intent, "confidence", 1.0) if intent is not None else 1.0
         context["confidence"] = confidence
@@ -1444,6 +1448,7 @@ class TurnRunner:
             intent=intent,
             user_message=user_message,
             working_memory=working_memory,
+            execution_mode=getattr(tree, "execution_mode", None),
         )
         try:
             results = await orchestrator.run_tree(tree, context=context)

@@ -69,6 +69,13 @@ class CascadeIntentAnalyzer:
       5. Clarification if confidence is low and alternatives are close.
     """
 
+    # Language-agnostic sequential markers that strongly imply multi-step workflow.
+    _SEQUENTIAL_MARKERS = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
+
+    # Length threshold for complex heuristic, measured in characters so it works
+    # for both CJK and Latin text.
+    _COMPLEX_MESSAGE_CHAR_THRESHOLD = 80
+
     def __init__(
         self,
         definitions: Optional[List[IntentDefinition]] = None,
@@ -187,7 +194,7 @@ class CascadeIntentAnalyzer:
                 keywords = [
                     "单细胞", "single cell", "scRNA", "10x", "scanpy", "seurat",
                     "PBMC", "细胞", "cell", "umap", "pca", "聚类", "cluster",
-                    "差异表达", "marker gene",
+                    "差异表达", "marker gene", "h5ad", ".h5ad",
                 ]
                 complexity_indicators = [
                     "流程", "pipeline", "全流程", "完整",
@@ -864,7 +871,14 @@ class CascadeIntentAnalyzer:
 
         # Honor structured intent first.
         if match.structured is not None:
-            return match.structured.to_legacy_complexity()
+            s = match.structured
+            if s.intent_type in ("qa", "information_request", "general_help", "greeting", "clarification"):
+                return "direct_response"
+            if s.scope == "single_step":
+                return "single_step"
+            if s.scope in ("partial", "full"):
+                return "complex"
+            return "single_step"
 
         text = message.lower()
 
@@ -879,8 +893,7 @@ class CascadeIntentAnalyzer:
             return "direct_response"
 
         # Sequential markers (e.g. "先...再...") strongly imply a multi-step workflow.
-        sequential_markers = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
-        if any(m in text for m in sequential_markers):
+        if any(m in text for m in self._SEQUENTIAL_MARKERS):
             if match.structured is None or match.structured.intent_type == "analysis":
                 return "complex"
 
@@ -893,15 +906,14 @@ class CascadeIntentAnalyzer:
             if any(kw.lower() in text for kw in indicators):
                 return "complex"
 
-        # Heuristic: multiple analysis keywords or long message
-        if len(text.split()) > 15:
+        # Heuristic: long message (character count, so it is language-agnostic).
+        if len(text) > self._COMPLEX_MESSAGE_CHAR_THRESHOLD:
             return "complex"
 
-        # Multi-intent implies complex workflow
+        # Multi-intent domain requests default to complex unless sequential markers
+        # are absent and the message is short.
         if match.analysis_type in ("single_cell_analysis", "spatial_analysis", "metagenomics_analysis"):
-            # Check for sequential markers
-            sequential_markers = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
-            if any(m in text for m in sequential_markers):
+            if any(m in text for m in self._SEQUENTIAL_MARKERS):
                 return "complex"
 
         return "single_step"
@@ -1035,9 +1047,11 @@ class CascadeIntentAnalyzer:
         # Structured intent decomposition (best-practice v2).
         structured = match.structured
         if structured is None:
-            # Synthesize a StructuredIntent from the legacy match for consistency.
+            # Synthesize a StructuredIntent from the canonical classifier signals.
+            # v2 fields are the source of truth; legacy analysis_type/complexity
+            # are only used as raw input to this synthesis.
             structured = StructuredIntent(
-                intent_type=self._legacy_to_intent_type(match.analysis_type, complexity, metadata),
+                intent_type=self._derive_intent_type(match.analysis_type, complexity, metadata),
                 interaction_mode=self._determine_interaction_mode(match, complexity, metadata),
                 domain=self._determine_domain(match, definition),
                 target=self._determine_target(match, definition),
@@ -1155,11 +1169,17 @@ class CascadeIntentAnalyzer:
             pass
 
     @staticmethod
-    def _legacy_to_intent_type(
+    def _derive_intent_type(
         analysis_type: str,
         complexity: str,
         metadata: Dict[str, Any],
     ) -> str:
+        """Map classifier outputs to the canonical v2 intent_type.
+
+        This is a one-way normalization: legacy ``analysis_type``/``complexity``
+        are consumed at construction time and then discarded.  Downstream code
+        should read ``interaction_mode``/``scope``/``intent_type`` instead.
+        """
         if analysis_type == "clarification":
             return "clarification"
         if analysis_type in ("qa", "information_request"):
@@ -1230,6 +1250,14 @@ class CascadeIntentAnalyzer:
             return "answer_question"
         if match.analysis_type == "general_help":
             return "generate_code"
+        # Tool-only intents are their own target.
+        if match.analysis_type in (
+            "pubmed_search",
+            "pubmed_fetch",
+            "uniprot_search",
+            "geo_search",
+        ):
+            return match.analysis_type
         # If the analysis_type itself is a known phase id, treat it as the target.
         if self._is_known_phase(match.analysis_type):
             return match.analysis_type

@@ -80,15 +80,6 @@ class StructuredIntent:
             return f"{self.domain}_analysis"
         return "general"
 
-    def to_legacy_complexity(self) -> str:
-        """Return a backward-compatible ``complexity`` value."""
-        if self.intent_type in ("qa", "information_request", "general_help", "greeting", "clarification"):
-            return "direct_response"
-        if self.scope == "single_step":
-            return "single_step"
-        if self.scope in ("partial", "full"):
-            return "complex"
-        return "single_step"
 
 
 @dataclass
@@ -120,10 +111,11 @@ class UserIntent:
     """User-facing intent object (backward compatible with v1).
 
     The structured fields ``interaction_mode``, ``domain``, ``target`` and
-    ``scope`` provide a clearer separation of concerns than the legacy
-    ``analysis_type`` + ``complexity`` pair. When they are not explicitly
-    provided they are derived from the legacy fields so existing call sites
-    keep working.
+    ``scope`` are now the source of truth.  The legacy ``analysis_type`` and
+    ``complexity`` fields are kept for compatibility but are always derived
+    from the v2 fields after normalization.  Call sites that still construct
+    UserIntent with only ``analysis_type``/``complexity`` will continue to
+    work because the v2 fields are back-filled from the legacy values.
     """
 
     analysis_type: str
@@ -146,8 +138,27 @@ class UserIntent:
     structured_intent: Optional[StructuredIntent] = None
 
     def __post_init__(self):
+        # Normalize sub-intents first so parent derivation can see them.
+        for sub in self.sub_intents:
+            sub._normalize()
         if self.structured_intent is not None:
             self._apply_structured_intent()
+        self._normalize()
+
+    def _normalize(self) -> None:
+        """Normalize intent fields with v2 fields as the single source of truth.
+
+        ``interaction_mode``, ``scope``, ``domain`` and ``target`` are the
+        canonical representation.  ``analysis_type`` and ``complexity`` are
+        derived read-only projections kept for transitional call sites and will
+        be removed in a follow-up cleanup.
+
+        Back-fill order:
+          1. v2 fields already provided explicitly or via ``structured_intent``.
+          2. Legacy fields when v2 fields are still missing (transitional).
+          3. Default derivations.
+        """
+        # 1. Back-fill missing v2 fields from legacy values (transitional).
         if not self.interaction_mode:
             self.interaction_mode = self._derive_interaction_mode()
         if not self.scope:
@@ -157,29 +168,75 @@ class UserIntent:
         if self.target is None:
             self.target = self._derive_target()
 
+        # 2. Enforce legacy projections consistent with v2 truth.
+        self.complexity = self._derive_complexity()
+        self.analysis_type = self._derive_analysis_type()
+
     def _apply_structured_intent(self) -> None:
-        """Populate legacy/structured fields from a StructuredIntent."""
+        """Populate v2 fields from a StructuredIntent.
+
+        The StructuredIntent is the source of truth for the fields it
+        explicitly provides.  Legacy ``analysis_type``/``complexity`` are
+        derived from the v2 fields in :meth:`_normalize`, but when the
+        structured intent is concrete we let it update the legacy projection
+        directly so the canonical v2 decision is reflected downstream.
+        """
         s = self.structured_intent
         if s is None:
             return
-        # Do not overwrite explicitly provided values; otherwise mirror v2.
-        if not self.analysis_type or self.analysis_type == "general":
-            self.analysis_type = s.to_legacy_analysis_type()
-        if not self.complexity or self.complexity == "single_step":
-            self.complexity = s.to_legacy_complexity()
-        if not self.interaction_mode:
+        if s.interaction_mode:
             self.interaction_mode = s.interaction_mode
-        if not self.scope:
+        if s.scope:
             self.scope = s.scope
-        if self.domain is None:
+        if s.domain is not None:
             self.domain = s.domain
-        if self.target is None:
+        if s.target is not None:
             self.target = s.target
+        if s.intent_type:
+            self.metadata["intent_type"] = s.intent_type
+        if s.reason:
+            self.metadata.setdefault("reason", s.reason)
+
+        # When the structured intent is concrete, mirror its semantic type to
+        # the legacy projection so existing routers/plans keep working while
+        # the v2 representation becomes the single source of truth.
+        structured_analysis = self._intent_type_to_analysis_type(s.intent_type, s.target)
+        is_structured_concrete = (
+            s.target is not None
+            or s.intent_type
+            in {
+                "qa",
+                "information_request",
+                "general_help",
+                "greeting",
+                "clarification",
+                "file_conversion",
+                "tool_call",
+            }
+        )
+        if is_structured_concrete or not self.analysis_type or self.analysis_type in {"", "general", "unknown", "builtin_analysis"}:
+            if structured_analysis:
+                self.analysis_type = structured_analysis
+
         # Merge entities into metadata for downstream use. Some LLMs return
         # entities as a string or a list instead of the requested object; guard
         # against that instead of crashing intent analysis.
         if s.entities and isinstance(s.entities, dict):
             self.metadata = {**s.entities, **self.metadata}
+
+    @staticmethod
+    def _intent_type_to_analysis_type(intent_type: str, target: Optional[str]) -> Optional[str]:
+        """Map a canonical v2 intent_type to the legacy analysis_type projection."""
+        mapping = {
+            "qa": "qa",
+            "information_request": "information_request",
+            "general_help": "general_help",
+            "greeting": "greeting",
+            "clarification": "clarification",
+            "file_conversion": "file_conversion",
+            "tool_call": target or "tool_call",
+        }
+        return mapping.get(intent_type)
 
     def _derive_interaction_mode(self) -> str:
         if self.analysis_type == "clarification":
@@ -205,6 +262,47 @@ class UserIntent:
             return "full"
         return "full"
 
+    def _derive_complexity(self) -> str:
+        """Derive legacy complexity from v2 fields."""
+        if self.interaction_mode in ("answer", "clarify"):
+            return "direct_response"
+        if self.scope == "single_step":
+            return "single_step"
+        if self.scope in ("partial", "full"):
+            return "complex"
+        if self.complexity:
+            return self.complexity
+        return "single_step"
+
+    def _derive_analysis_type(self) -> str:
+        """Derive legacy analysis_type from v2 fields.
+
+        Preserves an explicitly provided concrete legacy value.  Falls back to
+        target, then v2 intent_type, then domain, then the existing value.
+        """
+        if self.analysis_type and self.analysis_type not in {"", "general", "unknown"}:
+            return self.analysis_type
+        if self.target:
+            return self.target
+        intent_type = self.metadata.get("intent_type")
+        if intent_type == "qa":
+            return "qa"
+        if intent_type == "information_request":
+            return "information_request"
+        if intent_type == "general_help":
+            return "general_help"
+        if intent_type == "greeting":
+            return "greeting"
+        if intent_type == "clarification":
+            return "clarification"
+        if intent_type == "file_conversion":
+            return "file_conversion"
+        if intent_type == "tool_call":
+            return self.metadata.get("tool_name") or "tool_call"
+        if self.domain:
+            return f"{self.domain}_analysis"
+        return self.analysis_type or "general"
+
     def _derive_domain(self) -> Optional[str]:
         if self.structured_intent and self.structured_intent.domain:
             return self.structured_intent.domain
@@ -216,6 +314,7 @@ class UserIntent:
             "proteomics_analysis": "proteomics",
             "transcriptomics_analysis": "transcriptomics",
             "epigenomics_analysis": "epigenomics",
+            "descriptive_statistics": "single-cell-transcriptomics",
         }
         return mapping.get(self.analysis_type)
 

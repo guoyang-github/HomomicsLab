@@ -3,6 +3,15 @@
 All skills (builtin and external) now use the same directory-based layout.
 The executor no longer distinguishes between builtin (code strings) and
 external (file-based) skills.
+
+Note on "CodeAct" terminology in this module:
+- ``metadata["code_act"] == True`` skills are routed to ``execution/code_act.py``
+  via ``_execute_code_act``.
+- Declarative/agent skills (``cli/workflow/container/agent/knowledge`` or
+  ``python/r/mixed`` without an entrypoint) are executed by ``AgentSkillExecutor``,
+  which runs an LLM tool-calling loop; this is CodeAct-style but a separate path.
+- The orchestrator-level CodeAct fallback (``Orchestrator._try_codeact_fallback``)
+  lives in ``agent/orchestrator.py`` and is invoked when a skill fails.
 """
 
 import importlib.metadata

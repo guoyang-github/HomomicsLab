@@ -133,7 +133,7 @@ async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
     assert plan.strategy_name == "single-cell-transcriptomics"
     task_names = [t.name for t in tree.tasks]
     # Core single-cell pipeline driven by the new domain template.
-    assert "data_io" in task_names
+    # data_io is optional and only included when the input state triggers it.
     assert "qc" in task_names
     assert "normalization" in task_names
     assert "dim_reduction" in task_names
@@ -141,10 +141,6 @@ async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
     assert "annotation" in task_names
 
     # Dependencies should come from phase_transitions, not a linear fallback.
-    qc_task = next(t for t in tree.tasks if t.name == "qc")
-    data_io_task = next(t for t in tree.tasks if t.name == "data_io")
-    assert data_io_task.id in qc_task.dependencies
-
     cluster_task = next(t for t in tree.tasks if t.name == "clustering")
     dr_task = next(t for t in tree.tasks if t.name == "dim_reduction")
     assert dr_task.id in cluster_task.dependencies
@@ -191,8 +187,7 @@ async def test_decompose_derives_sub_intents_from_message(domain_decomposer):
     assert "dim_reduction" in task_names
     assert "normalization" in task_names
     assert "qc" in task_names
-    assert "data_io" in task_names
-    # Annotation should be omitted because the user only asked for clustering.
+    # data_io is optional and only included when explicitly triggered by input state.
     assert "annotation" not in task_names
 
 
@@ -286,10 +281,6 @@ async def test_decompose_does_not_route_domain_request_to_standalone(standalone_
 @pytest.mark.asyncio
 async def test_decompose_explicit_skill_target_avoids_full_pipeline(monkeypatch):
     """When the user names a concrete skill, the plan contains only that skill."""
-    from homomics_lab.config import settings
-
-    monkeypatch.setattr(settings, "capability_first_routing_enabled", True)
-
     registry = SkillRegistry()
     registry.register(
         SkillDefinition(
@@ -368,3 +359,37 @@ def test_attach_uploaded_files_to_tree():
     assert tree.tasks[0].parameters["uploaded_files"] == [
         {"filename": "sample.h5ad", "path": str(uploaded.resolve())}
     ]
+
+
+@pytest.mark.asyncio
+async def test_decompose_populates_routing_trace():
+    """The routing decision trace is exposed in the PlanResult for observability."""
+    registry = SkillRegistry()
+    registry.register(
+        SkillDefinition(
+            id="bio-single-cell-annotation-celltypist",
+            name="CellTypist Annotation",
+            version="1.0",
+            category="single-cell-transcriptomics",
+            description="CellTypist cell type annotation",
+            domains=["single-cell-transcriptomics"],
+            input_schema=SkillInputSchema(),
+        )
+    )
+
+    decomposer = TaskDecomposer(skill_registry=registry)
+    intent = UserIntent(
+        analysis_type="single_cell_analysis",
+        complexity="single_step",
+        domain="single-cell-transcriptomics",
+        target="bio-single-cell-annotation-celltypist",
+        original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释",
+    )
+
+    plan, _ = await decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.routing_trace
+    assert any(
+        entry.get("route") == "standalone_skill" for entry in plan.routing_trace
+    )
+    assert plan.to_dict().get("routing_trace") == plan.routing_trace

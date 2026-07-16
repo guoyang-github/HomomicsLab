@@ -239,3 +239,189 @@ async def test_adaptive_replan_inserts_downstream_phase(tmp_path):
     assert "normalization" in task_names
     assert tree.get_task("t1").status == TaskStatus.COMPLETED
     assert result["t1"]["status"] == "success"
+
+
+class FailingAgent(BaseAgent):
+    agent_type = AgentType.BIOINFO
+    capabilities = ["failing_skill"]
+
+    async def run(self, task, context):
+        raise RuntimeError("skill executor failed")
+
+
+class SuccessFalseAgent(BaseAgent):
+    agent_type = AgentType.BIOINFO
+    capabilities = ["success_false_skill"]
+
+    async def run(self, task, context):
+        return {"success": False, "error": "explicit skill failure"}
+
+
+@pytest.fixture
+def failing_orchestrator():
+    registry = AgentRegistry()
+    registry.register(FailingAgent())
+    return Orchestrator(registry=registry)
+
+
+@pytest.fixture
+def success_false_orchestrator():
+    registry = AgentRegistry()
+    registry.register(SuccessFalseAgent())
+    return Orchestrator(registry=registry)
+
+
+@pytest.mark.asyncio
+async def test_codeact_fallback_on_exception(failing_orchestrator, monkeypatch, tmp_path):
+    fallback_called = {"args": None}
+
+    async def fake_run_code_act(*args, **kwargs):
+        fallback_called["args"] = kwargs
+        return {
+            "success": True,
+            "result": {"cells": 100, "output_path": str(tmp_path / "out.h5ad")},
+            "stdout": "fallback ok",
+            "code": "print('fallback')",
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["failing_skill"],
+            parameters={"input_path": str(tmp_path / "in.h5ad")},
+        ),
+    ])
+
+    result = await failing_orchestrator.run_tree(tree, context={"project_id": "proj1"})
+
+    task = tree.get_task("t1")
+    assert task.status == TaskStatus.COMPLETED
+    assert result["t1"]["status"] == "success"
+    assert result["t1"].get("fallback") is True
+    assert "fallback ok" in result["t1"].get("stdout", "")
+    assert fallback_called["args"] is not None
+    assert "quality_control" in fallback_called["args"]["task"]
+
+
+@pytest.mark.asyncio
+async def test_codeact_fallback_on_success_false(success_false_orchestrator, monkeypatch, tmp_path):
+    async def fake_run_code_act(*args, **kwargs):
+        return {
+            "success": True,
+            "result": {"cells": 200},
+            "stdout": "recovered",
+            "code": "print('recovered')",
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["success_false_skill"],
+        ),
+    ])
+
+    result = await success_false_orchestrator.run_tree(tree, context={"project_id": "proj1"})
+
+    task = tree.get_task("t1")
+    assert task.status == TaskStatus.COMPLETED
+    assert result["t1"]["status"] == "success"
+    assert result["t1"].get("fallback") is True
+
+
+@pytest.mark.asyncio
+async def test_codeact_fallback_disabled_raises(failing_orchestrator, monkeypatch):
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator.settings.codeact_fallback_enabled", False
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["failing_skill"],
+        ),
+    ])
+
+    with pytest.raises(RuntimeError, match="skill executor failed"):
+        await failing_orchestrator.run_tree(tree, context={"project_id": "proj1"})
+
+
+@pytest.mark.asyncio
+async def test_codeact_mode_skips_agent(failing_orchestrator, monkeypatch, tmp_path):
+    """When execution_mode is 'codeact', the orchestrator bypasses agents."""
+    agent_ran = {"count": 0}
+    original_run = FailingAgent.run
+
+    async def tracking_run(self, task, context):
+        agent_ran["count"] += 1
+        return await original_run(self, task, context)
+
+    monkeypatch.setattr(FailingAgent, "run", tracking_run)
+
+    async def fake_run_code_act(*args, **kwargs):
+        return {
+            "success": True,
+            "result": {"cells": 42},
+            "stdout": "codeact mode",
+            "code": "print('codeact')",
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["failing_skill"],
+        ),
+    ])
+
+    result = await failing_orchestrator.run_tree(
+        tree, context={"project_id": "proj1", "execution_mode": "codeact"}
+    )
+
+    assert agent_ran["count"] == 0
+    assert result["t1"]["status"] == "success"
+    assert result["t1"]["skill"] == "codeact"
+    assert result["t1"].get("fallback") is False
+
+
+@pytest.mark.asyncio
+async def test_fixed_pipeline_mode_disables_codeact_fallback(
+    failing_orchestrator, monkeypatch
+):
+    """When execution_mode is 'fixed_pipeline', skill failures stay failed."""
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator.run_code_act",
+        lambda *args, **kwargs: {"success": True, "result": {}},
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["failing_skill"],
+        ),
+    ])
+
+    with pytest.raises(RuntimeError, match="skill executor failed"):
+        await failing_orchestrator.run_tree(
+            tree, context={"project_id": "proj1", "execution_mode": "fixed_pipeline"}
+        )

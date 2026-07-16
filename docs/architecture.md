@@ -134,3 +134,31 @@ HomomicsLab uses a layered hybrid architecture:
 11. **Auto-regression baselines**: Successful CodeAct executions automatically record baselines so future runs can be checked for drift.
 
 12. **Pluggable execution backends**: The same agent plan can be dispatched to `LocalScheduler`, `SlurmScheduler`, or `NextflowRunner`. Nextflow templates and nf-core pipelines provide reproducible, containerized execution at scale.
+
+## CodeAct Terminology (disambiguation)
+
+The word "CodeAct" appears in three distinct roles in the codebase. Keeping the
+three roles explicit avoids confusing "the skill type" with "the execution
+style" and with "the fallback path".
+
+1. **CodeAct skill type** — `SkillDefinition.metadata["code_act"] == True`
+   - A curated skill whose *reference implementation* is a prompt/template for
+     the CodeAct engine rather than a static script.
+   - Routed by `SkillRuntimeExecutor._execute_code_act()` to `execution/code_act.py`.
+
+2. **Agent-loop / tool-calling execution style** — `AgentSkillExecutor`
+   - Used for declarative skills (`runtime.type` in `cli/workflow/container/agent/knowledge`,
+     or `python/r/mixed` skills without a concrete entrypoint).
+   - The executor runs an LLM tool-calling loop that may generate and execute
+     code.  It is "CodeAct-style" but is *not* the same code path as (1) or (3).
+
+3. **Orchestrator fallback** — `Orchestrator._try_codeact_fallback()`
+   - Triggered when a curated skill or script fails and the plan-level
+     `execution_mode` is not `fixed_pipeline`.
+   - It asks the CodeAct engine to generate recovery code from the task
+     description plus the original error.
+
+Plan-level `execution_mode` (`pipeline` / `codeact` / `auto`) is orthogonal to
+these three roles.  `mode_selector` sets it; `Orchestrator._execute_task` reads
+it and decides whether to run curated skills, skip fallback, or hand the whole
+task to CodeAct as the primary path.

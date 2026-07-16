@@ -7,12 +7,14 @@ changes).
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
 from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
 from homomics_lab.config import settings
+from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.domain.registry import get_domain_registry
+from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.jobs.constants import JobMode
 from homomics_lab.metrics import record_plan_created
 from homomics_lab.models.common import ChatMessage, MessageType
@@ -72,12 +74,11 @@ class IntentRouter:
         scope = intent.scope
 
         # Backward compatibility for legacy intents that don't set the new fields.
-        if intent.analysis_type == "clarification":
-            interaction_mode = "clarify"
-        elif intent.complexity == "direct_response" and not intent.metadata.get(
-            "tool_name"
-        ):
-            interaction_mode = "answer"
+        if not interaction_mode:
+            if intent.analysis_type == "clarification":
+                interaction_mode = "clarify"
+            elif intent.interaction_mode == "answer" or intent.complexity == "direct_response":
+                interaction_mode = "answer"
 
         if interaction_mode == "clarify":
             return self._runner._handle_clarification(intent, working_memory)
@@ -124,9 +125,24 @@ class IntentRouter:
                 )
 
         # Everything else is some form of execution.
+        plan_context = {"project_id": project_id}
         plan_result, tree = await self._runner.task_decomposer.decompose_with_plan(
-            intent, context={"project_id": project_id}
+            intent, context=plan_context
         )
+
+        # If the domain planner only produced a fallback (no concrete skill match),
+        # let the open agent try before presenting an approval-gated fallback plan.
+        if (
+            plan_result.is_fallback
+            and not self._runner._is_fallback_suggestion(tree)
+            and getattr(settings, "open_agent_fallback_enabled", True)
+        ):
+            open_plan = await self._runner.task_decomposer._get_open_agent_planner().plan(
+                intent
+            )
+            if open_plan is not None and not open_plan.is_fallback:
+                plan_result = open_plan
+                tree = self._runner.task_decomposer._plan_result_to_task_tree(open_plan)
 
         # Open agent plans are executed by the open agent executor.
         if plan_result.derivation == "open-agent":
@@ -205,7 +221,7 @@ class IntentRouter:
                 plan_mode=plan_mode,
             )
 
-        if scope == "single_step" or intent.complexity == "single_step":
+        if scope == "single_step":
             return await self._runner._handle_single_step(
                 tree,
                 working_memory,
@@ -289,12 +305,11 @@ class IntentRouter:
         # runs directly under every strategy.
         domain_def = get_domain_registry().get(intent.domain) if intent.domain else None
         strategy = resolve_strategy(domain_def=domain_def, role_id=None, settings=settings)
-        signature_cache = getattr(self._runner, "_approved_plan_signatures", None)
-        if signature_cache is None:
-            signature_cache = {}
-            self._runner._approved_plan_signatures = signature_cache
-        seen_signatures = signature_cache.setdefault(session_id, set())
-        needs_approval = should_require_approval(
+        # Load persisted approved plan signatures for first_time strategy.
+        project_state_manager = ProjectStateManager(CBKB(settings.data_dir))
+        project_state = project_state_manager.load(project_id or "default")
+        seen_signatures = project_state.approved_plan_signatures
+        needs_approval, updated_signatures = should_require_approval(
             strategy=strategy,
             plan=plan,
             tree=tree,
@@ -377,14 +392,15 @@ class IntentRouter:
                         "total_estimated_cost_usd": plan.plan_result.total_estimated_cost_usd,
                         "total_estimated_duration_seconds": plan.plan_result.total_estimated_duration_seconds,
                     }
+                progress, progress_tasks = self.build_initial_progress(tree)
                 agent_msg = ChatMessage(
                     id=f"msg_{len(working_memory.messages)}",
                     type=MessageType.EXECUTION_PLAN,
                     content={
                         "plan_id": plan.plan_id,
                         "response_text": response_text,
-                        "tasks": [t.model_dump() for t in tree.tasks],
-                        "progress": self.build_initial_progress(tree),
+                        "tasks": progress_tasks,
+                        "progress": progress,
                         "estimates": estimates,
                         "critic_review": review,
                     },
@@ -403,7 +419,6 @@ class IntentRouter:
         mode = (
             JobMode.SINGLE_STEP
             if intent.scope == "single_step"
-            or intent.complexity == "single_step"
             or is_single_task_tree
             else JobMode.WORKFLOW
         )
@@ -420,14 +435,29 @@ class IntentRouter:
             plan.approved_by = "system"
             await plan_store.update(plan)
 
+        # Persist the plan signature now that it has been approved/executed.
+        # This makes the first_time approval strategy survive restarts.
+        if (
+            strategy == "first_time"
+            and plan is not None
+            and updated_signatures is not None
+            and len(updated_signatures) > len(seen_signatures)
+        ):
+            try:
+                project_state.approved_plan_signatures = updated_signatures
+                project_state_manager.save(project_state)
+            except Exception:
+                logger.warning("Failed to persist approved plan signatures", exc_info=True)
+
         response_text = "已提交后台执行，完成后会通知您。"
+        progress, progress_tasks = self.build_initial_progress(tree)
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
             type=MessageType.TODO_LIST,
             content={
                 "text": response_text,
-                "tasks": [t.model_dump() for t in tree.tasks],
-                "progress": self.build_initial_progress(tree),
+                "tasks": progress_tasks,
+                "progress": progress,
                 "job_id": job.job_id,
                 "project_id": project_id,
             },
@@ -470,10 +500,39 @@ class IntentRouter:
         return review.to_dict()
 
     @staticmethod
-    def build_initial_progress(tree: "TaskTree") -> Dict[str, Any]:
-        """Build a zero-progress dict for a freshly created plan/job."""
-        total = len(tree.tasks)
-        return {
+    def build_initial_progress(tree: "TaskTree") -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        """Build a zero-progress dict and a task list for a freshly created plan/job.
+
+        When the task tree carries finer-grained ``display_steps`` (e.g. a single
+        skill that performs annotation + label comparison), those steps are
+        surfaced to the user instead of the coarse executable tasks.
+        """
+        display_steps = getattr(tree, "display_steps", None) or []
+        if display_steps:
+            progress_tasks = [
+                {
+                    "id": getattr(step, "id", f"step_{idx}"),
+                    "name": getattr(step, "description", "") or getattr(step, "phase_type", ""),
+                    "description": getattr(step, "description", ""),
+                    "phase_type": getattr(step, "phase_type", None),
+                    "analysis_type": getattr(step, "analysis_type", None),
+                    "status": "pending",
+                }
+                for idx, step in enumerate(display_steps, start=1)
+            ]
+        else:
+            progress_tasks = [
+                {
+                    "id": task.id,
+                    "name": task.name,
+                    "description": task.description,
+                    "phase_type": task.phase,
+                    "status": "pending",
+                }
+                for task in tree.tasks
+            ]
+        total = len(progress_tasks)
+        progress = {
             "total": total,
             "pending": total,
             "running": 0,
@@ -482,3 +541,4 @@ class IntentRouter:
             "awaiting_human": 0,
             "percent": 0,
         }
+        return progress, progress_tasks

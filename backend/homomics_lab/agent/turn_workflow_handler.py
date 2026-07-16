@@ -82,6 +82,7 @@ class WorkflowHandler:
             intent=intent,
             user_message=user_message,
             working_memory=working_memory,
+            execution_mode=getattr(tree, "execution_mode", None),
         )
         try:
             results = await orchestrator.run_tree(tree, context=context)

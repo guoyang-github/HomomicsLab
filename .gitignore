@@ -8,7 +8,6 @@ build/
 *.pkl
 *.h5ad
 bak/
-docs/
 .claude/
 .*_cache
 *_cache

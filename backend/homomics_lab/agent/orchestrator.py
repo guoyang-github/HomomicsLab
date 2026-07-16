@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Any, Callable, Dict, List, Optional
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
 from homomics_lab.config import settings
 from homomics_lab.agent.intent_analyzer import UserIntent
+from homomics_lab.execution.code_act import run_code_act
+from homomics_lab.llm_client import LLMClient
 from homomics_lab.agent.interpretation import InterpretationEngine
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.phase_gate import GateResult, PhaseGateEvaluator
@@ -28,6 +31,7 @@ from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.workspace.context import workspace_context
 from homomics_lab.workflow.cache import WorkflowCache
 
+logger = logging.getLogger(__name__)
 
 _UNSET = object()
 
@@ -49,9 +53,13 @@ class Orchestrator:
         cbkb: Optional[CBKB] = None,
         skill_registry: Optional[SkillRegistry] = None,
         workflow_cache: Optional[WorkflowCache] = None,
+        skill_executor: Optional[Any] = None,
+        execution_router: Optional[Any] = None,
     ):
         self.registry = registry or get_default_registry()
         self.skill_registry = skill_registry or get_default_skill_registry()
+        self.skill_executor = skill_executor
+        self.execution_router = execution_router
         self.workflow_cache = workflow_cache
         self.state_machine = TaskStateMachine()
         self.hitl_detector = HITLDetector()
@@ -393,12 +401,22 @@ class Orchestrator:
         # Respect explicit agent/skill failure before gates/reviewers.
         if isinstance(result, dict) and result.get("success") is False:
             error_message = result.get("error") or "Skill execution failed"
-            task.error_message = error_message
-            self.state_machine.transition(task, TaskStatus.FAILED)
-            self._publish_task_update(
-                tree, task, "FAILED", error_message=error_message
+            fallback = await self._try_codeact_fallback(
+                task, context, original_error=error_message
             )
-            return
+            if fallback is not None:
+                results[task.id] = fallback
+                task.result = fallback
+                # Replace the failed result with the fallback and continue normal
+                # post-processing (gate, cache, completion).
+                result = fallback
+            else:
+                task.error_message = error_message
+                self.state_machine.transition(task, TaskStatus.FAILED)
+                self._publish_task_update(
+                    tree, task, "FAILED", error_message=error_message
+                )
+                return
 
         # SWR: escalate worker failures that survived retries.
         if self.supervisor is not None:
@@ -410,13 +428,22 @@ class Orchestrator:
                     await self._replan_for_worker_failure(tree, task, worker_result, context)
                     self.state_machine.transition(task, TaskStatus.COMPLETED)
                     return
-                # Escalate to HITL (or replan exhausted).
-                checkpoint = self._create_worker_failure_checkpoint(task, worker_result)
-                task.hitl_checkpoints.insert(0, checkpoint)
-                self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
-                results[task.id] = {"hitl": checkpoint.model_dump()}
-                self._publish_task_update(tree, task, "AWAITING_HUMAN")
-                return
+                # Replan exhausted — try CodeAct fallback before escalating to HITL.
+                fallback = await self._try_codeact_fallback(
+                    task, context, original_error=worker_result.get("error")
+                )
+                if fallback is not None:
+                    results[task.id] = fallback
+                    task.result = fallback
+                    result = fallback
+                else:
+                    # Escalate to HITL.
+                    checkpoint = self._create_worker_failure_checkpoint(task, worker_result)
+                    task.hitl_checkpoints.insert(0, checkpoint)
+                    self.state_machine.transition(task, TaskStatus.AWAITING_HUMAN)
+                    results[task.id] = {"hitl": checkpoint.model_dump()}
+                    self._publish_task_update(tree, task, "AWAITING_HUMAN")
+                    return
 
         # Snapshot before gate evaluation if needed.
         if self._should_snapshot(task):
@@ -1050,6 +1077,165 @@ class Orchestrator:
 
         tree.tasks = new_tasks
 
+    def _fallback_task_prompt(
+        self,
+        task: TaskNode,
+        original_error: Optional[str] = None,
+    ) -> str:
+        """Build a concise CodeAct prompt from the failed task metadata."""
+        parts = [
+            f"Task: {task.name}",
+            f"Description: {task.description or task.name}",
+        ]
+        if task.skills_required:
+            parts.append(f"Skills that failed: {', '.join(task.skills_required)}")
+        if task.parameters:
+            # Keep the prompt focused; avoid dumping huge nested structures.
+            params = {
+                k: v for k, v in task.parameters.items()
+                if isinstance(v, (str, int, float, bool)) or v is None
+            }
+            if params:
+                parts.append(f"Parameters: {params}")
+        if original_error:
+            parts.append(f"Original error: {original_error}")
+        return "\n".join(parts)
+
+    def _fallback_working_dir(self, context: Dict[str, Any]) -> Optional[Path]:
+        """Resolve a working directory for CodeAct fallback."""
+        project_id = context.get("project_id") if context else None
+        if project_id:
+            return settings.data_dir / "workspaces" / project_id
+        return None
+
+    async def _try_codeact_fallback(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        original_error: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Try to recover a failed task by generating and executing code.
+
+        Returns a skill-style result dict on success, or None when fallback
+        is disabled, unavailable, or also fails.
+        """
+        # Fixed-pipeline mode means curated skills must succeed or fail cleanly;
+        # do not silently generate code.
+        if self._execution_mode(context) == "fixed_pipeline":
+            return None
+
+        codeact_result = await self._run_codeact_for_task(
+            task, context, original_error=original_error
+        )
+        if not codeact_result.get("success"):
+            return None
+        return self._normalize_codeact_result(
+            task, codeact_result, original_error=original_error, fallback=True
+        )
+
+    def _execution_mode(self, context: Dict[str, Any]) -> str:
+        """Return the plan-level execution mode from context."""
+        mode = context.get("execution_mode") if context else None
+        if mode in ("fixed_pipeline", "codeact", "auto"):
+            return mode
+        return "auto"
+
+    async def _execute_task_codeact(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute a task directly with CodeAct (foundation-first path).
+
+        This is the primary execution strategy when ``execution_mode`` is
+        ``codeact``. Curated skills are treated as references, not as rigid
+        entrypoints, so the agent can generate bridging code as needed.
+        """
+        self.state_machine.transition(task, TaskStatus.RUNNING)
+        codeact_result = await self._run_codeact_for_task(task, context)
+        return self._normalize_codeact_result(
+            task, codeact_result, skill_name="codeact"
+        )
+
+    async def _run_codeact_for_task(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        original_error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate and run CodeAct for a task."""
+        if not getattr(settings, "codeact_fallback_enabled", True):
+            return {"success": False, "error": "CodeAct execution disabled"}
+
+        working_dir = self._fallback_working_dir(context)
+        if working_dir is None:
+            return {"success": False, "error": "No project working directory available"}
+
+        prompt = self._fallback_task_prompt(task, original_error)
+        code_context: Dict[str, Any] = {
+            "task_name": task.name,
+            "task_description": task.description or task.name,
+            "project_id": context.get("project_id"),
+        }
+        for key, value in task.parameters.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file() or path.is_dir():
+                    code_context[key] = str(value)
+            elif isinstance(value, dict) and "path" in value:
+                code_context[key] = value["path"]
+            elif isinstance(value, (int, float, bool)) or value is None:
+                code_context[key] = value
+
+        llm_client: Optional[LLMClient] = None
+        try:
+            llm_client = LLMClient()
+        except Exception:
+            llm_client = None
+
+        try:
+            return await run_code_act(
+                task=prompt,
+                language="python",
+                context=code_context,
+                working_dir=working_dir,
+                llm_client=llm_client,
+                skill_registry=self.skill_registry,
+                tool_registry=None,
+            )
+        except Exception as exc:
+            logger.warning("CodeAct execution failed for task %s: %s", task.name, exc)
+            return {"success": False, "error": str(exc)}
+
+    @staticmethod
+    def _normalize_codeact_result(
+        task: TaskNode,
+        codeact_result: Dict[str, Any],
+        original_error: Optional[str] = None,
+        fallback: bool = False,
+        skill_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Normalize a CodeAct result into a skill-style result dict."""
+        if skill_name is None:
+            skill_name = task.skills_required[0] if task.skills_required else "codeact"
+        normalized: Dict[str, Any] = {
+            "status": "success" if codeact_result.get("success") else "error",
+            "skill": skill_name,
+            "fallback": fallback,
+            "original_error": original_error,
+            "result": codeact_result.get("result") or {},
+            "stdout": codeact_result.get("stdout", ""),
+            "stderr": codeact_result.get("stderr", ""),
+            "code": codeact_result.get("code", ""),
+        }
+        result_data = normalized["result"]
+        if isinstance(result_data, dict):
+            for key in ("output_path", "output_file", "plot_path"):
+                if key in result_data and "output_files" not in normalized:
+                    normalized["output_files"] = [result_data[key]]
+                    break
+        return normalized
+
     async def _execute_task(
         self,
         task: TaskNode,
@@ -1069,8 +1255,21 @@ class Orchestrator:
             finally:
                 await self._finish_trace_node(task, context, trace_node_id, results)
 
+        mode = self._execution_mode(context)
+
+        # CodeAct-first mode: skip curated skill runtime entirely.
+        if mode == "codeact":
+            try:
+                result = await self._execute_task_codeact(task, context)
+                results[task.id] = result
+                task.result = result
+                return result
+            finally:
+                await self._finish_trace_node(task, context, trace_node_id, results)
+
         max_attempts = task.retry_policy.max_attempts
         backoff = task.retry_policy.backoff_seconds
+        last_error: Optional[Exception] = None
 
         try:
             for attempt in range(1, max_attempts + 1):
@@ -1089,6 +1288,7 @@ class Orchestrator:
                     return result
 
                 except Exception as e:
+                    last_error = e
                     task.error_message = str(e)
                     task.attempt_count = attempt
 
@@ -1098,9 +1298,21 @@ class Orchestrator:
                         # Retry with backoff
                         await asyncio.sleep(backoff * (2 ** (attempt - 1)))
                     else:
-                        # Final attempt failed
+                        # Final attempt failed; try CodeAct fallback unless we
+                        # are in fixed-pipeline mode (where curated skills must
+                        # succeed or fail cleanly).
+                        if mode != "fixed_pipeline":
+                            fallback = await self._try_codeact_fallback(
+                                task, context, original_error=str(e)
+                            )
+                            if fallback is not None:
+                                results[task.id] = fallback
+                                task.result = fallback
+                                return fallback
+                        # Fallback unavailable, disabled, or fixed-pipeline —
+                        # raise the original error.
                         self.state_machine.transition(task, TaskStatus.FAILED)
-                        raise
+                        raise last_error
         finally:
             await self._finish_trace_node(task, context, trace_node_id, results)
 

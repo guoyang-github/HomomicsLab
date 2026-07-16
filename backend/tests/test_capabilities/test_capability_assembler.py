@@ -192,8 +192,6 @@ async def test_capability_first_routing_through_task_decomposer(monkeypatch):
     from homomics_lab.agent.task_decomposer import TaskDecomposer
     from homomics_lab.config import settings
 
-    monkeypatch.setattr(settings, "capability_first_routing_enabled", True)
-
     reg = SkillRegistry()
     reg.register(_make_skill("text_summarizer", "Summarize long articles"))
 

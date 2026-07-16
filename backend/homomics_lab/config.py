@@ -338,11 +338,9 @@ class Settings(BaseSettings):
     llm_response_cache_max_entries: int = 1000
     llm_complexity_routing_enabled: bool = True
 
-    # Capability-first routing (P3): when True, TaskDecomposer uses the unified
-    # CapabilityAssembler to decide between cross-domain, template, standalone
-    # skill and open-agent planners.  This is now the default and recommended
-    # mode; set to False to restore the legacy _should_use_* rule set.
-    capability_first_routing_enabled: bool = True
+    # Capability-first routing is now the only routing mode.  Open exploration
+    # lets the assembler propose cross-domain combinations even when the user
+    # message does not explicitly name multiple domains.
     open_exploration_mode_enabled: bool = False
 
     # Agent executor reliability
@@ -437,12 +435,17 @@ class Settings(BaseSettings):
     # before falling back to the interactive tool loop. Enabled by default because
     # it avoids the long-context doom loop for standard analysis tasks while still
     # falling back to the interactive loop when the script fails.
-    agent_script_first_enabled: bool = True
+    agent_script_first_enabled: bool = False
     agent_auto_run_script: bool = True
 
     # Workflow execution settings
     workflow_nextflow_enabled: bool = True
-    workflow_nextflow_min_phases: int = 3
+    # Nextflow is reserved for genuinely large workflows.  A low threshold
+    # causes small single-skill tasks (e.g. "use CellTypist") to be wrapped in
+    # a Nextflow project, which is unnecessary overhead.  The conservative
+    # default (8) plus the sample-count guard in ``hpc/router.py`` means most
+    # interactive analyses run locally unless the user explicitly opts in.
+    workflow_nextflow_min_phases: int = 8
     workflow_cache_enabled: bool = True
     workflow_cache_dir: Optional[Path] = None
     workflow_cache_content_hash_limit: int = 10 * 1024 * 1024  # 10 MB
@@ -494,6 +497,15 @@ class Settings(BaseSettings):
 
     # CodeAct safety settings
     codeact_hitl_level: str = "high"  # "low" | "medium" | "high" | "critical" | "never"
+
+    # CodeAct fallback: when a skill task fails, try to generate and run code
+    # directly before giving up. Enabled by default.
+    codeact_fallback_enabled: bool = True
+
+    # Open-agent fallback: when the domain planner returns a fallback plan with
+    # no concrete skill match, let the open agent try before asking the user to
+    # approve a vague plan. Enabled by default.
+    open_agent_fallback_enabled: bool = True
 
     # CodeAct cache settings
     codeact_cache_enabled: bool = True
