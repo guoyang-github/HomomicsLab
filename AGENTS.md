@@ -224,6 +224,25 @@ GitHub Actions (`.github/workflows/ci.yml`) runs:
 - Backend Docker build + `/health` smoke test.
 - Frontend `npm ci`, `npm test -- --run`, and `npm run build` on Node 20.
 
+### Testing discipline
+
+When refactoring signature-sensitive or heuristic-sensitive code, run the
+relevant test suites before committing. Concrete guardrails:
+
+- Changes to `homomics_lab.execution.code_act.generate_code_async` or
+  `run_code_act` must pass `backend/tests/test_skills` and
+  `backend/tests/test_execution`.
+- Changes to `homomics_lab.hpc.router.select_execution_backend` or
+  workflow backend thresholds must pass `backend/tests/test_skills/test_runtime_backend.py`
+  and `backend/tests/test_hpc`.
+- Changes to `homomics_lab.agent.orchestrator` execution routing
+  (`execution_mode`, `use_skill_reference`, `_execute_task_*`) must pass
+  `backend/tests/test_agent/test_orchestrator.py` and
+  `backend/tests/test_agent/test_task_decomposer.py`.
+
+Keep the backend suite green; red tests caused by out-of-sync fixtures or
+mocks should be fixed in the same commit as the production change.
+
 ## Code style guidelines
 
 ### Python
