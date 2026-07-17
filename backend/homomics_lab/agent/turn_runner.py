@@ -11,16 +11,12 @@ The TurnRunner handles every user message through a single, consistent pipeline:
 This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 """
 
-import json
-import asyncio
 import logging
-import random
 import time
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
-from homomics_lab.agent.agent_loop import AgentLoop, ToolCallRecord, TurnBudget
 from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.agent.errors import (
     ExecutionError,
@@ -37,14 +33,18 @@ from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.plan.self_correction import SelfCorrectionEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
+from homomics_lab.agent.turn_agent_loop import AgentLoopHandler
+from homomics_lab.agent.turn_approval_handler import ToolApprovalHandler
 from homomics_lab.agent.turn_clarification import ClarificationHandler
 from homomics_lab.agent.turn_context_formatter import ContextFormatter
+from homomics_lab.agent.turn_feedback_recorder import FeedbackRecorder
 from homomics_lab.agent.turn_file_resolver import FileReferenceResolver
 from homomics_lab.agent.turn_intent_router import IntentRouter
 from homomics_lab.agent.turn_response_generator import ResponseGenerator
 from homomics_lab.agent.turn_result_assembler import ResultAssembler
 from homomics_lab.agent.turn_risk_assessor import RiskAssessor
 from homomics_lab.agent.turn_self_correction import SelfCorrectionHandler
+from homomics_lab.agent.turn_state_persistence import TurnStatePersistence
 from homomics_lab.agent.turn_workflow_handler import WorkflowHandler
 from homomics_lab.agent.permission_ruleset import (
     PermissionRegistry,
@@ -55,30 +55,19 @@ from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
 from homomics_lab.context.context_engine.models import ContextBundle
-from homomics_lab.context.feedback_store import FeedbackOutcome
 from homomics_lab.context.memory_backend import MemoryBackend
 from homomics_lab.context.memory_manager import MemoryManager
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.context.prompter import Prompter
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.hpc.state import ExecutionState
-from homomics_lab.workspace.context import current_workspace
-from homomics_lab.workspace.manager import WorkspaceManager
 from homomics_lab.llm_client import LLMClient
-from homomics_lab.models.common import (
-    ChatMessage,
-    HITLCheckpoint,
-    HITLTrigger,
-    MessageType,
-    Option,
-)
+from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.plan.models import Plan
 from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.store import PlanStore
 from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
-from homomics_lab.knowledge.seed import record_observed_seed_edges
-from homomics_lab.tasks.models import TaskStatus
 from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
@@ -261,6 +250,17 @@ class TurnRunner:
         self._response_generator = ResponseGenerator(self)
         self._self_correction_handler = SelfCorrectionHandler(self)
         self._workflow_handler = WorkflowHandler(self)
+        self._state_persistence = TurnStatePersistence(self)
+        self._agent_loop_handler = AgentLoopHandler(self)
+        self._approval_handler = ToolApprovalHandler(self)
+        # FeedbackRecorder is the one collaborator without a runner
+        # back-reference: its services are never reassigned after
+        # construction, so they are injected explicitly.
+        self._feedback_recorder = FeedbackRecorder(
+            capability_index=self.capability_index,
+            memory_backend=self.memory_backend,
+            skill_dag=self.skill_dag,
+        )
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -527,156 +527,6 @@ class TurnRunner:
             plan_mode=plan_mode,
         )
 
-    async def _run_turn_with_state(
-        self,
-        session_id: str,
-        user_message: str,
-        working_memory: WorkingMemory,
-        project_id: str,
-        task_tree: Optional[TaskTree] = None,
-        job_service=None,
-        enqueue_skills: bool = False,
-        plan_store: Optional[PlanStore] = None,
-        debate_response: Optional[Dict[str, Any]] = None,
-        plan_mode: bool = False,
-        trace_id: Optional[str] = None,
-    ) -> TurnResult:
-        """Run the turn pipeline once and persist state."""
-        turn_result: Optional[TurnResult] = None
-        workspace_token = None
-        if project_id:
-            workspace = WorkspaceManager(settings.data_dir, project_id)
-            workspace_token = current_workspace.set(workspace)
-        try:
-            turn_result = await self._run_turn_once(
-                session_id=session_id,
-                user_message=user_message,
-                working_memory=working_memory,
-                project_id=project_id,
-                task_tree=task_tree,
-                job_service=job_service,
-                enqueue_skills=enqueue_skills,
-                plan_store=plan_store,
-                debate_response=debate_response,
-                plan_mode=plan_mode,
-            )
-        except TurnError as exc:
-            if exc.retryable:
-                max_retries = 2
-                for attempt in range(max_retries):
-                    backoff = (2**attempt) * 0.5 + random.uniform(0, 0.25)
-                    logger.warning(
-                        "Retryable turn error, retrying in %.2fs: %s",
-                        backoff,
-                        exc,
-                    )
-                    await asyncio.sleep(backoff)
-                    try:
-                        turn_result = await self._run_turn_once(
-                            session_id=session_id,
-                            user_message=user_message,
-                            working_memory=working_memory,
-                            project_id=project_id,
-                            task_tree=task_tree,
-                            job_service=job_service,
-                            enqueue_skills=enqueue_skills,
-                            plan_store=plan_store,
-                            debate_response=debate_response,
-                            plan_mode=plan_mode,
-                        )
-                        break
-                    except TurnError as exc2:
-                        exc = exc2
-                        if not exc2.retryable or attempt == max_retries - 1:
-                            turn_result = self._build_error_result(exc2, working_memory)
-                            break
-                else:
-                    turn_result = self._build_error_result(exc, working_memory)
-            else:
-                turn_result = self._build_error_result(exc, working_memory)
-        except Exception as exc:
-            # Wrap unexpected errors as ExecutionError for structured reporting.
-            turn_result = self._build_error_result(
-                ExecutionError(
-                    str(exc), context={"exception_type": type(exc).__name__}
-                ),
-                working_memory,
-            )
-        finally:
-            if workspace_token is not None:
-                current_workspace.reset(workspace_token)
-
-        # 5. Persist turn to long-term memory (best-effort)
-        if self.memory_manager is not None and turn_result is not None:
-            try:
-                await self.memory_manager.persist_turn(
-                    session_id=session_id,
-                    project_id=project_id,
-                    user_message=user_message,
-                    turn_result=turn_result,
-                    working_memory=working_memory,
-                    task_tree=turn_result.task_tree,
-                )
-            except Exception:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "Failed to persist turn to memory", exc_info=True
-                )
-
-        # 6. Update structured project state (best-effort)
-        if self.project_state_manager is not None and turn_result is not None:
-            try:
-                project_state = self.project_state_manager.load(project_id)
-                project_state = self.project_state_manager.update_from_turn(
-                    project_state,
-                    task_tree=getattr(turn_result, "task_tree", None),
-                    turn_result=turn_result,
-                )
-                self.project_state_manager.save(project_state)
-            except Exception:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "Failed to update project state", exc_info=True
-                )
-
-        turn_result = turn_result or self._build_error_result(
-            ExecutionError("Turn produced no result"), working_memory
-        )
-
-        # Record a lightweight summary node in the execution trace.
-        if self._trace_store is not None and trace_id is not None:
-            try:
-                await self._trace_store.add_node(
-                    trace_id=trace_id,
-                    node_type="turn",
-                    name="chat_turn",
-                    metadata={
-                        "mode": str(
-                            turn_result.mode.value
-                            if hasattr(turn_result.mode, "value")
-                            else turn_result.mode
-                        ),
-                        "response_length": len(turn_result.response_text or ""),
-                        "has_error": turn_result.error is not None,
-                        "job_id": turn_result.job_id,
-                        "plan_id": turn_result.plan_id,
-                    },
-                )
-                await self._trace_store.update_node(
-                    trace_id=trace_id,
-                    node_id="root",
-                    status="completed" if not turn_result.error else "failed",
-                    outputs={
-                        "response_preview": (turn_result.response_text or "")[:200]
-                    },
-                )
-            except Exception:
-                logger.warning("Failed to record turn trace node", exc_info=True)
-
-        return turn_result
-
     async def _run_turn_once(
         self,
         session_id: str,
@@ -866,358 +716,6 @@ class TurnRunner:
             agent_message=agent_msg,
         )
 
-    async def _handle_agent_loop(
-        self,
-        user_message: str,
-        working_memory: WorkingMemory,
-        allowed_tools: Optional[List[str]] = None,
-        intent: Optional[UserIntent] = None,
-    ) -> TurnResult:
-        """Run the LLM-driven tool-calling loop for MCP tool intents."""
-        if self._llm_client is None or self._tool_registry is None:
-            raise RuntimeError("AgentLoop requires both llm_client and tool_registry")
-
-        history = self._working_memory_to_history(working_memory)
-        loop = AgentLoop(
-            llm_client=self._llm_client,
-            tool_registry=self._tool_registry,
-            session_id=getattr(self, "_session_id", None),
-            project_id=getattr(self, "_project_id", None),
-            request_id=getattr(self, "_turn_request_id", None),
-            max_rounds=3,
-            budget=TurnBudget(max_llm_calls=5, max_tool_calls=10),
-            event_callback=getattr(self, "_event_callback", None),
-        )
-        result = await loop.run(
-            user_message=user_message,
-            history=history,
-            allowed_tools=allowed_tools,
-        )
-
-        if result.awaiting_approval and result.approval_request:
-            tool_name = result.approval_request.get("tool_name", "")
-            risk_level = result.approval_request.get("risk_level", "high")
-            if self._permission_registry.can_auto_approve_tool(
-                role_id=None,
-                domain=intent.domain if intent else None,
-                tool_name=tool_name,
-                risk_level=risk_level,
-            ):
-                return await self.respond_to_tool_approval(
-                    call_id=result.approval_request["call_id"],
-                    approved=True,
-                    working_memory=working_memory,
-                    project_id=getattr(self, "_project_id", "default"),
-                )
-            return await self._create_tool_approval_hitl(
-                result, working_memory, user_message
-            )
-
-        response_text = result.response_text
-        if not response_text or not str(response_text).strip():
-            response_text = "工具调用已完成，但没有生成可读的回复。"
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TEXT,
-            content=response_text,
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        # Preserve a structured preview if any tool calls were made.
-        if result.tool_calls:
-            preview_msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.RESULT_PREVIEW,
-                content={
-                    "tool_calls": [
-                        {
-                            "tool_name": tc.tool_name,
-                            "inputs": tc.inputs,
-                            "success": tc.success,
-                            "output_summary": tc.output_summary,
-                        }
-                        for tc in result.tool_calls
-                    ],
-                    "response_text": response_text,
-                },
-                sender="agent",
-            )
-            working_memory.add_message(preview_msg)
-
-        # Suggest follow-up questions for direct text/tool answers.
-        suggestions = await self._generate_followup_suggestions(
-            user_message=user_message,
-            response_text=response_text,
-        )
-        if suggestions:
-            follow_up_msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.FOLLOW_UP,
-                content={"suggestions": suggestions},
-                sender="agent",
-            )
-            working_memory.add_message(follow_up_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.DIRECT_RESPONSE,
-            response_text=response_text,
-            agent_message=agent_msg,
-        )
-
-    async def _generate_followup_suggestions(
-        self,
-        user_message: str,
-        response_text: str,
-        max_suggestions: int = 3,
-    ) -> List[str]:
-        """Generate concise follow-up question suggestions using the LLM."""
-        if (
-            self._llm_client is None
-            or not getattr(self._llm_client, "is_configured", lambda: False)()
-        ):
-            return []
-
-        prompt = (
-            f"User question: {user_message}\n"
-            f"Agent answer: {response_text}\n\n"
-            f"Generate up to {max_suggestions} concise follow-up questions the user might ask next. "
-            "Respond with a JSON array of strings only, no markdown."
-        )
-        try:
-            raw = await self._llm_client.chat_completion(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that suggests follow-up questions.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-                max_tokens=200,
-                response_format={"type": "json_object"},
-            )
-            parsed = json.loads(raw)
-            suggestions = (
-                parsed.get("suggestions", parsed)
-                if isinstance(parsed, dict)
-                else parsed
-            )
-            if isinstance(suggestions, list):
-                return [str(s) for s in suggestions[:max_suggestions]]
-        except Exception:
-            logger.debug("Follow-up suggestion generation failed", exc_info=True)
-        return []
-
-    async def _create_tool_approval_hitl(
-        self,
-        loop_result: Any,
-        working_memory: WorkingMemory,
-        user_message: str,
-    ) -> "TurnResult":
-        """Create a HITL request when the agent loop pauses for tool approval."""
-        req = loop_result.approval_request
-        call_id = req["call_id"]
-        tool_name = req["tool_name"]
-        arguments = req["arguments"]
-
-        checkpoint = HITLCheckpoint(
-            id=f"tool_approval_{call_id}",
-            trigger_reason=HITLTrigger.HIGH_RISK,
-            context_summary=(
-                f"Agent wants to run high-risk tool `{tool_name}` "
-                f"with arguments {arguments}. Please approve or decline."
-            ),
-            options=[
-                Option(
-                    id="approve", label="授权执行", description="允许执行该高风险工具"
-                ),
-                Option(id="decline", label="拒绝", description="跳过该工具调用"),
-            ],
-            metadata={
-                "tool_approval_call_id": call_id,
-                "tool_name": tool_name,
-                "arguments": arguments,
-            },
-        )
-
-        hitl_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.HITL_REQUEST,
-            content={
-                "checkpoint": checkpoint.model_dump(),
-                "task_id": call_id,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(hitl_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.AWAITING_HITL,
-            response_text=loop_result.response_text,
-            agent_message=hitl_msg,
-            hitl_task_id=call_id,
-            hitl_checkpoint=checkpoint.model_dump(),
-        )
-
-    async def respond_to_tool_approval(
-        self,
-        call_id: str,
-        approved: bool,
-        working_memory: WorkingMemory,
-        project_id: str,
-    ) -> "TurnResult":
-        """Resume an agent loop after a high-risk tool approval decision."""
-        from homomics_lab.tools.approval_store import PersistentApprovalStore
-        from homomics_lab.agent.agent_loop import AgentLoop
-
-        store = self._approval_store or PersistentApprovalStore()
-        request = store.get(call_id)
-        if request is None:
-            text = f"找不到工具授权请求 `{call_id}`，请重新发起查询。"
-            msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.TEXT,
-                content=text,
-                sender="agent",
-            )
-            working_memory.add_message(msg)
-            return TurnResult(
-                mode=ExecutionMode.DIRECT_RESPONSE,
-                response_text=text,
-                agent_message=msg,
-            )
-
-        if not approved:
-            text = f"已拒绝执行高风险工具 `{request.tool_name}`。"
-            msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.TEXT,
-                content=text,
-                sender="agent",
-            )
-            working_memory.add_message(msg)
-            request.approved = False
-            store.reject(call_id, resolver="user", reason="declined")
-            return TurnResult(
-                mode=ExecutionMode.DIRECT_RESPONSE,
-                response_text=text,
-                agent_message=msg,
-            )
-
-        # Mark approved and execute the tool directly.
-        request.approved = True
-        store.approve(call_id, resolver="user", reason="approved")
-
-        metadata = request.metadata or {}
-        messages = list(metadata.get("messages", []))
-        tool_records = [ToolCallRecord(**r) for r in metadata.get("tool_records", [])]
-        pending = metadata.get("pending_tool_call", {})
-        tool_name = pending.get("name", request.tool_name)
-        tool_inputs = pending.get("inputs", request.arguments)
-        tool_call_id = pending.get("id", call_id)
-
-        if self._tool_registry is None:
-            text = "Tool registry unavailable, cannot resume tool execution."
-            msg = ChatMessage(
-                id=f"msg_{len(working_memory.messages)}",
-                type=MessageType.TEXT,
-                content=text,
-                sender="agent",
-            )
-            working_memory.add_message(msg)
-            return TurnResult(
-                mode=ExecutionMode.DIRECT_RESPONSE,
-                response_text=text,
-                agent_message=msg,
-            )
-
-        try:
-            tool_result = await self._tool_registry.invoke_async(tool_name, tool_inputs)
-            summary = AgentLoop(
-                llm_client=self._llm_client,
-                tool_registry=self._tool_registry,
-            )._summarize_tool_output(tool_name, tool_result.output)
-        except Exception as exc:
-            summary = f"调用工具 `{tool_name}` 失败：{exc}"
-            tool_result = None
-
-        record = ToolCallRecord(
-            tool_call_id=tool_call_id,
-            tool_name=tool_name,
-            inputs=tool_inputs,
-            success=tool_result is not None and getattr(tool_result, "success", False),
-            output_summary=summary,
-        )
-        tool_records.append(record)
-
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": summary,
-            }
-        )
-
-        # Ask the LLM to summarize the result for the user.
-        final_text = summary
-        if (
-            self._llm_client is not None
-            and getattr(self._llm_client, "is_configured", lambda: False)()
-        ):
-            try:
-                final_msg, _ = await self._llm_client.chat_completion_message(
-                    messages=messages,
-                    temperature=0.3,
-                    max_tokens=2000,
-                    session_id=self._session_id,
-                    project_id=self._project_id,
-                    request_id=f"{self._turn_request_id or 'agent'}_approval_resume",
-                )
-                final_text = (
-                    getattr(final_msg, "content", None) or ""
-                ).strip() or summary
-            except Exception as exc:
-                logger.warning("Tool approval final summarization failed: %s", exc)
-                final_text = summary
-
-        if not final_text or not str(final_text).strip():
-            final_text = "工具调用已完成。"
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TEXT,
-            content=final_text,
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        preview_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.RESULT_PREVIEW,
-            content={
-                "tool_calls": [
-                    {
-                        "tool_name": tc.tool_name,
-                        "inputs": tc.inputs,
-                        "success": tc.success,
-                        "output_summary": tc.output_summary,
-                    }
-                    for tc in tool_records
-                ],
-                "response_text": final_text,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(preview_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.DIRECT_RESPONSE,
-            response_text=final_text,
-            agent_message=agent_msg,
-        )
-
     async def _evaluate_risk(
         self,
         intent: UserIntent,
@@ -1311,122 +809,6 @@ class TurnRunner:
             context["risk_score"] = 0.0
 
         return context
-
-    async def _record_execution_feedback(
-        self,
-        tree: TaskTree,
-        results: Dict[str, Any],
-        project_id: str,
-    ) -> None:
-        """Record skill execution feedback into CapabilityIndex, MemoryBackend and SkillDAG.
-
-        This is best-effort: failures are logged but never break the turn.
-        """
-        if (
-            self.capability_index is None
-            and self.memory_backend is None
-            and self.skill_dag is None
-        ):
-            return
-
-        for task in tree.tasks:
-            if not task.skills_required:
-                continue
-            skill_id = task.skills_required[0]
-            if not skill_id:
-                continue
-
-            outcome = (
-                FeedbackOutcome.SUCCESS
-                if task.status == TaskStatus.COMPLETED
-                else FeedbackOutcome.FAILURE
-            )
-
-            if self.capability_index is not None:
-                try:
-                    await self.capability_index.add_feedback(
-                        capability_id=skill_id,
-                        capability_type=CapabilityType.SKILL,
-                        outcome=outcome,
-                        project_id=project_id,
-                        context={
-                            "task_id": task.id,
-                            "phase": task.phase,
-                            "result_keys": list(results.get(task.id, {}).keys())
-                            if isinstance(results.get(task.id), dict)
-                            else [],
-                        },
-                    )
-                except Exception:
-                    logger.warning(
-                        "Failed to record capability feedback for %s",
-                        skill_id,
-                        exc_info=True,
-                    )
-
-            if self.memory_backend is not None:
-                try:
-                    await self.memory_backend.add(
-                        text=(
-                            f"Executed skill '{skill_id}' for task '{task.name}' "
-                            f"with outcome {outcome.value}."
-                        ),
-                        memory_type="task",
-                        metadata={
-                            "skill_id": skill_id,
-                            "task_id": task.id,
-                            "phase": task.phase,
-                            "outcome": outcome.value,
-                        },
-                        importance=0.7 if outcome == FeedbackOutcome.SUCCESS else 0.9,
-                        project_id=project_id,
-                    )
-                except Exception:
-                    logger.warning(
-                        "Failed to record task memory for %s", skill_id, exc_info=True
-                    )
-
-        if self.skill_dag is not None:
-            # Record adjacent skill transitions so the SkillDAG evolves from
-            # real executions instead of only offline mining.
-            try:
-                from homomics_lab.skills.skill_dag import EdgeType
-
-                prev_skill: Optional[str] = None
-                prev_ok = True
-                observed_pairs: List[Tuple[str, str]] = []
-                for task in tree.tasks:
-                    if not task.skills_required:
-                        continue
-                    skill_id = task.skills_required[0]
-                    if not skill_id:
-                        continue
-                    ok = task.status == TaskStatus.COMPLETED
-                    if prev_skill is not None and prev_skill != skill_id:
-                        self.skill_dag.record_observation(
-                            prev_skill,
-                            skill_id,
-                            EdgeType.FOLLOWED_BY,
-                            prev_ok and ok,
-                            context=f"Turn execution in project {project_id}",
-                        )
-                        if prev_ok and ok:
-                            observed_pairs.append((prev_skill, skill_id))
-                    prev_skill = skill_id
-                    prev_ok = ok
-
-                # Promote high-confidence observed transitions to observed seed
-                # edges (G4). This is best-effort and never blocks the turn.
-                if observed_pairs:
-                    record_observed_seed_edges(
-                        self.skill_dag,
-                        observed_pairs,
-                        threshold=settings.seed_observed_promotion_threshold,
-                    )
-            except Exception:
-                logger.warning(
-                    "Failed to record SkillDAG observations", exc_info=True
-                )
 
     async def _handle_single_step(
         self,
@@ -1615,6 +997,72 @@ class TurnRunner:
     # still invoke these private methods on TurnRunner, while the
     # implementations live in dedicated collaborator classes (pure code move,
     # no logic changes).
+
+    async def _run_turn_with_state(
+        self,
+        session_id: str,
+        user_message: str,
+        working_memory: WorkingMemory,
+        project_id: str,
+        task_tree: Optional[TaskTree] = None,
+        job_service=None,
+        enqueue_skills: bool = False,
+        plan_store: Optional[PlanStore] = None,
+        debate_response: Optional[Dict[str, Any]] = None,
+        plan_mode: bool = False,
+        trace_id: Optional[str] = None,
+    ) -> TurnResult:
+        return await self._state_persistence.run_with_state(
+            session_id=session_id,
+            user_message=user_message,
+            working_memory=working_memory,
+            project_id=project_id,
+            task_tree=task_tree,
+            job_service=job_service,
+            enqueue_skills=enqueue_skills,
+            plan_store=plan_store,
+            debate_response=debate_response,
+            plan_mode=plan_mode,
+            trace_id=trace_id,
+        )
+
+    async def _handle_agent_loop(
+        self,
+        user_message: str,
+        working_memory: WorkingMemory,
+        allowed_tools: Optional[List[str]] = None,
+        intent: Optional[UserIntent] = None,
+    ) -> TurnResult:
+        return await self._agent_loop_handler.handle(
+            user_message=user_message,
+            working_memory=working_memory,
+            allowed_tools=allowed_tools,
+            intent=intent,
+        )
+
+    async def respond_to_tool_approval(
+        self,
+        call_id: str,
+        approved: bool,
+        working_memory: WorkingMemory,
+        project_id: str,
+    ) -> "TurnResult":
+        return await self._approval_handler.respond(
+            call_id=call_id,
+            approved=approved,
+            working_memory=working_memory,
+            project_id=project_id,
+        )
+
+    async def _record_execution_feedback(
+        self,
+        tree: TaskTree,
+        results: Dict[str, Any],
+        project_id: str,
+    ) -> None:
+        return await self._feedback_recorder.record_execution_feedback(
+            tree, results, project_id
+        )
 
     def _working_memory_to_history(
         self, working_memory: WorkingMemory

@@ -126,7 +126,9 @@ async def test_promotes_observed_seed_edges_for_successful_pairs():
         ("t2", "scanpy_norm", TaskStatus.COMPLETED),
     )
 
-    with patch("homomics_lab.agent.turn_runner.record_observed_seed_edges") as mock:
+    with patch(
+        "homomics_lab.agent.turn_feedback_recorder.record_observed_seed_edges"
+    ) as mock:
         await runner._record_execution_feedback(tree, {}, "proj_1")
 
     mock.assert_called_once()
@@ -144,7 +146,9 @@ async def test_failed_pairs_are_not_submitted_as_observed_seeds():
         ("t2", "scanpy_norm", TaskStatus.FAILED),
     )
 
-    with patch("homomics_lab.agent.turn_runner.record_observed_seed_edges") as mock:
+    with patch(
+        "homomics_lab.agent.turn_feedback_recorder.record_observed_seed_edges"
+    ) as mock:
         await runner._record_execution_feedback(tree, {}, "proj_1")
 
     mock.assert_not_called()
@@ -160,7 +164,7 @@ async def test_observed_seed_errors_never_break_feedback():
     )
 
     with patch(
-        "homomics_lab.agent.turn_runner.record_observed_seed_edges",
+        "homomics_lab.agent.turn_feedback_recorder.record_observed_seed_edges",
         side_effect=RuntimeError("observed seed broken"),
     ):
         await runner._record_execution_feedback(tree, {}, "proj_1")

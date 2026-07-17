@@ -10,7 +10,6 @@ retrieval or manual execution.
 """
 
 import asyncio
-import ast
 import json
 import logging
 import os
@@ -23,10 +22,26 @@ from homomics_lab.agent.progress_events import (
     build_agent_event,
     subagent_actor,
 )
-from homomics_lab.artifacts import build_artifact
 from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.llm_client import LLMClient
+from homomics_lab.skills.agent_executor_actions import parse_action
+from homomics_lab.skills.agent_executor_results import (
+    # Re-exported (redundant-alias form) so existing references like
+    # ``from ...agent_executor import harvest_agent_artifacts`` keep working.
+    _MAX_SCAN_FILES as _MAX_SCAN_FILES,
+    _TOOL_ALIASES as _TOOL_ALIASES,
+    enrich_final_output_from_files as enrich_final_output_from_files,
+    harvest_agent_artifacts as harvest_agent_artifacts,
+)
+from homomics_lab.skills.agent_executor_prompts import (
+    # Re-exported (redundant-alias form) so existing references like
+    # ``agent_executor._compact_skill_doc`` keep working after the move.
+    _compact_skill_doc as _compact_skill_doc,
+    _extract_script_reference as _extract_script_reference,
+    build_system_prompt,
+)
+from homomics_lab.skills.agent_executor_script_first import ScriptFirstRunner
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.tools.approval import ToolApprovalRequired, get_default_approval_store
 from homomics_lab.tools.models import ToolResult
@@ -34,23 +49,6 @@ from homomics_lab.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-
-# Common aliases used by community skills (e.g. utils-workflow-management-nextflow)
-_TOOL_ALIASES = {
-    "read_file": "file_read",
-    "write_file": "file_write",
-    "edit_file": "file_edit",
-    "run_shell_command": "shell_exec",
-    "execute_shell": "shell_exec",
-}
-
-
-# Directory names that almost always hold inputs, not skill outputs. When an
-# agentic run falls back to a directory scan we skip these so uploaded data is
-# not mistaken for a produced artifact.
-_INPUT_DIR_NAMES = {"data", "input", "inputs", "raw", "reference", "references"}
-_SCAN_SKIP_DIRS = _INPUT_DIR_NAMES | {".git", ".metadata", "__pycache__", ".venv", "node_modules"}
-_MAX_SCAN_FILES = 2000
 
 # Convergence guardrails (read from settings with safe fallbacks so tests that
 # construct the executor without a fully wired settings object still pass).
@@ -200,171 +198,6 @@ _TIER_TASK_TYPE = {
 _DEFAULT_MODEL_WORDS = {"", "default", "inherit"}
 
 
-def _first_doc_line(doc: Optional[str]) -> str:
-    if not doc:
-        return ""
-    line = doc.strip().splitlines()[0]
-    return (" — " + line) if line else ""
-
-
-def _extract_python_api(path: Path) -> List[str]:
-    """Return concise ``function(args) -> hint — doc`` lines for a Python module."""
-    try:
-        source = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return []
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return []
-
-    def _unparse(ann: Optional[ast.AST]) -> Optional[str]:
-        if ann is None:
-            return None
-        try:
-            return ast.unparse(ann)
-        except Exception:
-            return None
-
-    api: List[str] = []
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            name = node.name
-            if name.startswith("_"):
-                continue
-            arg_nodes = node.args.args
-            defaults = [None] * (len(arg_nodes) - len(node.args.defaults)) + node.args.defaults
-            sig_parts = []
-            for arg_node, default in zip(arg_nodes, defaults):
-                arg_name = arg_node.arg
-                if default is not None:
-                    sig_parts.append(f"{arg_name}=...")
-                else:
-                    sig_parts.append(arg_name)
-            sig = f"{name}({', '.join(sig_parts)})"
-            ret = _unparse(node.returns)
-            if ret:
-                sig += f" -> {ret}"
-            doc = ast.get_docstring(node)
-            api.append(f"- {sig}{_first_doc_line(doc)}")
-        elif isinstance(node, ast.ClassDef):
-            methods = [
-                n.name
-                for n in node.body
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and not n.name.startswith("_")
-            ]
-            if methods:
-                api.append(f"- class {node.name}: methods {methods}")
-    return api
-
-
-def _extract_r_api(path: Path) -> List[str]:
-    """Return concise function signatures from an R script (best-effort regex)."""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        return []
-    api: List[str] = []
-    for match in re.finditer(r"^\s*([A-Za-z_.][A-Za-z0-9_.]*)\s*<-\s*function\s*\(([^)]*)\)", text, re.MULTILINE):
-        name, args = match.group(1), match.group(2)
-        if name.startswith("."):
-            continue
-        api.append(f"- {name}({args.strip()})")
-    return api
-
-
-def _extract_script_reference(source_dir: Optional[Path], max_chars: int = 6000) -> str:
-    """Build a reference from helper scripts in a skill's source dir.
-
-    Small helper scripts (<= 300 lines, <= 12 KB) are inlined in full so the
-    agent can use them without attempting to read files outside the workspace.
-    Larger scripts are summarized as API signatures only. This keeps the prompt
-    compact while giving the agent enough information to write a correct driver.
-    """
-    if not source_dir:
-        return ""
-
-    def _is_small_script(path: Path) -> bool:
-        try:
-            stat = path.stat()
-            if stat.st_size > 12_000:
-                return False
-            with path.open("r", encoding="utf-8", errors="replace") as fh:
-                for i, _ in enumerate(fh):
-                    if i >= 300:
-                        return False
-            return True
-        except Exception:
-            return False
-
-    def _read_source(path: Path) -> str:
-        try:
-            return path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            return ""
-
-    sections: List[str] = []
-    python_dir = Path(source_dir) / "scripts" / "python"
-    r_dir = Path(source_dir) / "scripts" / "r"
-
-    if python_dir.is_dir():
-        entries: List[str] = []
-        for py_file in sorted(python_dir.glob("*.py")):
-            if _is_small_script(py_file):
-                source = _read_source(py_file)
-                if source:
-                    entries.append(f"### {py_file.name} (full source)\n```python\n{source}\n```")
-            else:
-                api = _extract_python_api(py_file)
-                if api:
-                    entries.append(f"### {py_file.name}\n" + "\n".join(api))
-        if entries:
-            sections.append(
-                "## Skill Python helpers (import these; do not read whole files)\n"
-                + "\n\n".join(entries)
-            )
-
-    if r_dir.is_dir():
-        entries = []
-        for r_file in sorted(r_dir.glob("*.R")):
-            if _is_small_script(r_file):
-                source = _read_source(r_file)
-                if source:
-                    entries.append(f"### {r_file.name} (full source)\n```r\n{source}\n```")
-            else:
-                api = _extract_r_api(r_file)
-                if api:
-                    entries.append(f"### {r_file.name}\n" + "\n".join(api))
-        if entries:
-            sections.append(
-                "## Skill R helpers (source these; do not read whole files)\n"
-                + "\n\n".join(entries)
-            )
-
-    text = "\n\n".join(sections)
-    if len(text) > max_chars:
-        text = text[:max_chars].rsplit("\n", 1)[0] + "\n... [truncated] ..."
-    return text
-
-
-def _compact_skill_doc(text: str, max_chars: int = 4000) -> str:
-    """Bound a SKILL.md body for prompt injection.
-
-    Long skill docs bloat the prompt and slow the provider, so only the head
-    (workflow, parameter defaults) and the tail (output contracts and pitfalls
-    conventionally live at the end) are kept, with an explicit elision marker.
-    """
-    text = text.strip()
-    if len(text) <= max_chars:
-        return text
-    head_budget = int(max_chars * 0.6)
-    tail_budget = max_chars - head_budget
-    head = text[:head_budget].rsplit("\n", 1)[0]
-    tail = text[-tail_budget:].split("\n", 1)[-1]
-    return f"{head}\n\n... [middle of SKILL.md elided] ...\n\n{tail}"
-
-
 _SOURCE_READ_PATTERNS = re.compile(
     r"\b(cat|sed|grep|awk|head|tail|less|more|xxd|od|strings|nl|wc)\b"
 )
@@ -399,270 +232,6 @@ def _command_looks_like_driver_script(command: str) -> bool:
     return True
 
 
-def _iter_strings(obj: Any):
-    """Yield every string value nested inside dicts/lists."""
-    if isinstance(obj, dict):
-        for v in obj.values():
-            yield from _iter_strings(v)
-    elif isinstance(obj, (list, tuple)):
-        for v in obj:
-            yield from _iter_strings(v)
-    elif isinstance(obj, str):
-        yield obj
-
-
-def _candidate_paths_from_text(text: str) -> List[Path]:
-    """Pull path-like tokens (with a known artifact extension) out of text."""
-    found: List[Path] = []
-    for token in re.split(r"[\s,;`'\"()\[\]{}]+", text):
-        if len(token) < 3 or len(token) > 512:
-            continue
-        if "/" not in token and "\\" not in token:
-            continue
-        try:
-            p = Path(token)
-        except (ValueError, OSError):
-            continue
-        if p.suffix.lower() in {ext for ext in _ARTIFACT_EXTS}:
-            found.append(p)
-    return found
-
-
-_ARTIFACT_EXTS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
-    ".csv", ".tsv", ".html", ".htm", ".pdf", ".json",
-    ".h5ad", ".h5", ".txt", ".md", ".log", ".rds",
-}
-
-
-def harvest_agent_artifacts(
-    working_dir: Optional[Path],
-    tool_outputs: List[Dict[str, Any]],
-    ignore_preexisting: Optional[Dict[str, float]] = None,
-) -> tuple[List[Dict[str, Any]], List[str]]:
-    """Collect files an agentic run actually produced.
-
-    Strategy: trust the agent's own tool calls first (paths that appear in tool
-    inputs/outputs and now exist on disk). If none are found, fall back to a
-    bounded scan of ``working_dir`` that skips obvious input/hidden directories.
-
-    ``ignore_preexisting`` is a mapping of absolute paths that existed before
-    this agent run started to their modification timestamps. Files whose
-    timestamp has not changed are treated as stale and skipped; overwritten
-    files are kept because their mtime is newer.
-
-    Returns ``(envelopes, output_files)`` where ``envelopes`` are the
-    frontend-ready dicts from :func:`build_artifact` and ``output_files`` is the
-    plain path-string list (for consumers that key on ``output_files``).
-    """
-    root = Path(working_dir) if working_dir else None
-    ignore_map: Dict[str, float] = ignore_preexisting or {}
-    seen: set = set()
-    ordered: List[Path] = []
-
-    # Only these tools actually create or modify files. Harvesting paths from
-    # file_read / file_list would mistake inputs for outputs (e.g. the uploaded
-    # h5ad the agent merely inspected).
-    write_tools = {"file_write", "write_file", "file_edit", "edit_file", "shell_exec"}
-
-    def _is_stale(path: Path) -> bool:
-        try:
-            key = str(path.absolute())
-            old_mtime = ignore_map.get(key)
-            if old_mtime is None:
-                return False
-            return path.stat().st_mtime <= old_mtime + 1.0
-        except OSError:
-            return True
-
-    def add(path: Path, check_ignore: bool = True) -> None:
-        try:
-            if not path.is_file():
-                return
-            key = str(path.absolute())
-            if key in seen or (check_ignore and _is_stale(path)):
-                return
-            seen.add(key)
-            ordered.append(path)
-        except OSError:
-            return
-
-    # 1. Paths referenced by the agent's own write/execute tool calls.
-    # These are always honored, even if the path existed before the run, because
-    # the agent explicitly (re)wrote the file in this run.
-    for entry in tool_outputs or []:
-        if not isinstance(entry, dict):
-            continue
-        tool_name = str(entry.get("tool") or entry.get("tool_name") or "")
-        canonical = _TOOL_ALIASES.get(tool_name, tool_name)
-        if canonical not in write_tools:
-            continue
-        for text in _iter_strings(entry):
-            for cand in _candidate_paths_from_text(text):
-                if not cand.is_absolute() and root is not None:
-                    cand = root / cand
-                add(cand, check_ignore=False)
-
-    # 2. Bounded directory scan to catch files the agent produced but did not
-    # explicitly name in tool output (e.g. files written by a driver script).
-    if root is not None and root.is_dir():
-        count = 0
-        for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-            dirnames[:] = [
-                d
-                for d in dirnames
-                if d not in _SCAN_SKIP_DIRS and not d.startswith(".")
-            ]
-            for fname in filenames:
-                if count >= _MAX_SCAN_FILES:
-                    break
-                p = Path(dirpath) / fname
-                if p.is_file() and p.suffix.lower() in _ARTIFACT_EXTS:
-                    count += 1
-                    add(p)
-            if count >= _MAX_SCAN_FILES:
-                break
-
-    envelopes: List[Dict[str, Any]] = []
-    output_files: List[str] = []
-    for p in ordered:
-        # Never surface files that live in obvious input directories, even if a
-        # shell command happened to print their path.
-        if root is not None:
-            try:
-                rel = p.resolve().relative_to(root.resolve())
-                if any(part in _INPUT_DIR_NAMES for part in rel.parts):
-                    continue
-            except ValueError:
-                # Outside the workspace: only keep if a write tool named it
-                # explicitly (already the case for strategy 1); skip for safety.
-                continue
-        env = build_artifact(p)
-        if env is not None:
-            envelopes.append(env)
-            output_files.append(str(p))
-    return envelopes, output_files
-
-
-def _is_falsy(value: Any) -> bool:
-    """Return True if a metric value should be considered missing/placeholder."""
-    if value is None:
-        return True
-    if isinstance(value, (list, tuple, dict)) and len(value) == 0:
-        return True
-    if isinstance(value, (int, float)) and value == 0:
-        return True
-    if isinstance(value, str) and value.strip() == "":
-        return True
-    return False
-
-
-def _read_json_metrics(path: Path) -> Dict[str, Any]:
-    """Read a summary JSON file and flatten useful metrics."""
-    try:
-        with path.open("r", encoding="utf-8", errors="replace") as fh:
-            data = json.load(fh)
-    except Exception:
-        return {}
-
-    metrics: Dict[str, Any] = {}
-    shape = data.get("shape") or {}
-    if isinstance(shape, dict):
-        metrics["cell_count"] = shape.get("n_cells", shape.get("n_obs"))
-        metrics["gene_count"] = shape.get("n_genes", shape.get("n_vars"))
-    if "obs_columns" in data:
-        metrics["obs_columns"] = data["obs_columns"]
-    if "var_columns" in data:
-        metrics["var_columns"] = data["var_columns"]
-    if "layers" in data:
-        metrics["layers"] = data["layers"]
-    for key in ("nnz", "sparsity", "total_counts", "mean_counts_per_cell", "median_genes_per_cell"):
-        if key in data:
-            metrics[key] = data[key]
-    return {k: v for k, v in metrics.items() if v is not None}
-
-
-def _build_summary_from_metrics(metrics: Dict[str, Any], output_files: List[str]) -> str:
-    """Generate a concrete fallback summary from enriched metrics."""
-    lines = []
-    cell_count = metrics.get("cell_count")
-    gene_count = metrics.get("gene_count")
-    if cell_count is not None and gene_count is not None:
-        lines.append(f"Dataset shape: **{cell_count} cells × {gene_count} genes**.")
-    layers = metrics.get("layers")
-    if layers:
-        lines.append(f"Layers: {', '.join(str(x) for x in layers)}.")
-    total_counts = metrics.get("total_counts")
-    if total_counts is not None:
-        lines.append(f"Total counts: {total_counts:,.0f}.")
-    mean_counts = metrics.get("mean_counts_per_cell")
-    if mean_counts is not None:
-        lines.append(f"Mean counts per cell: {mean_counts:,.1f}.")
-    median_genes = metrics.get("median_genes_per_cell")
-    if median_genes is not None:
-        lines.append(f"Median genes per cell: {median_genes:,.0f}.")
-    obs_cols = metrics.get("obs_columns")
-    if obs_cols:
-        lines.append(f"Obs metadata columns: {', '.join(str(x) for x in obs_cols)}.")
-    if output_files:
-        lines.append("Generated files: " + ", ".join(Path(p).name for p in output_files) + ".")
-    return "\n".join(lines) if lines else ""
-
-
-def enrich_final_output_from_files(
-    final_output: Dict[str, Any],
-    output_files: List[str],
-) -> Dict[str, Any]:
-    """Back-fill final_output.metrics from generated summary/report files.
-
-    Agents sometimes return placeholder zeros or omit concrete numbers in
-    final_output.metrics even when the driver script produced a correct summary
-    JSON. This helper reads the actual output files, merges real metrics, and
-    falls back to a generated concrete summary when the agent's summary is vague.
-    """
-    if not output_files:
-        return final_output
-
-    metrics = dict(final_output.get("metrics", {}))
-
-    for path_str in output_files:
-        path = Path(path_str)
-        if not path.is_file():
-            continue
-        if path.name.lower().endswith("summary.json") or path.suffix.lower() == ".json":
-            file_metrics = _read_json_metrics(path)
-            for key, value in file_metrics.items():
-                if _is_falsy(metrics.get(key)) and not _is_falsy(value):
-                    metrics[key] = value
-
-    # Always expose core shape metrics even if the agent forgot them.
-    for path_str in output_files:
-        path = Path(path_str)
-        if not path.is_file():
-            continue
-        if path.name.lower().endswith("summary.json") or path.suffix.lower() == ".json":
-            file_metrics = _read_json_metrics(path)
-            for key in ("cell_count", "gene_count", "layers", "obs_columns", "var_columns",
-                        "total_counts", "mean_counts_per_cell", "median_genes_per_cell"):
-                if key not in metrics and not _is_falsy(file_metrics.get(key)):
-                    metrics[key] = file_metrics[key]
-
-    final_output["metrics"] = metrics
-
-    summary = final_output.get("summary", "")
-    fallback = _build_summary_from_metrics(metrics, output_files)
-    # If the agent summary is empty or lacks concrete numbers, append the fallback.
-    has_numbers = bool(re.search(r"\d", str(summary)))
-    if fallback and (not summary or not has_numbers):
-        final_output["summary"] = fallback
-
-    logger.debug(
-        "Enriched final_output from %d output files for skill execution",
-        len(output_files),
-    )
-    return final_output
-
-
 class AgentSkillExecutor:
     """Execute declarative skills via an LLM tool loop.
 
@@ -695,6 +264,10 @@ class AgentSkillExecutor:
         # next (same pattern as _last_progress_pct).
         self._actor: Optional[str] = None
         self._model_override: Optional[str] = None
+        # Collaborator holding the script-first fast path (extracted to
+        # agent_executor_script_first.py); it reaches shared services
+        # (_call_llm, _publish_progress, ...) back through this executor.
+        self._script_first_runner = ScriptFirstRunner(self)
 
     def set_parent_context(self, parent_id: Optional[str]) -> None:
         """Set the parent job/task id used to attribute progress events."""
@@ -1900,197 +1473,13 @@ class AgentSkillExecutor:
     ) -> Optional[Dict[str, Any]]:
         """Try to complete the skill in one shot: ask LLM for a driver script and run it.
 
-        This is the fast path for skills that ship helper scripts. It avoids the
-        slow multi-turn exploration loop that often times out on slow providers.
-        If the generated script fails, the caller falls back to the normal agent
-        loop with the error context.
+        Thin delegate to :class:`ScriptFirstRunner`
+        (``skills/agent_executor_script_first.py``), which holds the actual
+        fast-path implementation.
         """
-        source_dir = skill.source_dir
-        scripts_python = Path(source_dir) / "scripts" / "python" if source_dir else None
-        if scripts_python is None or not scripts_python.is_dir():
-            return None
-
-        runner = "python"
-        import_path = str(scripts_python)
-        script_reference = _extract_script_reference(source_dir, max_chars=800)
-
-        objective = str(inputs.get("user_request", "")) if isinstance(inputs, dict) else ""
-        input_file = ""
-        if isinstance(inputs, dict):
-            input_file = str(inputs.get("input_file", ""))
-            if not input_file and isinstance(inputs.get("uploaded_files"), list) and inputs["uploaded_files"]:
-                input_file = str(inputs["uploaded_files"][0].get("path", ""))
-
-        skill_doc = ""
-        raw_instructions = str(skill.metadata.get("instructions") or "")
-        if raw_instructions:
-            skill_doc = (
-                "## Skill documentation (contractual — follow its defaults, "
-                "output filenames, and report sections)\n"
-                + _compact_skill_doc(raw_instructions, max_chars=4000)
-                + "\n\n"
-            )
-
-        prompt = (
-            f"Write a compact, complete Python driver script for skill '{skill.id}'.\n\n"
-            f"## Helpers\n"
-            f"```python\nimport sys, os\nsys.path.insert(0, '{import_path}')\n"
-            f"from core_analysis import *\nfrom utils import *\n```\n\n"
-            f"{skill_doc}"
-            f"{script_reference}\n\n"
-            f"## Objective\n"
-            f"{objective}\n\n"
-            f"## Input file\n"
-            f"{input_file}\n\n"
-            f"## Requirements\n"
-            f"- Follow the skill documentation above exactly: default parameters, output "
-            f"filenames, and report sections are contractual (downstream summaries parse them).\n"
-            f"- Save outputs under {working_dir}/outputs/ with clear filenames.\n"
-            f"- Keep under 70 lines, no plots.\n"
-            f"- After writing all outputs, also write a JSON manifest at {working_dir}/__skill_outputs__.json "
-            f"listing every output file path relative to {working_dir}.\n"
-            f"Return only a ```python code block."
+        return await self._script_first_runner.execute(
+            skill, inputs, working_dir, tools, preexisting_files=preexisting_files
         )
-
-        self._publish_progress(
-            status="RUNNING",
-            phase="正在生成一次性驱动脚本",
-            progress_pct=10.0,
-            active_task_id=skill.id,
-        )
-        response_text, llm_error = await self._call_llm(
-            [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": "Generate the driver script."},
-            ],
-            max_tokens=8000,
-            json_mode=False,
-        )
-        if llm_error is not None:
-            return None
-
-        script_code = self._extract_script_from_markdown(response_text)
-        expected_outputs: List[str] = []
-        if not script_code:
-            return None
-
-        # If the extracted script is not valid Python (e.g. truncated), ask the
-        # LLM once more to complete/fix it before falling back to the slow loop.
-        if not self._is_valid_python(script_code):
-            fix_prompt = (
-                "The previous driver script was cut off or has a syntax error. "
-                "Return the COMPLETE, fixed Python script in a single markdown code block.\n\n"
-                "Continue/fix from here:\n"
-                f"```python\n{script_code}\n```"
-            )
-            response_text, llm_error = await self._call_llm(
-                [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": fix_prompt},
-                ],
-                max_tokens=3000,
-                json_mode=False,
-            )
-            if llm_error is None:
-                script_code = self._extract_script_from_markdown(response_text)
-            if not script_code or not self._is_valid_python(script_code):
-                return None
-
-        if not working_dir:
-            working_dir = Path.cwd()
-        else:
-            working_dir = Path(working_dir)
-        working_dir.mkdir(parents=True, exist_ok=True)
-        script_path = working_dir / f"__skill_driver_{skill.id}.py"
-        script_path.write_text(script_code, encoding="utf-8")
-
-        self._publish_progress(
-            status="RUNNING",
-            phase=f"正在运行驱动脚本：{script_path.name}",
-            progress_pct=50.0,
-            active_task_id=skill.id,
-        )
-        output = await self._invoke_tool_with_logging(
-            "shell_exec",
-            "shell_exec",
-            {"command": f"{runner} {script_path}", "timeout": 600},
-        )
-        # Compact before the record is persisted in the result or handed to the
-        # fallback loop (which extends its tool_outputs from this result).
-        # Structured fields (returncode, paths) survive truncation.
-        output = _compact_tool_output(output)
-
-        # shell_exec reports tool-level success even when the inner command exits
-        # non-zero. Treat a non-zero returncode as a script failure so we fall
-        # back or retry instead of claiming success.
-        tool_output = output.get("output", {}) if isinstance(output.get("output"), dict) else {}
-        command_returncode = tool_output.get("returncode", 0)
-        if output.get("success") and command_returncode == 0:
-            # Verify expected outputs exist; harvest artifacts.
-            artifacts, output_files = harvest_agent_artifacts(
-                working_dir, [output], ignore_preexisting=preexisting_files
-            )
-
-            # If the driver script wrote a manifest of its outputs, honor it.
-            # This avoids losing files when the workspace scan hits its limit or
-            # when outputs were overwritten and look stale against preexisting files.
-            manifest_path = working_dir / "__skill_outputs__.json"
-            if manifest_path.is_file():
-                try:
-                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                    manifest_paths = manifest.get("output_files", []) if isinstance(manifest, dict) else manifest
-                    for rel in manifest_paths:
-                        if not isinstance(rel, str):
-                            continue
-                        p = working_dir / rel
-                        # The manifest itself is an internal bookkeeping file, not a user-facing output.
-                        if p == manifest_path:
-                            continue
-                        if p.is_file() and str(p) not in output_files:
-                            output_files.append(str(p))
-                            env = build_artifact(p)
-                            if env is not None:
-                                artifacts.append(env)
-                except Exception:
-                    pass
-
-            # Also check expected_outputs explicitly.
-            for rel in expected_outputs:
-                p = working_dir / rel
-                if p.is_file() and str(p) not in output_files:
-                    output_files.append(str(p))
-                    env = build_artifact(p)
-                    if env is not None:
-                        artifacts.append(env)
-            return {
-                "success": True,
-                "mode": "agent",
-                "skill_id": skill.id,
-                "final_output": {
-                    "note": "Driver script executed successfully.",
-                    "expected_outputs": expected_outputs,
-                    "output_files": output_files,
-                },
-                "artifacts": artifacts,
-                "output_files": output_files,
-                "tool_outputs": [output],
-            }
-
-        # Script failed: return a partial result so the caller can fall back.
-        # ``output`` was already compacted above; bound the error string itself
-        # too, since it propagates into the job result and the parent agent's
-        # context — a raw multi-KB log must not leak through it (tail-priority:
-        # the actionable traceback lines sit at the end).
-        raw_error = output.get("error_message") or "unknown error"
-        if not isinstance(raw_error, str):
-            raw_error = str(raw_error)
-        return {
-            "success": False,
-            "partial": False,
-            "skill_id": skill.id,
-            "error": f"Generated driver script failed: {_truncate_text(raw_error, 2000, is_error=True)}",
-            "tool_outputs": [output],
-        }
 
     def _available_tools(self, skill: SkillDefinition) -> Dict[str, Any]:
         """Return the tool schemas available to this skill.
@@ -2156,145 +1545,16 @@ class AgentSkillExecutor:
         return []
 
     @staticmethod
-    def _tool_summary(tool: Any) -> str:
-        """Return a one-line description with parameter names only."""
-        schema = tool.input_schema if hasattr(tool, "input_schema") else {}
-        params = []
-        if isinstance(schema, dict):
-            required = schema.get("required", [])
-            props = schema.get("properties", schema)
-            for key in sorted(props.keys()):
-                marker = "*" if key in required else ""
-                params.append(f"{key}{marker}")
-        return f"- {tool.name}: {tool.description} ({', '.join(params) if params else 'no args'})"
-
-    @staticmethod
     def _build_system_prompt(
         skill: SkillDefinition,
         inputs: Dict[str, Any],
         tools: Dict[str, Any],
     ) -> str:
-        """Build a concise, action-oriented system prompt for the LLM agent."""
-        # Use the short description as the objective instead of dumping the entire
-        # SKILL.md body. Long SKILL.md files bloat the prompt and slow the provider.
-        instructions = skill.description or skill.metadata.get("instructions", "")
+        """Build a concise, action-oriented system prompt for the LLM agent.
 
-        tool_descriptions = [AgentSkillExecutor._tool_summary(tool) for tool in tools.values()]
-
-        source_dir = skill.source_dir
-        script_reference = _extract_script_reference(source_dir, max_chars=2500)
-
-        file_read_restriction = ""
-        if source_dir and "file_read" in tools:
-            file_read_restriction = (
-                "\nWhen using file_read, you may only read files under the current "
-                "project workspace (input data, existing outputs, etc.). The skill helper "
-                "scripts are already provided above; do NOT file_read them.\n"
-            )
-
-        scripts_hint = ""
-        if source_dir:
-            scripts_python = Path(source_dir) / "scripts" / "python"
-            scripts_r = Path(source_dir) / "scripts" / "r"
-            if scripts_python.is_dir():
-                scripts_hint = (
-                    f"\nTo use the Python helpers, write a driver script that begins with:\n"
-                    f"import sys, os\n"
-                    f"sys.path.insert(0, '{scripts_python}')\n"
-                    f"from <helper_module> import <function>  # import ONLY the helpers listed above; do NOT assume core_analysis.py or run.py exists\n"
-                )
-            elif scripts_r.is_dir():
-                scripts_hint = (
-                    f"\nTo use the R helpers, write a driver script that begins with:\n"
-                    f"source('{scripts_r}/<helper>.R')\n"
-                )
-
-        return f"""You are an autonomous agent executing the skill "{skill.id}".
-
-## Objective
-{instructions}
-
-## User inputs (satisfy every clause)
-{json.dumps(inputs, ensure_ascii=False, indent=2)}
-
-{script_reference}
-{scripts_hint}
-{file_read_restriction}
-## Available tools
-{chr(10).join(tool_descriptions)}
-
-## Execution workflow (two phases)
-
-Phase 1 — Inspect (your FIRST turn only):
-- Review the helper API / full source above; do NOT use file_read on helper scripts.
-- Briefly inspect input data to confirm columns, shape, and existing labels.
-  For large `.h5ad` files use `anndata.read_h5ad(path, backed='r')` to read metadata
-  without loading the full expression matrix into memory.
-- Allowed tools: file_read, file_list, shell_exec (short introspection only).
-- Do NOT write files, do NOT run a full pipeline, do NOT return action: "final" yet.
-
-Phase 2 — Execute (after Phase 1):
-- Write ONE driver script (.py or .R) that imports only the helpers listed in the API
-  reference above and satisfies every clause of the objective.
-- Run it with a single shell_exec call.
-- Save outputs with clear filenames under `outputs/` (e.g. report.txt, summary.csv,
-  figures/*.png, summary.json, etc.).
-- If the objective includes comparing predictions to reference labels, save both a
-  cell-level comparison CSV and a human-readable report.
-- BEFORE returning action: "final", use file_read to read the generated report/
-  summary files and cite concrete numbers (cell counts, gene counts, accuracy,
-  ARI, top categories, etc.) in both `final_output.summary` and `final_output.metrics`.
-- Return action: "final" listing the output file paths and concrete metrics.
-
-Rules:
-- Treat `inputs.user_request` as the complete objective. Do every requested step.
-- If inputs contain a reference/ground-truth column (target_column, reference_column,
-  label_column, ground_truth), compare results and report metrics.
-- Use the helper API reference above. Prefer high-level helpers when they satisfy the
-  objective; do not reimplement helper logic in the driver script.
-- Do NOT assume a fixed entrypoint such as `core_analysis.py` or `run.py` exists.
-  Import only the helper modules actually present in the API reference.
-- Keep the driver script compact and focused: no boilerplate docstrings, minimal
-  comments, no dead code.
-- Do not save `.h5ad` output unless the user explicitly requests it.
-- Satisfy every clause of the objective. If a requested deliverable fails (e.g. a
-  comparison or metric), diagnose and fix it; do not return partial success prematurely.
-- Do not chase perfect accuracy with iterative manual label remapping. If predicted and
-  ground-truth labels differ in granularity, report the raw comparison and note it.
-- Inspect actual `adata.obs.columns` / `adata.var.columns` to find column names instead
-  of hard-coding defaults.
-- If the skill documentation calls for strict input requirements (e.g. a specific
-  normalization), perform that step in the driver script rather than assuming existing
-  layers already match.
-- When saving `.h5ad` files, use `safe_write_h5ad` from the skill's utils if available
-  instead of `adata.write_h5ad`, to avoid nullable-string errors.
-- Print the absolute paths of all output files the script creates so they can be harvested.
-- Prefer one `shell_exec` per pipeline over many small reads.
-- On a tool error, diagnose and retry once; do not repeat the same call.
-- Tool names must come from Available tools.
-
-## Output format
-Respond ONLY with a JSON object:
-
-1. Tool call: {{"thought": "...", "action": "tool", "tool": "tool_name", "arguments": {{...}}}}
-2. Final result: {{"thought": "...", "action": "final", "final_output": {{"summary": "...", "output_files": [...], "metrics": {{...}}}}}}
-
-The `final_output.summary` must be a concise but concrete markdown summary. It MUST cite
-numerical findings directly from the generated outputs (report.txt, summary.csv, etc.):
-cell counts, key proportions, accuracy / ARI / F1 when a comparison was requested, the
-model or method used, and any notable disagreements. Do not give a vague high-level description.
-
-No markdown or explanation outside the JSON. Your first response MUST be a Phase 1 inspection tool call.
-"""
-
-    @staticmethod
-    def _is_valid_python(code: str) -> bool:
-        """Return True if ``code`` parses as Python without syntax errors."""
-        try:
-            ast.parse(code)
-            return True
-        except SyntaxError:
-            return False
+        Thin delegate to ``skills/agent_executor_prompts.build_system_prompt``.
+        """
+        return build_system_prompt(skill, inputs, tools)
 
     @staticmethod
     def _extract_script_from_markdown(response_text: str) -> str:
@@ -2321,121 +1581,9 @@ No markdown or explanation outside the JSON. Your first response MUST be a Phase
     def _parse_action(response_text: str) -> Optional[Dict[str, Any]]:
         """Parse an agent action from LLM output, tolerating markdown fences.
 
-        Tries a direct JSON parse first, then strips markdown fences, then
-        extracts the first JSON object.
+        Thin delegate to ``skills/agent_executor_actions.parse_action``.
         """
-        text = response_text.strip()
-        # Strip markdown code fences if present.
-        if text.startswith("```"):
-            lines = text.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            text = "\n".join(lines).strip()
-
-        try:
-            parsed = json.loads(text, strict=False)
-        except json.JSONDecodeError:
-            parsed = AgentSkillExecutor._extract_json(text)
-        return AgentSkillExecutor._normalize_action(parsed)
-
-    @staticmethod
-    def _normalize_action(parsed: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Accept common LLM shorthand shapes and coerce them to actions."""
-        if not isinstance(parsed, dict):
-            return None
-
-        def inferred_tool(arguments: Dict[str, Any]) -> Optional[str]:
-            if "command" in parsed or (
-                isinstance(arguments, dict) and "command" in arguments
-            ):
-                return "shell_exec"
-            if isinstance(arguments, dict):
-                if "content" in arguments and "path" in arguments:
-                    return "file_write"
-                if "old_string" in arguments and "new_string" in arguments:
-                    return "file_edit"
-                if "directory" in arguments:
-                    return "file_list"
-                if "path" in arguments:
-                    return "file_read"
-            return None
-
-        if parsed.get("action") == "final":
-            return parsed
-        if parsed.get("action") == "tool":
-            normalized = dict(parsed)
-            normalized.setdefault("arguments", {})
-            if not normalized.get("tool"):
-                tool = inferred_tool(normalized.get("arguments") or {})
-                if tool is None:
-                    return normalized
-                normalized["tool"] = tool
-                if tool == "shell_exec" and "command" in normalized:
-                    normalized["arguments"] = {
-                        "command": normalized["command"],
-                        **({"timeout": normalized["timeout"]} if "timeout" in normalized else {}),
-                    }
-            return normalized
-        if "command" in parsed and "tool" not in parsed:
-            normalized = dict(parsed)
-            normalized["action"] = "tool"
-            normalized["tool"] = "shell_exec"
-            normalized.setdefault(
-                "arguments",
-                {
-                    "command": parsed["command"],
-                    **({"timeout": parsed["timeout"]} if "timeout" in parsed else {}),
-                },
-            )
-            return normalized
-        if "tool" in parsed:
-            normalized = dict(parsed)
-            normalized["action"] = "tool"
-            normalized.setdefault("arguments", {})
-            return normalized
-        if "final_output" in parsed:
-            normalized = dict(parsed)
-            normalized["action"] = "final"
-            return normalized
-        # Accept bare file-write/file-edit shapes that some models emit.
-        if "path" in parsed and "content" in parsed and "tool" not in parsed:
-            return {
-                "action": "tool",
-                "tool": "file_write",
-                "arguments": {
-                    "path": parsed["path"],
-                    "content": parsed["content"],
-                },
-            }
-        if "path" in parsed and "old_string" in parsed and "new_string" in parsed and "tool" not in parsed:
-            return {
-                "action": "tool",
-                "tool": "file_edit",
-                "arguments": {
-                    "path": parsed["path"],
-                    "old_string": parsed["old_string"],
-                    "new_string": parsed["new_string"],
-                },
-            }
-        return None
-
-    @staticmethod
-    def _extract_json(text: str) -> Optional[Dict[str, Any]]:
-        """Try to extract the first decodable JSON object from a string."""
-        decoder = json.JSONDecoder(strict=False)
-        start = text.find("{")
-        while start != -1:
-            try:
-                obj, _ = decoder.raw_decode(text[start:])
-            except json.JSONDecodeError:
-                start = text.find("{", start + 1)
-                continue
-            if isinstance(obj, dict):
-                return obj
-            start = text.find("{", start + 1)
-        return None
+        return parse_action(response_text)
 
     async def _invoke_tool_with_logging(
         self,
