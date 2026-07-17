@@ -6,7 +6,9 @@ changes).
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
@@ -212,15 +214,35 @@ class IntentRouter:
                     working_memory,
                 )
 
+        # Everything from here on is some form of execution. Push an immediate
+        # progress event so the user sees planning has started before the
+        # (potentially slow) preflight metadata reads and plan decomposition.
+        await self._emit_turn_event(
+            {
+                "type": "planning",
+                "message": "正在分析数据并规划执行步骤…",
+                "timestamp": time.time(),
+            }
+        )
+
+        # File-path resolution and the project-data scan are pure filesystem
+        # reads that do NOT depend on the intent result, so they run
+        # concurrently in threads. The resolved paths are shared by the
+        # exploration gate and the preflight below (previously the same
+        # resolution ran twice, serially).
+        file_paths, project_has_data = await asyncio.gather(
+            asyncio.to_thread(resolve_preflight_file_paths, project_id, user_message),
+            asyncio.to_thread(self._project_has_data_files, project_id),
+        )
+
         # Hypothesis-driven exploration: open-ended research questions that
         # reference project data are routed to the ExplorationEngine. Placed
         # after clarify/answer (and the fast-path handlers above) but before
         # the generic workflow path. The gate is deliberately conservative —
         # when in doubt we fall through to the normal execution path.
         if settings.exploration_enabled:
-            exploration_files = resolve_preflight_file_paths(project_id, user_message)
             if self._should_route_to_exploration(
-                intent, user_message, exploration_files, project_id
+                intent, user_message, file_paths, project_id, project_has_data
             ):
                 exploration_result = await self._handle_exploration(
                     intent=intent,
@@ -229,7 +251,7 @@ class IntentRouter:
                     project_id=project_id,
                     session_id=session_id,
                     plan_store=plan_store,
-                    file_paths=exploration_files,
+                    file_paths=file_paths,
                 )
                 if exploration_result is not None:
                     return exploration_result
@@ -237,7 +259,10 @@ class IntentRouter:
                 # the normal workflow path below.
 
         # Everything else is some form of execution.
-        file_paths = resolve_preflight_file_paths(project_id, user_message)
+        # NOTE: DataPreflight's per-file metadata reads stay inside run() —
+        # their to_thread-ification is a separate change — and its LLM
+        # decision consumes intent_type, so the preflight itself remains
+        # serial after intent analysis.
         preflight = await DataPreflight(self._runner._llm_client).run(
             user_request=user_message,
             file_paths=file_paths,
@@ -376,18 +401,36 @@ class IntentRouter:
             plan=plan,
         )
 
+    async def _emit_turn_event(self, payload: Dict[str, Any]) -> None:
+        """Best-effort push of a turn-level progress event to WS listeners.
+
+        Delivery must never break routing; failures are logged only. These are
+        top-level turn events, so ``actor`` / ``parent_id`` are omitted per the
+        progress-events contract (they are reserved for subagent executions).
+        """
+        callback = getattr(self._runner, "_event_callback", None)
+        if callback is None:
+            return
+        try:
+            await callback(payload)
+        except Exception:
+            logger.debug("Turn event push failed; continuing", exc_info=True)
+
     def _should_route_to_exploration(
         self,
         intent: "UserIntent",
         user_message: str,
         file_paths: List[str],
         project_id: str,
+        project_has_data: Optional[bool] = None,
     ) -> bool:
         """Conservative gate for hypothesis-driven exploration routing.
 
         Every condition must hold; any doubt sends the request down the
         normal workflow path (better to miss an exploration than to misroute
-        an explicit analysis request).
+        an explicit analysis request). ``project_has_data`` may be precomputed
+        by the caller (it is gathered concurrently with file-path resolution);
+        when omitted it is scanned here.
         """
         if not settings.exploration_enabled:
             return False
@@ -396,7 +439,12 @@ class IntentRouter:
         if intent.interaction_mode not in ("", "execute", "explore"):
             return False
         # The question must reference project data.
-        if not file_paths and not self._project_has_data_files(project_id):
+        has_data = (
+            project_has_data
+            if project_has_data is not None
+            else self._project_has_data_files(project_id)
+        )
+        if not file_paths and not has_data:
             return False
         text = (user_message or "").lower()
         if not text.strip():

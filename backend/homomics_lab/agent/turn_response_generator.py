@@ -191,11 +191,41 @@ class ResponseGenerator:
             messages.append({"role": "user", "content": user_message})
 
         type_max_tokens = {"greeting": 800, "qa": 2000, "information_request": 2000}
+        resolved_max_tokens = max_tokens or type_max_tokens.get(response_type, 2000)
+
+        # Streaming branch: when the turn carries an event callback (frontend
+        # listening on the session WebSocket), stream tokens live. The
+        # accumulated text is the same string the one-shot call would return.
+        event_callback = getattr(self._runner, "_event_callback", None)
+        if event_callback is not None:
+            try:
+                chunks: List[str] = []
+                async for token in self._runner._llm_client.chat_completion_stream(
+                    messages=messages,
+                    temperature=0.3,
+                    max_tokens=resolved_max_tokens,
+                ):
+                    chunks.append(token)
+                    await event_callback({"type": "answer_token", "token": token})
+                await event_callback({"type": "answer_done"})
+                return "".join(chunks)
+            except Exception:
+                logger.warning(
+                    "LLM streaming direct response failed for type %s; "
+                    "falling back to one-shot completion",
+                    response_type,
+                    exc_info=True,
+                )
+                try:
+                    await event_callback({"type": "answer_reset"})
+                except Exception:
+                    pass
+
         try:
             return await self._runner._llm_client.chat_completion(
                 messages=messages,
                 temperature=0.3,
-                max_tokens=max_tokens or type_max_tokens.get(response_type, 2000),
+                max_tokens=resolved_max_tokens,
                 session_id=getattr(self._runner, "_session_id", None),
                 project_id=getattr(self._runner, "_project_id", None),
                 request_id=f"{getattr(self._runner, '_turn_request_id', 'direct')}_direct",

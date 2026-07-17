@@ -1,6 +1,7 @@
+import asyncio
 import logging
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import Awaitable, Callable, List, Dict, Any, Optional, Set
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 
@@ -25,6 +26,78 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _debate_store = DebateStore()
+
+
+# --- Session WebSocket registry --------------------------------------------
+# Sockets connected to ``/api/chat/ws/{session_id}`` are registered here so the
+# HTTP ``/send`` flow can push live turn events (streamed answer tokens,
+# planning progress) to listeners of the same session while a turn runs.
+_session_sockets: Dict[str, Set[WebSocket]] = {}
+# Serializes sends across sessions: Starlette WebSocket sends are not safe to
+# interleave from concurrent tasks, and token pushes come from /send handlers.
+_session_send_lock = asyncio.Lock()
+
+
+def _register_session_socket(session_id: str, websocket: WebSocket) -> None:
+    _session_sockets.setdefault(session_id, set()).add(websocket)
+
+
+def _unregister_session_socket(session_id: str, websocket: WebSocket) -> None:
+    sockets = _session_sockets.get(session_id)
+    if sockets is None:
+        return
+    sockets.discard(websocket)
+    if not sockets:
+        _session_sockets.pop(session_id, None)
+
+
+def _has_session_listeners(session_id: str) -> bool:
+    return bool(_session_sockets.get(session_id))
+
+
+async def _broadcast_to_session(session_id: str, payload: Dict[str, Any]) -> None:
+    """Push a JSON payload to every socket listening on ``session_id``.
+
+    Best-effort: dead sockets are dropped and send failures never propagate
+    into the turn pipeline.
+    """
+    sockets = list(_session_sockets.get(session_id) or ())
+    if not sockets:
+        return
+    async with _session_send_lock:
+        for ws in sockets:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                _unregister_session_socket(session_id, ws)
+
+
+def _make_turn_event_callback(
+    session_id: str,
+) -> Callable[[Dict[str, Any]], Awaitable[None]]:
+    """Translate turn-level stream events into the chat WebSocket contract.
+
+    Answer tokens reuse the existing ``{"type": "token", ...}`` contract of the
+    WS stream mode (see ``chat_websocket``); all other events travel inside the
+    existing ``{"type": "agent_event", "payload": ...}`` envelope.
+    """
+
+    async def _callback(payload: Dict[str, Any]) -> None:
+        event_type = payload.get("type")
+        if event_type == "answer_token":
+            await _broadcast_to_session(
+                session_id, {"type": "token", "token": payload.get("token", "")}
+            )
+        elif event_type == "answer_done":
+            await _broadcast_to_session(session_id, {"type": "token", "done": True})
+        elif event_type == "answer_reset":
+            await _broadcast_to_session(session_id, {"type": "token", "reset": True})
+        else:
+            await _broadcast_to_session(
+                session_id, {"type": "agent_event", "payload": payload}
+            )
+
+    return _callback
 
 
 class SendMessageRequest(BaseModel):
@@ -121,20 +194,28 @@ async def send_message(
     )
 
     trace_id = str(uuid.uuid4())
-    try:
-        await trace_store.start_trace(
-            trace_id=trace_id,
-            session_id=request.session_id,
-            project_id=request.project_id,
-            root_name="chat_turn",
-        )
-    except Exception as exc:
-        logger.warning(
-            "Failed to start execution trace (correlation_id=%s, session=%s): %s",
-            get_correlation_id(),
-            request.session_id,
-            exc,
-        )
+
+    async def _start_trace_background() -> None:
+        # Fire-and-forget: trace bookkeeping must not block the first visible
+        # response. ``TraceStore.start_trace`` is idempotent for a trace_id, so
+        # downstream executors can safely create the record if this task has
+        # not landed yet.
+        try:
+            await trace_store.start_trace(
+                trace_id=trace_id,
+                session_id=request.session_id,
+                project_id=request.project_id,
+                root_name="chat_turn",
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to start execution trace (correlation_id=%s, session=%s): %s",
+                get_correlation_id(),
+                request.session_id,
+                exc,
+            )
+
+    asyncio.create_task(_start_trace_background())
 
     # Use TurnRunner for consistent handling of all intents, including LLM fallback.
     runner = TurnRunner(
@@ -151,6 +232,15 @@ async def send_message(
         skill_executor=skill_executor,
         skill_dag=getattr(http_request.app.state, "skill_dag", None),
     )
+    # When the frontend is listening on the session WebSocket, push live turn
+    # events (streamed answer tokens, planning progress) while the turn runs.
+    # Without listeners the callback is omitted entirely, which keeps the
+    # classic non-streaming LLM call path byte-identical to before.
+    event_callback = (
+        _make_turn_event_callback(request.session_id)
+        if _has_session_listeners(request.session_id)
+        else None
+    )
     result = await runner.run_turn(
         session_id=request.session_id,
         user_message=user_message,
@@ -161,6 +251,7 @@ async def send_message(
         plan_store=plan_store,
         plan_mode=request.plan_mode,
         trace_id=trace_id,
+        event_callback=event_callback,
     )
 
     # Extract plot attachments produced during execution
@@ -536,6 +627,9 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
     """
     await require_ws_auth(websocket)
     await websocket.accept()
+    # Register so concurrent HTTP /send turns can push live events (streamed
+    # answer tokens, planning progress) to this listener.
+    _register_session_socket(session_id, websocket)
     memory_manager: MemoryManager = websocket.app.state.memory_manager
     llm_client = getattr(websocket.app.state, "llm_client", None)
     runner = TurnRunner(
@@ -612,6 +706,8 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
     except WebSocketDisconnect:
         pass
+    finally:
+        _unregister_session_socket(session_id, websocket)
 
 
 class FeedbackRequest(BaseModel):

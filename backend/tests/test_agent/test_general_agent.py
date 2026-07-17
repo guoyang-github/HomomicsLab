@@ -16,6 +16,30 @@ class FakeLLM:
         return "Fake answer"
 
 
+class StreamingFakeLLM(FakeLLM):
+    """Fake LLM that also supports token streaming."""
+
+    def __init__(self, chunks=("Fake", " answer")):
+        self.chunks = list(chunks)
+        self.one_shot_called = False
+
+    async def chat_completion(self, **kwargs):
+        self.one_shot_called = True
+        return "Fake answer"
+
+    async def chat_completion_stream(self, **kwargs):
+        for chunk in self.chunks:
+            yield chunk
+
+
+class FailingStreamFakeLLM(StreamingFakeLLM):
+    """Stream raises immediately; one-shot completion still works."""
+
+    async def chat_completion_stream(self, **kwargs):
+        raise RuntimeError("stream unsupported")
+        yield  # pragma: no cover - keeps this an async generator
+
+
 @pytest.fixture
 def agent():
     return GeneralScientificAgent(llm_client=FakeLLM())
@@ -82,3 +106,76 @@ async def test_unconfigured_llm_returns_fallback_message():
 
     assert result.mode == ExecutionMode.DIRECT_RESPONSE
     assert "未配置 LLM" in result.response_text
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_streams_tokens_via_event_callback():
+    """With an event callback, tokens stream live and the full text is returned."""
+    llm = StreamingFakeLLM()
+    agent = GeneralScientificAgent(llm_client=llm)
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        original_message="什么是 UMAP？",
+    )
+    wm = WorkingMemory()
+    events = []
+
+    async def cb(payload):
+        events.append(payload)
+
+    result = await agent.answer(intent, wm, event_callback=cb)
+
+    assert result.mode == ExecutionMode.DIRECT_RESPONSE
+    assert result.response_text == "Fake answer"
+    # Tokens were forwarded in order, then a single done marker.
+    token_events = [e["token"] for e in events if e["type"] == "answer_token"]
+    assert token_events == ["Fake", " answer"]
+    assert [e["type"] for e in events][-1] == "answer_done"
+    # The one-shot completion was NOT used.
+    assert llm.one_shot_called is False
+    # The persisted agent message carries the complete text.
+    assert wm.messages[-1].content == "Fake answer"
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_stream_failure_falls_back_to_one_shot():
+    """A failing stream falls back to the classic one-shot completion."""
+    llm = FailingStreamFakeLLM()
+    agent = GeneralScientificAgent(llm_client=llm)
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        original_message="什么是 UMAP？",
+    )
+    wm = WorkingMemory()
+    events = []
+
+    async def cb(payload):
+        events.append(payload)
+
+    result = await agent.answer(intent, wm, event_callback=cb)
+
+    assert result.response_text == "Fake answer"
+    assert llm.one_shot_called is True
+    # Listeners were told to discard any partial tokens.
+    assert any(e["type"] == "answer_reset" for e in events)
+    assert not any(e["type"] == "answer_token" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_without_callback_keeps_one_shot_path():
+    """No event callback: behaviour is byte-identical to the classic path."""
+    llm = StreamingFakeLLM()
+    agent = GeneralScientificAgent(llm_client=llm)
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        original_message="什么是 UMAP？",
+    )
+    wm = WorkingMemory()
+
+    result = await agent.answer(intent, wm)
+
+    assert result.response_text == "Fake answer"
+    assert llm.one_shot_called is True

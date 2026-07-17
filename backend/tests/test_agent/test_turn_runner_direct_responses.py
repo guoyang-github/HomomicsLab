@@ -190,3 +190,99 @@ async def test_direct_response_via_llm_includes_context(
     assert "single-cell-transcriptomics" in content
     assert "0.95" in content
     assert "What is single-cell RNA-seq?" in content
+
+
+def _make_stream(chunks):
+    """Return a chat_completion_stream replacement yielding the given chunks."""
+
+    async def _stream(**kwargs):
+        for chunk in chunks:
+            yield chunk
+
+    return _stream
+
+
+@pytest.mark.asyncio
+async def test_qa_response_streams_tokens_when_event_callback_set(
+    mock_llm_client, working_memory
+):
+    """QA direct responses stream tokens through the turn event callback."""
+    mock_llm_client.chat_completion_stream = _make_stream(["LLM generated", " response"])
+    runner = TurnRunner(llm_client=mock_llm_client)
+    events = []
+
+    async def cb(payload):
+        events.append(payload)
+
+    runner._event_callback = cb
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        domain="spatial-transcriptomics",
+        original_message="什么是空间转录组？",
+    )
+    response = await runner._generate_qa_response(
+        intent, intent.original_message, working_memory, project_id="proj_1"
+    )
+
+    assert response == "LLM generated response"
+    token_events = [e["token"] for e in events if e["type"] == "answer_token"]
+    assert token_events == ["LLM generated", " response"]
+    assert events[-1]["type"] == "answer_done"
+    # The one-shot path was bypassed.
+    mock_llm_client.chat_completion.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_qa_response_stream_failure_falls_back_to_one_shot(
+    mock_llm_client, working_memory
+):
+    """A failing stream degrades to the one-shot completion with a reset event."""
+
+    async def _failing_stream(**kwargs):
+        raise RuntimeError("stream failed")
+        yield  # pragma: no cover - keeps this an async generator
+
+    mock_llm_client.chat_completion_stream = _failing_stream
+    runner = TurnRunner(llm_client=mock_llm_client)
+    events = []
+
+    async def cb(payload):
+        events.append(payload)
+
+    runner._event_callback = cb
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        domain="metagenomics",
+        original_message="什么是宏基因组？",
+    )
+    response = await runner._generate_qa_response(
+        intent, intent.original_message, working_memory, project_id="proj_1"
+    )
+
+    assert response == "LLM generated response"
+    mock_llm_client.chat_completion.assert_awaited_once()
+    assert any(e["type"] == "answer_reset" for e in events)
+    assert not any(e["type"] == "answer_token" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_qa_response_without_event_callback_uses_one_shot(
+    mock_llm_client, working_memory
+):
+    """No event callback: the streaming branch stays off (classic behaviour)."""
+    mock_llm_client.chat_completion_stream = _make_stream(["streamed"])
+    runner = TurnRunner(llm_client=mock_llm_client)
+    intent = UserIntent(
+        analysis_type="qa",
+        complexity="direct_response",
+        domain="metagenomics",
+        original_message="什么是宏基因组？",
+    )
+    response = await runner._generate_qa_response(
+        intent, intent.original_message, working_memory, project_id="proj_1"
+    )
+
+    assert response == "LLM generated response"
+    mock_llm_client.chat_completion.assert_awaited_once()

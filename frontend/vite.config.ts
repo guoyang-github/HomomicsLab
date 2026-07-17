@@ -17,6 +17,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // Allow WebSocket upgrade for the live chat stream (/api/chat/ws/...).
+        ws: true,
       },
       '/ws': {
         target: 'ws://localhost:8080',
@@ -30,6 +32,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        ws: true,
       },
       '/ws': {
         target: 'ws://localhost:8080',

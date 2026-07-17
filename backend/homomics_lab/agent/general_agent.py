@@ -9,7 +9,8 @@ questions while preserving the workflow path for domain-specific analyses.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+import logging
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from homomics_lab.agent.intent import UserIntent
 from homomics_lab.agent.source_attribution import (
@@ -25,6 +26,8 @@ from homomics_lab.tools.registry import ToolRegistry, get_default_tool_registry
 
 if TYPE_CHECKING:
     from homomics_lab.agent.turn_runner import TurnResult
+
+logger = logging.getLogger(__name__)
 
 
 class GeneralScientificAgent:
@@ -53,8 +56,14 @@ class GeneralScientificAgent:
         intent: UserIntent,
         working_memory: WorkingMemory,
         context: Optional[Dict[str, Any]] = None,
+        event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ) -> TurnResult:
-        """Generate a direct response for a general scientific request."""
+        """Generate a direct response for a general scientific request.
+
+        ``event_callback`` (when provided) receives live ``answer_token``
+        events while the direct LLM answer is being generated; the assembled
+        text is identical to the non-streaming path.
+        """
         context = context or {}
 
         # Explore / tool_call intents delegate to the tool registry.
@@ -73,19 +82,22 @@ class GeneralScientificAgent:
             return await self._handle_general_help(intent, working_memory, context)
 
         # Default: direct LLM answer.
-        return await self._handle_direct_answer(intent, working_memory, context)
+        return await self._handle_direct_answer(
+            intent, working_memory, context, event_callback=event_callback
+        )
 
     async def _handle_direct_answer(
         self,
         intent: UserIntent,
         working_memory: WorkingMemory,
         context: Dict[str, Any],
+        event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ) -> TurnResult:
         """Answer knowledge or information questions directly."""
         from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
 
         messages = self._build_messages(intent, working_memory, context)
-        response_text = await self._call_llm(messages)
+        response_text = await self._call_llm(messages, event_callback=event_callback)
 
         agent_msg = ChatMessage(
             id=f"msg_{len(working_memory.messages)}",
@@ -237,14 +249,46 @@ class GeneralScientificAgent:
             messages.append({"role": "user", "content": intent.original_message})
         return messages
 
-    async def _call_llm(self, messages: List[Dict[str, str]]) -> str:
-        """Call the LLM and return the text response."""
+    async def _call_llm(
+        self,
+        messages: List[Dict[str, str]],
+        event_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+    ) -> str:
+        """Call the LLM and return the text response.
+
+        When ``event_callback`` is provided the answer is streamed token by
+        token (each token is emitted as an ``answer_token`` event, followed by
+        a single ``answer_done``). The accumulated text is the same string the
+        one-shot call would have produced, so persistence is unchanged. Any
+        streaming failure falls back to the one-shot completion (an
+        ``answer_reset`` event tells listeners to discard partial tokens).
+        """
         if self.llm_client is None or not self.llm_client.is_configured():
             original = messages[-1].get("content", "") if messages else ""
             return (
                 f"当前未配置 LLM，无法直接回答「{original}」。"
                 "请配置 LLM 后重试，或将问题转换为具体的分析任务。"
             )
+        if event_callback is not None:
+            try:
+                chunks: List[str] = []
+                async for token in self.llm_client.chat_completion_stream(
+                    messages=messages,
+                    temperature=0.3,
+                ):
+                    chunks.append(token)
+                    await event_callback({"type": "answer_token", "token": token})
+                await event_callback({"type": "answer_done"})
+                return "".join(chunks)
+            except Exception as exc:
+                logger.warning(
+                    "Streaming answer failed; falling back to one-shot completion: %s",
+                    exc,
+                )
+                try:
+                    await event_callback({"type": "answer_reset"})
+                except Exception:
+                    pass
         try:
             return await self.llm_client.chat_completion(
                 messages=messages,

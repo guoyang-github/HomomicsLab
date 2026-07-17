@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { chatApi, executionApi } from '@/services/api'
+import { connectChatStream } from '@/services/chatStream'
 import type { ChatMessage } from '@/types/chat'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
@@ -504,6 +505,52 @@ export const useChatStore = create<ChatState>()(
         get().addMessage(userMessage)
         get().setIsTyping(true)
 
+        // Live turn streaming: while the /send request is in flight, listen on
+        // the session WebSocket for streamed answer tokens and progress events.
+        // Tokens are rendered into a placeholder message that grows
+        // incrementally; the HTTP response remains authoritative and replaces
+        // it wholesale. Any failure here degrades to the classic one-shot UX.
+        const streamId = `stream_${Date.now()}`
+        let streamedText = ''
+        const preJobLogs: Array<Omit<LogEntry, 'id'>> = []
+        const removeStreamPlaceholder = () => {
+          set((state) => ({ messages: state.messages.filter((m) => m.id !== streamId) }))
+        }
+        const stream = connectChatStream(sessionId, {
+          onToken: (token) => {
+            streamedText += token
+            get().setIsTyping(false)
+            get().addMessage({
+              id: streamId,
+              type: 'text',
+              content: streamedText,
+              sender: 'agent',
+              timestamp: new Date().toISOString(),
+              metadata: { streaming: true },
+            })
+          },
+          onReset: () => {
+            // The backend stream failed mid-answer; drop the partial
+            // placeholder — the final answer arrives via the HTTP response.
+            streamedText = ''
+            removeStreamPlaceholder()
+          },
+          onAgentEvent: (payload) => {
+            // Pre-job progress signals (e.g. planning started) are stashed and
+            // flushed into the job's Execution Logs once a job id exists.
+            if (payload?.type === 'planning' && payload.message) {
+              preJobLogs.push({
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                message: String(payload.message),
+              })
+            }
+          },
+        })
+        // Give the socket a brief chance to open so the backend enables its
+        // streaming path; connectChatStream caps this wait itself.
+        await stream.ready
+
         try {
           const response = await chatApi.sendMessage({
             project_id: state.currentProjectId,
@@ -529,11 +576,16 @@ export const useChatStore = create<ChatState>()(
           get().setMessages(response.data.messages)
 
           if (response.data.job_id) {
-            useExecutionStore.getState().startJob(response.data.job_id, sessionId)
+            const jobId = response.data.job_id
+            useExecutionStore.getState().startJob(jobId, sessionId)
+            // Flush pre-job progress events into the job's log panel so the
+            // "planning" signal stays visible once execution starts.
+            preJobLogs.forEach((entry) => useExecutionStore.getState().addLog(jobId, entry))
             useTaskStore.getState().setTaskTree(tasks)
             useTaskStore.getState().setProgress(_extractProgress(tasks))
           }
         } catch (error: any) {
+          removeStreamPlaceholder()
           const detail = error?.response?.data?.detail || error?.message
           const errorMessage: ChatMessage = {
             id: `msg_${Date.now()}_error`,
@@ -545,6 +597,7 @@ export const useChatStore = create<ChatState>()(
           get().addMessage(errorMessage)
           toastError(detail || 'Send failed')
         } finally {
+          stream.close()
           get().setIsTyping(false)
         }
       },
