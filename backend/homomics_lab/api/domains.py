@@ -1,5 +1,6 @@
 """API endpoints for the domain template marketplace."""
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -7,7 +8,9 @@ import yaml
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from homomics_lab.domain.marketplace import DomainMarketplace
+from homomics_lab.domain.marketplace import DomainMarketplace, DomainMarketplaceError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -91,8 +94,11 @@ async def import_domain(request: Request, body: ImportDomainRequest):
     marketplace = _get_marketplace(request)
     try:
         target_dir = marketplace.import_domain(body.source, target_name=body.target_name)
-    except Exception as exc:
+    except DomainMarketplaceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Domain import failed (source=%s)", body.source)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     return {"domain_id": target_dir.name, "path": str(target_dir)}
 
 
@@ -113,8 +119,11 @@ async def import_domain_zip(
 
     try:
         target_dir = marketplace.import_domain(tmp_path, target_name=target_name)
-    except Exception as exc:
+    except DomainMarketplaceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Domain zip import failed (filename=%s)", file.filename)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
@@ -127,8 +136,11 @@ async def import_templates(request: Request, body: ImportTemplatesRequest):
     marketplace = _get_marketplace(request)
     try:
         domain_dir = marketplace.import_code_templates(body.domain_id, body.templates)
-    except Exception as exc:
+    except DomainMarketplaceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Domain template import failed (domain_id=%s)", body.domain_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     return {"domain_id": body.domain_id, "path": str(domain_dir)}
 
 
@@ -146,8 +158,11 @@ async def preview_domain(domain_id: str, request: Request):
 
     try:
         data: Dict[str, Any] = yaml.safe_load(domain_yaml.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except yaml.YAMLError as exc:
         raise HTTPException(status_code=400, detail=f"Failed to read domain: {exc}") from exc
+    except Exception as exc:
+        logger.exception("Domain preview failed (domain_id=%s)", domain_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return {
         "domain_id": domain_id,
@@ -181,6 +196,9 @@ async def export_domain(domain_id: str, request: Request):
             domain_id,
             output_path=Path(tempfile.gettempdir()) / f"{domain_id}_domain.zip",
         )
-    except Exception as exc:
+    except DomainMarketplaceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Domain export failed (domain_id=%s)", domain_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     return {"domain_id": domain_id, "zip_path": str(output_path)}

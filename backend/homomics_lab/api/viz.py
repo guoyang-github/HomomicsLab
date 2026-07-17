@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import json
+import logging
 import re
 import uuid
 from pathlib import Path
@@ -12,6 +13,8 @@ from homomics_lab.config import settings
 from homomics_lab.viz.generator import PlotGenerator, PlotType
 from homomics_lab.viz.plotly_adapter import to_plotly_json
 from homomics_lab.workspace.manager import WorkspaceManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -85,7 +88,8 @@ async def generate_plot(request: PlotRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Plot generation failed: {str(e)}")
+        logger.exception("Plot generation failed (plot_type=%s)", request.plot_type)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.post("/plot-data", response_model=PlotDataResponse)
@@ -110,7 +114,8 @@ async def generate_plot_data(request: PlotDataRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Plot data generation failed: {str(e)}")
+        logger.exception("Plot data generation failed (plot_type=%s)", request.plot_type)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.get("/plot/types", response_model=List[PlotTypeInfo])

@@ -132,6 +132,7 @@ async def update_analysis_template(
 
 @router.delete(
     "/{template_id}",
+    response_model=Dict[str, bool],
     dependencies=[Depends(rate_limit_dependency), Depends(require_admin)],
 )
 async def delete_analysis_template(template_id: str, request: Request):

@@ -48,7 +48,7 @@ async def add_server(
     return entry.model_dump()
 
 
-@router.delete("/servers/{id}")
+@router.delete("/servers/{id}", response_model=Dict[str, bool])
 async def remove_server(
     id: str,
     marketplace: MCPMarketplace = Depends(_marketplace),

@@ -6,6 +6,7 @@ resolves such references back into data or file streams.
 """
 
 from pathlib import Path
+import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +16,8 @@ from pydantic import BaseModel
 from homomics_lab.api.auth import require_auth
 from homomics_lab.config import settings
 from homomics_lab.data import DataStore, ResultReference
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["results"])
 
@@ -105,6 +108,7 @@ async def load_result(
     try:
         data = data_store.load(ref)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to load result: {exc}") from exc
+        logger.exception("Failed to load result (format=%s)", ref.format)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return ResultPayloadResponse(data=data, format=ref.format, size=ref.size)

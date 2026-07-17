@@ -1,11 +1,14 @@
 """API endpoints for skill generation."""
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from homomics_lab.skills.generator.generator import SkillGenerator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -75,7 +78,8 @@ async def generate_skill(request: GenerateSkillRequest):
             saved_path=saved_path,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Skill generation failed: {str(e)}")
+        logger.exception("Skill generation failed (name=%s)", request.name)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.post("/suggest", response_model=SuggestedSkillResponse)

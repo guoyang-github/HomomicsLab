@@ -221,7 +221,7 @@ async def list_sessions(http_request: Request, project_id: Optional[str] = None)
     return await memory_manager.list_sessions(project_id=project_id)
 
 
-@router.delete("/sessions/{session_id}", dependencies=[Depends(require_auth)])
+@router.delete("/sessions/{session_id}", response_model=Dict[str, bool], dependencies=[Depends(require_auth)])
 async def delete_session(session_id: str, http_request: Request) -> Dict[str, bool]:
     """Delete a persisted chat session and its working memory."""
     memory_manager: MemoryManager = http_request.app.state.memory_manager
@@ -229,7 +229,7 @@ async def delete_session(session_id: str, http_request: Request) -> Dict[str, bo
     return {"deleted": True}
 
 
-@router.patch("/sessions/{session_id}", dependencies=[Depends(require_auth)])
+@router.patch("/sessions/{session_id}", response_model=ChatSessionSummary, dependencies=[Depends(require_auth)])
 async def rename_session(
     session_id: str,
     request: RenameSessionRequest,

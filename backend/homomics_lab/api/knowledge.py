@@ -1,5 +1,6 @@
 """API endpoints for knowledge ingestion and graph search."""
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -14,6 +15,8 @@ from homomics_lab.knowledge.ingestion import CognifyOptions, KnowledgeIndex
 from homomics_lab.knowledge.ingestion.models import IngestionResult
 from homomics_lab.projects.permissions import require_project_permission
 from homomics_lab.security import validate_project_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -106,8 +109,11 @@ async def ingest(
             result = await index.ingest_url(body.source, project_id=project_id, options=options)
         else:
             result = await index.ingest_text(body.source, project_id=project_id, options=options)
-    except Exception as exc:
+    except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Knowledge ingest failed (source_type=%s)", body.source_type)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return _result_to_response(result)
 
@@ -147,8 +153,11 @@ async def ingest_upload(
     parsed_options = _build_options(_parse_options_form(options))
     try:
         result = await index.ingest_file(file_path, project_id=project_id, options=parsed_options)
-    except Exception as exc:
+    except (ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Knowledge upload ingest failed (project_id=%s)", project_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return _result_to_response(result)
 
@@ -241,7 +250,8 @@ async def search(
     try:
         results = await index.search_chunks(q, project_id=validated_project_id, top_k=top_k)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Knowledge search failed (project_id=%s)", validated_project_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return SearchResponse(results=results)
 
@@ -281,7 +291,8 @@ async def update_document(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Document update failed (document_id=%s)", document_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
 
 @router.get("/documents", response_model=DocumentListResponse)
@@ -302,7 +313,8 @@ async def list_documents(
     try:
         documents = await index.list_documents(project_id=validated_project_id)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Document listing failed (project_id=%s)", validated_project_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return DocumentListResponse(documents=documents)
 

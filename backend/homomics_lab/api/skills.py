@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 import tempfile
 from typing import Any, Dict, List, Optional, Union
 
@@ -8,9 +9,11 @@ from pydantic import BaseModel
 from homomics_lab.api.auth import require_admin, require_auth
 from homomics_lab.api.responses import MessageResponse
 from homomics_lab.security import PathSecurityError, safe_extractall
-from homomics_lab.skills.promotion import TransientSkillPromoter
-from homomics_lab.skills.skill_store import SkillStore
+from homomics_lab.skills.promotion import SkillPromotionError, TransientSkillPromoter
+from homomics_lab.skills.skill_store import SkillStore, SkillStoreError
 from homomics_lab.tools.approval import get_default_approval_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -421,8 +424,11 @@ async def import_skill(request: Request, body: ImportSkillRequest):
             skill_id=body.skill_id,
             enable=body.enable,
         )
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill import failed (source=%s)", body.source)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
     return ImportSkillResponse(
         skill_id=skill.id,
@@ -513,8 +519,11 @@ async def update_skill(request: Request, skill_id: str, body: ImportSkillRequest
             source=body.source,
             namespace=body.namespace,
         )
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill update failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
     return ImportSkillResponse(
         skill_id=skill.id,
@@ -539,8 +548,11 @@ async def remove_skill(
     store = _get_store(request)
     try:
         store.remove_skill(skill_id, namespace=namespace)
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill removal failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
     return {"skill_id": skill_id, "namespace": namespace, "removed": True}
 
 
@@ -558,8 +570,11 @@ async def enable_skill(
     store = _get_store(request)
     try:
         skill = store.enable_skill(skill_id, namespace=namespace)
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill enable failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
     return {"skill_id": skill.id, "namespace": namespace, "enabled": True}
 
 
@@ -577,8 +592,11 @@ async def disable_skill(
     store = _get_store(request)
     try:
         store.disable_skill(skill_id, namespace=namespace)
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill disable failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
     return {"skill_id": skill_id, "namespace": namespace, "enabled": False}
 
 
@@ -620,8 +638,11 @@ async def test_skill(
     store = _get_store(request)
     try:
         report = store.run_tests(skill_id, namespace=namespace)
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill test run failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
     return TestResponse(
         success=report.success,
@@ -671,8 +692,11 @@ async def promote_skill(request: Request, body: PromoteSkillRequest):
         if not body.trusted:
             skill.metadata["trusted"] = False
             store.trust_skill(skill.id, trusted=False)
-    except Exception as e:
+    except (SkillPromotionError, SkillStoreError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill promotion failed (source_dir=%s)", body.source_dir)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
     return {
         "skill_id": skill.id,
@@ -701,8 +725,11 @@ async def trust_skill(
     store = _get_store(request)
     try:
         skill = store.trust_skill(skill_id, trusted=body.trusted)
-    except Exception as e:
+    except SkillStoreError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Skill trust toggle failed (skill_id=%s)", skill_id)
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
     return {
         "skill_id": skill.id,

@@ -1,5 +1,6 @@
 """API endpoints for the LLM Wiki document knowledge base."""
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +13,8 @@ from homomics_lab.knowledge.wiki import WikiEngine, WikiStore
 from homomics_lab.knowledge.wiki.models import WikiPage, WikiQueryResult
 from homomics_lab.projects.permissions import require_project_permission
 from homomics_lab.security import validate_project_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -137,7 +140,7 @@ async def update_page(
     return _page_to_dict(updated)
 
 
-@router.delete("/pages/{page_id}")
+@router.delete("/pages/{page_id}", response_model=Dict[str, bool])
 async def delete_page(
     request: Request,
     page_id: str,
@@ -174,8 +177,11 @@ async def generate_pages(
         pages = await engine.generate_pages_from_document(
             body.document_id, project_id=validated
         )
-    except Exception as exc:
+    except (ValueError, KeyError, FileNotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Wiki page generation failed (document_id=%s)", body.document_id)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     return [_page_to_dict(p) for p in pages]
 
 
@@ -194,7 +200,8 @@ async def ask_wiki(
     try:
         result = await engine.answer(body.question, project_id=validated, top_k=body.top_k)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Wiki ask failed (project_id=%s)", validated)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
     return _result_to_dict(result)
 
 

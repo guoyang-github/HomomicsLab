@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -9,6 +10,8 @@ from homomics_lab.nfcore_integration import get_nfcore_manager
 from homomics_lab.nfcore_results import NFCoreResultIngester
 from homomics_lab.nfcore_schema import form_to_dict, parse_schema, validate_params
 from homomics_lab.workspace.manager import WorkspaceManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -120,7 +123,8 @@ async def list_nfcore_pipelines(
     try:
         pipelines = get_nfcore_manager().list_pipelines(use_cache=cached_only)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.exception("Failed to list nf-core pipelines")
+        raise HTTPException(status_code=502, detail="Internal error") from exc
 
     return [
         NFCorePipelineResponse(
@@ -148,7 +152,8 @@ async def download_nfcore_pipeline(
     try:
         path = get_nfcore_manager().download_pipeline(pipeline, version)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("nf-core pipeline download failed (pipeline=%s)", pipeline)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return {"pipeline": pipeline, "version": version, "path": str(path)}
 
@@ -172,7 +177,8 @@ async def run_nfcore_pipeline(
             profiles=request.profiles or settings.nfcore_default_profiles,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("nf-core pipeline run failed (pipeline=%s)", request.pipeline)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return result
 
@@ -202,7 +208,8 @@ async def list_nfcore_releases(
     try:
         releases = get_nfcore_manager().list_releases(pipeline)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("nf-core releases listing failed (pipeline=%s)", pipeline)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     return {"pipeline": pipeline, "releases": releases}
 
@@ -222,7 +229,8 @@ async def get_nfcore_schema(
         form = parse_schema(schema, pipeline_name=pipeline, version=version)
         return form_to_dict(form)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("nf-core schema load failed (pipeline=%s)", pipeline)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
 
 class ValidateParamsRequest(BaseModel):
@@ -244,7 +252,8 @@ async def validate_nfcore_params(
         schema = manager.load_schema(request.pipeline, request.version)
         errors = validate_params(schema, request.params)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("nf-core param validation failed (pipeline=%s)", request.pipeline)
+        raise HTTPException(status_code=500, detail="Internal error") from exc
 
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))

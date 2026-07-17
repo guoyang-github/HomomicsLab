@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from homomics_lab.api.responses import StatusResponse
 from homomics_lab.config import settings
 from homomics_lab.database.connection import get_async_session
 from homomics_lab.database.models import User
@@ -422,10 +423,10 @@ admin_router = APIRouter(
 )
 
 
-@admin_router.get("/status")
+@admin_router.get("/status", response_model=StatusResponse)
 async def admin_status():
     """Simple admin-only health/status endpoint."""
-    return {"status": "ok"}
+    return StatusResponse(status="ok")
 
 
 # ---------------------------------------------------------------------------
