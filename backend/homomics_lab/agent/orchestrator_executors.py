@@ -13,13 +13,16 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
+from homomics_lab.agent.progress_events import build_agent_event
 from homomics_lab.config import settings
 from homomics_lab.execution.code_act import run_code_act
+from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import TaskStatus
 from homomics_lab.tasks.models import TaskNode
+from homomics_lab.viz.chart_critic import ChartCritic, ChartCritique, collect_chart_paths
 
 if TYPE_CHECKING:
     from homomics_lab.agent.orchestrator import Orchestrator
@@ -32,6 +35,14 @@ class TaskExecutors:
 
     def __init__(self, orchestrator: "Orchestrator"):
         self._orch = orchestrator
+
+    @staticmethod
+    def _new_llm_client() -> Optional[LLMClient]:
+        """Best-effort LLM client construction; None when unavailable."""
+        try:
+            return LLMClient()
+        except Exception:
+            return None
 
     def _fallback_task_prompt(
         self,
@@ -145,11 +156,7 @@ class TaskExecutors:
             elif isinstance(value, (int, float, bool)) or value is None:
                 code_context[key] = value
 
-        llm_client: Optional[LLMClient] = None
-        try:
-            llm_client = LLMClient()
-        except Exception:
-            llm_client = None
+        llm_client = self._new_llm_client()
 
         max_attempts = max(1, task.retry_policy.max_attempts)
         backoff = task.retry_policy.backoff_seconds
@@ -181,7 +188,21 @@ class TaskExecutors:
                         current_phase="脚本执行完成，正在整理结果…",
                         progress_pct=80.0,
                     )
-                    return codeact_result
+
+                    async def _rerun(new_prompt: str) -> Dict[str, Any]:
+                        return await run_code_act(
+                            task=new_prompt,
+                            language="python",
+                            context=code_context,
+                            working_dir=working_dir,
+                            llm_client=llm_client,
+                            skill_registry=self._orch.skill_registry,
+                            tool_registry=None,
+                        )
+
+                    return await self._critique_charts_and_repair(
+                        task, context, codeact_result, attempt_prompt, llm_client, _rerun
+                    )
                 last_error = codeact_result.get("stderr") or codeact_result.get("error") or "unknown error"
             except Exception as exc:
                 last_error = str(exc)
@@ -218,6 +239,10 @@ class TaskExecutors:
             "stdout": codeact_result.get("stdout", ""),
             "stderr": codeact_result.get("stderr", ""),
             "code": codeact_result.get("code", ""),
+            # Self-correction provenance: SkillGenesis uses a non-empty
+            # fix_history as the "validated robustness" candidacy signal.
+            "attempts": codeact_result.get("attempts", 1),
+            "fix_history": codeact_result.get("fix_history", []),
         }
         result_data = normalized["result"]
         if isinstance(result_data, dict):
@@ -226,6 +251,137 @@ class TaskExecutors:
                     normalized["output_files"] = [result_data[key]]
                     break
         return normalized
+
+    async def _critique_charts_and_repair(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        codeact_result: Dict[str, Any],
+        prompt: str,
+        llm_client: Optional[LLMClient],
+        rerun: Callable[[str], Awaitable[Dict[str, Any]]],
+    ) -> Dict[str, Any]:
+        """VLM chart feedback loop: critique produced charts, repair at most N times.
+
+        Opt-in via ``settings.chart_critic_enabled`` (default off). Each
+        produced chart is assessed by :class:`ChartCritic` (cheap rule
+        pre-checks first, vision LLM second). When a high-severity problem is
+        found, the critique suggestion is fed back into one bounded repair run
+        (``settings.chart_critic_max_retries``, default 1). If the repair does
+        not converge, the original charts are kept and a note is attached to
+        the result. Every failure inside this loop degrades to returning the
+        original result unchanged — it must never break the main flow.
+        """
+        if not getattr(settings, "chart_critic_enabled", False):
+            return codeact_result
+        try:
+            charts = collect_chart_paths(codeact_result.get("result") or {})
+            if not charts:
+                return codeact_result
+
+            critic = ChartCritic(llm_client=llm_client)
+            intent = task.description or task.name
+            critiques = await self._critique_all(critic, charts, intent, task)
+            codeact_result["chart_critiques"] = critiques
+            bad = [c for c in critiques if not c["ok"] and c["severity"] == "high"]
+            if not bad:
+                return codeact_result
+
+            max_retries = max(0, int(getattr(settings, "chart_critic_max_retries", 1)))
+            suggestions = "; ".join(
+                f"[{', '.join(c['issues'])}] {c['suggestion']}".strip() for c in bad
+            )
+            for attempt in range(1, max_retries + 1):
+                self._orch._emit_progress(
+                    status="RETRYING",
+                    current_phase=f"图表质检发现问题，正在自动修正… (尝试 {attempt}/{max_retries})",
+                    progress_pct=85.0,
+                )
+                repair_prompt = (
+                    f"{prompt}\n\nChart quality feedback from automated visual review: "
+                    f"{suggestions}\nRegenerate the analysis so the produced charts fix "
+                    "these issues (non-empty data, labeled axes, readable labels, no "
+                    "legend occlusion), keeping all other outputs intact."
+                )
+                try:
+                    repaired = await rerun(repair_prompt)
+                except Exception as exc:
+                    logger.warning("chart repair run failed for task %s: %s", task.name, exc)
+                    break
+                if not repaired.get("success"):
+                    break
+                repaired_charts = collect_chart_paths(repaired.get("result") or {})
+                repaired_critiques = await self._critique_all(
+                    critic, repaired_charts, intent, task
+                )
+                repaired["chart_critiques"] = critiques + repaired_critiques
+                if not [
+                    c
+                    for c in repaired_critiques
+                    if not c["ok"] and c["severity"] == "high"
+                ]:
+                    return repaired
+
+            # Repair did not converge: keep the original charts and annotate.
+            codeact_result["chart_critique_note"] = (
+                "图表自动质检发现问题（自动修正后仍未完全解决）："
+                f"{suggestions}。已保留原始图表，请人工确认。"
+            )
+            return codeact_result
+        except Exception:
+            logger.debug("chart critique loop failed; keeping original result", exc_info=True)
+            return codeact_result
+
+    async def _critique_all(
+        self,
+        critic: ChartCritic,
+        charts: List[Path],
+        intent: str,
+        task: TaskNode,
+    ) -> List[Dict[str, Any]]:
+        """Critique every chart and emit one ``chart_critique`` event per chart."""
+        critiques: List[Dict[str, Any]] = []
+        for chart in charts:
+            critique = await critic.critique(
+                chart, intent=intent, context={"task_name": task.name}
+            )
+            critiques.append({"path": str(chart), **critique.to_dict()})
+            self._emit_chart_critique_event(task, str(chart), critique)
+        return critiques
+
+    def _emit_chart_critique_event(
+        self, task: TaskNode, chart_path: str, critique: ChartCritique
+    ) -> None:
+        """Emit a structured ``chart_critique`` progress event for Execution Logs.
+
+        Uses the same ``resource_usage["agent_events"]`` channel as the agent
+        skill loop (see ``homomics_lab.agent.progress_events``); top-level
+        executions carry no ``actor``/``parent_id``.
+        """
+        event = build_agent_event(
+            "chart_critique",
+            tool="chart_critic",
+            success=critique.ok,
+            output=(
+                f"{Path(chart_path).name}: ok={critique.ok} "
+                f"severity={critique.severity} issues={critique.issues} "
+                f"suggestion={critique.suggestion} source={critique.source}"
+            ),
+            artifacts=[chart_path],
+        )
+        try:
+            self._orch._report_progress(
+                ExecutionState(
+                    job_id="",
+                    status="RUNNING",
+                    current_phase=task.name,
+                    progress_pct=85.0,
+                    scheduler_type="agent",
+                    resource_usage={"agent_events": [event]},
+                )
+            )
+        except Exception:
+            pass
 
     def _load_skill_reference(self, skill: Any) -> str:
         """Load SKILL.md and reference scripts for use as prompt context.
@@ -380,11 +536,7 @@ class TaskExecutors:
             code_context["input_path"] = first_input_path
             code_context["adata_path"] = first_input_path
 
-        llm_client: Optional[LLMClient] = None
-        try:
-            llm_client = LLMClient()
-        except Exception:
-            llm_client = None
+        llm_client = self._new_llm_client()
 
         try:
             return await run_code_act(
@@ -439,6 +591,14 @@ class TaskExecutors:
                     status="RUNNING",
                     current_phase="脚本执行完成，正在整理结果…",
                     progress_pct=80.0,
+                )
+                codeact_result = await self._critique_charts_and_repair(
+                    task,
+                    context,
+                    codeact_result,
+                    prompt,
+                    self._new_llm_client(),
+                    lambda p: self._run_codeact_with_prompt(task, context, p),
                 )
                 return self._normalize_codeact_result(
                     task, codeact_result, skill_name=skill.id

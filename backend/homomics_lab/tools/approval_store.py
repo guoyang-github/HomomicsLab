@@ -28,6 +28,7 @@ class ToolApprovalRequest:
     risk_level: str
     approved: bool = False
     metadata: Dict = field(default_factory=dict)
+    resolved: bool = False
 
     def to_dict(self) -> Dict:
         return {
@@ -37,6 +38,7 @@ class ToolApprovalRequest:
             "risk_level": self.risk_level,
             "approved": self.approved,
             "metadata": self.metadata,
+            "resolved": self.resolved,
         }
 
 
@@ -123,7 +125,7 @@ class PersistentApprovalStore:
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 row = conn.execute(
-                    "SELECT tool_name, arguments, risk_level, approved, metadata FROM approvals WHERE call_id = ?",
+                    "SELECT tool_name, arguments, risk_level, approved, metadata, resolved_at FROM approvals WHERE call_id = ?",
                     (call_id,),
                 ).fetchone()
             if row is None:
@@ -135,6 +137,7 @@ class PersistentApprovalStore:
                 risk_level=row[2],
                 approved=bool(row[3]),
                 metadata=json.loads(row[4] or "{}"),
+                resolved=row[5] is not None,
             )
             self._memory[call_id] = request
             return request
@@ -169,6 +172,7 @@ class PersistentApprovalStore:
         if request is None:
             return False
         request.approved = approved
+        request.resolved = True
         if self._available:
             try:
                 with sqlite3.connect(str(self.db_path)) as conn:
@@ -194,13 +198,23 @@ class PersistentApprovalStore:
         request = self.get(call_id)
         return request is not None and request.approved
 
+    def get_resolution(self, call_id: str) -> Optional[bool]:
+        """Return the resolution of a request: True approved, False rejected.
+
+        Returns None when the request does not exist or is still pending.
+        """
+        request = self.get(call_id)
+        if request is None or not request.resolved:
+            return None
+        return request.approved
+
     def list_pending(self) -> List[ToolApprovalRequest]:
         if not self._available:
-            return [r for r in self._memory.values() if not r.approved]
+            return [r for r in self._memory.values() if not r.resolved]
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 rows = conn.execute(
-                    "SELECT call_id, tool_name, arguments, risk_level, approved, metadata FROM approvals WHERE approved = 0"
+                    "SELECT call_id, tool_name, arguments, risk_level, approved, metadata FROM approvals WHERE approved = 0 AND resolved_at IS NULL"
                 ).fetchall()
             return [
                 ToolApprovalRequest(

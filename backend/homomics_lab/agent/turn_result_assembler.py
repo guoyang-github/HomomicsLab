@@ -54,6 +54,10 @@ class ResultAssembler:
                 }
             else:
                 path = getattr(a, "path", None)
+                if path is None and isinstance(a, (str, Path)):
+                    # Plain path entry (documented in the docstring); strings
+                    # and Paths have no ``.path`` attribute.
+                    path = str(a)
                 task_id = getattr(a, "task_id", None)
                 atype = getattr(a, "artifact_type", None)
                 if task_id is not None:
@@ -101,6 +105,13 @@ class ResultAssembler:
                     paths.append(val)
             if paths:
                 collected.extend(ResultAssembler.envelopes_from_artifacts(paths))
+            # Propagate chart-critic annotations onto the chart envelopes so
+            # the summary can surface them next to the affected figure.
+            note = obj.get("chart_critique_note")
+            if note:
+                for env in collected:
+                    if env.get("kind") == "image":
+                        env.setdefault("chart_critique_note", note)
             return collected
 
         collected: List[Dict[str, Any]] = []
@@ -133,10 +144,19 @@ class ResultAssembler:
                 envelopes, skill_id=skill_id, user_message=user_message or ""
             )
             md = summary.to_markdown()
-            return md if md else ""
         except Exception:  # never let summarization break the turn
             logger.debug("result summarization failed", exc_info=True)
-            return ""
+            md = ""
+        # Surface chart-critic annotations (e.g. a repair that did not
+        # converge) so the user sees the caveat next to the affected figure.
+        notes: List[str] = []
+        for env in envelopes:
+            note = env.get("chart_critique_note")
+            if note and note not in notes:
+                notes.append(note)
+        if notes:
+            md = (md + "\n\n" if md else "") + "\n".join(f"> {n}" for n in notes)
+        return md if md else ""
 
     @staticmethod
     def tree_progress(tree: "TaskTree") -> Dict[str, Any]:

@@ -450,6 +450,34 @@ class CBKB:
             for r in rows
         ]
 
+    def query_parameter_lore_by_prefix(
+        self,
+        skill_id_prefix: str,
+        limit: int = 500,
+    ) -> List[ParameterLoreEntry]:
+        """Return parameter lore entries whose skill_id starts with a prefix.
+
+        Generic companion to ``query_parameter_lore`` for namespaced lore
+        (e.g. skill-genesis candidates stored under ``genesis:<hash>``).
+        """
+        with sqlite3.connect(str(self.db_path)) as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM parameter_lore
+                WHERE skill_id LIKE ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (f"{skill_id_prefix}%", limit),
+            ).fetchall()
+        return [
+            ParameterLoreEntry(
+                id=r[0], skill_id=r[1], param_name=r[2], param_value=r[3],
+                outcome_metric=r[4], outcome_value=r[5], project_id=r[6],
+                context=r[7], created_at=r[8],
+            )
+            for r in rows
+        ]
+
     # ── Layer 3: Anomaly Archive ────────────────────
 
     def archive_anomaly(self, record: AnomalyRecord) -> None:

@@ -209,6 +209,16 @@ class BackgroundJobRunner:
                         self._skill_executor.set_workspace(workspace)
                     with workspace_context(workspace):
                         result = await asyncio.wait_for(coro, timeout=timeout)
+                        # Hypothesis-driven exploration post-processing:
+                        # critique each verified hypothesis branch, chase
+                        # depth-limited follow-ups, and synthesize the
+                        # exploration report. Best-effort; never changes the
+                        # job outcome.
+                        exploration_message = (
+                            await self._maybe_run_exploration_postprocess(
+                                job, result, runner
+                            )
+                        )
                     await workspace.create_git_snapshot("post-run", job_id)
 
                     # Persist mutated state
@@ -223,6 +233,9 @@ class BackgroundJobRunner:
                     # result so that reloading the session still shows the outcome.
                     # Also capture the new result message for real-time broadcast.
                     result_messages = await self._update_queued_todo_message(job, result)
+                    if exploration_message is not None:
+                        result_messages = list(result_messages or [])
+                        result_messages.append(exploration_message)
 
                     # Update plan status before persisting the job so that callers
                     # observing a completed job also see a completed plan.
@@ -481,6 +494,112 @@ class BackgroundJobRunner:
             return None
         except Exception:
             logger.warning("Failed to update queued TODO message", exc_info=True)
+            return None
+
+    async def _maybe_run_exploration_postprocess(
+        self, job: Job, result, runner
+    ) -> Optional[Dict[str, Any]]:
+        """Critique + synthesize for hypothesis-driven exploration jobs.
+
+        When the job's plan carries an exploration blueprint (stored by the
+        intent router's exploration branch), each hypothesis branch result is
+        critiqued by the ExplorationEngine, depth-limited follow-up hypotheses
+        are executed through the same runner (i.e. the existing Orchestrator /
+        CodeAct stack), and a Markdown exploration report is appended to the
+        conversation. Returns the report message dict for broadcast, or None
+        when the job is not an exploration job or post-processing is
+        unavailable. Never raises.
+        """
+        try:
+            if not settings.exploration_enabled or not job.plan_id:
+                return None
+            plan = await PlanStore().get(job.plan_id)
+            blueprint_data = None
+            if plan is not None:
+                blueprint_data = (plan.metadata or {}).get("exploration_blueprint")
+            if not blueprint_data:
+                return None
+
+            from homomics_lab.agent.exploration import (
+                ExplorationBlueprint,
+                ExplorationEngine,
+            )
+            from homomics_lab.context.working_memory import WorkingMemory
+            from homomics_lab.llm_client import LLMClient
+            from homomics_lab.tasks.task_tree import TaskTree
+
+            llm_client = LLMClient()
+            if not llm_client.is_configured():
+                return None
+            blueprint = ExplorationBlueprint.from_dict(blueprint_data)
+            engine = ExplorationEngine(llm_client=llm_client)
+
+            tree = getattr(result, "task_tree", None) or job.task_tree
+            task_results: Dict[str, Any] = {}
+            for task in getattr(tree, "tasks", []) or []:
+                hypothesis_id = (task.parameters or {}).get("exploration_hypothesis_id")
+                if hypothesis_id:
+                    task_results[hypothesis_id] = task.result
+
+            working_memory = job.working_memory or WorkingMemory()
+
+            async def _execute_follow_up(task_node):
+                """Run one follow-up hypothesis task via the existing stack."""
+                sub_result = await runner.execute_tree(
+                    tree=TaskTree(tasks=[task_node]),
+                    working_memory=working_memory,
+                    project_id=job.project_id or "default",
+                    trace_id=f"{job.job_id}-explore",
+                    session_id=job.session_id or "",
+                )
+                sub_tree = getattr(sub_result, "task_tree", None)
+                sub_tasks = getattr(sub_tree, "tasks", []) or []
+                return getattr(sub_tasks[0], "result", None) if sub_tasks else None
+
+            await engine.run_blueprint(
+                blueprint, task_results=task_results, executor=_execute_follow_up
+            )
+            report_md = engine.synthesize(
+                blueprint.question, blueprint.all_hypotheses()
+            )
+            report_msg = ChatMessage(
+                id=f"msg_exploration_{job.job_id}",
+                type=MessageType.TEXT,
+                content=report_md,
+                sender="agent",
+            )
+
+            # Append to the in-job working memory and the persisted session so
+            # the report survives reloads, mirroring the summary-message dance.
+            in_memory_messages = getattr(working_memory, "messages", [])
+            in_memory_ids = {getattr(m, "id", None) for m in in_memory_messages}
+            if report_msg.id not in in_memory_ids:
+                in_memory_messages.append(report_msg)
+            if self._memory_manager is not None and job.session_id:
+                try:
+                    loaded = await self._memory_manager.load_session(
+                        job.session_id, job.project_id or "default"
+                    )
+                    persisted_memory, task_tree = loaded
+                    persisted_ids = {
+                        getattr(m, "id", None) for m in persisted_memory.messages
+                    }
+                    if report_msg.id not in persisted_ids:
+                        persisted_memory.messages.append(report_msg)
+                    await self._memory_manager._save_session(
+                        job.session_id,
+                        job.project_id or "default",
+                        persisted_memory,
+                        task_tree,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to persist exploration report", exc_info=True
+                    )
+
+            return report_msg.model_dump(mode="json")
+        except Exception:
+            logger.warning("Exploration post-processing failed", exc_info=True)
             return None
 
     @staticmethod

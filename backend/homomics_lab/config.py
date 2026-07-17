@@ -225,6 +225,15 @@ class Settings(BaseSettings):
     seed_observed_promotion_threshold: int = 3
     scheduler_run_at_startup: bool = False
 
+    # Skill genesis (P2): crystallize repeatedly-validated CodeAct scripts into
+    # reusable community-trust skills. Disabled by default (opt-in) so individual
+    # users do not spend LLM drafting tokens; enabling it lets the system propose
+    # a new skill after a generated script succeeds post self-correction, or after
+    # the same normalized task signature succeeds skill_genesis_min_successes
+    # times. Every proposal requires explicit human approval (HITL).
+    skill_genesis_enabled: bool = False
+    skill_genesis_min_successes: int = 3
+
     # Skill sandbox / security settings
     auto_load_domain_strategies: bool = True
     skill_sandbox_backend: str = "auto"  # "auto" | "local" | "bubblewrap" | "container"
@@ -505,10 +514,33 @@ class Settings(BaseSettings):
     # 1 + codeact_max_fix_attempts executions. 0 disables self-correction.
     codeact_max_fix_attempts: int = 3
 
+    # Chart critic (VLM visual feedback loop): after a CodeAct / skill-as-reference
+    # run produces charts, a vision-capable LLM inspects them (empty figure,
+    # missing axes, garbled labels, truncation, legend occlusion, intent
+    # mismatch) and high-severity problems trigger a bounded repair re-run.
+    # Opt-in (disabled by default) so individual users do not spend extra
+    # tokens; degrades silently to no-op without a vision-capable model.
+    chart_critic_enabled: bool = False
+    # Max repair re-runs after a failed chart critique. The critique itself
+    # always runs once; this bounds regeneration attempts (default 1).
+    chart_critic_max_retries: int = 1
+
     # Open-agent fallback: when the domain planner returns a fallback plan with
     # no concrete skill match, let the open agent try before asking the user to
     # approve a vague plan. Enabled by default.
     open_agent_fallback_enabled: bool = True
+
+    # Hypothesis-driven exploration: open-ended research questions with
+    # associated data files are routed to the ExplorationEngine, which
+    # generates testable hypotheses, verifies them through the existing
+    # Orchestrator/CodeAct stack, self-critiques the results, and synthesizes
+    # a report. This is a user-facing product capability (not a background
+    # token-consuming job), so it is enabled by default. The routing gate is
+    # deliberately conservative and falls back to the standard workflow path
+    # whenever it is unsure or no LLM is available.
+    exploration_enabled: bool = True
+    exploration_max_hypotheses: int = 4  # blueprint size cap (2..N hypotheses)
+    exploration_max_depth: int = 2  # max hypothesis layers incl. follow-ups
 
     # CodeAct cache settings
     codeact_cache_enabled: bool = True

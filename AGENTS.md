@@ -124,11 +124,18 @@ Key variables:
 | `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, `auto` |
 | `HOMOMICS_CODEACT_CACHE_ENABLED` | `true` | Cache CodeAct-generated code |
 | `HOMOMICS_CODEACT_MAX_FIX_ATTEMPTS` | `3` | In-engine self-correction: LLM repair iterations after a failed CodeAct execution (0 disables) |
+| `HOMOMICS_EXPLORATION_ENABLED` | `true` | Hypothesis-driven exploration mode: open-ended research questions with associated data files are routed to `agent/exploration.py` (blueprint → verify → critique → report); falls back to the workflow path when unsure or LLM-less |
+| `HOMOMICS_EXPLORATION_MAX_HYPOTHESES` | `4` | Max hypotheses in an exploration blueprint (2..N generated) |
+| `HOMOMICS_EXPLORATION_MAX_DEPTH` | `2` | Max hypothesis layers including critique-generated follow-ups |
+| `HOMOMICS_CHART_CRITIC_ENABLED` | `false` | VLM chart feedback loop: a vision-capable LLM critiques CodeAct-produced charts and high-severity issues trigger a bounded repair re-run (opt-in; silently no-op without a vision-capable model) |
+| `HOMOMICS_CHART_CRITIC_MAX_RETRIES` | `1` | Max chart regeneration re-runs after a failed chart critique |
 | `HOMOMICS_SKILL_CACHE_ENABLED` | `true` | Memoize deterministic skill results |
 | `HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS` | `4000` | Per-tool output budget before `_compact_tool_output` truncation (errors keep the tail, get 1.5x budget) |
 | `HOMOMICS_WORKER_MODE` | `true` | Run a local worker inside the API process |
 | `HOMOMICS_CURATION_ENABLED` | `false` | Nightly CBKB curation (disabled by default) |
 | `HOMOMICS_EVOLUTION_ENABLED` | `false` | Nightly agent evolution (disabled by default) |
+| `HOMOMICS_SKILL_GENESIS_ENABLED` | `false` | Skill genesis: crystallize repeatedly-validated CodeAct scripts into community-trust skills (opt-in; proposals always require HITL approval) |
+| `HOMOMICS_SKILL_GENESIS_MIN_SUCCESSES` | `3` | Accumulated successes of one normalized task signature before genesis proposes a skill (a post-self-correction success proposes immediately) |
 
 The frontend uses `VITE_API_BASE_URL` and `VITE_WS_URL` for build-time/dev proxy configuration (see `frontend/vite.config.ts`).
 
@@ -279,6 +286,7 @@ mocks should be fixed in the same commit as the production change.
 - Self-improvement data:
   - `agent/plan/mode_selection_lore.py` stores `(intent_features → execution_mode)` statistics learned from `evaluation/mode_benchmark.py`; `ModeSelector` uses them as a prior when confidence and sample thresholds are met.
   - `knowledge/seed.py` / `skills/skill_dag.py` distinguish `source="seed"` (hand-curated YAML) from `source="observed"` (auto-promoted from consecutive successful skill transitions via `_record_execution_feedback`). Observed edges are promoted to `CONFIRMED` only after `seed_observed_promotion_threshold` consecutive successes and zero failures.
+  - `skills/genesis.py` (`SkillGenesis`, opt-in via `HOMOMICS_SKILL_GENESIS_ENABLED`) crystallizes repeatedly-validated CodeAct scripts into community-trust skills: candidates are a post-self-correction success or `skill_genesis_min_successes` successes of one normalized task signature, tracked as namespaced rows (`genesis:<hash>`) in the CBKB `parameter_lore` table (no new table). Proposals are staged under `data/skill_genesis/`, gated by a `PersistentApprovalStore` HITL request (`call_id: skill-genesis:<hash>`, visible via the existing `GET /api/skills/tools/pending` + approve/reject endpoints), and decisions are applied by `finalize_resolved()` on the next recorded execution. Approval imports the package via `SkillStore.import_skill` (SKILL.md carries `trust_level: community`); rejection is recorded and the signature is never re-proposed. The hook lives in `agent/turn_feedback_recorder.py` (CodeAct results are recognized by their `code` key); DAG linking uses the standard `propose_edge` CANDIDATE path — never bypass `skills/promotion.py`/`trust_skill` for trust changes.
 
 ## Project conventions
 
@@ -455,6 +463,8 @@ Production Gunicorn config is in `gunicorn.conf.py`:
 - Prefer editing `domain.yaml` over Python code when adding or modifying analysis strategies, intents, roles, or SOPs.
 - When adding a new skill, follow the `SKILL.md + scripts/` convention and place it in the correct domain `skills/` directory or use the skill import API.
 - Subagent progress events follow the contract in `agent/progress_events.py`: sub-execution states carry top-level `actor: "subagent:<skill_id>"` and `parent_id`; top-level executions omit both keys. The frontend (`utils/subagentLogs.ts`, `ExecutionLogPanel`) relies on this to group nested logs — keep both ends in sync when changing the event shape.
+- `viz/chart_critic.py` implements the opt-in VLM chart feedback loop: `ChartCritic` runs cheap rule pre-checks (missing/empty/blank image) before calling a vision-capable LLM, and silently degrades to `ok=True` when no vision model is available or the call fails. It is wired into the CodeAct result assembly in `agent/orchestrator_executors.py` (`_critique_charts_and_repair`), emits `chart_critique` agent events through the standard `resource_usage["agent_events"]` channel, and annotates results with `chart_critique_note` when a repair does not converge.
 - `agent/turn_runner.py` is no longer a god class; it delegates to `turn_result_assembler`, `turn_context_formatter`, `turn_file_resolver`, `turn_risk_assessor`, `turn_clarification`, `turn_intent_router`, `turn_response_generator`, `turn_self_correction`, and `turn_workflow_handler`. Do not add new large methods directly to `turn_runner.py` — place them in the appropriate collaborator module and add a thin delegating method only when necessary.
+- Hypothesis-driven exploration (`agent/exploration.py`, `ExplorationEngine`) handles open-ended research questions: `turn_intent_router.py` routes them (after clarify/answer, before workflow; conservative keyword + data-file gate) to a blueprint of 2..`exploration_max_hypotheses` testable hypotheses. The blueprint becomes a standard TaskTree (skill-less tasks → CodeAct base) gated by the normal plan-approval flow; after the job runs, `jobs/runner.py::_maybe_run_exploration_postprocess` critiques each branch, chases depth-limited follow-ups (≤ `exploration_max_depth` layers) through the same runner, and emits a Markdown hypothesis-evidence-conclusion report.
 - Run `make lint-backend` / `make test-backend` after backend changes and `npm test -- --run` / `npm run build` after frontend changes.
 - Do not run `git commit`, `git push`, or destructive production actions unless explicitly asked.

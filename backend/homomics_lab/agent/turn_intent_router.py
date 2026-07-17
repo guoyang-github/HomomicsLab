@@ -19,7 +19,7 @@ from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.jobs.constants import JobMode
 from homomics_lab.metrics import record_plan_created
 from homomics_lab.models.common import ChatMessage, MessageType
-from homomics_lab.agent.plan.models import DataState
+from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.plan.models import Plan, PlanStatus
 from homomics_lab.plan.presenter import PlanPresenter
 from homomics_lab.plan.store import PlanStore, _new_plan_id
@@ -44,6 +44,88 @@ REAL_DOMAIN_VALUES = {
     "proteomics",
     "epigenomics",
 }
+
+# Open-question phrasing that signals hypothesis-driven exploration. Kept
+# deliberately tight: matched messages must ALSO carry no explicit analysis
+# verb (see EXPLORATION_ANALYSIS_VERBS) and reference project data.
+EXPLORATION_QUESTION_PATTERNS = (
+    "为什么",
+    "为何",
+    "什么原因",
+    "哪些因素",
+    "是什么驱动",
+    "什么驱动",
+    "探索",
+    "有什么规律",
+    "有何规律",
+    "什么规律",
+    "有哪些规律",
+    "why",
+    "what factors",
+    "which factors",
+    "what drives",
+    "what's driving",
+    "explore",
+    "what patterns",
+)
+
+# Concrete analysis verbs: their presence means the user is asking for a
+# specific analysis, so the request stays on the normal workflow path.
+EXPLORATION_ANALYSIS_VERBS = (
+    "质控",
+    "聚类",
+    "注释",
+    "差异表达",
+    "降维",
+    "比对",
+    "定量",
+    "富集",
+    "标准化",
+    "归一化",
+    "过滤",
+    "整合",
+    "去批次",
+    "批次校正",
+    "轨迹",
+    "拟时序",
+    "通讯分析",
+    "变异检测",
+    "拼接",
+    "物种注释",
+    "多样性",
+    "画",
+    "可视化",
+    "转换",
+    "下载",
+    "运行",
+    "跑一下",
+    "跑个",
+    "qc",
+    "cluster",
+    "annotat",
+    "differential",
+    "pca",
+    "umap",
+    "tsne",
+    "align",
+    "quantif",
+    "enrich",
+    "normaliz",
+    "filter",
+    "integrat",
+    "batch",
+    "trajectory",
+    "pseudotime",
+    "cellchat",
+    "variant",
+    "assembl",
+    "taxonomy",
+    "diversity",
+    "plot",
+    "visualiz",
+    "convert",
+    "download",
+)
 
 
 class IntentRouter:
@@ -129,6 +211,30 @@ class IntentRouter:
                     intent.metadata.get("tool_inputs", {}),
                     working_memory,
                 )
+
+        # Hypothesis-driven exploration: open-ended research questions that
+        # reference project data are routed to the ExplorationEngine. Placed
+        # after clarify/answer (and the fast-path handlers above) but before
+        # the generic workflow path. The gate is deliberately conservative —
+        # when in doubt we fall through to the normal execution path.
+        if settings.exploration_enabled:
+            exploration_files = resolve_preflight_file_paths(project_id, user_message)
+            if self._should_route_to_exploration(
+                intent, user_message, exploration_files, project_id
+            ):
+                exploration_result = await self._handle_exploration(
+                    intent=intent,
+                    user_message=user_message,
+                    working_memory=working_memory,
+                    project_id=project_id,
+                    session_id=session_id,
+                    plan_store=plan_store,
+                    file_paths=exploration_files,
+                )
+                if exploration_result is not None:
+                    return exploration_result
+                # Exploration unavailable (e.g. LLM failure): fall through to
+                # the normal workflow path below.
 
         # Everything else is some form of execution.
         file_paths = resolve_preflight_file_paths(project_id, user_message)
@@ -268,6 +374,184 @@ class IntentRouter:
             intent=intent,
             user_message=user_message,
             plan=plan,
+        )
+
+    def _should_route_to_exploration(
+        self,
+        intent: "UserIntent",
+        user_message: str,
+        file_paths: List[str],
+        project_id: str,
+    ) -> bool:
+        """Conservative gate for hypothesis-driven exploration routing.
+
+        Every condition must hold; any doubt sends the request down the
+        normal workflow path (better to miss an exploration than to misroute
+        an explicit analysis request).
+        """
+        if not settings.exploration_enabled:
+            return False
+        # clarify/answer intents have already returned above; only genuine
+        # execution-style intents qualify.
+        if intent.interaction_mode not in ("", "execute", "explore"):
+            return False
+        # The question must reference project data.
+        if not file_paths and not self._project_has_data_files(project_id):
+            return False
+        text = (user_message or "").lower()
+        if not text.strip():
+            return False
+        # Must look like an open-ended research question...
+        if not any(pattern in text for pattern in EXPLORATION_QUESTION_PATTERNS):
+            return False
+        # ...and must NOT ask for a concrete analysis.
+        if any(verb in text for verb in EXPLORATION_ANALYSIS_VERBS):
+            return False
+        return True
+
+    @staticmethod
+    def _project_has_data_files(project_id: str) -> bool:
+        """Return True when the project has uploaded raw/workspace data files."""
+        if not project_id:
+            return False
+        for base in (
+            settings.data_dir / "raw" / project_id,
+            settings.data_dir / "workspaces" / project_id / "data",
+        ):
+            try:
+                if base.is_dir() and any(p.is_file() for p in base.iterdir()):
+                    return True
+            except OSError:
+                continue
+        return False
+
+    async def _handle_exploration(
+        self,
+        intent: "UserIntent",
+        user_message: str,
+        working_memory: "WorkingMemory",
+        project_id: str,
+        session_id: str,
+        plan_store: Optional[PlanStore],
+        file_paths: List[str],
+    ) -> Optional["TurnResult"]:
+        """Generate an exploration blueprint and gate it on plan approval.
+
+        The blueprint is persisted as a standard pending plan, so the
+        existing approval flow applies unchanged: the user can approve or
+        modify the hypothesis set before execution, and an unanswered plan
+        simply stays pending like any other pending plan. Returns ``None``
+        when exploration cannot proceed (no plan store, no LLM, or blueprint
+        generation failure) so the caller falls back to the workflow path.
+        """
+        from homomics_lab.agent.exploration import ExplorationEngine
+        from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
+
+        if plan_store is None:
+            return None
+        llm_client = self._runner._llm_client
+        if llm_client is None:
+            try:
+                from homomics_lab.llm_client import LLMClient
+
+                llm_client = LLMClient()
+                self._runner._llm_client = llm_client
+            except Exception:
+                return None
+
+        engine = ExplorationEngine(llm_client=llm_client)
+        data_context = ", ".join(file_paths) if file_paths else "项目已关联数据文件"
+        try:
+            blueprint = await engine.generate_blueprint(
+                user_message, data_context=data_context, file_paths=file_paths
+            )
+        except Exception:
+            logger.warning(
+                "Exploration blueprint generation failed; falling back to workflow",
+                exc_info=True,
+            )
+            return None
+        if blueprint is None or not blueprint.hypotheses:
+            return None
+
+        tree = engine.blueprint_to_task_tree(blueprint)
+        plan_result = PlanResult(
+            phases=[
+                Phase(
+                    phase_type="exploration",
+                    description=h.statement,
+                    derivation="exploration",
+                )
+                for h in blueprint.hypotheses
+            ],
+            strategy_name="exploration",
+            data_state=DataState(),
+            derivation="exploration",
+        )
+        plan = Plan(
+            plan_id=_new_plan_id(),
+            session_id=session_id,
+            project_id=project_id,
+            status=PlanStatus.PENDING_APPROVAL,
+            is_fallback=False,
+            intent_analysis_type=intent.analysis_type,
+            intent_complexity=intent.complexity,
+            original_intent={
+                "analysis_type": intent.analysis_type,
+                "complexity": intent.complexity,
+                "confidence": intent.confidence,
+                "original_message": intent.original_message,
+                "domain": intent.domain,
+                "target": intent.target,
+                "scope": intent.scope,
+                "interaction_mode": intent.interaction_mode,
+                "metadata": (
+                    dict(intent.metadata)
+                    if isinstance(intent.metadata, dict)
+                    else {"_raw": intent.metadata}
+                ),
+            },
+            plan_result=plan_result,
+            task_tree=tree,
+            working_memory=working_memory,
+            metadata={
+                "exploration": True,
+                "exploration_blueprint": blueprint.to_dict(),
+            },
+        )
+        await plan_store.create(plan)
+        record_plan_created(strategy="exploration", is_fallback=False)
+
+        hypothesis_lines = "\n".join(
+            f"{idx}. {h.statement}（验证：{h.verification}）"
+            for idx, h in enumerate(blueprint.hypotheses, start=1)
+        )
+        response_text = (
+            "这是一个开放式研究问题，我为您生成了假设驱动的探索计划，"
+            "将逐一验证以下假设：\n"
+            + hypothesis_lines
+            + "\n\n请确认后开始探索，您也可以修改计划。"
+        )
+        progress, progress_tasks = self.build_initial_progress(tree)
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.EXECUTION_PLAN,
+            content={
+                "plan_id": plan.plan_id,
+                "response_text": response_text,
+                "tasks": progress_tasks,
+                "progress": progress,
+                "exploration": True,
+            },
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+        return TurnResult(
+            mode=ExecutionMode.AWAITING_PLAN_APPROVAL,
+            response_text=response_text,
+            task_tree=tree,
+            agent_message=agent_msg,
+            plan_id=plan.plan_id,
         )
 
     @staticmethod
