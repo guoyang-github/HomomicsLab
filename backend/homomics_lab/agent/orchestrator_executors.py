@@ -1,0 +1,518 @@
+"""TaskExecutors — CodeAct/supervisor execution strategies for Orchestrator.
+
+Extracted from ``orchestrator.Orchestrator`` as a pure code move (no logic
+changes). The executor holds a back-reference to the orchestrator for the
+shared services that remain on ``Orchestrator`` (``state_machine``,
+``skill_registry``, ``supervisor``, ``_emit_progress``, ``_execution_mode``,
+``_resolve_skill_definition``).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from homomics_lab.config import settings
+from homomics_lab.execution.code_act import run_code_act
+from homomics_lab.llm_client import LLMClient
+from homomics_lab.models.common import TaskStatus
+from homomics_lab.tasks.models import TaskNode
+
+if TYPE_CHECKING:
+    from homomics_lab.agent.orchestrator import Orchestrator
+
+logger = logging.getLogger(__name__)
+
+
+class TaskExecutors:
+    """Execute tasks via CodeAct, skill-as-reference, or supervisor delegation."""
+
+    def __init__(self, orchestrator: "Orchestrator"):
+        self._orch = orchestrator
+
+    def _fallback_task_prompt(
+        self,
+        task: TaskNode,
+        original_error: Optional[str] = None,
+    ) -> str:
+        """Build a concise CodeAct prompt from the failed task metadata."""
+        parts = [
+            f"Task: {task.name}",
+            f"Description: {task.description or task.name}",
+        ]
+        if task.skills_required:
+            parts.append(f"Skills that failed: {', '.join(task.skills_required)}")
+        if task.parameters:
+            # Keep the prompt focused; avoid dumping huge nested structures.
+            params = {
+                k: v for k, v in task.parameters.items()
+                if isinstance(v, (str, int, float, bool)) or v is None
+            }
+            if params:
+                parts.append(f"Parameters: {params}")
+        if original_error:
+            parts.append(f"Original error: {original_error}")
+        return "\n".join(parts)
+
+    def _fallback_working_dir(self, context: Dict[str, Any]) -> Optional[Path]:
+        """Resolve a working directory for CodeAct fallback."""
+        project_id = context.get("project_id") if context else None
+        if project_id:
+            return settings.data_dir / "workspaces" / project_id
+        return None
+
+    async def _try_codeact_fallback(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        original_error: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Try to recover a failed task by generating and executing code.
+
+        Returns a skill-style result dict on success, or None when fallback
+        is disabled, unavailable, or also fails.
+        """
+        # Fixed-pipeline mode means curated skills must succeed or fail cleanly;
+        # do not silently generate code.
+        if self._orch._execution_mode(context) == "fixed_pipeline":
+            return None
+
+        codeact_result = await self._run_codeact_for_task(
+            task, context, original_error=original_error
+        )
+        if not codeact_result.get("success"):
+            return None
+        return self._normalize_codeact_result(
+            task, codeact_result, original_error=original_error, fallback=True
+        )
+
+    async def _execute_task_codeact(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute a task directly with CodeAct (foundation-first path).
+
+        This is the primary execution strategy when ``execution_mode`` is
+        ``codeact``. Curated skills are treated as references, not as rigid
+        entrypoints, so the agent can generate bridging code as needed.
+        """
+        self._orch.state_machine.transition(task, TaskStatus.RUNNING)
+        codeact_result = await self._run_codeact_for_task(task, context)
+        return self._normalize_codeact_result(
+            task, codeact_result, skill_name="codeact"
+        )
+
+    async def _run_codeact_for_task(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        original_error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate and run CodeAct for a task."""
+        if not getattr(settings, "codeact_fallback_enabled", True):
+            return {"success": False, "error": "CodeAct execution disabled"}
+
+        working_dir = self._fallback_working_dir(context)
+        if working_dir is None:
+            return {"success": False, "error": "No project working directory available"}
+
+        outputs_dir = working_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+
+        prompt = self._fallback_task_prompt(task, original_error)
+        prompt += (
+            "\n\nImportant: write all output files (CSV, TXT, JSON, PNG, PDF, etc.) "
+            f"to the directory '{outputs_dir}'. Do not scatter outputs in the working directory."
+        )
+        code_context: Dict[str, Any] = {
+            "task_name": task.name,
+            "task_description": task.description or task.name,
+            "project_id": context.get("project_id"),
+            "output_dir": str(outputs_dir),
+            "working_dir": str(working_dir),
+        }
+        for key, value in task.parameters.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file() or path.is_dir():
+                    code_context[key] = str(value)
+            elif isinstance(value, dict) and "path" in value:
+                code_context[key] = value["path"]
+            elif isinstance(value, (int, float, bool)) or value is None:
+                code_context[key] = value
+
+        llm_client: Optional[LLMClient] = None
+        try:
+            llm_client = LLMClient()
+        except Exception:
+            llm_client = None
+
+        max_attempts = max(1, task.retry_policy.max_attempts)
+        backoff = task.retry_policy.backoff_seconds
+        last_error: Optional[str] = original_error
+        for attempt in range(1, max_attempts + 1):
+            attempt_prompt = self._fallback_task_prompt(task, last_error)
+            attempt_prompt += (
+                "\n\nImportant: write all output files (CSV, TXT, JSON, PNG, PDF, etc.) "
+                f"to the directory '{outputs_dir}'. Do not scatter outputs in the working directory."
+            )
+            self._orch._emit_progress(
+                status="RUNNING",
+                current_phase=f"正在生成分析脚本… (尝试 {attempt}/{max_attempts})",
+                progress_pct=10.0 + (attempt - 1) * 20.0,
+            )
+            try:
+                codeact_result = await run_code_act(
+                    task=attempt_prompt,
+                    language="python",
+                    context=code_context,
+                    working_dir=working_dir,
+                    llm_client=llm_client,
+                    skill_registry=self._orch.skill_registry,
+                    tool_registry=None,
+                )
+                if codeact_result.get("success"):
+                    self._orch._emit_progress(
+                        status="RUNNING",
+                        current_phase="脚本执行完成，正在整理结果…",
+                        progress_pct=80.0,
+                    )
+                    return codeact_result
+                last_error = codeact_result.get("stderr") or codeact_result.get("error") or "unknown error"
+            except Exception as exc:
+                last_error = str(exc)
+                logger.warning("CodeAct execution failed for task %s (attempt %d): %s", task.name, attempt, exc)
+
+            if attempt < max_attempts:
+                self._orch._emit_progress(
+                    status="RETRYING",
+                    current_phase=f"检测到错误，正在自动修复并重试… (attempt {attempt + 1}/{max_attempts})",
+                    progress_pct=30.0 + attempt * 20.0,
+                    error_message=last_error[:500],
+                )
+                await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+
+        return {"success": False, "error": last_error or "CodeAct execution failed after retries"}
+
+    @staticmethod
+    def _normalize_codeact_result(
+        task: TaskNode,
+        codeact_result: Dict[str, Any],
+        original_error: Optional[str] = None,
+        fallback: bool = False,
+        skill_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Normalize a CodeAct result into a skill-style result dict."""
+        if skill_name is None:
+            skill_name = task.skills_required[0] if task.skills_required else "codeact"
+        normalized: Dict[str, Any] = {
+            "status": "success" if codeact_result.get("success") else "error",
+            "skill": skill_name,
+            "fallback": fallback,
+            "original_error": original_error,
+            "result": codeact_result.get("result") or {},
+            "stdout": codeact_result.get("stdout", ""),
+            "stderr": codeact_result.get("stderr", ""),
+            "code": codeact_result.get("code", ""),
+        }
+        result_data = normalized["result"]
+        if isinstance(result_data, dict):
+            for key in ("output_path", "output_file", "plot_path"):
+                if key in result_data and "output_files" not in normalized:
+                    normalized["output_files"] = [result_data[key]]
+                    break
+        return normalized
+
+    def _load_skill_reference(self, skill: Any) -> str:
+        """Load SKILL.md and reference scripts for use as prompt context.
+
+        The text is aggressively size-capped so it can be fed into the LLM
+        prompt without crowding out the user's specific request.  SKILL.md
+        gets the largest budget; each reference script is limited to a small
+        chunk so only the most relevant scripts are included.
+        """
+        parts: List[str] = []
+        if skill.body_path and skill.body_path.is_file():
+            try:
+                text = skill.body_path.read_text(encoding="utf-8", errors="ignore")
+                parts.append(f"=== SKILL DOCUMENTATION ({skill.id}) ===\n{text[:12000]}")
+            except Exception as exc:
+                logger.warning("Failed to read skill body for %s: %s", skill.id, exc)
+
+        if skill.has_scripts and skill.source_dir:
+            scripts_dir = skill.source_dir / "scripts"
+            if scripts_dir.is_dir():
+                parts.append(f"=== REFERENCE SCRIPTS ({skill.id}) ===")
+                total_chars = 0
+                max_total = 30000
+                per_file_max = 5000
+                for path in sorted(scripts_dir.rglob("*")):
+                    if not path.is_file():
+                        continue
+                    suffix = path.suffix.lower()
+                    if suffix in (".pyc", ".pyo", ".so", ".dll", ".exe", ".bin"):
+                        continue
+                    if "__pycache__" in path.parts:
+                        continue
+                    if path.stat().st_size > 200_000:
+                        continue
+                    try:
+                        snippet = path.read_text(encoding="utf-8", errors="ignore")
+                    except Exception:
+                        continue
+                    if not snippet.strip():
+                        continue
+                    header = f"--- {path.relative_to(scripts_dir)} ---"
+                    chunk = f"{header}\n{snippet[:per_file_max]}"
+                    if total_chars + len(chunk) > max_total:
+                        break
+                    parts.append(chunk)
+                    total_chars += len(chunk)
+        return "\n\n".join(parts)
+
+    def _build_skill_reference_prompt(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        reference_text: str,
+    ) -> str:
+        """Build a CodeAct prompt that treats a skill as reference material."""
+        user_request = (
+            task.parameters.get("user_request")
+            or task.description
+            or task.name
+        )
+        preflight = task.parameters.get("preflight") or {}
+
+        # Resolve input files from task parameters and context.
+        input_files: List[str] = []
+        for key, value in task.parameters.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file() and str(path) not in input_files:
+                    input_files.append(str(path))
+            elif isinstance(value, dict) and "path" in value:
+                p = value["path"]
+                if p not in input_files:
+                    input_files.append(p)
+
+        ctx_inputs = context.get("workspace_inputs") or {}
+        for value in ctx_inputs.values():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file() and str(path) not in input_files:
+                    input_files.append(str(path))
+
+        working_dir = self._fallback_working_dir(context)
+        outputs_dir = (working_dir / "outputs") if working_dir else Path(".")
+
+        parts = [
+            f"User request: {user_request}",
+            f"Task: {task.name}",
+            f"Skill reference: {task.skills_required[0] if task.skills_required else 'unknown'}",
+        ]
+        if input_files:
+            parts.append(f"Input files: {', '.join(input_files)}")
+        if preflight:
+            parts.append(
+                "Data preflight (use this to decide the minimal workflow): "
+                f"{json.dumps(preflight, ensure_ascii=False, default=str)}"
+            )
+        if reference_text:
+            parts.append(reference_text)
+        parts.append(
+            "\nGenerate a compact, self-contained Python script (ideally ≤60 lines) that fulfills "
+            "the user request. Use the skill documentation and reference scripts above as "
+            "implementation guidance, but adapt the code to the user's specific data and request. "
+            f"Read data from the Input files listed above, and write all output files "
+            f"(CSV, TXT, JSON, PNG, PDF, etc.) to '{outputs_dir}'. Do not scatter outputs. "
+            "If the user asked to compare results with an existing label column (e.g. all_celltype), "
+            "include the comparison and report agreement metrics (ARI, NMI, confusion matrix). "
+            "Print a brief summary of results at the end and assign it to the `result` variable."
+        )
+        return "\n\n".join(parts)
+
+    async def _run_codeact_with_prompt(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        prompt: str,
+    ) -> Dict[str, Any]:
+        """Run CodeAct with a fully custom prompt."""
+        if not getattr(settings, "codeact_fallback_enabled", True):
+            return {"success": False, "error": "CodeAct execution disabled"}
+
+        working_dir = self._fallback_working_dir(context)
+        if working_dir is None:
+            return {"success": False, "error": "No project working directory available"}
+
+        outputs_dir = working_dir / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+
+        code_context: Dict[str, Any] = {
+            "task_name": task.name,
+            "task_description": task.description or task.name,
+            "project_id": context.get("project_id"),
+            "output_dir": str(outputs_dir),
+            "working_dir": str(working_dir),
+            "skills_required": task.skills_required,
+        }
+        first_input_path: Optional[str] = None
+        for key, value in task.parameters.items():
+            if isinstance(value, (str, Path)):
+                path = Path(value)
+                if path.is_file() or path.is_dir():
+                    code_context[key] = str(path)
+                    if first_input_path is None and path.is_file():
+                        first_input_path = str(path)
+            elif isinstance(value, dict) and "path" in value:
+                code_context[key] = value["path"]
+                if first_input_path is None:
+                    first_input_path = value["path"]
+            elif isinstance(value, (int, float, bool)) or value is None:
+                code_context[key] = value
+
+        if first_input_path is not None:
+            code_context["input_path"] = first_input_path
+            code_context["adata_path"] = first_input_path
+
+        llm_client: Optional[LLMClient] = None
+        try:
+            llm_client = LLMClient()
+        except Exception:
+            llm_client = None
+
+        try:
+            return await run_code_act(
+                task=prompt,
+                language="python",
+                context=code_context,
+                working_dir=working_dir,
+                llm_client=llm_client,
+                skill_registry=self._orch.skill_registry,
+                tool_registry=None,
+                max_tokens=8000,
+            )
+        except Exception as exc:
+            logger.warning("CodeAct execution failed for task %s: %s", task.name, exc)
+            return {"success": False, "error": str(exc)}
+
+    async def _execute_task_with_skill_reference(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute a task by asking the LLM to write a compact script using a skill as reference.
+
+        This is the default path for concrete skill requests: instead of invoking
+        the skill's own entrypoint, the LLM reads the skill documentation and
+        reference scripts and produces an end-to-end script tailored to the
+        user's data and question.
+        """
+        skill = self._orch._resolve_skill_definition(task)
+        if skill is None:
+            return {
+                "success": False,
+                "error": f"Skill not found: {task.skills_required}",
+            }
+
+        reference_text = self._load_skill_reference(skill)
+        prompt = self._build_skill_reference_prompt(task, context, reference_text)
+
+        self._orch.state_machine.transition(task, TaskStatus.RUNNING)
+        max_attempts = max(1, task.retry_policy.max_attempts)
+        backoff = task.retry_policy.backoff_seconds
+        last_error: Optional[str] = None
+        for attempt in range(1, max_attempts + 1):
+            self._orch._emit_progress(
+                status="RUNNING",
+                current_phase=f"正在生成分析脚本… (尝试 {attempt}/{max_attempts})",
+                progress_pct=10.0 + (attempt - 1) * 20.0,
+            )
+            codeact_result = await self._run_codeact_with_prompt(task, context, prompt)
+            if codeact_result.get("success"):
+                self._orch._emit_progress(
+                    status="RUNNING",
+                    current_phase="脚本执行完成，正在整理结果…",
+                    progress_pct=80.0,
+                )
+                return self._normalize_codeact_result(
+                    task, codeact_result, skill_name=skill.id
+                )
+            last_error = codeact_result.get("stderr") or codeact_result.get("error") or "unknown error"
+            if attempt < max_attempts:
+                prompt = self._build_skill_reference_prompt(task, context, reference_text)
+                prompt += (
+                    f"\n\nThe previous attempt failed with the following error. "
+                    f"Please fix the script and try again.\nError: {last_error[:2000]}"
+                )
+                self._orch._emit_progress(
+                    status="RETRYING",
+                    current_phase=f"检测到错误，正在自动修复并重试… (attempt {attempt + 1}/{max_attempts})",
+                    progress_pct=30.0 + attempt * 20.0,
+                    error_message=last_error[:500],
+                )
+                await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+        return {
+            "success": False,
+            "error": last_error or "Skill-as-reference execution failed after retries",
+            "skill": skill.id,
+        }
+
+    async def _execute_task_with_supervisor(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        results: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Execute a task under Supervisor delegation.
+
+        Returns a WorkerResult-style dict on failure instead of raising, so
+        the Orchestrator can decide retry/replan/HITL.
+        """
+        max_attempts = task.retry_policy.max_attempts
+        backoff = task.retry_policy.backoff_seconds
+
+        for attempt in range(1, max_attempts + 1):
+            if task.status != TaskStatus.RUNNING:
+                self._orch.state_machine.transition(task, TaskStatus.RUNNING)
+
+            try:
+                worker = await self._orch.supervisor.delegate(task, context)
+                if worker is None:
+                    raise RuntimeError(f"Supervisor could not delegate task {task.name}")
+
+                raw_result = await worker.run(task, context)
+            except Exception as e:
+                task.error_message = str(e)
+                task.attempt_count = attempt
+                if attempt < max_attempts:
+                    self._orch.state_machine.transition(task, TaskStatus.FAILED)
+                    await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+                    continue
+                raw_result = {
+                    "task_id": task.id,
+                    "status": "failure",
+                    "output": {},
+                    "error": str(e),
+                    "execution_time_seconds": 0.0,
+                    "metadata": {},
+                }
+
+            task.attempt_count = attempt
+            task.error_message = raw_result.get("error") if isinstance(raw_result, dict) else None
+
+            # If the worker returned a structured failure, retry internally.
+            if isinstance(raw_result, dict) and raw_result.get("status") == "failure":
+                if attempt < max_attempts:
+                    self._orch.state_machine.transition(task, TaskStatus.FAILED)
+                    await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+                    continue
+
+            results[task.id] = raw_result
+            task.result = raw_result
+            return raw_result

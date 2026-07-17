@@ -285,7 +285,7 @@ async def test_codeact_fallback_on_exception(failing_orchestrator, monkeypatch, 
         }
 
     monkeypatch.setattr(
-        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
     )
 
     tree = TaskTree([
@@ -320,7 +320,7 @@ async def test_codeact_fallback_on_success_false(success_false_orchestrator, mon
         }
 
     monkeypatch.setattr(
-        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
     )
 
     tree = TaskTree([
@@ -380,7 +380,7 @@ async def test_codeact_mode_skips_agent(failing_orchestrator, monkeypatch, tmp_p
         }
 
     monkeypatch.setattr(
-        "homomics_lab.agent.orchestrator.run_code_act", fake_run_code_act
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
     )
 
     tree = TaskTree([
@@ -408,7 +408,7 @@ async def test_fixed_pipeline_mode_disables_codeact_fallback(
 ):
     """When execution_mode is 'fixed_pipeline', skill failures stay failed."""
     monkeypatch.setattr(
-        "homomics_lab.agent.orchestrator.run_code_act",
+        "homomics_lab.agent.orchestrator_executors.run_code_act",
         lambda *args, **kwargs: {"success": True, "result": {}},
     )
 
@@ -475,7 +475,7 @@ async def test_use_skill_reference_includes_skill_docs_and_scripts(tmp_path, mon
         }
 
     monkeypatch.setattr(
-        orchestrator, "_run_codeact_with_prompt", fake_run_codeact_with_prompt
+        orchestrator._executors, "_run_codeact_with_prompt", fake_run_codeact_with_prompt
     )
 
     tree = TaskTree([
