@@ -123,6 +123,7 @@ Key variables:
 | `HOMOMICS_FORCE_SANDBOX` | `true` | Force sandbox for shell/code execution |
 | `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, `auto` |
 | `HOMOMICS_CODEACT_CACHE_ENABLED` | `true` | Cache CodeAct-generated code |
+| `HOMOMICS_CODEACT_MAX_FIX_ATTEMPTS` | `3` | In-engine self-correction: LLM repair iterations after a failed CodeAct execution (0 disables) |
 | `HOMOMICS_SKILL_CACHE_ENABLED` | `true` | Memoize deterministic skill results |
 | `HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS` | `4000` | Per-tool output budget before `_compact_tool_output` truncation (errors keep the tail, get 1.5x budget) |
 | `HOMOMICS_WORKER_MODE` | `true` | Run a local worker inside the API process |

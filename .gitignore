@@ -70,8 +70,7 @@ backend/data/workspaces/*/logs/
 backend/data/workspaces/*/results/
 backend/data/workspaces/*/scripts/
 backend/data/workspaces/*/__skill_*
-backend/data/workspaces/*/__code_act__*
-backend/data/workspaces/*/__code_act_exit__
+backend/data/workspaces/*/__code_act_*
 backend/data/workspaces/*/_homomics_tools.py
 backend/data/workspaces/*/run_*.py
 backend/data/workspaces/*/driver_*.py
