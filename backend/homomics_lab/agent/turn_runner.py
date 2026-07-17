@@ -11,6 +11,7 @@ The TurnRunner handles every user message through a single, consistent pipeline:
 This replaces the ad-hoc logic in chat.py with a testable, extensible loop.
 """
 
+import asyncio
 import logging
 import time
 from enum import Enum
@@ -231,7 +232,7 @@ class TurnRunner:
             self._debate = LightweightDebate(judge=judge)
 
         self.intent_analyzer = intent_analyzer or IntentAnalyzer(
-            debate=self._debate, cbkb=self._cbkb
+            debate=self._debate, cbkb=self._cbkb, llm_client=self._llm_client
         )
         self.task_decomposer = task_decomposer or TaskDecomposer(
             cbkb=self._cbkb,
@@ -541,25 +542,54 @@ class TurnRunner:
         plan_mode: bool = False,
     ) -> TurnResult:
         """Execute the core turn pipeline once."""
-        # 2. Build a token-safe context bundle from the ContextEngine.
-        extra_context = None
-        if self.memory_manager is not None:
+        # 2. Assemble context: enrich_context, capability search, and the
+        # ContextEngine bundle have no data dependencies on each other (they
+        # only read project_id / user_message / working_memory; their outputs
+        # are merged below), so they run concurrently. Each has its own
+        # degradation path — a single retrieval failure must not fail the turn.
+        #
+        # The semantic-memory query shared by enrich_context and
+        # ContextEngine.build is hoisted and run once here; on failure both
+        # consumers fall back to searching individually (previous behavior).
+        shared_memories = None
+        sem_mem = (
+            getattr(self.memory_manager, "semantic_memory", None)
+            if self.memory_manager is not None
+            else None
+        )
+        if sem_mem is not None:
             try:
-                extra_context = await self.memory_manager.enrich_context(
-                    project_id, user_message, working_memory
+                shared_memories = await sem_mem.search(
+                    query=user_message, top_k=5, project_id=project_id
                 )
             except Exception:
-                import logging
+                logger.warning(
+                    "Shared semantic memory search failed; "
+                    "consumers will retry individually",
+                    exc_info=True,
+                )
 
-                logging.getLogger(__name__).warning(
+        async def _enrich_context() -> Optional[Dict[str, Any]]:
+            if self.memory_manager is None:
+                return None
+            try:
+                return await self.memory_manager.enrich_context(
+                    project_id,
+                    user_message,
+                    working_memory,
+                    prefetched_memory_results=shared_memories,
+                )
+            except Exception:
+                logger.warning(
                     "Memory enrichment failed; continuing without it", exc_info=True
                 )
-        self._extra_context = extra_context or {}
+                return None
 
-        # 2.5 Enrich context with semantically relevant capabilities (skills/tools/SOPs).
-        if self.capability_index is not None:
+        async def _search_capabilities():
+            if self.capability_index is None:
+                return None
             try:
-                capability_candidates = await self.capability_index.search(
+                return await self.capability_index.search(
                     query=user_message,
                     top_k=5,
                     item_types=[
@@ -569,40 +599,52 @@ class TurnRunner:
                     ],
                     project_id=project_id,
                 )
-                self._extra_context["capability_candidates"] = [
-                    {
-                        "id": c.id,
-                        "type": c.type.value,
-                        "name": c.name,
-                        "description": c.description,
-                        "category": c.category,
-                        "score": c.score,
-                    }
-                    for c in capability_candidates
-                ]
             except Exception:
                 logger.warning(
                     "Capability index enrichment failed; continuing without it",
                     exc_info=True,
                 )
+                return None
 
-        context_bundle = None
-        if self.context_engine is not None:
+        async def _build_context_bundle() -> Optional[ContextBundle]:
+            if self.context_engine is None:
+                return None
             try:
-                context_bundle = await self.context_engine.build(
+                return await self.context_engine.build(
                     user_message=user_message,
                     working_memory=working_memory,
                     project_id=project_id,
                     intent=None,
                     reserved_output_tokens=2000,
+                    session_id=session_id,
+                    prefetched_memories=shared_memories,
                 )
             except Exception:
-                import logging
-
-                logging.getLogger(__name__).warning(
+                logger.warning(
                     "ContextEngine build failed; falling back to raw working memory",
                     exc_info=True,
                 )
+                return None
+
+        extra_context, capability_candidates, context_bundle = await asyncio.gather(
+            _enrich_context(),
+            _search_capabilities(),
+            _build_context_bundle(),
+        )
+
+        self._extra_context = extra_context or {}
+        if capability_candidates is not None:
+            self._extra_context["capability_candidates"] = [
+                {
+                    "id": c.id,
+                    "type": c.type.value,
+                    "name": c.name,
+                    "description": c.description,
+                    "category": c.category,
+                    "score": c.score,
+                }
+                for c in capability_candidates
+            ]
         self._context_bundle = context_bundle
 
         # 3. Analyze intent with conversation context
@@ -615,6 +657,7 @@ class TurnRunner:
                     working_memory=working_memory,
                     extra_context=extra_context,
                     context_bundle=context_bundle,
+                    session_id=session_id,
                 )
             except Exception as exc:
                 raise IntentError(
@@ -668,6 +711,7 @@ class TurnRunner:
             intent=intent,
             working_memory=working_memory,
             context=context,
+            event_callback=getattr(self, "_event_callback", None),
         )
 
         # Ensure we never return a completely empty assistant text bubble.

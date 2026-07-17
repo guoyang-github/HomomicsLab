@@ -379,6 +379,9 @@ class LLMIntentClassifier(IntentClassifier):
 
     def __init__(self, weight: float = 0.6, llm_client: Optional[LLMClient] = None):
         super().__init__(weight=weight)
+        # Prefer an injected shared client (e.g. ``app.state.llm_client``),
+        # which carries the response cache and cost attribution. A private
+        # uncached client is only built lazily when none was injected.
         self._client = llm_client
 
     def _get_client(self) -> Optional[LLMClient]:

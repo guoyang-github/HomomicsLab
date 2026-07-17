@@ -1,10 +1,12 @@
 """Cascade intent analyzer — LLM-first classification with keyword guardrails."""
 
+import asyncio
+import hashlib
 import json
 import re
 import weakref
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.models import ContextBundle
@@ -26,6 +28,10 @@ from homomics_lab.agent.intent.models import (
     IntentMatch,
     StructuredIntent,
     UserIntent,
+)
+from homomics_lab.agent.intent.result_cache import (
+    IntentResultCache,
+    get_shared_intent_result_cache,
 )
 from homomics_lab.agent.debate import LightweightDebate
 from homomics_lab.context.working_memory import WorkingMemory
@@ -89,6 +95,8 @@ class CascadeIntentAnalyzer:
         cbkb: Optional[Any] = None,
         decision_logger: Optional[IntentDecisionLogger] = None,
         calibrator: Optional[ConfidenceCalibrator] = None,
+        llm_client: Optional[Any] = None,
+        result_cache: Union[IntentResultCache, bool, None] = None,
     ):
         self._definitions = list(definitions or [])
         self.use_domain_registry = use_domain_registry
@@ -100,11 +108,24 @@ class CascadeIntentAnalyzer:
         # an intentionally low weight to simulate weak keyword evidence.
         self.keyword_classifier = keyword_classifier or KeywordIntentClassifier(weight=1.0)
         self.embedding_classifier = embedding_classifier or EmbeddingIntentClassifier(weight=0.25)
-        self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.60)
+        # The shared app-level LLM client (with response cache) is preferred;
+        # the classifier only builds a private uncached client when none is
+        # injected here or via ``llm_classifier``.
+        self.llm_classifier = llm_classifier or LLMIntentClassifier(weight=0.60, llm_client=llm_client)
         self.debate = debate
         self.cbkb = cbkb
         self.decision_logger = decision_logger if decision_logger is not None else IntentDecisionLogger()
         self.calibrator = calibrator if calibrator is not None else ConfidenceCalibrator(self.decision_logger)
+
+        # Short-term classification cache. The analyzer is rebuilt per chat
+        # message, so the default cache is the process-wide shared instance.
+        # Pass ``result_cache=False`` to disable (e.g. in tests).
+        if result_cache is False:
+            self._result_cache: Optional[IntentResultCache] = None
+        elif isinstance(result_cache, IntentResultCache):
+            self._result_cache = result_cache
+        else:
+            self._result_cache = get_shared_intent_result_cache()
 
         # Always load built-in intents (qa, general_help, file_conversion) so
         # domain-agnostic requests work even without domain registry.
@@ -302,8 +323,18 @@ class CascadeIntentAnalyzer:
         extra_context: Optional[Dict[str, Any]] = None,
         cbkb: Optional[Any] = None,
         context_bundle: Optional[ContextBundle] = None,
+        session_id: Optional[str] = None,
     ) -> UserIntent:
-        """Analyze user message and return structured intent."""
+        """Analyze user message and return structured intent.
+
+        Results are memoized for a short TTL in a process-wide cache (see the
+        ``result_cache`` constructor argument). The cache key covers every
+        input that can change the outcome: session id, normalized message,
+        classification-relevant context (recent messages + current task),
+        intent definitions, classifier weights/thresholds, and the identity
+        of the LLM client and CBKB. ``session_id`` should be provided by
+        chat entry points to prevent cross-session reuse.
+        """
         context = self._build_context(
             working_memory,
             extra_context,
@@ -311,6 +342,100 @@ class CascadeIntentAnalyzer:
             context_bundle=context_bundle,
         )
 
+        cache = self._result_cache
+        cache_key: Optional[str] = None
+        cache_refs: Tuple[Any, ...] = ()
+        if cache is not None:
+            cache_key, cache_refs = self._make_cache_key(session_id, message, context, cbkb)
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        intent = await self._analyze_context(message, context, cbkb)
+
+        if cache is not None and cache_key is not None:
+            # Clarification intents produced with a debate attached carry
+            # debate-instance-specific metadata; keep them out of the cache.
+            if not (self.debate is not None and intent.analysis_type == "clarification"):
+                cache.put(cache_key, intent, refs=cache_refs)
+        return intent
+
+    def _make_cache_key(
+        self,
+        session_id: Optional[str],
+        message: str,
+        context: Dict[str, Any],
+        cbkb: Optional[Any],
+    ) -> Tuple[str, Tuple[Any, ...]]:
+        """Build a content-derived cache key plus identity-pinning references.
+
+        The returned refs are stored alongside the cache entry so the objects
+        whose ``id()`` is folded into the key (LLM client, CBKB) cannot be
+        garbage-collected — and their ids reused — while the entry lives.
+        """
+        llm_token = "llm:none"
+        llm_ref: Optional[Any] = None
+        classifier = self.llm_classifier
+        if isinstance(classifier, LLMIntentClassifier):
+            if classifier.is_available():
+                llm_ref = classifier._get_client()
+                llm_token = f"llm:{id(llm_ref)}"
+            else:
+                llm_token = "llm:off"
+        elif classifier is not None:
+            llm_ref = classifier
+            llm_token = f"llm-custom:{id(classifier)}"
+
+        effective_cbkb = cbkb or self.cbkb
+        cbkb_token = f"cbkb:{id(effective_cbkb)}" if effective_cbkb is not None else "cbkb:none"
+
+        parts = {
+            "v": 1,
+            "session": session_id or "",
+            "message": IntentResultCache.normalize_message(message),
+            # Classification-relevant context only: the LLM prompt and the
+            # classifiers consume recent_messages / current_task_id; other
+            # context entries (pinned items, extra_context) do not affect the
+            # outcome.
+            "recent": [
+                (m.get("role", ""), m.get("content", ""))
+                for m in context.get("recent_messages", [])
+            ],
+            "task": context.get("current_task_id"),
+            "defs": [
+                (
+                    d.analysis_type,
+                    tuple(d.keywords),
+                    tuple(d.examples),
+                    tuple(d.complexity_indicators),
+                    tuple(d.data_scale_patterns),
+                    d.domain,
+                )
+                for d in self._definitions
+            ],
+            "weights": (
+                getattr(self.keyword_classifier, "weight", None),
+                getattr(self.embedding_classifier, "weight", None),
+                getattr(classifier, "weight", None),
+                self.clarification_threshold,
+                self.high_confidence_threshold,
+            ),
+            "llm": llm_token,
+            "cbkb": cbkb_token,
+        }
+        digest = hashlib.sha256(
+            json.dumps(parts, sort_keys=True, ensure_ascii=False, default=repr).encode("utf-8")
+        ).hexdigest()
+        refs = tuple(obj for obj in (llm_ref, effective_cbkb) if obj is not None)
+        return digest, refs
+
+    async def _analyze_context(
+        self,
+        message: str,
+        context: Dict[str, Any],
+        cbkb: Optional[Any] = None,
+    ) -> UserIntent:
+        """Run the classification cascade for a pre-built context."""
         # Layer 1: keyword guardrail fast path for unambiguous direct-response signals.
         keyword_matches = await self.keyword_classifier.classify(
             message, self._definitions, context
@@ -328,17 +453,18 @@ class CascadeIntentAnalyzer:
                 self._enrich_with_cbkb(intent, cbkb)
                 return intent
 
-        # Layer 2: LLM-first structured classification.
-        llm_matches = []
+        # Layer 2+3: LLM structured classification and embedding semantic
+        # alternatives are independent — run them concurrently.
+        llm_matches: List[IntentMatch] = []
         if isinstance(self.llm_classifier, LLMIntentClassifier) and self.llm_classifier.is_available():
-            llm_matches = await self.llm_classifier.classify(
+            llm_matches, embedding_matches = await asyncio.gather(
+                self.llm_classifier.classify(message, self._definitions, context),
+                self.embedding_classifier.classify(message, self._definitions, context),
+            )
+        else:
+            embedding_matches = await self.embedding_classifier.classify(
                 message, self._definitions, context
             )
-
-        # Layer 3: embedding semantic alternatives.
-        embedding_matches = await self.embedding_classifier.classify(
-            message, self._definitions, context
-        )
 
         # Layer 4: fusion with keyword guardrail override.
         fused = self._fuse_matches(keyword_matches, embedding_matches, llm_matches, message)

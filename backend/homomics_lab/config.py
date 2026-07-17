@@ -581,6 +581,10 @@ class Settings(BaseSettings):
     context_enable_project_state: bool = True
     context_enable_episodic_summary: bool = True
     context_output_reserve_tokens: int = 2000
+    # Episodic summary throttling: skip summarization for very short sessions
+    # and only recompute when the message count has grown by >= interval.
+    episodic_summary_min_messages: int = 6
+    episodic_summary_min_interval: int = 3
 
     def masked_dump(self) -> Dict[str, Any]:
         """Return a copy of the settings with sensitive values redacted.

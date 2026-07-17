@@ -78,6 +78,9 @@ async def test_run_turn_calls_enrich_context_and_persist_turn(
     # Should complete successfully (direct response for QA)
     assert result.mode == ExecutionMode.DIRECT_RESPONSE
 
+    # Persistence is fire-and-forget; wait for the background task to finish.
+    await runner_with_memory._state_persistence.drain()
+
     # enrich_context triggers semantic_memory.search (memory snippets + preferences)
     assert semantic_memory.search.await_count == 2
     search_calls = semantic_memory.search.await_args_list

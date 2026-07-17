@@ -7,13 +7,17 @@ knows the user's overall goal and key decisions.
 
 import json
 import logging
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import ChatMessage
 
 logger = logging.getLogger(__name__)
+
+_MAX_CACHED_SESSIONS = 256
 
 
 @dataclass
@@ -79,26 +83,77 @@ class EpisodicSummary:
 
 
 class EpisodicSummarizer:
-    """Generate and update a rolling session summary."""
+    """Generate and update a rolling session summary.
+
+    The summarizer is throttled to keep it off the chat critical path:
+
+    - Sessions with fewer than ``settings.episodic_summary_min_messages``
+      messages are not summarized at all (the last cached/previous summary,
+      if any, is returned instead).
+    - Summaries are cached per ``session_id`` and only recomputed when the
+      session's message count has moved by at least
+      ``settings.episodic_summary_min_interval`` since the cached entry.
+
+    The LLM client is injected by the caller (shared instance). When it is
+    ``None`` the LLM path is skipped and the rule-based fallback is used.
+    """
 
     def __init__(self, llm_client: Optional[LLMClient] = None):
         self.llm_client = llm_client
-
-    def _get_client(self) -> Optional[LLMClient]:
-        if self.llm_client is None:
-            self.llm_client = LLMClient()
-        return self.llm_client
+        # session_id -> (message_count, summary)
+        self._cache: "OrderedDict[str, Tuple[int, EpisodicSummary]]" = OrderedDict()
 
     async def summarize(
         self,
         messages: List[ChatMessage],
         previous_summary: Optional[EpisodicSummary] = None,
+        session_id: Optional[str] = None,
+        message_count: Optional[int] = None,
     ) -> EpisodicSummary:
-        """Update session summary from recent messages."""
-        if not messages:
-            return previous_summary or EpisodicSummary()
+        """Update session summary from recent messages.
 
-        client = self._get_client()
+        ``messages`` may be a truncated window (e.g. the most recent 10);
+        ``message_count`` should carry the full session message count so the
+        throttling cache does not saturate on the window size. It defaults to
+        ``len(messages)``.
+        """
+        count = message_count if message_count is not None else len(messages)
+        cached_count: Optional[int] = None
+        cached_summary: Optional[EpisodicSummary] = None
+        if session_id is not None:
+            entry = self._cache.get(session_id)
+            if entry is not None:
+                cached_count, cached_summary = entry
+                self._cache.move_to_end(session_id)
+
+        if not messages:
+            return previous_summary or cached_summary or EpisodicSummary()
+
+        # Too early in the session to be worth a summary.
+        if count < settings.episodic_summary_min_messages:
+            return cached_summary or previous_summary or EpisodicSummary()
+
+        # Reuse the cached summary until the session has grown enough.
+        if (
+            cached_summary is not None
+            and cached_count is not None
+            and abs(count - cached_count) < settings.episodic_summary_min_interval
+        ):
+            return cached_summary
+
+        summary = await self._compute(messages, previous_summary or cached_summary)
+        if session_id is not None:
+            self._cache[session_id] = (count, summary)
+            while len(self._cache) > _MAX_CACHED_SESSIONS:
+                self._cache.popitem(last=False)
+        return summary
+
+    async def _compute(
+        self,
+        messages: List[ChatMessage],
+        previous_summary: Optional[EpisodicSummary],
+    ) -> EpisodicSummary:
+        client = self.llm_client
         if client is not None and client.is_configured():
             try:
                 return await self._llm_summarize(messages, previous_summary)
@@ -113,7 +168,9 @@ class EpisodicSummarizer:
         previous_summary: Optional[EpisodicSummary],
     ) -> EpisodicSummary:
         """Use an LLM to merge previous summary with recent messages."""
-        client = self._get_client()
+        client = self.llm_client
+        if client is None:
+            raise RuntimeError("LLM client not configured")
         history_text = "\n".join(
             f"{msg.sender}: {_message_to_text(msg)}" for msg in messages[-10:]
         )

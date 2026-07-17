@@ -71,8 +71,16 @@ class ContextEngine:
         model: Optional[str] = None,
         intent: Optional[Any] = None,
         reserved_output_tokens: Optional[int] = None,
+        session_id: Optional[str] = None,
+        prefetched_memories: Optional[List[Dict[str, Any]]] = None,
     ) -> ContextBundle:
-        """Build a token-safe context bundle for the current turn."""
+        """Build a token-safe context bundle for the current turn.
+
+        ``prefetched_memories`` lets the caller pass in the result of an
+        already-executed ``semantic_memory.search(user_message)`` so the same
+        query is not run twice per turn (e.g. by MemoryManager.enrich_context
+        and this engine). When ``None`` the engine searches on its own.
+        """
         model = model or self.default_model
         budget_manager = TokenBudgetManager(
             model=model,
@@ -165,11 +173,14 @@ class ContextEngine:
         # 5. Semantic memory
         if self.semantic_memory is not None:
             try:
-                memories = await self.semantic_memory.search(
-                    query=user_message,
-                    top_k=5,
-                    project_id=project_id,
-                )
+                if prefetched_memories is not None:
+                    memories = prefetched_memories
+                else:
+                    memories = await self.semantic_memory.search(
+                        query=user_message,
+                        top_k=5,
+                        project_id=project_id,
+                    )
                 for mem in memories:
                     text = mem.get("text", "")
                     if text:
@@ -192,7 +203,9 @@ class ContextEngine:
         if self.enable_llm_summary:
             try:
                 summary = await self.episodic_summarizer.summarize(
-                    working_memory.get_recent_messages(10)
+                    working_memory.get_recent_messages(10),
+                    session_id=session_id,
+                    message_count=len(working_memory.messages),
                 )
                 summary_text = summary.to_text()
                 if summary_text:

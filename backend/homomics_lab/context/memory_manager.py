@@ -83,8 +83,15 @@ class MemoryManager:
         project_id: str,
         user_message: str,
         working_memory: WorkingMemory,
+        prefetched_memory_results: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Retrieve relevant historical context for the current turn."""
+        """Retrieve relevant historical context for the current turn.
+
+        ``prefetched_memory_results`` lets the caller reuse an already-run
+        ``semantic_memory.search(user_message)`` result so the identical query
+        is not executed twice per turn (see ContextEngine.build). When
+        ``None`` the search is performed here as before.
+        """
         context: Dict[str, Any] = {
             "memory_snippets": [],
             "recent_experiments": [],
@@ -96,9 +103,12 @@ class MemoryManager:
 
         if self.semantic_memory is not None:
             try:
-                results = await self.semantic_memory.search(
-                    user_message, top_k=5, project_id=project_id
-                )
+                if prefetched_memory_results is not None:
+                    results = prefetched_memory_results
+                else:
+                    results = await self.semantic_memory.search(
+                        user_message, top_k=5, project_id=project_id
+                    )
                 context["memory_snippets"] = [r["text"] for r in results]
 
                 # Retrieve explicit user preferences for this project.

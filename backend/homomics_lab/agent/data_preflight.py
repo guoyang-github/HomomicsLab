@@ -6,6 +6,7 @@ unneeded qc / normalization / clustering steps when the user only wants a
 single-shot analysis (e.g. "run CellTypist and compare labels").
 """
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -75,7 +76,9 @@ class DataPreflight:
         metadatas = []
         for p in file_paths:
             try:
-                meta = self._read_metadata(Path(p))
+                # _read_metadata does blocking file I/O (h5ad reads, matrix
+                # sampling); keep it off the event loop.
+                meta = await asyncio.to_thread(self._read_metadata, Path(p))
                 metadatas.append({"path": p, **meta})
             except Exception as exc:
                 logger.warning("Preflight failed to read %s: %s", p, exc)
