@@ -120,7 +120,10 @@ function formatObjectSummary(obj: Record<string, any>): string {
 
 export function ExecutionResult({ content, mode = 'full' }: Props) {
   const { t } = useTranslation()
-  const executionResult = useExecutionStore((state) => state.result)
+  // Fall back to the live store result of THIS message's job only. Reading a
+  // global "latest result" would leak a newer job's outputs into older cards.
+  const jobId = typeof content.job_id === 'string' && content.job_id ? content.job_id : null
+  const jobResult = useExecutionStore((state) => (jobId ? state.jobs[jobId]?.result ?? null : null))
 
   const taskResult =
     content.tasks?.find(
@@ -129,7 +132,7 @@ export function ExecutionResult({ content, mode = 'full' }: Props) {
         task.result &&
         typeof task.result === 'object'
     )?.result || null
-  const rawResult = content.result || taskResult || executionResult
+  const rawResult = content.result || taskResult || jobResult
   const normalizedResult = normalizeResult(rawResult)
   const isFailure =
     normalizedResult?.success === false ||

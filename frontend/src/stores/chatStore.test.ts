@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useChatStore } from './chatStore'
 import { useTaskStore } from './taskStore'
 import { usePlanStore } from './planStore'
-import { useExecutionStore } from './executionStore'
+import { useExecutionStore, selectActiveJob } from './executionStore'
 import { chatApi, executionApi } from '@/services/api'
 import type { ChatMessage, PlanRequestContent } from '@/types/chat'
 import type { TaskNode } from '@/types/tasks'
@@ -109,10 +109,10 @@ describe('chatStore.selectSession', () => {
     useExecutionStore.getState().reset()
   })
 
-  it('resets plan/execution/task stores when switching sessions', async () => {
+  it('clears plan/task stores and the execution view for the new session, retaining other job data', async () => {
     usePlanStore.getState().loadPlan(makePlan())
     useExecutionStore.getState().startJob('job_old', 'sess_old')
-    useExecutionStore.getState().addLog({
+    useExecutionStore.getState().addLog('job_old', {
       timestamp: new Date().toISOString(),
       level: 'info',
       message: 'old log',
@@ -126,10 +126,12 @@ describe('chatStore.selectSession', () => {
     expect(usePlanStore.getState().draftPlan).toBeNull()
     expect(usePlanStore.getState().viewMode).toBeNull()
     const exec = useExecutionStore.getState()
-    expect(exec.jobId).toBeNull()
-    expect(exec.status).toBe('idle')
-    expect(exec.logs).toEqual([])
-    expect(exec.percent).toBe(0)
+    // The new session shows no job…
+    expect(selectActiveJob(exec, 'sess_new')).toBeNull()
+    // …but the previous session's job runtime is retained in memory.
+    expect(exec.activeJobIdBySession['sess_old']).toBe('job_old')
+    expect(exec.jobs['job_old'].status).toBe('running')
+    expect(exec.jobs['job_old'].logs.map((l) => l.message)).toEqual(['old log'])
     expect(useTaskStore.getState().tasks).toEqual([])
     expect(useTaskStore.getState().progress.total).toBe(0)
   })
@@ -155,9 +157,8 @@ describe('chatStore.selectSession', () => {
     expect(progress.total).toBe(2)
     expect(progress.completed).toBe(1)
     expect(progress.percent).toBe(50)
-    // No running job in history: the execution store stays idle.
-    expect(useExecutionStore.getState().jobId).toBeNull()
-    expect(useExecutionStore.getState().status).toBe('idle')
+    // No running job in history: the session has no active job.
+    expect(selectActiveJob(useExecutionStore.getState(), 'sess_1')).toBeNull()
   })
 
   it('normalizes all tasks to the terminal status of a finished todo_list', async () => {
@@ -224,11 +225,59 @@ describe('chatStore.selectSession', () => {
     // Live tasks from getStatus win over the persisted TODO card.
     expect(useTaskStore.getState().tasks.map((t) => t.id)).toEqual(['qc', 'clustering'])
     const exec = useExecutionStore.getState()
-    expect(exec.jobId).toBe('job_1')
-    expect(exec.jobSessionId).toBe('sess_1')
-    expect(exec.status).toBe('running')
-    expect(exec.percent).toBe(40)
-    expect(exec.currentPhase).toBe('clustering')
-    expect(exec.logs.some((l) => l.message === 'trace line')).toBe(true)
+    expect(exec.activeJobIdBySession['sess_1']).toBe('job_1')
+    const job = exec.jobs['job_1']
+    expect(job.sessionId).toBe('sess_1')
+    expect(job.status).toBe('running')
+    expect(job.percent).toBe(40)
+    expect(job.currentPhase).toBe('clustering')
+    expect(job.logs.some((l) => l.message === 'trace line')).toBe(true)
+  })
+
+  it('retains a running job view when switching sessions away and back', async () => {
+    const messagesA = [
+      makeMessage({
+        id: 'm1',
+        type: 'todo_list',
+        content: {
+          text: 'running',
+          status: 'running',
+          job_id: 'job_a',
+          tasks: [makeTask('qc', 'running')],
+        },
+      }),
+    ]
+    vi.spyOn(chatApi, 'getMessages').mockImplementation(async (id: string) => {
+      return { data: id === 'sess_a' ? messagesA : [] } as any
+    })
+    vi.spyOn(executionApi, 'getStatus').mockResolvedValue({
+      data: { latest_state: { status: 'running', progress_pct: 40, current_phase: 'qc' } },
+    } as any)
+    vi.spyOn(executionApi, 'getTrace').mockResolvedValue({ data: { nodes: [] } } as any)
+
+    // Session A starts showing job_a; a live SSE log lands in memory.
+    await useChatStore.getState().selectSession('sess_a')
+    expect(useExecutionStore.getState().activeJobIdBySession['sess_a']).toBe('job_a')
+    useExecutionStore.getState().addLog('job_a', {
+      timestamp: new Date().toISOString(),
+      level: 'stdout',
+      message: 'live line A',
+    })
+
+    // Switch to session B: job_a's runtime stays in the store.
+    await useChatStore.getState().selectSession('sess_b')
+    let exec = useExecutionStore.getState()
+    expect(selectActiveJob(exec, 'sess_b')).toBeNull()
+    expect(exec.jobs['job_a'].logs.some((l) => l.message === 'live line A')).toBe(true)
+
+    // Switch back to A: the pointer is intact, and restoreJob refreshes the
+    // status without clobbering the in-memory log buffer.
+    await useChatStore.getState().selectSession('sess_a')
+    exec = useExecutionStore.getState()
+    expect(exec.activeJobIdBySession['sess_a']).toBe('job_a')
+    const job = exec.jobs['job_a']
+    expect(job.status).toBe('running')
+    expect(job.percent).toBe(40)
+    expect(job.logs.some((l) => l.message === 'live line A')).toBe(true)
   })
 })

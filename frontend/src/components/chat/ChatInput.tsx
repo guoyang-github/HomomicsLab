@@ -6,6 +6,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useExecutionStore } from '@/stores/executionStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
 import { executionApi } from '@/sdk'
@@ -49,7 +50,10 @@ export function ChatInput({ onOpenCommandPalette }: { onOpenCommandPalette?: () 
   } = useChatStore()
   const { setTaskTree, setProgress } = useTaskStore()
   const { loadPlan, discardDraft } = usePlanStore()
-  const { startJob, status: executionStatus, jobId: activeJobId } = useExecutionStore()
+  const startJob = useExecutionStore((state) => state.startJob)
+  // Stop button targets the current session's active job only.
+  const { jobId: activeJobId, job: activeJob } = useActiveExecutionJob()
+  const executionStatus = activeJob?.status ?? 'idle'
 
   useEffect(() => {
     if (!draftInput || consumedDraftRef.current === draftInput) return

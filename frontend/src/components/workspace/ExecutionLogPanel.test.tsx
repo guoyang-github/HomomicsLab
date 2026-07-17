@@ -3,20 +3,34 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ExecutionLogPanel } from './ExecutionLogPanel'
 import { useExecutionStore } from '@/stores/executionStore'
+import { useChatStore } from '@/stores/chatStore'
 import type { LogEntry } from '@/stores/executionStore'
 
 // jsdom does not implement Element.scrollTo; the panel calls it on expand.
 Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo
 
 function seedLogs(logs: Array<Partial<LogEntry> & { message: string }>) {
+  // The panel renders the active job of the current session.
+  useChatStore.setState({ currentSessionId: 'sess_1' })
   useExecutionStore.setState({
-    status: 'running',
-    logs: logs.map((partial, idx) => ({
-      id: `log_${idx}`,
-      timestamp: '2026-07-14T10:00:00.000Z',
-      level: 'info',
-      ...partial,
-    })),
+    jobs: {
+      job_1: {
+        sessionId: 'sess_1',
+        isConnected: false,
+        status: 'running',
+        percent: 0,
+        currentPhase: null,
+        result: null,
+        updatedAt: Date.now(),
+        logs: logs.map((partial, idx) => ({
+          id: `log_${idx}`,
+          timestamp: '2026-07-14T10:00:00.000Z',
+          level: 'info',
+          ...partial,
+        })),
+      },
+    },
+    activeJobIdBySession: { sess_1: 'job_1' },
   })
 }
 

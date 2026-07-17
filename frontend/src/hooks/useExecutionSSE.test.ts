@@ -53,12 +53,13 @@ describe('useExecutionSSE', () => {
   })
 
   it('streams state events into the execution store', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_1')
     renderHook(() => useExecutionSSE('job_1'))
     const es = MockEventSource.instances[0]
     expect(es.url).toContain('/execution/job_1/events')
 
     act(() => es.onopen?.())
-    expect(useExecutionStore.getState().isConnected).toBe(true)
+    expect(useExecutionStore.getState().jobs['job_1'].isConnected).toBe(true)
 
     act(() =>
       es.emit('state', {
@@ -71,11 +72,11 @@ describe('useExecutionSSE', () => {
       })
     )
 
-    const state = useExecutionStore.getState()
-    expect(state.status).toBe('running')
-    expect(state.percent).toBe(25)
-    expect(state.currentPhase).toBe('qc')
-    expect(state.logs.some((l) => l.message === 'hello world')).toBe(true)
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.status).toBe('running')
+    expect(job.percent).toBe(25)
+    expect(job.currentPhase).toBe('qc')
+    expect(job.logs.some((l) => l.message === 'hello world')).toBe(true)
   })
 
   it('refreshes session messages and restores the result on terminal state', async () => {
@@ -106,11 +107,12 @@ describe('useExecutionSSE', () => {
     })
 
     await waitFor(() => expect(loadSessionMessages).toHaveBeenCalledWith('sess_1'))
-    await waitFor(() => expect(useExecutionStore.getState().result).toEqual({ success: true }))
-    expect(useExecutionStore.getState().status).toBe('completed')
-    expect(useExecutionStore.getState().isConnected).toBe(false)
+    await waitFor(() => expect(useExecutionStore.getState().jobs['job_1'].result).toEqual({ success: true }))
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.status).toBe('completed')
+    expect(job.isConnected).toBe(false)
     expect(es.closed).toBe(true)
-    expect(useExecutionStore.getState().logs.some((l) => l.level === 'success')).toBe(true)
+    expect(job.logs.some((l) => l.level === 'success')).toBe(true)
   })
 
   it('tags subagent events without overwriting the parent job status', () => {
@@ -129,15 +131,15 @@ describe('useExecutionSSE', () => {
       })
     })
 
-    const state = useExecutionStore.getState()
+    const job = useExecutionStore.getState().jobs['job_1']
     // A sub-executor terminal event must not close the SSE connection or
     // overwrite the parent job's status / percent.
-    expect(state.status).toBe('running')
-    expect(state.percent).toBe(30)
+    expect(job.status).toBe('running')
+    expect(job.percent).toBe(30)
     expect(es.closed).toBe(false)
-    const subLog = state.logs.find((l) => l.message === 'sub line')
+    const subLog = job.logs.find((l) => l.message === 'sub line')
     expect(subLog?.actor).toBe('subagent:celltypist')
     expect(subLog?.parentId).toBe('task_1')
-    expect(state.logs.some((l) => l.subStatus === 'completed')).toBe(true)
+    expect(job.logs.some((l) => l.subStatus === 'completed')).toBe(true)
   })
 })

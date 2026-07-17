@@ -8,7 +8,7 @@ import { PlanEditor } from './PlanEditor'
 import { ExecutionSSEConnector } from './ExecutionSSEConnector'
 import { usePlanStore } from '@/stores/planStore'
 import { useChatStore } from '@/stores/chatStore'
-import { useExecutionStore } from '@/stores/executionStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { useTranslation } from '@/i18n'
 import { planApi } from '@/services/api'
 import { Info } from 'lucide-react'
@@ -22,7 +22,8 @@ export function Workspace() {
   const loadApprovedPlan = usePlanStore((state) => state.loadApprovedPlan)
   const discardDraft = usePlanStore((state) => state.discardDraft)
   const currentSessionId = useChatStore((state) => state.currentSessionId)
-  const executionStatus = useExecutionStore((state) => state.status)
+  const { job: activeExecutionJob } = useActiveExecutionJob()
+  const executionStatus = activeExecutionJob?.status ?? 'idle'
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('workflow')
 
   // Load the latest approved plan for this session so the workflow view shows

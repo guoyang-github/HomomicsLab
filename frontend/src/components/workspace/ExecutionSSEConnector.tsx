@@ -1,8 +1,8 @@
-import { useExecutionStore } from '@/stores/executionStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { useExecutionSSE } from '@/hooks/useExecutionSSE'
 
 export function ExecutionSSEConnector() {
-  const jobId = useExecutionStore((state) => state.jobId)
+  const { jobId } = useActiveExecutionJob()
   useExecutionSSE(jobId)
   return null
 }

@@ -4,7 +4,7 @@ import { chatApi, executionApi } from '@/services/api'
 import type { ChatMessage } from '@/types/chat'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
-import { useExecutionStore, type LogEntry, type ExecutionState } from '@/stores/executionStore'
+import { useExecutionStore, type LogEntry, type ExecutionStatus } from '@/stores/executionStore'
 import { toastError } from '@/stores/toastStore'
 import type { TaskProgress, TaskNode } from '@/types/tasks'
 import type { PlanRequestContent } from '@/types/chat'
@@ -232,7 +232,10 @@ export const useChatStore = create<ChatState>()(
         // Any explicit selection makes the startup restore moot.
         set({ currentSessionId: id, messages: [], messagesLoading: true, sessionRestoreAttempted: true })
         usePlanStore.getState().discardDraft()
-        useExecutionStore.getState().reset()
+        // Execution state is keyed per session: the outgoing session keeps its
+        // job data in memory, and the target session's active-job pointer is
+        // still intact, so its log panel restores instantly. loadSessionMessages
+        // below refreshes (restoreJob) or clears (deactivate) that pointer.
         useTaskStore.getState().setTaskTree([])
         useTaskStore.getState().setProgress({
           total: 0,
@@ -325,7 +328,7 @@ export const useChatStore = create<ChatState>()(
             const initialLogs = traceLogs.length > 0 ? traceLogs : liveLogs
             const terminalStatuses = ['completed', 'failed', 'cancelled']
             const normalizedStatus = terminalStatuses.includes(liveStatus)
-              ? (liveStatus as ExecutionState['status'])
+              ? (liveStatus as ExecutionStatus)
               : 'running'
             useExecutionStore.getState().restoreJob(
               recentJob.jobId,
@@ -351,7 +354,9 @@ export const useChatStore = create<ChatState>()(
                 percent: 0,
               })
             }
-            useExecutionStore.getState().reset()
+            // No job in this session's history: clear its active-job pointer
+            // only; other sessions' job runtimes stay untouched.
+            useExecutionStore.getState().deactivate(sessionId)
           }
         } catch (err) {
           set({ messagesLoading: false })
@@ -396,7 +401,8 @@ export const useChatStore = create<ChatState>()(
           updatedAt: new Date().toISOString(),
         }
         usePlanStore.getState().discardDraft()
-        useExecutionStore.getState().reset()
+        // A fresh session has no active-job pointer yet; previous sessions'
+        // job data stays in the execution store untouched.
         useTaskStore.getState().setTaskTree([])
         useTaskStore.getState().setProgress({
           total: 0,

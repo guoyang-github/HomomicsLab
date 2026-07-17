@@ -94,9 +94,12 @@ export function useExecutionSSE(jobId: string | null) {
         pollTimerRef.current = null
       }
       retryCountRef.current = 0
-      setConnected(false)
       return
     }
+
+    // All store writes below are scoped to this job; other sessions' jobs keep
+    // streaming/retaining their own runtime state independently.
+    const jid = jobId as string
 
     function applyPayload(data: ExecutionStatePayload) {
       const status = data.status.toLowerCase()
@@ -108,7 +111,7 @@ export function useExecutionSSE(jobId: string | null) {
       // log panel can fold it into the parent group. Top-level events (no
       // actor) flow through unchanged.
       const pushLog = (entry: Omit<LogEntry, 'id'>) =>
-        addLog(actor ? { ...entry, actor, parentId } : entry)
+        addLog(jid, actor ? { ...entry, actor, parentId } : entry)
 
       if (!isSubagentEvent && data.tasks && data.tasks.length > 0) {
         setTaskTree(data.tasks)
@@ -123,7 +126,7 @@ export function useExecutionSSE(jobId: string | null) {
             typeof t.result === 'object'
         )
         if (completedTask?.result) {
-          setResult(completedTask.result as Record<string, any>)
+          setResult(jid, completedTask.result as Record<string, any>)
         }
       }
 
@@ -162,7 +165,7 @@ export function useExecutionSSE(jobId: string | null) {
       }
 
       if (data.current_phase) {
-        setCurrentPhase(data.current_phase)
+        setCurrentPhase(jid, data.current_phase)
       }
 
       const isRetrying = status === 'retrying'
@@ -246,6 +249,7 @@ export function useExecutionSSE(jobId: string | null) {
       // percent or result; their progress lives inside the tagged log group.
       if (!isSubagentEvent) {
         setStatus(
+          jid,
           status === 'completed'
             ? 'completed'
             : status === 'failed' || status === 'cancelled'
@@ -258,7 +262,7 @@ export function useExecutionSSE(jobId: string | null) {
         )
 
         if (data.result) {
-          setResult(data.result)
+          setResult(jid, data.result)
         }
       }
 
@@ -293,7 +297,7 @@ export function useExecutionSSE(jobId: string | null) {
           clearInterval(pollTimerRef.current)
           pollTimerRef.current = null
         }
-        setConnected(false)
+        setConnected(jid, false)
         pushLog({
           timestamp: new Date().toISOString(),
           level: status === 'completed' ? 'success' : 'error',
@@ -319,7 +323,7 @@ export function useExecutionSSE(jobId: string | null) {
       const maxAttempts = 8
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         try {
-          const res = await executionApi.getTrace(jobId as string)
+          const res = await executionApi.getTrace(jid)
           const trace = res.data
           const resultNode =
             trace.nodes?.find((n: any) => n.outputs?.result?.success !== undefined) ||
@@ -328,10 +332,10 @@ export function useExecutionSSE(jobId: string | null) {
           const outputs = resultNode?.outputs
           if (outputs) {
             if (outputs.result) {
-              setResult(outputs.result)
+              setResult(jid, outputs.result)
               return
             } else if (outputs.success !== undefined) {
-              setResult(outputs)
+              setResult(jid, outputs)
               return
             }
           }
@@ -343,7 +347,7 @@ export function useExecutionSSE(jobId: string | null) {
     }
 
     async function refreshSessionMessages() {
-      const jobSessionId = useExecutionStore.getState().jobSessionId
+      const jobSessionId = useExecutionStore.getState().jobs[jid]?.sessionId
       if (!jobSessionId) {
         return
       }
@@ -374,17 +378,17 @@ export function useExecutionSSE(jobId: string | null) {
     }
 
     function connect() {
-      const url = executionApi.eventsUrl(jobId as string)
+      const url = executionApi.eventsUrl(jid)
       const es = new EventSource(url)
       eventSourceRef.current = es
 
       es.onopen = () => {
         retryCountRef.current = 0
-        setConnected(true)
-        addLog({
+        setConnected(jid, true)
+        addLog(jid, {
           timestamp: new Date().toISOString(),
           level: 'info',
-          message: t('executionLog.running') + ` (${(jobId as string).slice(0, 8)})`,
+          message: t('executionLog.running') + ` (${jid.slice(0, 8)})`,
         })
       }
 
@@ -393,7 +397,7 @@ export function useExecutionSSE(jobId: string | null) {
           const data: ExecutionStatePayload = JSON.parse(event.data)
           applyPayload(data)
         } catch {
-          addLog({
+          addLog(jid, {
             timestamp: new Date().toISOString(),
             level: 'info',
             message: event.data,
@@ -402,13 +406,13 @@ export function useExecutionSSE(jobId: string | null) {
       })
 
       es.onerror = () => {
-        setConnected(false)
+        setConnected(jid, false)
         es.close()
 
         if (retryCountRef.current < MAX_RECONNECT_RETRIES) {
           const delay = RECONNECT_BASE_DELAY_MS * 2 ** retryCountRef.current
           retryCountRef.current += 1
-          addLog({
+          addLog(jid, {
             timestamp: new Date().toISOString(),
             level: 'warning',
             message: t('executionLog.reconnecting', {
@@ -419,7 +423,7 @@ export function useExecutionSSE(jobId: string | null) {
           })
           reconnectTimerRef.current = setTimeout(connect, delay)
         } else {
-          addLog({
+          addLog(jid, {
             timestamp: new Date().toISOString(),
             level: 'error',
             message: t('executionLog.reconnectFailed') || 'SSE connection lost and reconnect limit reached.',
@@ -431,7 +435,7 @@ export function useExecutionSSE(jobId: string | null) {
 
     function startPolling() {
       if (pollTimerRef.current) return
-      addLog({
+      addLog(jid, {
         timestamp: new Date().toISOString(),
         level: 'warning',
         message: 'SSE unavailable; falling back to polling.',
@@ -439,12 +443,13 @@ export function useExecutionSSE(jobId: string | null) {
 
       async function poll() {
         try {
-          const res = await executionApi.getTrace(jobId as string)
+          const res = await executionApi.getTrace(jid)
           const trace = res.data
           const status = String(trace.status || 'running').toLowerCase()
           const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled'
 
           setStatus(
+            jid,
             status === 'completed'
               ? 'completed'
               : status === 'failed' || status === 'cancelled'
@@ -454,7 +459,7 @@ export function useExecutionSSE(jobId: string | null) {
           )
 
           if (trace.error_message) {
-            addLog({
+            addLog(jid, {
               timestamp: new Date().toISOString(),
               level: 'error',
               message: trace.error_message,
@@ -469,9 +474,9 @@ export function useExecutionSSE(jobId: string | null) {
           const outputs = resultNode?.outputs
           if (outputs) {
             if (outputs.result) {
-              setResult(outputs.result)
+              setResult(jid, outputs.result)
             } else if (outputs.success !== undefined) {
-              setResult(outputs)
+              setResult(jid, outputs)
             }
           }
 
@@ -480,8 +485,8 @@ export function useExecutionSSE(jobId: string | null) {
               clearInterval(pollTimerRef.current)
               pollTimerRef.current = null
             }
-            setConnected(false)
-            addLog({
+            setConnected(jid, false)
+            addLog(jid, {
               timestamp: new Date().toISOString(),
               level: status === 'completed' ? 'success' : 'error',
               message: status === 'completed' ? t('executionLog.completed') : t('executionLog.failed'),

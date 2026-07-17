@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useExecutionStore } from '@/stores/executionStore'
-import { useChatStore } from '@/stores/chatStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { TodoChecklist } from './TodoChecklist'
@@ -10,11 +9,10 @@ import { ExecutionLogPanel } from '@/components/workspace/ExecutionLogPanel'
 
 export function ChatPanel() {
   const [commandOpen, setCommandOpen] = useState(false)
-  const executionStatus = useExecutionStore((state) => state.status)
-  const jobSessionId = useExecutionStore((state) => state.jobSessionId)
-  const currentSessionId = useChatStore((state) => state.currentSessionId)
-  const isJobForCurrentSession = !jobSessionId || jobSessionId === currentSessionId
-  const showExecutionLogs = executionStatus === 'running' && isJobForCurrentSession
+  // The active job is tracked per session, so it is always scoped to the
+  // session currently on screen — no cross-session gating needed here.
+  const { job } = useActiveExecutionJob()
+  const showExecutionLogs = job?.status === 'running'
 
   return (
     <div className="relative flex h-full flex-col bg-background">

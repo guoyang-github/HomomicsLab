@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { Terminal, ChevronUp, ChevronDown, ChevronRight, Trash2, Download, Activity } from 'lucide-react'
 import { useExecutionStore } from '@/stores/executionStore'
 import type { LogEntry } from '@/stores/executionStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { Button, Badge } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 import { formatActorLabel, groupSubagentLogs } from '@/utils/subagentLogs'
@@ -14,11 +15,17 @@ interface Props {
   compact?: boolean
 }
 
+/** Stable empty buffer so a jobless panel does not re-render on every store change. */
+const NO_LOGS: LogEntry[] = []
+
 export function ExecutionLogPanel({ compact = false }: Props) {
   const { t } = useTranslation()
-  const logs = useExecutionStore((state) => state.logs)
-  const status = useExecutionStore((state) => state.status)
-  const isConnected = useExecutionStore((state) => state.isConnected)
+  // Renders the job attached to the current session; other sessions' jobs
+  // keep their logs in the store and reappear here on session switch.
+  const { jobId, job } = useActiveExecutionJob()
+  const logs = job?.logs ?? NO_LOGS
+  const status = job?.status ?? 'idle'
+  const isConnected = job?.isConnected ?? false
   const clearLogs = useExecutionStore((state) => state.clearLogs)
   const [expanded, setExpanded] = useState(false)
   const [userCollapsed, setUserCollapsed] = useState(false)
@@ -196,7 +203,12 @@ export function ExecutionLogPanel({ compact = false }: Props) {
               <Button variant="ghost" size="icon" onClick={downloadLogs} title={t('executionLog.download')}>
                 <Download className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={clearLogs} title={t('executionLog.clear')}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => jobId && clearLogs(jobId)}
+                title={t('executionLog.clear')}
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </>

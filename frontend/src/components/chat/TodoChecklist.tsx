@@ -2,8 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { clsx } from 'clsx'
 import { Loader2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Workflow } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
-import { useExecutionStore } from '@/stores/executionStore'
-import { useChatStore } from '@/stores/chatStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { usePlanStore } from '@/stores/planStore'
 import { useTranslation } from '@/i18n'
@@ -79,16 +78,13 @@ function deriveGroupStatus(tasks: TaskNode[]): 'running' | 'completed' | 'failed
 export function TodoChecklist() {
   const { t } = useTranslation()
   const tasks = useTaskStore((state) => state.tasks)
-  const status = useExecutionStore((state) => state.status)
-  const jobSessionId = useExecutionStore((state) => state.jobSessionId)
-  const currentSessionId = useChatStore((state) => state.currentSessionId)
+  // The active job is tracked per session, so this checklist always reflects
+  // the session on screen; other sessions' jobs keep running in the store.
+  const { job } = useActiveExecutionJob()
+  const status = job?.status ?? 'idle'
   const [expanded, setExpanded] = useState(false)
   const openWorkflow = useOverlayStore((state) => state.openWorkflow)
   const discardDraft = usePlanStore((state) => state.discardDraft)
-
-  // Keep the floating TODO scoped to the current session. This prevents the
-  // old session's task list from flashing when the user switches sessions.
-  const isJobForCurrentSession = !jobSessionId || jobSessionId === currentSessionId
 
   const items = useMemo(() => flattenTasks(tasks), [tasks])
   const groupStatus = useMemo(() => deriveGroupStatus(tasks), [tasks])
@@ -104,7 +100,6 @@ export function TodoChecklist() {
   }, [status, groupStatus])
 
   // Show the floating TODO whenever the current session has tasks.
-  if (!isJobForCurrentSession) return null
   if (items.length === 0) return null
 
   const failedCount = items.filter((item) => item.status === 'failed').length
