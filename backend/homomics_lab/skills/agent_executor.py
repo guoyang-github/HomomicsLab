@@ -348,6 +348,23 @@ def _extract_script_reference(source_dir: Optional[Path], max_chars: int = 6000)
     return text
 
 
+def _compact_skill_doc(text: str, max_chars: int = 4000) -> str:
+    """Bound a SKILL.md body for prompt injection.
+
+    Long skill docs bloat the prompt and slow the provider, so only the head
+    (workflow, parameter defaults) and the tail (output contracts and pitfalls
+    conventionally live at the end) are kept, with an explicit elision marker.
+    """
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    head_budget = int(max_chars * 0.6)
+    tail_budget = max_chars - head_budget
+    head = text[:head_budget].rsplit("\n", 1)[0]
+    tail = text[-tail_budget:].split("\n", 1)[-1]
+    return f"{head}\n\n... [middle of SKILL.md elided] ...\n\n{tail}"
+
+
 _SOURCE_READ_PATTERNS = re.compile(
     r"\b(cat|sed|grep|awk|head|tail|less|more|xxd|od|strings|nl|wc)\b"
 )
@@ -1904,31 +1921,31 @@ class AgentSkillExecutor:
             if not input_file and isinstance(inputs.get("uploaded_files"), list) and inputs["uploaded_files"]:
                 input_file = str(inputs["uploaded_files"][0].get("path", ""))
 
+        skill_doc = ""
+        raw_instructions = str(skill.metadata.get("instructions") or "")
+        if raw_instructions:
+            skill_doc = (
+                "## Skill documentation (contractual — follow its defaults, "
+                "output filenames, and report sections)\n"
+                + _compact_skill_doc(raw_instructions, max_chars=4000)
+                + "\n\n"
+            )
+
         prompt = (
             f"Write a compact, complete Python driver script for skill '{skill.id}'.\n\n"
             f"## Helpers\n"
             f"```python\nimport sys, os\nsys.path.insert(0, '{import_path}')\n"
             f"from core_analysis import *\nfrom utils import *\n```\n\n"
+            f"{skill_doc}"
             f"{script_reference}\n\n"
             f"## Objective\n"
             f"{objective}\n\n"
             f"## Input file\n"
             f"{input_file}\n\n"
             f"## Requirements\n"
-            f"- For immune cell annotation with CellTypist, default to model='Immune_All_Low.pkl', "
-            f"mode='best match', majority_voting=True, p_thres=0.5. "
-            f"Only deviate if the user explicitly names another model/mode.\n"
-            f"- Normalize from raw counts (layer='counts') with target_sum=1e4 and log1p if needed.\n"
+            f"- Follow the skill documentation above exactly: default parameters, output "
+            f"filenames, and report sections are contractual (downstream summaries parse them).\n"
             f"- Save outputs under {working_dir}/outputs/ with clear filenames.\n"
-            f"- Before writing .h5ad, set anndata.settings.allow_write_nullable_strings = True and convert any nullable string index/columns to plain str.\n"
-            f"- Required outputs: annotated.h5ad, annotations.csv, celltypist_comparison.csv "
-            f"(columns: all_celltype, celltypist_predicted, celltypist_conf_score), "
-            f"comparison_report.txt, report.txt.\n"
-            f"- CellTypist result objects may expose predicted_labels and a separate probability_matrix. "
-            f"If predicted_labels does not contain a 'conf_score' column, derive confidence scores as "
-            f"the maximum probability per cell from the probability_matrix. Do not assume 'conf_score' exists.\n"
-            f"- report.txt must include: cells x genes, model, gene overlap, mode, threshold, "
-            f"Unassigned rate, preprocessing note, ARI/NMI vs all_celltype, per-label agreement.\n"
             f"- Keep under 70 lines, no plots.\n"
             f"- After writing all outputs, also write a JSON manifest at {working_dir}/__skill_outputs__.json "
             f"listing every output file path relative to {working_dir}.\n"
