@@ -28,21 +28,23 @@ class TestGitWorkspaceSnapshot:
         assert snapshot.git_dir.exists()
         assert (snapshot.git_dir / "HEAD").exists()
 
-    def test_commit_returns_hash(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_commit_returns_hash(self, snapshot):
         snapshot.init()
         file_path = snapshot.workspace_dir / "data" / "raw.txt"
         file_path.write_text("hello")
 
-        commit_hash = snapshot.commit("test-label", "task_1")
+        commit_hash = await snapshot.commit("test-label", "task_1")
 
         assert commit_hash is not None
         assert len(commit_hash) == 40
 
-    def test_commit_message_includes_task_id_and_label(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_commit_message_includes_task_id_and_label(self, snapshot):
         snapshot.init()
         (snapshot.workspace_dir / "data" / "raw.txt").write_text("hello")
 
-        snapshot.commit("pre-run", "job_1")
+        await snapshot.commit("pre-run", "job_1")
         commits = snapshot.list_commits()
 
         assert len(commits) == 1
@@ -52,12 +54,13 @@ class TestGitWorkspaceSnapshot:
         snapshot.init()
         assert snapshot.list_commits() == []
 
-    def test_list_commits_returns_multiple_commits(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_list_commits_returns_multiple_commits(self, snapshot):
         snapshot.init()
         (snapshot.workspace_dir / "data" / "a.txt").write_text("a")
-        snapshot.commit("first", "task_1")
+        await snapshot.commit("first", "task_1")
         (snapshot.workspace_dir / "data" / "b.txt").write_text("b")
-        snapshot.commit("second", "task_2")
+        await snapshot.commit("second", "task_2")
 
         commits = snapshot.list_commits()
 
@@ -65,14 +68,15 @@ class TestGitWorkspaceSnapshot:
         assert commits[0]["message"] == "task_2: second"
         assert commits[1]["message"] == "task_1: first"
 
-    def test_diff_between_commits(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_diff_between_commits(self, snapshot):
         snapshot.init()
         data_file = snapshot.workspace_dir / "data" / "raw.txt"
         data_file.write_text("v1")
-        hash_a = snapshot.commit("first", "task_1")
+        hash_a = await snapshot.commit("first", "task_1")
 
         data_file.write_text("v2")
-        hash_b = snapshot.commit("second", "task_1")
+        hash_b = await snapshot.commit("second", "task_1")
 
         diff = snapshot.diff(hash_a, hash_b)
 
@@ -82,14 +86,15 @@ class TestGitWorkspaceSnapshot:
         snapshot.init()
         assert snapshot.diff("deadbeef", "cafebabe") == ""
 
-    def test_restore_reverts_files(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_restore_reverts_files(self, snapshot):
         snapshot.init()
         data_file = snapshot.workspace_dir / "data" / "raw.txt"
         data_file.write_text("v1")
-        hash_a = snapshot.commit("first", "task_1")
+        hash_a = await snapshot.commit("first", "task_1")
 
         data_file.write_text("v2")
-        snapshot.commit("second", "task_1")
+        await snapshot.commit("second", "task_1")
 
         restored = snapshot.restore(hash_a)
 
@@ -100,10 +105,11 @@ class TestGitWorkspaceSnapshot:
         snapshot.init()
         assert snapshot.restore("deadbeef") is False
 
-    def test_gitignore_excludes_metadata_git_dir(self, snapshot):
+    @pytest.mark.asyncio
+    async def test_gitignore_excludes_metadata_git_dir(self, snapshot):
         snapshot.init()
         (snapshot.workspace_dir / "data" / "raw.txt").write_text("hello")
-        snapshot.commit("first", "task_1")
+        await snapshot.commit("first", "task_1")
 
         gitignore = snapshot.workspace_dir / ".gitignore"
         assert gitignore.exists()
@@ -117,11 +123,12 @@ class TestGitWorkspaceSnapshotMissingGit:
         with patch("shutil.which", return_value=None):
             assert snapshot.init() is False
 
-    def test_commit_returns_none_when_git_missing(self, tmp_path):
+    @pytest.mark.asyncio
+    async def test_commit_returns_none_when_git_missing(self, tmp_path):
         ws = WorkspaceManager(base_dir=tmp_path, project_id="proj_no_git")
         snapshot = GitWorkspaceSnapshot(ws.workspace_dir)
         with patch("shutil.which", return_value=None):
-            assert snapshot.commit("label", "task") is None
+            assert await snapshot.commit("label", "task") is None
 
     def test_list_commits_returns_empty_when_git_missing(self, tmp_path):
         ws = WorkspaceManager(base_dir=tmp_path, project_id="proj_no_git")
@@ -144,9 +151,10 @@ class TestGitWorkspaceSnapshotMissingGit:
 
 class TestWorkspaceManagerGitIntegration:
     @pytest.mark.skipif(not shutil.which("git"), reason="git not available")
-    def test_create_git_snapshot(self, git_ws):
+    @pytest.mark.asyncio
+    async def test_create_git_snapshot(self, git_ws):
         (git_ws.workspace_dir / "outputs" / "result.txt").write_text("result")
-        commit_hash = git_ws.create_git_snapshot("post-run", "job_1")
+        commit_hash = await git_ws.create_git_snapshot("post-run", "job_1")
 
         assert commit_hash is not None
         snapshots = git_ws.list_git_snapshots()
@@ -157,10 +165,11 @@ class TestWorkspaceManagerGitIntegration:
         assert git_ws.list_git_snapshots() == []
 
     @pytest.mark.skipif(not shutil.which("git"), reason="git not available")
-    def test_restore_git_snapshot(self, git_ws):
+    @pytest.mark.asyncio
+    async def test_restore_git_snapshot(self, git_ws):
         data_file = git_ws.workspace_dir / "data" / "raw.txt"
         data_file.write_text("v1")
-        commit_hash = git_ws.create_git_snapshot("first", "job_1")
+        commit_hash = await git_ws.create_git_snapshot("first", "job_1")
 
         data_file.write_text("v2")
         restored = git_ws.restore_git_snapshot(commit_hash)

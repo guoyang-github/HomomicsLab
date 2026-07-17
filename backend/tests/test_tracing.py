@@ -17,7 +17,18 @@ class TestTracingSetup:
     def test_setup_tracing_console_when_enabled(self, monkeypatch):
         pytest = __import__("pytest")
         try:
+            # Mirror the import chain in homomics_lab.tracing.setup_tracing;
+            # it returns None gracefully when any of these are missing.
             __import__("opentelemetry")
+            from opentelemetry.sdk.resources import Resource, SERVICE_NAME  # noqa: F401
+            from opentelemetry.sdk.trace import TracerProvider  # noqa: F401
+            from opentelemetry.sdk.trace.export import (  # noqa: F401
+                BatchSpanProcessor,
+                ConsoleSpanExporter,
+            )
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # noqa: F401
+                OTLPSpanExporter,
+            )
         except ImportError:
             pytest.skip("opentelemetry packages not installed")
 

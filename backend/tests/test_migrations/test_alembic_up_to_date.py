@@ -18,6 +18,11 @@ async def test_migrations_produce_current_schema(tmp_path):
     # conflicts with async SQLAlchemy in the same process.
     import subprocess
     import sys
+    from pathlib import Path
+
+    # Resolve backend/ (where alembic.ini lives) from this file so the test
+    # works whether pytest is invoked from the repo root or from backend/.
+    backend_dir = Path(__file__).resolve().parents[2]
 
     env = {
         **{k: str(v) for k, v in settings.model_dump().items() if v is not None},
@@ -25,7 +30,7 @@ async def test_migrations_produce_current_schema(tmp_path):
     }
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd="backend",
+        cwd=str(backend_dir),
         env=env,
         capture_output=True,
         text=True,

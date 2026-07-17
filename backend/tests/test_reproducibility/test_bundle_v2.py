@@ -33,13 +33,13 @@ def engine(tmp_path):
     return engine
 
 
-def _make_git_commits(workspace, count: int = 2):
+async def _make_git_commits(workspace, count: int = 2):
     if not shutil.which("git"):
         return []
     for i in range(count):
         file_path = workspace.workspace_dir / "data" / f"file_{i}.txt"
         file_path.write_text(f"content {i}")
-        workspace.create_git_snapshot(f"step_{i}", f"task_{i}")
+        await workspace.create_git_snapshot(f"step_{i}", f"task_{i}")
     return workspace.list_git_snapshots()
 
 
@@ -51,8 +51,9 @@ class TestReproducibilityBundleV2:
         assert len(bundle.env_snapshot_hash) == 64
 
     @pytest.mark.skipif(not shutil.which("git"), reason="git not available")
-    def test_finalize_includes_latest_git_snapshot(self, engine):
-        commits = _make_git_commits(engine.workspace, count=2)
+    @pytest.mark.asyncio
+    async def test_finalize_includes_latest_git_snapshot(self, engine):
+        commits = await _make_git_commits(engine.workspace, count=2)
 
         bundle = engine.finalize()
 
@@ -136,8 +137,9 @@ class TestReproducibilityExportZip:
             assert any(name.startswith("env/") and name.endswith(".json") for name in names)
 
     @pytest.mark.skipif(not shutil.which("git"), reason="git not available")
-    def test_export_zip_contains_git_snapshot(self, engine, tmp_path):
-        _make_git_commits(engine.workspace, count=1)
+    @pytest.mark.asyncio
+    async def test_export_zip_contains_git_snapshot(self, engine, tmp_path):
+        await _make_git_commits(engine.workspace, count=1)
 
         output_path = tmp_path / "bundle.zip"
         engine.export_zip(output_path)

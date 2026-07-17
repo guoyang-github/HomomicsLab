@@ -37,7 +37,10 @@ async def test_intent_recognizes_pubmed_search():
     analyzer = CascadeIntentAnalyzer(use_domain_registry=False)
     intent = await analyzer.analyze("帮我搜索 PubMed 单细胞 RNA-seq")
     assert intent.analysis_type == "pubmed_search"
-    assert intent.complexity == "direct_response"
+    # v2 structured fields are the source of truth: tool intents get
+    # interaction_mode="execute" + scope="single_step", so the derived legacy
+    # complexity projection is "single_step" (routing uses metadata["tool_name"]).
+    assert intent.complexity == "single_step"
     assert intent.metadata["tool_name"] == "pubmed_search"
     assert "单细胞" in intent.metadata["tool_inputs"]["query"]
 

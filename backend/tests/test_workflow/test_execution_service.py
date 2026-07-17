@@ -69,6 +69,9 @@ class TestBackendSelection:
         monkeypatch.setattr("homomics_lab.hpc.scheduler.NextflowRunner.is_available", lambda: True)
         monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
         monkeypatch.setattr("homomics_lab.config.settings.workflow_nextflow_min_phases", 3)
+        # The current routing heuristic also requires a large workload
+        # (effective_samples > 100) before promoting a plan to Nextflow.
+        plan.plan_result.phases[0].parameters["n_samples"] = 200
 
         def _make_nextflow_result(*args, **kwargs):
             for task in plan.task_tree.tasks:
