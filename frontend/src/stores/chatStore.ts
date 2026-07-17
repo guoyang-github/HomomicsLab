@@ -54,12 +54,16 @@ interface ChatState {
   draftInput: string
   sessionsLoading: boolean
   messagesLoading: boolean
+  /** True once a session has been selected/created this page load; gates the
+   *  one-shot startup restore so it never runs twice (StrictMode included). */
+  sessionRestoreAttempted: boolean
 
   addMessage: (message: ChatMessage) => void
   setMessages: (messages: ChatMessage[]) => void
   setIsTyping: (typing: boolean) => void
   setSessionId: (id: string) => void
   selectSession: (id: string) => Promise<void>
+  restoreCurrentSession: () => Promise<void>
   setProjectId: (id: string) => void
   setDraftInput: (value: string) => void
   clearMessages: () => void
@@ -196,6 +200,7 @@ export const useChatStore = create<ChatState>()(
       draftInput: '',
       sessionsLoading: false,
       messagesLoading: false,
+      sessionRestoreAttempted: false,
 
       addMessage: (message) =>
         set((state) => {
@@ -224,7 +229,8 @@ export const useChatStore = create<ChatState>()(
       setIsTyping: (isTyping) => set({ isTyping }),
       setSessionId: (currentSessionId) => set({ currentSessionId }),
       selectSession: async (id) => {
-        set({ currentSessionId: id, messages: [], messagesLoading: true })
+        // Any explicit selection makes the startup restore moot.
+        set({ currentSessionId: id, messages: [], messagesLoading: true, sessionRestoreAttempted: true })
         usePlanStore.getState().discardDraft()
         useExecutionStore.getState().reset()
         useTaskStore.getState().setTaskTree([])
@@ -238,6 +244,25 @@ export const useChatStore = create<ChatState>()(
           percent: 0,
         })
         await get().loadSessionMessages(id)
+      },
+      restoreCurrentSession: async () => {
+        // One-shot startup restore (F5): reload the persisted session's
+        // messages, TODO tree and running job. Skips silently whenever a
+        // session was already selected/created, messages are present or
+        // loading, or the persisted id is unknown to the loaded session list.
+        const state = get()
+        if (state.sessionRestoreAttempted) return
+        if (!state.currentSessionId) return
+        if (state.messagesLoading) return
+        if (state.messages.length > 0) return
+        if (!state.sessions.some((s) => s.id === state.currentSessionId)) return
+        set({ sessionRestoreAttempted: true })
+        try {
+          await get().selectSession(state.currentSessionId)
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to restore persisted session', err)
+        }
       },
       loadSessionMessages: async (sessionId) => {
         try {
@@ -387,6 +412,8 @@ export const useChatStore = create<ChatState>()(
           currentSessionId: id,
           currentProjectId: resolvedProjectId,
           messages: [],
+          // A fresh session has nothing to restore; disarm the startup restore.
+          sessionRestoreAttempted: true,
         }))
         return id
       },

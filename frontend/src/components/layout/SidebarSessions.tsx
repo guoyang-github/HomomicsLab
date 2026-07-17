@@ -25,6 +25,7 @@ export function SidebarSessions({ collapsed = false }: Props) {
   const currentSessionId = useChatStore((state) => state.currentSessionId)
   const currentProjectId = useChatStore((state) => state.currentProjectId)
   const selectSession = useChatStore((state) => state.selectSession)
+  const restoreCurrentSession = useChatStore((state) => state.restoreCurrentSession)
   const createSession = useChatStore((state) => state.createSession)
   const renameSession = useChatStore((state) => state.renameSession)
   const deleteSession = useChatStore((state) => state.deleteSession)
@@ -48,8 +49,13 @@ export function SidebarSessions({ collapsed = false }: Props) {
     }
     if (!projectSessions.some((s) => s.id === currentSessionId)) {
       selectSession(projectSessions[0].id)
+      return
     }
-  }, [currentProjectId, sessions, currentSessionId, createSession, selectSession, t, sessionsLoading])
+    // The persisted session is still valid: restore its messages, TODO tree
+    // and running job once after a page reload (F5). Guarded inside the store
+    // so repeat effect runs / StrictMode remounts stay no-ops.
+    restoreCurrentSession()
+  }, [currentProjectId, sessions, currentSessionId, createSession, selectSession, restoreCurrentSession, t, sessionsLoading])
 
   // Keep the chat store's project id in sync with the global project store.
   useEffect(() => {

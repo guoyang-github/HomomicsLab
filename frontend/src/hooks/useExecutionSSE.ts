@@ -123,8 +123,6 @@ export function useExecutionSSE(jobId: string | null) {
             typeof t.result === 'object'
         )
         if (completedTask?.result) {
-          // eslint-disable-next-line no-console
-          console.log('[useExecutionSSE] setResult from task', JSON.parse(JSON.stringify(completedTask.result)))
           setResult(completedTask.result as Record<string, any>)
         }
       }
@@ -260,8 +258,6 @@ export function useExecutionSSE(jobId: string | null) {
         )
 
         if (data.result) {
-          // eslint-disable-next-line no-console
-          console.log('[useExecutionSSE] setResult', JSON.parse(JSON.stringify(data.result)))
           setResult(data.result)
         }
       }
@@ -332,8 +328,6 @@ export function useExecutionSSE(jobId: string | null) {
           const outputs = resultNode?.outputs
           if (outputs) {
             if (outputs.result) {
-              // eslint-disable-next-line no-console
-              console.log('[useExecutionSSE] setResult from trace', JSON.parse(JSON.stringify(outputs.result)))
               setResult(outputs.result)
               return
             } else if (outputs.success !== undefined) {

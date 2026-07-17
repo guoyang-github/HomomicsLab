@@ -39,6 +39,15 @@ export interface ExecutionState {
 
 let logIdCounter = 0
 
+/** Hard cap on retained execution logs; the oldest entries are dropped first. */
+export const MAX_LOG_ENTRIES = 2000
+/**
+ * Truncation trigger: only slice once the buffer exceeds this threshold and
+ * cut back to MAX_LOG_ENTRIES, so appends stay amortized O(1) instead of
+ * copying the whole array on every log line.
+ */
+const LOG_TRUNCATE_THRESHOLD = MAX_LOG_ENTRIES + 200
+
 export const useExecutionStore = create<ExecutionState>((set) => ({
   jobId: null,
   jobSessionId: null,
@@ -84,7 +93,9 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
   addLog: (entry) =>
     set((state) => ({
       logs: [
-        ...state.logs,
+        ...(state.logs.length >= LOG_TRUNCATE_THRESHOLD
+          ? state.logs.slice(state.logs.length - MAX_LOG_ENTRIES)
+          : state.logs),
         {
           ...entry,
           id: `log_${Date.now()}_${++logIdCounter}`,
