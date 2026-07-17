@@ -499,6 +499,12 @@ class Settings(BaseSettings):
     # directly before giving up. Enabled by default.
     codeact_fallback_enabled: bool = True
 
+    # CodeAct self-correction: after a failed execution, feed the failing code
+    # and its stderr back to the LLM and retry with the repaired snippet. This
+    # counts repair iterations, so a task runs at most
+    # 1 + codeact_max_fix_attempts executions. 0 disables self-correction.
+    codeact_max_fix_attempts: int = 3
+
     # Open-agent fallback: when the domain planner returns a fallback plan with
     # no concrete skill match, let the open agent try before asking the user to
     # approve a vague plan. Enabled by default.

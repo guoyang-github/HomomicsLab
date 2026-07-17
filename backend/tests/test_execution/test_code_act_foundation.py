@@ -83,7 +83,12 @@ async def test_run_code_act_rule_based_without_llm(tmp_path):
     )
 
     assert result["code"]
-    assert result["exit_code"] == 0 or result["exit_code"] == -1
+    # The input file does not exist, so the rule-based script crashes; the
+    # engine now reports the interpreter's real non-zero exit code instead of
+    # swallowing it as a success.
+    assert result["success"] is False
+    assert result["exit_code"] != 0
+    assert result["attempts"] == 1
 
 
 def test_execute_code_saves_artifact(tmp_path):

@@ -2,12 +2,22 @@
 
 The engine sits inside the runtime and is invoked for skills marked with
 ``metadata["code_act"] == True``. It produces Python/R/Bash code based on the
-task description and available context, then executes the code in a real
-subprocess outside the restrictive skill sandbox.
+task description and available context, then executes the code inside the
+configured skill sandbox (bubblewrap/container/local).
 
 When an LLM is configured, the engine retrieves relevant skill context and
 uses the LLM to generate code. Otherwise it falls back to a small set of
 rule-based templates for offline / test environments.
+
+Self-correction loop: with an LLM configured, a failed execution feeds the
+failing code, its stderr, and the task description back to the model, which
+generates a repaired snippet. The repair goes through the same safety scan
+(``CodeSafetyScanner``) and sandbox constraints as the first attempt, and the
+loop repeats until the run succeeds or ``max_fix_attempts`` repair iterations
+are exhausted (config: ``HOMOMICS_CODEACT_MAX_FIX_ATTEMPTS``, default 3).
+Only the final working snippet is written to the CodeAct cache; repair
+iterations never touch it. Without an LLM the engine keeps its single-attempt
+behavior (rule-based fallback, no retries).
 """
 
 import asyncio
@@ -249,6 +259,72 @@ def _extract_code_block(text: str, language: str) -> Optional[str]:
     return None
 
 
+async def _generate_fix_with_llm(
+    task: str,
+    language: str,
+    context: Dict[str, Any],
+    failing_code: str,
+    execution: Dict[str, Any],
+    llm_client: LLMClient,
+    max_tokens: int = 4000,
+    max_error_chars: int = 4000,
+) -> Optional[str]:
+    """Ask the LLM to repair failing code given its captured error output."""
+    error_output = str(execution.get("stderr") or execution.get("stdout") or "").strip()
+    if len(error_output) > max_error_chars:
+        # Keep the tail: tracebacks and error messages live at the end.
+        error_output = "..." + error_output[-max_error_chars:]
+
+    system_prompt = f"""You are a senior bioinformatics engineer.
+A {language} code snippet failed to execute. Repair it.
+
+Rules:
+- Output ONLY the corrected code inside a single markdown ```{language} ... ``` block.
+- The code must be self-contained and runnable.
+- Assign a JSON-serializable result to a variable named `result` before finishing.
+- Do not include explanations outside the code block.
+"""
+
+    user_prompt = f"""Task: {task}
+Language: {language}
+Context: {json.dumps(context, ensure_ascii=False)}
+
+Failing code:
+```{language}
+{failing_code}
+```
+
+Error output (stderr):
+{error_output or '(empty)'}
+
+Generate the corrected {language} code now.
+"""
+
+    try:
+        response = await llm_client.chat_completion(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+    except Exception:
+        return None
+
+    return _extract_code_block(response, language)
+
+
+def _summarize_execution_error(execution: Dict[str, Any], max_chars: int = 500) -> str:
+    """Build a compact error summary for the fix history of a failed attempt."""
+    summary = str(execution.get("stderr") or execution.get("stdout") or "").strip()
+    if not summary:
+        summary = f"exit_code={execution.get('exit_code', -1)}"
+    if len(summary) > max_chars:
+        summary = "..." + summary[-max_chars:]
+    return summary
+
+
 def _extract_input_path_from_context(context: Dict[str, Any]) -> Optional[str]:
     """Find a concrete input file path in the execution context.
 
@@ -470,7 +546,8 @@ async def execute_code(
     CodeAct no longer runs arbitrary code directly on the host. It uses the
     same sandbox backend (bubblewrap/container/local) as regular skills.
     When ``force_sandbox`` is enabled and no isolated backend is available,
-    execution is refused.
+    execution is refused. A non-zero interpreter exit code is reported as a
+    failure with the captured output surfaced as ``stderr``.
     """
     from homomics_lab.config import settings
     from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
@@ -558,7 +635,13 @@ async def execute_code(
     else:
         script_arg = f"/work/{script_path.name}"
 
-    command = f"{interpreter} {script_arg}"
+    # Record the interpreter's exit code through the shell. Sandbox
+    # run_command() returns merged output text, not the return code, so
+    # without this marker a crashing script would be reported as a success.
+    exit_marker = workdir / "__code_act_exit__"
+    exit_marker.unlink(missing_ok=True)
+
+    command = f"{interpreter} {script_arg}; echo $? > {exit_marker.name}"
 
     try:
         output = await sandbox.run_command(
@@ -577,6 +660,24 @@ async def execute_code(
             "stdout": "",
             "stderr": f"CodeAct sandbox execution failed: {exc}",
             "exit_code": -1,
+        }
+
+    exit_code = 0
+    if exit_marker.exists():
+        try:
+            exit_code = int(exit_marker.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            exit_code = -1
+
+    if exit_code != 0:
+        # The merged output holds the traceback; surface it as stderr so the
+        # self-correction loop and callers can diagnose the failure.
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": output,
+            "exit_code": exit_code,
+            "result": {},
         }
 
     result_path = workdir / "__skill_result__.json"
@@ -607,28 +708,106 @@ async def run_code_act(
     tool_registry: Optional[ToolRegistry] = None,
     use_cache: Optional[bool] = None,
     max_tokens: int = 4000,
+    max_fix_attempts: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Generate and execute code for a CodeAct task."""
-    context = context or {}
-    code = await generate_code_async(
-        task,
-        language,
-        context,
-        llm_client,
-        skill_registry,
-        retrieval_context,
-        use_cache=use_cache,
-        max_tokens=max_tokens,
-    )
-    execution = await execute_code(
-        code, language, working_dir, tool_registry=tool_registry, save_artifact=True
-    )
+    """Generate and execute code for a CodeAct task, with self-correction.
 
-    # Record a regression baseline for successful deterministic runs.
-    if execution.get("success") and working_dir is not None:
-        _record_regression_baseline(
-            task, language, context, execution.get("result", {}), working_dir
+    When an LLM is configured and ``max_fix_attempts`` > 0, a failed execution
+    feeds the failing code, its stderr, and the task description back to the
+    model, and the repaired snippet is re-scanned and re-executed under the
+    same sandbox constraints. The loop stops at the first success or after
+    ``max_fix_attempts`` repair iterations (at most
+    ``1 + max_fix_attempts`` executions). ``max_fix_attempts=None`` falls back
+    to ``settings.codeact_max_fix_attempts`` (default 3). Without an LLM the
+    engine performs a single attempt, exactly as before.
+
+    Only the final working snippet is written to the CodeAct cache; repair
+    iterations never touch it, so fix attempts cannot pollute cache keys.
+
+    The returned dict adds two keys to the original contract:
+
+    - ``attempts``: total number of executions (1 means no retry was needed).
+    - ``fix_history``: one ``{"attempt", "stderr"}`` entry per failed attempt.
+    """
+    from homomics_lab.config import settings
+    from homomics_lab.execution.code_cache import CodeActCache
+
+    context = context or {}
+    if max_fix_attempts is None:
+        max_fix_attempts = settings.codeact_max_fix_attempts
+
+    llm_ready = llm_client is not None and llm_client.is_configured()
+    self_correct = llm_ready and max_fix_attempts > 0
+
+    cache: Optional[CodeActCache] = None
+    if self_correct:
+        # Manage the cache here so only the final working snippet is stored;
+        # letting generate_code_async cache would persist the first,
+        # unvalidated draft.
+        if use_cache is None:
+            use_cache = settings.codeact_cache_enabled
+        if use_cache:
+            cache = CodeActCache(settings.codeact_cache_dir)
+        code = cache.get(task, language, context, retrieval_context) if cache else None
+        if code is None:
+            code = await generate_code_async(
+                task,
+                language,
+                context,
+                llm_client,
+                skill_registry,
+                retrieval_context,
+                use_cache=False,
+                max_tokens=max_tokens,
+            )
+    else:
+        code = await generate_code_async(
+            task,
+            language,
+            context,
+            llm_client,
+            skill_registry,
+            retrieval_context,
+            use_cache=use_cache,
+            max_tokens=max_tokens,
         )
+
+    fix_history: List[Dict[str, Any]] = []
+    attempts = 0
+    execution: Dict[str, Any] = {}
+    while True:
+        attempts += 1
+        execution = await execute_code(
+            code, language, working_dir, tool_registry=tool_registry, save_artifact=True
+        )
+        if execution.get("success"):
+            break
+        if "safety" in execution:
+            # Blocked by the safety gate (HITL): never regenerate code to
+            # route around a pending human approval.
+            break
+        fix_history.append(
+            {"attempt": attempts, "stderr": _summarize_execution_error(execution)}
+        )
+        if not self_correct or llm_client is None or attempts > max_fix_attempts:
+            break
+        fixed_code = await _generate_fix_with_llm(
+            task, language, context, code, execution, llm_client, max_tokens=max_tokens
+        )
+        if not fixed_code or fixed_code.strip() == code.strip():
+            # The model could not produce a different repair; further
+            # iterations would repeat the same failure.
+            break
+        code = fixed_code
+
+    if execution.get("success"):
+        if cache is not None:
+            cache.put(task, language, code, context, retrieval_context)
+        # Record a regression baseline for successful deterministic runs.
+        if working_dir is not None:
+            _record_regression_baseline(
+                task, language, context, execution.get("result", {}), working_dir
+            )
 
     return {
         "code": code,
@@ -637,6 +816,8 @@ async def run_code_act(
         "stderr": execution.get("stderr", ""),
         "exit_code": execution.get("exit_code", -1),
         "result": execution.get("result", {}),
+        "attempts": attempts,
+        "fix_history": fix_history,
     }
 
 
