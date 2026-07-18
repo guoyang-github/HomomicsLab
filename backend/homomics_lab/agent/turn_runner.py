@@ -27,6 +27,7 @@ from homomics_lab.agent.errors import (
 from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.agent.general_agent import GeneralScientificAgent
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
+from homomics_lab.agent.intent.classifiers import KeywordIntentClassifier
 from homomics_lab.agent.open_agent.executor import OpenAgentExecutor
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.orchestrator import Orchestrator
@@ -229,7 +230,9 @@ class TurnRunner:
                 from homomics_lab.agent.debate import LLMDebateJudge
 
                 judge = LLMDebateJudge(self._llm_client)
-            self._debate = LightweightDebate(judge=judge)
+            self._debate = LightweightDebate(
+                judge=judge, experts=self._build_debate_experts()
+            )
 
         self.intent_analyzer = intent_analyzer or IntentAnalyzer(
             debate=self._debate, cbkb=self._cbkb, llm_client=self._llm_client
@@ -262,6 +265,32 @@ class TurnRunner:
             memory_backend=self.memory_backend,
             skill_dag=self.skill_dag,
         )
+
+    @staticmethod
+    def _build_debate_experts() -> List[Any]:
+        """Build the debate expert panel for clarification debates.
+
+        Experts are derived from the domain registry's ``domain.yaml`` roles
+        so the judge scores reflect real domain specializations; when no
+        domain roles are registered, a generic minimal panel (methodologist /
+        data engineer / domain reviewer) is used instead.
+        """
+        from homomics_lab.agent.debate import (
+            default_debate_experts,
+            experts_from_domain_registry,
+        )
+        from homomics_lab.domain.registry import get_domain_registry
+
+        try:
+            experts = experts_from_domain_registry(get_domain_registry())
+        except Exception:
+            logger.warning(
+                "Failed to derive debate experts from domain registry; "
+                "falling back to the generic panel",
+                exc_info=True,
+            )
+            experts = []
+        return experts or default_debate_experts()
 
     def _get_orchestrator(self) -> Orchestrator:
         """Lazy init orchestrator with registry."""
@@ -528,6 +557,44 @@ class TurnRunner:
             plan_mode=plan_mode,
         )
 
+    async def _keyword_fast_path_hit(self, user_message: str) -> bool:
+        """Return True when the keyword guardrail alone can settle this turn.
+
+        This probe runs the *same* scoring logic the in-analyzer guardrail
+        fast path uses — the analyzer's own ``KeywordIntentClassifier``
+        instance, its intent definitions, and its high-confidence threshold —
+        so the pre-assembly decision can never drift from the guardrail it
+        mirrors. Only unambiguous direct-answer intents
+        (``interaction_mode == "answer"``: qa, greeting, information_request,
+        general_help) qualify; clarification/debate and execution intents
+        never take the fast path.
+
+        Anything unexpected (custom analyzer without a keyword classifier,
+        classifier errors) yields False, i.e. the full assembly path.
+        """
+        analyzer = self.intent_analyzer
+        classifier = getattr(analyzer, "keyword_classifier", None)
+        # Restrict to the built-in keyword classifier: a custom classifier may
+        # legitimately depend on assembled context, which the fast path skips.
+        if not isinstance(classifier, KeywordIntentClassifier):
+            return False
+        definitions = getattr(analyzer, "_definitions", None)
+        if definitions is None:
+            return False
+        threshold = getattr(analyzer, "high_confidence_threshold", 0.75)
+        try:
+            matches = await classifier.classify(user_message, definitions, {})
+        except Exception:
+            logger.debug("Keyword fast-path probe failed; using full assembly", exc_info=True)
+            return False
+        top = matches[0] if matches else None
+        return bool(
+            top
+            and top.confidence >= threshold
+            and top.structured is not None
+            and top.structured.interaction_mode == "answer"
+        )
+
     async def _run_turn_once(
         self,
         session_id: str,
@@ -542,7 +609,19 @@ class TurnRunner:
         plan_mode: bool = False,
     ) -> TurnResult:
         """Execute the core turn pipeline once."""
-        # 2. Assemble context: enrich_context, capability search, and the
+        # 2. Fast path: when the keyword guardrail alone settles the turn (a
+        # high-confidence direct-answer intent such as a greeting or simple
+        # QA), skip the three-way context assembly entirely — a "你好" should
+        # not pay for memory enrichment, capability search, and a ContextEngine
+        # bundle it will never use. The analyzer below re-applies the same
+        # guardrail and returns without an LLM call, so the routed intent is
+        # identical; only the (unused) enrichment is omitted. Debate-resolved
+        # turns and everything else go through the full assembly unchanged.
+        skip_assembly = debate_response is None and await self._keyword_fast_path_hit(
+            user_message
+        )
+
+        # Assemble context: enrich_context, capability search, and the
         # ContextEngine bundle have no data dependencies on each other (they
         # only read project_id / user_message / working_memory; their outputs
         # are merged below), so they run concurrently. Each has its own
@@ -557,7 +636,7 @@ class TurnRunner:
             if self.memory_manager is not None
             else None
         )
-        if sem_mem is not None:
+        if not skip_assembly and sem_mem is not None:
             try:
                 shared_memories = await sem_mem.search(
                     query=user_message, top_k=5, project_id=project_id
@@ -626,11 +705,19 @@ class TurnRunner:
                 )
                 return None
 
-        extra_context, capability_candidates, context_bundle = await asyncio.gather(
-            _enrich_context(),
-            _search_capabilities(),
-            _build_context_bundle(),
-        )
+        if skip_assembly:
+            # Fast path: no enrichment, no capability candidates, no bundle.
+            # The analyzer tolerates a missing extra_context (it only reads it
+            # for LLM prompts, which the guardrail fast path never reaches),
+            # and the response generators fall back to working-memory context
+            # when no bundle is present.
+            extra_context, capability_candidates, context_bundle = None, None, None
+        else:
+            extra_context, capability_candidates, context_bundle = await asyncio.gather(
+                _enrich_context(),
+                _search_capabilities(),
+                _build_context_bundle(),
+            )
 
         self._extra_context = extra_context or {}
         if capability_candidates is not None:

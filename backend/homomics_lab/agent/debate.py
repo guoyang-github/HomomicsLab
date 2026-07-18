@@ -1,12 +1,16 @@
 """LightweightDebate — short multi-agent debate for ambiguous decisions."""
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.core.dynamic_agent import DynamicAgent
+from homomics_lab.agent.core.role import RoleDefinition
 from homomics_lab.llm_client import LLMClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -307,3 +311,81 @@ class LightweightDebate:
                 "metadata": {"skill": analysis_type},
             })
         return candidates
+
+
+def experts_from_domain_registry(registry: Any) -> List[DynamicAgent]:
+    """Derive debate experts from the domain registry's ``roles`` sections.
+
+    Each ``domain.yaml`` role becomes one expert: ``role_id``/``name``/
+    ``description`` map directly onto the expert's :class:`RoleDefinition`.
+    The expert's ``allowed_skills`` combine the role's declared skills with
+    the *intent analysis types of its own domain* — debate candidates carry
+    ``metadata.skill = <analysis_type>``, so without this link the rule-based
+    judge would score every option uniformly and could never ground a
+    recommendation.
+
+    Returns an empty list when the registry has no domain roles (caller then
+    falls back to :func:`default_debate_experts`). Never raises: a malformed
+    role is skipped with a warning.
+    """
+    experts: List[DynamicAgent] = []
+    try:
+        domains = registry.list_all()
+    except Exception:
+        logger.warning("Domain registry unavailable; no debate experts derived", exc_info=True)
+        return experts
+    for domain in domains:
+        intent_types = [getattr(i, "analysis_type", "") for i in getattr(domain, "intents", [])]
+        for role in getattr(domain, "roles", []) or []:
+            try:
+                experts.append(
+                    DynamicAgent(
+                        role=RoleDefinition(
+                            role_id=role.role_id,
+                            name=role.name,
+                            description=getattr(role, "description", "") or "",
+                            allowed_skills=list(getattr(role, "allowed_skills", []) or [])
+                            + [t for t in intent_types if t],
+                        )
+                    )
+                )
+            except Exception:
+                logger.warning(
+                    "Skipping malformed domain role for debate experts: %r",
+                    getattr(role, "role_id", role),
+                    exc_info=True,
+                )
+    return experts
+
+
+def default_debate_experts() -> List[DynamicAgent]:
+    """Generic minimal expert panel used when no domain roles are available.
+
+    The experts are deliberate generalists (no allowed skills/categories):
+    without domain grounding the rule-based judge cannot substantiate a
+    recommendation, and the clarification path degrades to a plain-text
+    question instead of presenting an ungrounded debate card.
+    """
+    generic_roles = (
+        (
+            "methodologist",
+            "Methodologist",
+            "Reviews analytical soundness and methodological fit of candidate options.",
+        ),
+        (
+            "data_engineer",
+            "Data Engineer",
+            "Reviews data readiness, formats, and engineering feasibility of candidate options.",
+        ),
+        (
+            "domain_reviewer",
+            "Domain Reviewer",
+            "Reviews domain relevance and scientific interpretation of candidate options.",
+        ),
+    )
+    return [
+        DynamicAgent(
+            role=RoleDefinition(role_id=role_id, name=name, description=description)
+        )
+        for role_id, name, description in generic_roles
+    ]

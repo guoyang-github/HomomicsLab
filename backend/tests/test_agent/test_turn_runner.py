@@ -236,7 +236,8 @@ async def test_general_help_direct_response_with_llm(runner, working_memory):
 
 @pytest.mark.asyncio
 async def test_clarification_response(runner, working_memory):
-    """Ambiguous requests return a debate request for user resolution."""
+    """Ambiguous requests without a grounded debate recommendation degrade to
+    a plain-text clarification question (no DEBATE_REQUEST card)."""
     result = await runner.run_turn(
         session_id="sess_clarify",
         user_message="分析数据",
@@ -244,15 +245,42 @@ async def test_clarification_response(runner, working_memory):
         project_id="proj_1",
     )
 
-    assert result.mode == ExecutionMode.AWAITING_DEBATE
+    assert result.mode == ExecutionMode.DIRECT_RESPONSE
     assert result.task_tree is None or len(result.task_tree.tasks) == 0
     assert result.agent_message is not None
+    assert result.agent_message.type == MessageType.TEXT
+    assert "分析" in result.response_text
+
+
+def test_handle_clarification_with_debate_recommendation(runner, working_memory):
+    """Clarification intent carrying debate metadata with a recommendation
+    yields a debate request card."""
+    intent = UserIntent(
+        analysis_type="clarification",
+        complexity="direct_response",
+        metadata={
+            "debate": {
+                "topic": "请选择最符合您需求的选项",
+                "options": [
+                    {"id": "single_cell_analysis", "label": "单细胞分析"},
+                    {"id": "spatial_analysis", "label": "空间分析"},
+                ],
+                "recommendation": {"id": "single_cell_analysis", "label": "单细胞分析"},
+            }
+        },
+    )
+    result = runner._handle_clarification(intent, working_memory)
+
+    assert result.mode == ExecutionMode.AWAITING_DEBATE
+    assert result.agent_message is not None
     assert result.agent_message.type == MessageType.DEBATE_REQUEST
-    assert "分析数据" in result.response_text
+    assert result.agent_message.content["topic"]
+    assert len(result.agent_message.content["options"]) == 2
 
 
-def test_handle_clarification_with_debate(runner, working_memory):
-    """Clarification intent carrying debate metadata yields a debate request."""
+def test_handle_clarification_with_debate_no_recommendation(runner, working_memory):
+    """Debate metadata without a recommendation degrades to a plain-text
+    question that still lists the candidate options."""
     intent = UserIntent(
         analysis_type="clarification",
         complexity="direct_response",
@@ -269,11 +297,11 @@ def test_handle_clarification_with_debate(runner, working_memory):
     )
     result = runner._handle_clarification(intent, working_memory)
 
-    assert result.mode == ExecutionMode.AWAITING_DEBATE
+    assert result.mode == ExecutionMode.DIRECT_RESPONSE
     assert result.agent_message is not None
-    assert result.agent_message.type == MessageType.DEBATE_REQUEST
-    assert result.agent_message.content["topic"]
-    assert len(result.agent_message.content["options"]) == 2
+    assert result.agent_message.type == MessageType.TEXT
+    assert "单细胞分析" in result.response_text
+    assert "空间分析" in result.response_text
 
 
 @pytest.mark.asyncio

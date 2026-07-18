@@ -68,9 +68,11 @@ async def test_run_turn_calls_enrich_context_and_persist_turn(
     runner_with_memory, memory_manager, semantic_memory, working_memory
 ):
     """When memory_manager is provided, run_turn should call enrich_context and persist_turn."""
+    # The message carries no keyword-classifier signal, so the keyword fast
+    # path does not fire and the full context assembly (enrich_context) runs.
     result = await runner_with_memory.run_turn(
         session_id="sess_mem_1",
-        user_message="什么是单细胞测序？",
+        user_message="zzz qqq xxxx",
         working_memory=working_memory,
         project_id="proj_1",
     )
@@ -118,9 +120,10 @@ async def test_enrich_context_failure_is_non_fatal(
     semantic_memory.search = AsyncMock(side_effect=RuntimeError("DB down"))
 
     runner = TurnRunner(memory_manager=memory_manager)
+    # No keyword-classifier signal → enrich_context actually runs (and fails).
     result = await runner.run_turn(
         session_id="sess_err_1",
-        user_message="什么是 UMAP？",
+        user_message="zzz qqq xxxx",
         working_memory=working_memory,
         project_id="proj_1",
     )

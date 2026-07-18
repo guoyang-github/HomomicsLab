@@ -57,9 +57,11 @@ async def test_gather_single_failure_degrades(working_memory):
         capability_index=capability_index,
         context_engine=context_engine,
     )
+    # A message with no keyword-classifier signal: the keyword fast path does
+    # not fire, so the full three-way assembly runs (and degrades) as before.
     result = await runner.run_turn(
         session_id="sess_gather_1",
-        user_message="什么是单细胞测序？",
+        user_message="zzz qqq xxxx",
         working_memory=working_memory,
         project_id="proj_1",
     )
@@ -90,7 +92,8 @@ async def test_semantic_search_runs_once_per_turn(working_memory):
     context_engine.build = AsyncMock(return_value=None)
 
     runner = TurnRunner(memory_manager=memory_manager, context_engine=context_engine)
-    user_message = "什么是单细胞测序？"
+    # No keyword-classifier signal → full assembly path with the shared search.
+    user_message = "zzz qqq xxxx"
     result = await runner.run_turn(
         session_id="sess_gather_2",
         user_message=user_message,

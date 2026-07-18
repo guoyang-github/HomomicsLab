@@ -1,10 +1,12 @@
 """Intent classifiers: keyword guardrail, embedding semantic match, and LLM-first."""
 
+import hashlib
 import json
 import re
+import threading
 from abc import ABC, abstractmethod
-from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from collections import defaultdict, OrderedDict
+from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.intent.models import (
     IntentDefinition,
@@ -13,6 +15,56 @@ from homomics_lab.agent.intent.models import (
 )
 from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
+
+
+# Process-level cache for fitted TF-IDF definition indexes. The IntentAnalyzer
+# (and with it the EmbeddingIntentClassifier) is rebuilt for every chat
+# message, so an instance-level index would refit the char_wb 2-5gram /
+# 5000-feature TF-IDF matrix on every turn. The cache is keyed by a
+# fingerprint of the intent definitions (same fields as the definitions part
+# of the intent result-cache key) and bounded to a small LRU.
+_DEFINITION_INDEX_CACHE_MAXSIZE = 64
+_definition_index_cache: "OrderedDict[str, Tuple[Any, Any]]" = OrderedDict()
+_definition_index_lock = threading.Lock()
+
+
+def _definitions_fingerprint(definitions: List[IntentDefinition]) -> str:
+    """Content fingerprint of an intent-definition list.
+
+    Covers every field that can change the fitted index (analysis_type drives
+    the built-in example fallback used by ``_build_texts``); kept aligned with
+    the ``defs`` portion of ``CascadeIntentAnalyzer._make_cache_key``.
+    """
+    parts = [
+        (
+            d.analysis_type,
+            tuple(d.keywords),
+            tuple(d.examples),
+            tuple(d.complexity_indicators),
+            tuple(d.data_scale_patterns),
+            d.domain,
+        )
+        for d in definitions
+    ]
+    return hashlib.sha256(
+        json.dumps(parts, ensure_ascii=False, default=repr).encode("utf-8")
+    ).hexdigest()
+
+
+def _get_cached_definition_index(fingerprint: str) -> Optional[Tuple[Any, Any]]:
+    with _definition_index_lock:
+        cached = _definition_index_cache.get(fingerprint)
+        if cached is not None:
+            _definition_index_cache.move_to_end(fingerprint)
+        return cached
+
+
+def _put_cached_definition_index(fingerprint: str, vectorizer: Any, embeddings: Any) -> None:
+    with _definition_index_lock:
+        _definition_index_cache[fingerprint] = (vectorizer, embeddings)
+        _definition_index_cache.move_to_end(fingerprint)
+        while len(_definition_index_cache) > _DEFINITION_INDEX_CACHE_MAXSIZE:
+            _definition_index_cache.popitem(last=False)
 
 
 class IntentClassifier(ABC):
@@ -299,15 +351,27 @@ class EmbeddingIntentClassifier(IntentClassifier):
                 pass
 
         # Fall back to TF-IDF with character n-grams to handle short Chinese
-        # messages and mixed-language examples robustly.
+        # messages and mixed-language examples robustly. The fitted vectorizer
+        # and matrix are shared process-wide across classifier instances (the
+        # analyzer is rebuilt per chat message) via a definitions-fingerprint
+        # LRU, so a refit only happens when the definitions actually change.
         from sklearn.feature_extraction.text import TfidfVectorizer
-        self._vectorizer = TfidfVectorizer(
-            lowercase=True,
-            analyzer="char_wb",
-            ngram_range=(2, 5),
-            max_features=5000,
-        )
-        self._embeddings = self._vectorizer.fit_transform(texts)
+
+        fingerprint = _definitions_fingerprint(definitions)
+        cached = _get_cached_definition_index(fingerprint)
+        if cached is not None:
+            self._vectorizer, self._embeddings = cached
+        else:
+            vectorizer = TfidfVectorizer(
+                lowercase=True,
+                analyzer="char_wb",
+                ngram_range=(2, 5),
+                max_features=5000,
+            )
+            embeddings = vectorizer.fit_transform(texts)
+            _put_cached_definition_index(fingerprint, vectorizer, embeddings)
+            self._vectorizer = vectorizer
+            self._embeddings = embeddings
         self._model = None
 
     async def classify(
