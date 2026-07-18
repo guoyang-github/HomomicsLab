@@ -22,11 +22,12 @@ behavior (rule-based fallback, no retries).
 
 import asyncio
 import hashlib
+import inspect
 import json
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.agent.retrieval import RetrievalContext
 from homomics_lab.llm_client import LLMClient
@@ -533,6 +534,19 @@ AVAILABLE_TOOLS = {tool_names!r}
 """
 
 
+def _supports_output_line_callback(sandbox: Any) -> bool:
+    """Return True when the sandbox's ``run_command`` accepts a line callback.
+
+    All built-in backends (local/bubblewrap/container) stream output lines; a
+    custom backend that predates the callback degrades to batch collection
+    (consumers then see the output only after execution, as before).
+    """
+    try:
+        return "on_output_line" in inspect.signature(sandbox.run_command).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 async def execute_code(
     code: str,
     language: str,
@@ -540,6 +554,7 @@ async def execute_code(
     timeout_seconds: float = 300.0,
     tool_registry: Optional[ToolRegistry] = None,
     save_artifact: bool = True,
+    on_output_line: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     """Execute generated code inside the configured skill sandbox.
 
@@ -548,6 +563,11 @@ async def execute_code(
     When ``force_sandbox`` is enabled and no isolated backend is available,
     execution is refused. A non-zero interpreter exit code is reported as a
     failure with the captured output surfaced as ``stderr``.
+
+    ``on_output_line`` (optional) is forwarded to the sandbox and invoked
+    with ``(line, stream)`` for every output line as it arrives, enabling
+    real-time consumers (e.g. domain phase markers). Sandbox backends that
+    predate the callback silently degrade to batch collection.
     """
     from homomics_lab.config import settings
     from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
@@ -644,8 +664,11 @@ async def execute_code(
     command = f"{interpreter} {script_arg}; echo $? > {exit_marker.name}"
 
     try:
+        run_kwargs: Dict[str, Any] = {}
+        if on_output_line is not None and _supports_output_line_callback(sandbox):
+            run_kwargs["on_output_line"] = on_output_line
         output = await sandbox.run_command(
-            command, cwd=workdir, timeout_seconds=timeout_seconds
+            command, cwd=workdir, timeout_seconds=timeout_seconds, **run_kwargs
         )
     except TimeoutError:
         return {
@@ -709,6 +732,7 @@ async def run_code_act(
     use_cache: Optional[bool] = None,
     max_tokens: int = 4000,
     max_fix_attempts: Optional[int] = None,
+    on_output_line: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     """Generate and execute code for a CodeAct task, with self-correction.
 
@@ -720,6 +744,10 @@ async def run_code_act(
     ``1 + max_fix_attempts`` executions). ``max_fix_attempts=None`` falls back
     to ``settings.codeact_max_fix_attempts`` (default 3). Without an LLM the
     engine performs a single attempt, exactly as before.
+
+    ``on_output_line`` (optional) is forwarded to every sandbox execution
+    (the initial attempt and each repair re-run) so callers can react to
+    output lines in real time.
 
     Only the final working snippet is written to the CodeAct cache; repair
     iterations never touch it, so fix attempts cannot pollute cache keys.
@@ -778,7 +806,12 @@ async def run_code_act(
     while True:
         attempts += 1
         execution = await execute_code(
-            code, language, working_dir, tool_registry=tool_registry, save_artifact=True
+            code,
+            language,
+            working_dir,
+            tool_registry=tool_registry,
+            save_artifact=True,
+            on_output_line=on_output_line,
         )
         if execution.get("success"):
             break

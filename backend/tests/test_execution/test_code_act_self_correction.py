@@ -128,7 +128,8 @@ async def test_no_retry_without_llm(tmp_path, monkeypatch):
     execute_calls = []
 
     async def failing_execute(
-        code, language, working_dir=None, tool_registry=None, save_artifact=True
+        code, language, working_dir=None, tool_registry=None, save_artifact=True,
+        on_output_line=None,
     ):
         execute_calls.append(code)
         return {

@@ -11,6 +11,7 @@ import yaml
 from pathlib import Path
 
 from homomics_lab.agent.agent_registry import AgentRegistry
+from homomics_lab.agent.base_agent import BaseAgent
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.task_decomposer import TaskDecomposer
 from homomics_lab.agent.workflow_markers import (
@@ -25,6 +26,7 @@ from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.config import settings
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.jobs.runner import BackgroundJobRunner
+from homomics_lab.models.common import AgentType
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.tasks.models import RetryPolicy, TaskNode
@@ -715,3 +717,281 @@ async def test_decompose_stamps_domain_and_trimmed_pipeline(monkeypatch):
         skeleton = task.parameters["domain_phases"]
         assert "qc" not in [p["phase_type"] for p in skeleton]
         assert "clustering" in [p["phase_type"] for p in skeleton]
+
+
+# ----------------------------------------------------------------------
+# Real-time streaming phase events (line callback + task-level dedupe)
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_codeact_streams_phase_events_with_dedupe(
+    orchestrator, states, workspace, monkeypatch
+):
+    """Markers reported live via the line callback are emitted exactly once.
+
+    The fake execution reports markers through ``on_output_line`` (as the
+    sandbox streaming path would) and also returns them in the captured
+    output; the batch fallback scan must not re-emit them.
+    """
+    seen = {}
+
+    async def fake_run_code_act(**kwargs):
+        cb = kwargs.get("on_output_line")
+        seen["cb"] = cb
+        assert cb is not None, "domain task must get a streaming line callback"
+        for line, stream in [
+            ("__homomics_phase__:qc:start", "stdout"),
+            ("loading...", "stdout"),  # not a marker: ignored
+            ('__homomics_phase__:qc:done:{"min_genes": 200}', "stdout"),
+            ("__homomics_phase__:normalization:start", "stderr"),
+        ]:
+            cb(line, stream)
+        return {
+            "success": True,
+            # The same markers also appear in the captured output, so the
+            # batch fallback would re-report them without dedupe.
+            "stdout": (
+                "__homomics_phase__:qc:start\n"
+                '__homomics_phase__:qc:done:{"min_genes": 200}\n'
+            ),
+            "stderr": "__homomics_phase__:normalization:start\n",
+            "result": {"cells": 2700},
+            "code": "print(1)",
+            "attempts": 1,
+            "fix_history": [],
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
+    )
+
+    result = await orchestrator._executors._execute_task_codeact(
+        _domain_task(), {"project_id": "p1"}
+    )
+    assert result["status"] == "success"
+    assert seen["cb"] is not None
+
+    events = _workflow_events(states)
+    assert events[0].extra["event"] == "workflow_skeleton"
+    phase_events = [e.extra for e in events[1:]]
+    # In arrival order, each (phase, status) exactly once.
+    assert [(e["phase"], e["status"]) for e in phase_events] == [
+        ("qc", "start"),
+        ("qc", "done"),
+        ("normalization", "start"),
+    ]
+    assert phase_events[1]["params"] == {"min_genes": 200}
+
+
+@pytest.mark.asyncio
+async def test_generic_task_receives_no_line_callback(
+    orchestrator, states, workspace, monkeypatch
+):
+    """Generic tasks get no callback and no events — batch path unchanged."""
+    seen = {}
+
+    async def fake_run_code_act(**kwargs):
+        seen["cb"] = kwargs.get("on_output_line")
+        return {
+            "success": True,
+            "stdout": "__homomics_phase__:qc:start\n",
+            "stderr": "",
+            "result": {},
+            "code": "",
+            "attempts": 1,
+            "fix_history": [],
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
+    )
+
+    result = await orchestrator._executors._execute_task_codeact(
+        _domain_task(domain="generic"), {"project_id": "p1"}
+    )
+    assert result["status"] == "success"
+    assert seen["cb"] is None
+    assert _workflow_events(states) == []
+
+
+@pytest.mark.asyncio
+async def test_batch_fallback_when_callback_never_fires(
+    orchestrator, states, workspace, monkeypatch
+):
+    """A backend that never invokes the callback degrades to the batch scan."""
+
+    async def fake_run_code_act(**kwargs):
+        return {
+            "success": True,
+            "stdout": "__homomics_phase__:qc:start\n",
+            "stderr": "",
+            "result": {},
+            "code": "",
+            "attempts": 1,
+            "fix_history": [],
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
+    )
+
+    await orchestrator._executors._execute_task_codeact(
+        _domain_task(), {"project_id": "p1"}
+    )
+    phase_events = [
+        e.extra for e in _workflow_events(states) if e.extra["event"] == "phase"
+    ]
+    assert [(e["phase"], e["status"]) for e in phase_events] == [("qc", "start")]
+
+
+@pytest.mark.asyncio
+async def test_streamed_phase_events_mirrored_to_trace(
+    orchestrator, states, workspace, monkeypatch
+):
+    """Streamed (fire-and-forget) trace mirrors are flushed before return."""
+    trace_calls = []
+
+    class FakeTraceStore:
+        async def add_node(self, **kwargs):
+            trace_calls.append(kwargs)
+            return None
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.TraceStore", FakeTraceStore
+    )
+
+    async def fake_run_code_act(**kwargs):
+        cb = kwargs["on_output_line"]
+        cb("__homomics_phase__:qc:start", "stdout")
+        return {
+            "success": True,
+            "stdout": "__homomics_phase__:qc:start\n",
+            "stderr": "",
+            "result": {},
+            "code": "",
+            "attempts": 1,
+            "fix_history": [],
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
+    )
+
+    await orchestrator._executors._execute_task_codeact(
+        _domain_task(), {"project_id": "p1", "trace_id": "trace-rt"}
+    )
+
+    phase_traces = [c for c in trace_calls if c["node_type"] == "phase"]
+    assert len(phase_traces) == 1
+    assert phase_traces[0]["trace_id"] == "trace-rt"
+    assert phase_traces[0]["metadata"]["phase"] == "qc"
+    assert phase_traces[0]["metadata"]["status"] == "start"
+
+
+# ----------------------------------------------------------------------
+# Fixed-pipeline (curated skill runtime) workflow events
+# ----------------------------------------------------------------------
+
+
+class _FakeCuratedAgent(BaseAgent):
+    agent_type = AgentType.BIOINFO
+    capabilities = ["scanpy_qc"]
+
+    async def run(self, task, context):
+        return {"status": "success", "output": {"cells": 100}}
+
+
+class _FakeFailingAgent(BaseAgent):
+    agent_type = AgentType.BIOINFO
+    capabilities = ["scanpy_qc"]
+
+    async def run(self, task, context):
+        raise RuntimeError("curated skill exploded")
+
+
+def _fixed_orchestrator(states, agent) -> Orchestrator:
+    registry = AgentRegistry()
+    registry.register(agent)
+    return Orchestrator(
+        registry=registry,
+        skill_registry=SkillRegistry(),
+        progress_callback=states.append,
+    )
+
+
+def _fixed_pipeline_task(**param_overrides) -> TaskNode:
+    task = _domain_task(**param_overrides)
+    task.skills_required = ["scanpy_qc"]
+    return task
+
+
+@pytest.mark.asyncio
+async def test_fixed_pipeline_emits_skeleton_and_phase_events(states, workspace):
+    orch = _fixed_orchestrator(states, _FakeCuratedAgent())
+    result = await orch._execute_task(
+        _fixed_pipeline_task(),
+        {"execution_mode": "fixed_pipeline", "project_id": "p1"},
+        {},
+    )
+    assert result["status"] == "success"
+
+    events = _workflow_events(states)
+    assert events[0].extra["event"] == "workflow_skeleton"
+    assert events[0].extra["domain"] == DOMAIN
+    assert events[0].extra["phases"] == [
+        {"phase_type": "qc", "name": "Quality Control", "skipped": False},
+        {"phase_type": "normalization", "name": "Normalization", "skipped": False},
+        {"phase_type": "clustering", "name": "Clustering", "skipped": False},
+    ]
+    phase_events = [e.extra for e in events[1:] if e.extra["event"] == "phase"]
+    assert [(e["phase"], e["status"]) for e in phase_events] == [
+        ("qc", "start"),
+        ("qc", "done"),
+    ]
+    assert phase_events[0]["params"] == {"skill": "scanpy_qc"}
+    assert phase_events[1]["params"] == {"skill": "scanpy_qc"}
+
+
+@pytest.mark.asyncio
+async def test_fixed_pipeline_failed_task_emits_phase_failed(states, workspace):
+    orch = _fixed_orchestrator(states, _FakeFailingAgent())
+    with pytest.raises(RuntimeError, match="curated skill exploded"):
+        await orch._execute_task(
+            _fixed_pipeline_task(),
+            {"execution_mode": "fixed_pipeline", "project_id": "p1"},
+            {},
+        )
+    phase_events = [
+        e.extra for e in _workflow_events(states) if e.extra["event"] == "phase"
+    ]
+    assert [(e["phase"], e["status"]) for e in phase_events] == [
+        ("qc", "start"),
+        ("qc", "failed"),
+    ]
+    assert "curated skill exploded" in phase_events[-1]["params"]["error"]
+
+
+@pytest.mark.asyncio
+async def test_fixed_pipeline_generic_task_emits_nothing(states, workspace):
+    orch = _fixed_orchestrator(states, _FakeCuratedAgent())
+    result = await orch._execute_task(
+        _fixed_pipeline_task(domain="generic"),
+        {"execution_mode": "fixed_pipeline", "project_id": "p1"},
+        {},
+    )
+    assert result["status"] == "success"
+    assert _workflow_events(states) == []
+
+
+@pytest.mark.asyncio
+async def test_auto_mode_curated_path_stays_silent(states, workspace):
+    """The workflow events are a fixed_pipeline contract; auto mode is unchanged."""
+    orch = _fixed_orchestrator(states, _FakeCuratedAgent())
+    result = await orch._execute_task(
+        _fixed_pipeline_task(),
+        {"execution_mode": "auto", "project_id": "p1"},
+        {},
+    )
+    assert result["status"] == "success"
+    assert _workflow_events(states) == []

@@ -89,9 +89,67 @@ class Sandbox(ABC):
         cwd: Optional[Path] = None,
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
+        on_output_line: Optional[Callable[[str, str], None]] = None,
     ) -> str:
-        """Run a shell command and return stdout/stderr text."""
+        """Run a shell command and return stdout/stderr text.
+
+        When ``on_output_line`` is provided it is invoked with
+        ``(line, stream)`` for every output line as it arrives (``stream`` is
+        ``"stdout"`` or ``"stderr"``), while the full output is still
+        collected and returned. When omitted the output is collected in one
+        batch, exactly as before.
+        """
         pass
+
+    @staticmethod
+    def _merge_command_output(stdout: bytes, stderr: bytes) -> str:
+        """Decode and merge captured stdout/stderr into the return text."""
+        output = stdout.decode(errors="replace")
+        if stderr:
+            output += "\n" + stderr.decode(errors="replace")
+        return output.strip()
+
+    @staticmethod
+    async def _collect_command_output(
+        proc: asyncio.subprocess.Process,
+        timeout_seconds: float,
+        on_output_line: Callable[[str, str], None],
+    ) -> "tuple[bytes, bytes]":
+        """Drain stdout/stderr fully while reporting each line as it arrives.
+
+        Returns the raw ``(stdout, stderr)`` bytes exactly as
+        ``proc.communicate()`` would produce them. Timeout semantics match
+        ``asyncio.wait_for(proc.communicate(), timeout)``: on timeout the
+        drain is cancelled and ``TimeoutError`` propagates (the process
+        itself is left to the caller, same as the batch path).
+        """
+        stdout_chunks: List[bytes] = []
+        stderr_chunks: List[bytes] = []
+
+        async def _read(stream, chunks: List[bytes], stream_name: str) -> None:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                chunks.append(line)
+                try:
+                    on_output_line(
+                        line.decode(errors="replace").rstrip("\n"), stream_name
+                    )
+                except Exception:
+                    # A reporting callback must never break execution.
+                    pass
+
+        async def _drain() -> None:
+            await asyncio.gather(
+                _read(proc.stdout, stdout_chunks, "stdout"),
+                _read(proc.stderr, stderr_chunks, "stderr"),
+            )
+            # Match communicate(): wait for process exit once pipes close.
+            await proc.wait()
+
+        await asyncio.wait_for(_drain(), timeout=timeout_seconds)
+        return b"".join(stdout_chunks), b"".join(stderr_chunks)
 
     @abstractmethod
     def get_metadata(self) -> Dict[str, Any]:
@@ -425,6 +483,7 @@ class LocalSandbox(Sandbox):
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
         job_id: Optional[str] = None,
+        on_output_line: Optional[Callable[[str, str], None]] = None,
     ) -> str:
         """Run a shell command locally."""
         run_env = self._venv_env(env)
@@ -438,17 +497,19 @@ class LocalSandbox(Sandbox):
         if job_id:
             self._running[job_id] = proc
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=timeout_seconds,
-            )
+            if on_output_line is None:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(),
+                    timeout=timeout_seconds,
+                )
+            else:
+                stdout, stderr = await self._collect_command_output(
+                    proc, timeout_seconds, on_output_line
+                )
         finally:
             if job_id:
                 self._running.pop(job_id, None)
-        output = stdout.decode(errors="replace")
-        if stderr:
-            output += "\n" + stderr.decode(errors="replace")
-        return output.strip()
+        return self._merge_command_output(stdout, stderr)
 
     async def _stream_subprocess(
         self,
@@ -842,6 +903,7 @@ class BubblewrapSandbox(Sandbox):
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
         job_id: Optional[str] = None,
+        on_output_line: Optional[Callable[[str, str], None]] = None,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
         # Inherit the venv PATH so that `python` inside the sandbox resolves to
@@ -858,14 +920,18 @@ class BubblewrapSandbox(Sandbox):
         if job_id:
             self._running[job_id] = proc
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+            if on_output_line is None:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=timeout_seconds
+                )
+            else:
+                stdout, stderr = await self._collect_command_output(
+                    proc, timeout_seconds, on_output_line
+                )
         finally:
             if job_id:
                 self._running.pop(job_id, None)
-        output = stdout.decode(errors="replace")
-        if stderr:
-            output += "\n" + stderr.decode(errors="replace")
-        return output.strip()
+        return self._merge_command_output(stdout, stderr)
 
     async def _run_in_sandbox(
         self,
@@ -1167,6 +1233,7 @@ class ContainerSandbox(Sandbox):
         env: Optional[Dict[str, str]] = None,
         timeout_seconds: float = 30.0,
         job_id: Optional[str] = None,
+        on_output_line: Optional[Callable[[str, str], None]] = None,
     ) -> str:
         run_cwd = Path(cwd or self.working_dir)
         engine = self._engine
@@ -1190,14 +1257,18 @@ class ContainerSandbox(Sandbox):
         if job_id:
             self._running[job_id] = proc
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+            if on_output_line is None:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=timeout_seconds
+                )
+            else:
+                stdout, stderr = await self._collect_command_output(
+                    proc, timeout_seconds, on_output_line
+                )
         finally:
             if job_id:
                 self._running.pop(job_id, None)
-        output = stdout.decode(errors="replace")
-        if stderr:
-            output += "\n" + stderr.decode(errors="replace")
-        return output.strip()
+        return self._merge_command_output(stdout, stderr)
 
     async def _run_in_container(
         self,

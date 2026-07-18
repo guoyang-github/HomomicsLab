@@ -13,12 +13,13 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
 from homomics_lab.agent.progress_events import build_agent_event
 from homomics_lab.agent.workflow_markers import (
     build_marker_convention,
     extract_domain_pipeline,
+    parse_marker_line,
     scan_marker_lines,
 )
 from homomics_lab.config import settings
@@ -41,6 +42,14 @@ class TaskExecutors:
 
     def __init__(self, orchestrator: "Orchestrator"):
         self._orch = orchestrator
+        # Task-level dedupe sets recording already-emitted (phase, status)
+        # workflow events: the streaming line callback records what it reports
+        # in real time, and the post-execution batch scan skips those entries.
+        # Reset by ``_emit_workflow_skeleton`` at each task execution start.
+        self._phase_events_sent: Dict[str, Set[Tuple[str, str]]] = {}
+        # Fire-and-forget trace mirroring tasks scheduled from the (sync)
+        # streaming callback; strong refs are kept until they complete.
+        self._pending_trace_tasks: Set[asyncio.Task] = set()
 
     @staticmethod
     def _new_llm_client() -> Optional[LLMClient]:
@@ -171,6 +180,9 @@ class TaskExecutors:
         pipeline = extract_domain_pipeline(task)
         if pipeline is None:
             return
+        # A fresh task execution may re-report phases: reset the dedupe set so
+        # re-executions are not silenced by events from a previous attempt.
+        self._phase_events_sent[task.id] = set()
         domain, phases = pipeline
         skeleton = [
             {
@@ -197,6 +209,179 @@ class TaskExecutors:
             },
         )
 
+    # ------------------------------------------------------------------
+    # Fixed-pipeline (curated skill runtime) workflow DAG events.
+    #
+    # In fixed_pipeline mode the task tree carries one task per domain phase
+    # and no CodeAct script runs, so there are no stdout markers to scan.
+    # Instead the orchestrator's per-task dispatch maps directly onto phase
+    # events: task start/finish/failure -> phase start/done/failed. The
+    # skeleton is the same one the CodeAct path emits (idempotent on the
+    # frontend, which overwrites on repeats).
+    # ------------------------------------------------------------------
+
+    async def _emit_fixed_pipeline_task_start(
+        self, task: TaskNode, context: Dict[str, Any]
+    ) -> None:
+        """Emit skeleton + ``phase:start`` for a fixed_pipeline domain task."""
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return
+        await self._emit_workflow_skeleton(task, context)
+        await self._emit_fixed_pipeline_phase(task, context, "start")
+
+    async def _emit_fixed_pipeline_task_done(
+        self, task: TaskNode, context: Dict[str, Any]
+    ) -> None:
+        """Emit ``phase:done`` for a finished fixed_pipeline domain task."""
+        await self._emit_fixed_pipeline_phase(task, context, "done")
+
+    async def _emit_fixed_pipeline_task_failed(
+        self, task: TaskNode, context: Dict[str, Any], error: Optional[str] = None
+    ) -> None:
+        """Emit ``phase:failed`` for a failed fixed_pipeline domain task."""
+        await self._emit_fixed_pipeline_phase(task, context, "failed", error=error)
+
+    async def _emit_fixed_pipeline_phase(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        status: str,
+        error: Optional[str] = None,
+    ) -> None:
+        """Map one curated-runtime task state onto a ``phase`` workflow event."""
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return
+        phase_id = getattr(task, "phase", "") or ""
+        if not phase_id or phase_id == "execution":
+            return
+        _, phases = pipeline
+        order = {p["phase_type"]: idx for idx, p in enumerate(phases)}
+        total = max(1, len(phases))
+        params: Dict[str, Any] = {}
+        if task.skills_required:
+            params["skill"] = task.skills_required[0]
+        if error:
+            params["error"] = error
+        self._emit_workflow_event(
+            task,
+            {
+                "event": "phase",
+                "phase": phase_id,
+                "status": status,
+                "params": params,
+            },
+            progress_pct=self._phase_progress_pct(order, total, phase_id, status),
+        )
+        await self._trace_workflow_event(
+            task,
+            context,
+            node_type="phase",
+            name=f"phase:{phase_id}:{status}",
+            metadata={
+                "event": "phase",
+                "phase": phase_id,
+                "status": status,
+                "params": params,
+            },
+        )
+
+    @staticmethod
+    def _phase_progress_pct(
+        order: Dict[str, int], total: int, phase: str, status: str
+    ) -> float:
+        """Map a phase event onto the 10-95% execution progress band."""
+        idx = order.get(phase)
+        if idx is None:
+            return 50.0
+        # start advances half a step, done/failed a full step.
+        step = idx + (0.5 if status == "start" else 1.0)
+        return min(95.0, 10.0 + 80.0 * step / total)
+
+    async def _flush_trace_tasks(self) -> None:
+        """Await fire-and-forget trace mirroring tasks (best effort)."""
+        pending = list(self._pending_trace_tasks)
+        if not pending:
+            return
+        await asyncio.gather(*pending, return_exceptions=True)
+        self._pending_trace_tasks.difference_update(pending)
+
+    def _emit_phase_event(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        order: Dict[str, int],
+        total: int,
+        phase: str,
+        status: str,
+        params: Dict[str, Any],
+    ) -> None:
+        """Emit one ``phase`` workflow event and mirror it to the trace store.
+
+        The progress event goes out synchronously (real-time); the trace
+        mirror is scheduled as a fire-and-forget task because this method is
+        also called from the sync streaming line callback. Trace tasks are
+        awaited by ``_flush_trace_tasks`` after execution settles.
+        """
+        self._emit_workflow_event(
+            task,
+            {"event": "phase", "phase": phase, "status": status, "params": params},
+            progress_pct=self._phase_progress_pct(order, total, phase, status),
+        )
+        trace_coro = self._trace_workflow_event(
+            task,
+            context,
+            node_type="phase",
+            name=f"phase:{phase}:{status}",
+            metadata={
+                "event": "phase",
+                "phase": phase,
+                "status": status,
+                "params": params,
+            },
+        )
+        try:
+            trace_task = asyncio.create_task(trace_coro)
+        except RuntimeError:
+            # No running event loop (defensive; callbacks fire inside the loop).
+            trace_coro.close()
+            return
+        self._pending_trace_tasks.add(trace_task)
+        trace_task.add_done_callback(self._pending_trace_tasks.discard)
+
+    def _make_phase_line_callback(
+        self, task: TaskNode, context: Dict[str, Any]
+    ) -> Optional[Callable[[str, str], None]]:
+        """Build a real-time marker callback for streaming CodeAct output.
+
+        Returns ``None`` for non-domain tasks (no markers injected, nothing
+        to report — output is then collected in one batch as before). Each
+        parsed marker becomes an immediate ``phase`` event; the shared
+        per-task dedupe set keeps the post-execution batch scan from
+        re-emitting what was already reported.
+        """
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return None
+        _, phases = pipeline
+        order = {p["phase_type"]: idx for idx, p in enumerate(phases)}
+        total = max(1, len(phases))
+        emitted = self._phase_events_sent.setdefault(task.id, set())
+
+        def _on_output_line(line: str, stream: str) -> None:
+            marker = parse_marker_line(line)
+            if marker is None:
+                return
+            phase, status, params = marker
+            key = (phase, status)
+            if key in emitted:
+                return
+            emitted.add(key)
+            self._emit_phase_event(task, context, order, total, phase, status, params)
+
+        return _on_output_line
+
     async def _emit_phase_markers(
         self,
         task: TaskNode,
@@ -208,6 +393,10 @@ class TaskExecutors:
         Successful runs carry markers in ``stdout``; failed runs surface the
         merged stream as ``stderr`` (see ``execution/code_act.execute_code``),
         so both are scanned.  No markers -> no events (phases stay pending).
+
+        This is the batch fallback behind the real-time streaming callback
+        (``_make_phase_line_callback``): markers already reported live are
+        skipped via the task-level dedupe set.
         """
         pipeline = extract_domain_pipeline(task)
         if pipeline is None:
@@ -215,36 +404,21 @@ class TaskExecutors:
         _, phases = pipeline
         order = {p["phase_type"]: idx for idx, p in enumerate(phases)}
         total = max(1, len(phases))
+        emitted = self._phase_events_sent.setdefault(task.id, set())
         text = "\n".join(
             part
             for part in (codeact_result.get("stdout"), codeact_result.get("stderr"))
             if part
         )
         for phase, status, params in scan_marker_lines(text):
-            idx = order.get(phase)
-            if idx is None:
-                progress_pct = 50.0
-            else:
-                # start advances half a step, done/failed a full step.
-                step = idx + (0.5 if status == "start" else 1.0)
-                progress_pct = min(95.0, 10.0 + 80.0 * step / total)
-            self._emit_workflow_event(
-                task,
-                {"event": "phase", "phase": phase, "status": status, "params": params},
-                progress_pct=progress_pct,
-            )
-            await self._trace_workflow_event(
-                task,
-                context,
-                node_type="phase",
-                name=f"phase:{phase}:{status}",
-                metadata={
-                    "event": "phase",
-                    "phase": phase,
-                    "status": status,
-                    "params": params,
-                },
-            )
+            key = (phase, status)
+            if key in emitted:
+                continue
+            emitted.add(key)
+            self._emit_phase_event(task, context, order, total, phase, status, params)
+        # Drain trace mirrors scheduled from the streaming callback so trace
+        # state is settled before the task moves on.
+        await self._flush_trace_tasks()
 
     async def _try_codeact_fallback(
         self,
@@ -331,6 +505,12 @@ class TaskExecutors:
 
         llm_client = self._new_llm_client()
 
+        # Real-time phase reporting: domain phase markers printed by the
+        # generated script are turned into ``phase`` events as they arrive;
+        # the post-execution batch scan (``_emit_phase_markers``) stays as
+        # the deduplicated fallback.
+        on_output_line = self._make_phase_line_callback(task, context)
+
         max_attempts = max(1, task.retry_policy.max_attempts)
         backoff = task.retry_policy.backoff_seconds
         last_error: Optional[str] = original_error
@@ -354,6 +534,7 @@ class TaskExecutors:
                     llm_client=llm_client,
                     skill_registry=self._orch.skill_registry,
                     tool_registry=None,
+                    on_output_line=on_output_line,
                 )
                 if codeact_result.get("success"):
                     self._orch._emit_progress(
@@ -371,6 +552,7 @@ class TaskExecutors:
                             llm_client=llm_client,
                             skill_registry=self._orch.skill_registry,
                             tool_registry=None,
+                            on_output_line=on_output_line,
                         )
 
                     final_result = await self._critique_charts_and_repair(
@@ -750,6 +932,7 @@ class TaskExecutors:
                 skill_registry=self._orch.skill_registry,
                 tool_registry=None,
                 max_tokens=8000,
+                on_output_line=self._make_phase_line_callback(task, context),
             )
             await self._emit_phase_markers(task, context, result)
             return result

@@ -299,7 +299,7 @@ class TestCodeActCacheSwitch:
             return "result = None"
 
         async def fake_execute(code, language, working_dir=None, tool_registry=None,
-                               save_artifact=True):
+                               save_artifact=True, on_output_line=None):
             return {
                 "success": True, "stdout": "", "stderr": "",
                 "exit_code": 0, "result": None,

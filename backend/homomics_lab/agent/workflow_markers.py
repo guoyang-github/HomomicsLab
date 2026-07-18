@@ -8,11 +8,14 @@ phase boundary::
     __homomics_phase__:<phase_type>:done:{<json params>}
     __homomics_phase__:<phase_type>:failed:{<json params>}
 
-The orchestrator scans the captured stdout/stderr for these markers and turns
-them into ``phase`` progress events (plus one ``workflow_skeleton`` event at
-execution start) so the frontend can render the domain pipeline DAG with real
-execution progress.  Marking is best effort: a script that prints no markers
-produces no phase events and no errors — the skeleton stays ``pending``.
+The orchestrator turns these markers into ``phase`` progress events (plus
+one ``workflow_skeleton`` event at execution start) so the frontend can
+render the domain pipeline DAG with real execution progress.  The sandbox
+streams output lines back through an ``on_output_line`` callback so markers
+are reported in near real time; a deduplicated batch scan of the captured
+stdout/stderr after execution stays as the fallback for backends that cannot
+stream.  Marking is best effort: a script that prints no markers produces no
+phase events and no errors — the skeleton stays ``pending``.
 """
 
 from __future__ import annotations

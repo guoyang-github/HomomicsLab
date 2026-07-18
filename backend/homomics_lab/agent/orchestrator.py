@@ -1196,6 +1196,14 @@ class Orchestrator:
             finally:
                 await self._finish_trace_node(task, context, trace_node_id, results)
 
+        # Fixed-pipeline mode runs curated skills one domain phase per task.
+        # Mirror the CodeAct path's workflow DAG events: skeleton at dispatch,
+        # then one phase event per task start/finish/failure. Non-domain tasks
+        # emit nothing (gated by extract_domain_pipeline inside).
+        fixed_pipeline_workflow = mode == "fixed_pipeline"
+        if fixed_pipeline_workflow:
+            await self._executors._emit_fixed_pipeline_task_start(task, context)
+
         max_attempts = task.retry_policy.max_attempts
         backoff = task.retry_policy.backoff_seconds
         last_error: Optional[Exception] = None
@@ -1214,6 +1222,10 @@ class Orchestrator:
                     result = await agent.run(task, context)
                     results[task.id] = result
                     task.result = result
+                    if fixed_pipeline_workflow:
+                        await self._executors._emit_fixed_pipeline_task_done(
+                            task, context
+                        )
                     return result
 
                 except Exception as e:
@@ -1241,6 +1253,10 @@ class Orchestrator:
                         # Fallback unavailable, disabled, or fixed-pipeline —
                         # raise the original error.
                         self.state_machine.transition(task, TaskStatus.FAILED)
+                        if fixed_pipeline_workflow:
+                            await self._executors._emit_fixed_pipeline_task_failed(
+                                task, context, error=str(last_error)
+                            )
                         raise last_error
         finally:
             await self._finish_trace_node(task, context, trace_node_id, results)
