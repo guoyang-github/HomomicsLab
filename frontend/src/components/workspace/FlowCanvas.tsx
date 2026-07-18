@@ -17,9 +17,12 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  Workflow,
 } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePlanStore } from '@/stores/planStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
+import { buildPhaseTasks, type PhaseFlowTask } from '@/utils/workflowPhases'
 import { Badge } from '@/components/ui'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
@@ -72,16 +75,19 @@ const statusConfig: Record<
   },
 }
 
-function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
+function TaskNodeComponent({ data, selected }: NodeProps<PhaseFlowTask>) {
   const { t } = useTranslation()
   const selectTask = useTaskStore((state) => state.selectTask)
   const isApprovedPlan = usePlanStore((state) => state.viewMode) === 'approved'
   const config = statusConfig[data.status]
   const Icon = config.icon
+  // Phase nodes belong to the execution store (not the plan), so they stay
+  // selectable even while an approved plan view is loaded.
+  const selectable = data.fromPhase || !isApprovedPlan
 
   return (
     <div
-      onClick={() => !isApprovedPlan && selectTask(data.id)}
+      onClick={() => selectable && selectTask(data.id)}
       className={clsx(
         'relative min-w-[180px] max-w-[260px] cursor-pointer rounded-xl border-2 bg-card p-4 shadow-card transition-all',
         selected ? 'ring-2 ring-primary ring-offset-2' : '',
@@ -94,7 +100,9 @@ function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <div className="text-sm font-semibold text-foreground">{data.name}</div>
-          <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{data.description}</div>
+          {data.description && (
+            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{data.description}</div>
+          )}
         </div>
         <div className={clsx('rounded-full p-1.5', config.bg)}>
           <Icon className={clsx('h-4 w-4', config.color, data.status === 'running' && 'animate-spin')} />
@@ -105,7 +113,9 @@ function TaskNodeComponent({ data, selected }: NodeProps<TaskNode>) {
         <Badge variant={data.status === 'running' ? 'info' : data.status === 'completed' ? 'success' : data.status === 'failed' ? 'error' : 'secondary'} size="sm">
           {t(config.labelKey)}
         </Badge>
-        <span className="text-[10px] text-muted-foreground">{data.estimated_duration_minutes} min</span>
+        {!data.fromPhase && (
+          <span className="text-[10px] text-muted-foreground">{data.estimated_duration_minutes} min</span>
+        )}
       </div>
 
       {data.error_message && (
@@ -170,13 +180,27 @@ function expandTasks(tasks: TaskNode[]): TaskNode[] {
 }
 
 export function FlowCanvas() {
+  const { t } = useTranslation()
   const taskStoreTasks = useTaskStore((state) => state.tasks)
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
   const planTasks = usePlanStore((state) => state.tasks)
   const viewMode = usePlanStore((state) => state.viewMode)
   const isApprovedPlan = viewMode === 'approved'
+  const { job } = useActiveExecutionJob()
+  const skeleton = job?.workflowSkeleton ?? null
+  const phaseStates = job?.phaseStates
+
+  // Data source switch: a domain pipeline skeleton takes precedence and turns
+  // the canvas into the phase-level DAG; without one the canvas keeps the
+  // legacy task-tree / approved-plan rendering (fixed_pipeline, history).
+  const phaseTasks = useMemo(() => buildPhaseTasks(skeleton, phaseStates), [skeleton, phaseStates])
   const rawTasks = isApprovedPlan && planTasks.length > 0 ? planTasks : taskStoreTasks
-  const tasks = useMemo(() => expandTasks(rawTasks), [rawTasks])
+  // display_subtasks expansion only applies to the legacy task-tree path;
+  // skeleton phases are already the real execution steps.
+  const tasks = useMemo<PhaseFlowTask[]>(
+    () => phaseTasks ?? expandTasks(rawTasks),
+    [phaseTasks, rawTasks]
+  )
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -230,7 +254,7 @@ export function FlowCanvas() {
       type: 'task',
       position: layoutNodes[task.id] || { x: 100, y: 100 },
       data: task,
-      selected: !isApprovedPlan && task.id === selectedTaskId,
+      selected: (task.fromPhase || !isApprovedPlan) && task.id === selectedTaskId,
     }))
 
     const newEdges = tasks.flatMap((task) =>
@@ -245,10 +269,10 @@ export function FlowCanvas() {
 
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [tasks, selectedTaskId, layoutNodes, setNodes, setEdges])
+  }, [tasks, selectedTaskId, isApprovedPlan, layoutNodes, setNodes, setEdges])
 
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -268,6 +292,22 @@ export function FlowCanvas() {
           maskColor="hsl(var(--background) / 0.7)"
         />
       </ReactFlow>
+
+      {skeleton && (
+        <div className="absolute left-3 top-3 z-10 rounded-md border border-border bg-card/90 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
+          {t('workflow.domainLabel', { domain: skeleton.domain })}
+        </div>
+      )}
+
+      {tasks.length === 0 && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+          <div data-testid="workflow-empty" className="max-w-sm rounded-lg border border-border bg-card/95 p-6 text-center shadow-sm">
+            <Workflow className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-3 text-sm font-medium text-foreground">{t('workflow.emptyTitle')}</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">{t('workflow.emptyDesc')}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

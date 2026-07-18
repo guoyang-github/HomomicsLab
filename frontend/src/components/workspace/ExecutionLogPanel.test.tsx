@@ -21,6 +21,8 @@ function seedLogs(logs: Array<Partial<LogEntry> & { message: string }>) {
         percent: 0,
         currentPhase: null,
         result: null,
+        workflowSkeleton: null,
+        phaseStates: {},
         updatedAt: Date.now(),
         logs: logs.map((partial, idx) => ({
           id: `log_${idx}`,

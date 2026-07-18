@@ -1,4 +1,5 @@
 import { useTaskStore } from '@/stores/taskStore'
+import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
 import { PlanHistory } from './PlanHistory'
 import { Badge, Card, CardHeader, CardTitle, CardContent, Separator } from '@/components/ui'
 import { useTranslation } from '@/i18n'
@@ -18,11 +19,72 @@ const statusConfig: Record<string, { labelKey: string; variant: any }> = {
   aborted: { labelKey: 'taskStatus.aborted', variant: 'secondary' },
 }
 
+function formatParamValue(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'string') return value
+  return JSON.stringify(value)
+}
+
+/** Detail view for a domain pipeline phase selected on the skeleton canvas.
+ * Phases live in the execution store, not the task store, so the panel falls
+ * back to this when the selected id matches a skeleton phase. */
+function PhaseDetail({ jobPhaseStates, phaseId }: { jobPhaseStates: Record<string, { status: string; params?: Record<string, unknown> }>; phaseId: string }) {
+  const { t } = useTranslation()
+  const phaseState = jobPhaseStates[phaseId]
+  const status = statusConfig[phaseState?.status ?? 'pending'] || { labelKey: undefined, variant: 'secondary' }
+  const params = phaseState?.params ?? {}
+  const paramEntries = Object.entries(params)
+
+  return (
+    <div className="w-80 overflow-y-auto border-l border-border bg-card p-4">
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">{phaseId}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{t('detail.phase')}</p>
+        </div>
+        <Badge variant={status.variant} size="md">{status.labelKey ? t(status.labelKey) : phaseState?.status}</Badge>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">{t('detail.parameters')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paramEntries.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t('detail.noParams')}</p>
+          ) : (
+            <dl data-testid="phase-params" className="space-y-1.5 text-xs">
+              {paramEntries.map(([key, value]) => (
+                <div key={key} className="flex items-start justify-between gap-3">
+                  <dt className="shrink-0 font-medium text-muted-foreground">{key}</dt>
+                  <dd className="break-all text-right font-mono text-foreground">{formatParamValue(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator className="my-4" />
+      <PlanHistory />
+    </div>
+  )
+}
+
 export function DetailPanel() {
   const { t } = useTranslation()
   const selectedTaskId = useTaskStore((state) => state.selectedTaskId)
   const tasks = useTaskStore((state) => state.tasks)
+  const { job } = useActiveExecutionJob()
   const task = tasks.find((t) => t.id === selectedTaskId)
+  const skeleton = job?.workflowSkeleton ?? null
+  const isSkeletonPhase = Boolean(
+    selectedTaskId && skeleton?.phases.some((p) => p.phase_type === selectedTaskId)
+  )
+
+  if (!task && isSkeletonPhase && selectedTaskId && job) {
+    return <PhaseDetail jobPhaseStates={job.phaseStates} phaseId={selectedTaskId} />
+  }
 
   if (!task) {
     return (

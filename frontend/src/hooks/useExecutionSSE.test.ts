@@ -142,4 +142,110 @@ describe('useExecutionSSE', () => {
     expect(subLog?.parentId).toBe('task_1')
     expect(job.logs.some((l) => l.subStatus === 'completed')).toBe(true)
   })
+
+  it('stores the workflow skeleton and phase progress from progress events', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_1')
+    renderHook(() => useExecutionSSE('job_1'))
+    const es = MockEventSource.instances[0]
+
+    act(() =>
+      es.emit('progress', {
+        type: 'progress',
+        event: 'workflow_skeleton',
+        job_id: 'job_1',
+        session_id: 'sess_1',
+        domain: 'single-cell-transcriptomics',
+        phases: [
+          { phase_type: 'qc', name: 'Quality Control', skipped: false },
+          { phase_type: 'normalization', name: 'Normalization', skipped: false },
+        ],
+      })
+    )
+
+    let job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton?.domain).toBe('single-cell-transcriptomics')
+    expect(job.workflowSkeleton?.phases).toHaveLength(2)
+
+    act(() => es.emit('progress', { type: 'progress', event: 'phase', job_id: 'job_1', phase: 'qc', status: 'start' }))
+    act(() =>
+      es.emit('progress', {
+        type: 'progress',
+        event: 'phase',
+        job_id: 'job_1',
+        phase: 'qc',
+        status: 'done',
+        params: { min_genes: 200 },
+      })
+    )
+    act(() => es.emit('progress', { type: 'progress', event: 'phase', job_id: 'job_1', phase: 'normalization', status: 'failed' }))
+
+    job = useExecutionStore.getState().jobs['job_1']
+    expect(job.phaseStates['qc'].status).toBe('completed')
+    expect(job.phaseStates['qc'].params).toEqual({ min_genes: 200 })
+    expect(job.phaseStates['normalization'].status).toBe('failed')
+    // Progress events must not disturb the job-level status stream.
+    expect(job.status).toBe('running')
+  })
+
+  it('tolerates workflow progress payloads arriving on the state channel', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_1')
+    renderHook(() => useExecutionSSE('job_1'))
+    const es = MockEventSource.instances[0]
+
+    // The backend emits workflow events as full ExecutionState dicts; both the
+    // workflow store and the job-level status stream must be updated.
+    act(() =>
+      es.emit('state', {
+        type: 'progress',
+        event: 'workflow_skeleton',
+        job_id: 'job_1',
+        status: 'running',
+        progress_pct: 5,
+        current_phase: 'qc',
+        domain: 'spatial-transcriptomics',
+        phases: [{ phase_type: 'qc', name: 'QC' }],
+      })
+    )
+    act(() =>
+      es.emit('state', {
+        type: 'progress',
+        event: 'phase',
+        job_id: 'job_1',
+        status: 'running',
+        progress_pct: 40,
+        phase: 'qc',
+        params: { min_genes: 200 },
+      })
+    )
+    // A bare progress payload without an execution status must not crash the
+    // state handler either.
+    act(() => es.emit('state', { type: 'progress', event: 'phase', job_id: 'job_1', phase: 'qc', status: 'done' }))
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton?.domain).toBe('spatial-transcriptomics')
+    expect(job.workflowSkeleton?.phases[0]).toEqual({ phase_type: 'qc', name: 'QC', skipped: false })
+    expect(job.phaseStates['qc'].status).toBe('completed')
+    expect(job.phaseStates['qc'].params).toEqual({ min_genes: 200 })
+    expect(job.status).toBe('running')
+    expect(job.percent).toBe(40)
+  })
+
+  it('drops malformed workflow progress payloads without breaking the stream', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_1')
+    renderHook(() => useExecutionSSE('job_1'))
+    const es = MockEventSource.instances[0]
+
+    act(() => es.emit('progress', { type: 'progress', event: 'workflow_skeleton', job_id: 'job_1', phases: [] }))
+    act(() => es.emit('progress', { type: 'progress', event: 'phase', job_id: 'job_1', phase: 'qc' }))
+    act(() => es.emit('progress', { type: 'progress', event: 'phase', job_id: 'job_1', status: 'start' }))
+    act(() => es.emit('progress', 'not an object'))
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toBeNull()
+    expect(job.phaseStates).toEqual({})
+
+    // The regular state stream keeps working afterwards.
+    act(() => es.emit('state', { job_id: 'job_1', status: 'running', progress_pct: 10 }))
+    expect(useExecutionStore.getState().jobs['job_1'].percent).toBe(10)
+  })
 })

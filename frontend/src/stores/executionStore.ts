@@ -16,6 +16,30 @@ export interface LogEntry {
 
 export type ExecutionStatus = 'idle' | 'running' | 'completed' | 'failed' | 'aborted'
 
+/** One phase of a domain pipeline skeleton, after preflight pruning. */
+export interface WorkflowSkeletonPhase {
+  phase_type: string
+  name: string
+  skipped: boolean
+}
+
+/** Domain pipeline skeleton announced by the backend when execution starts.
+ * Only domain tasks (domain != generic) receive one; it drives the workflow
+ * DAG view instead of the task tree. */
+export interface WorkflowSkeleton {
+  domain: string
+  phases: WorkflowSkeletonPhase[]
+}
+
+export type PhaseStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+/** Live execution state of one skeleton phase, reported via phase events. */
+export interface PhaseState {
+  status: PhaseStatus
+  params?: Record<string, unknown>
+  updatedAt: number
+}
+
 /** Runtime state of a single execution job. Jobs are keyed by id and survive
  * session switches, so switching away and back restores the live view. */
 export interface JobRuntime {
@@ -27,6 +51,10 @@ export interface JobRuntime {
   percent: number
   currentPhase: string | null
   result: Record<string, any> | null
+  /** Domain pipeline skeleton; null for generic tasks and legacy sessions. */
+  workflowSkeleton: WorkflowSkeleton | null
+  /** Per-phase execution state keyed by phase_type. */
+  phaseStates: Record<string, PhaseState>
   /** Last mutation time in ms; drives terminal-job eviction. */
   updatedAt: number
 }
@@ -49,6 +77,14 @@ export interface ExecutionState {
   setConnected: (jobId: string, connected: boolean) => void
   setStatus: (jobId: string, status: ExecutionStatus, percent?: number, currentPhase?: string | null) => void
   setCurrentPhase: (jobId: string, phase: string | null) => void
+  /** Store the domain pipeline skeleton announced at execution start. */
+  setWorkflowSkeleton: (jobId: string, skeleton: WorkflowSkeleton) => void
+  /**
+   * Record a phase progress report. Raw backend statuses are accepted and
+   * normalized: start→running, done→completed, failed→failed. Unknown values
+   * are ignored.
+   */
+  setPhaseState: (jobId: string, phaseType: string, status: string, params?: Record<string, unknown>) => void
   addLog: (jobId: string, entry: Omit<LogEntry, 'id'>) => void
   clearLogs: (jobId: string) => void
   setResult: (jobId: string, result: Record<string, any> | null) => void
@@ -91,7 +127,28 @@ function createJobRuntime(sessionId: string): JobRuntime {
     percent: 0,
     currentPhase: null,
     result: null,
+    workflowSkeleton: null,
+    phaseStates: {},
     updatedAt: Date.now(),
+  }
+}
+
+/** Normalize a raw phase-event status to the canonical PhaseStatus, or null
+ * when the value is not recognized. */
+function normalizePhaseStatus(raw: string): PhaseStatus | null {
+  switch (raw) {
+    case 'start':
+    case 'running':
+      return 'running'
+    case 'done':
+    case 'completed':
+      return 'completed'
+    case 'failed':
+      return 'failed'
+    case 'pending':
+      return 'pending'
+    default:
+      return null
   }
 }
 
@@ -155,6 +212,8 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
         percent: percent ?? existing?.percent ?? 0,
         currentPhase: currentPhase !== undefined ? currentPhase : existing?.currentPhase ?? null,
         result: existing?.result ?? null,
+        workflowSkeleton: existing?.workflowSkeleton ?? null,
+        phaseStates: existing?.phaseStates ?? {},
         updatedAt: Date.now(),
       }
       const activeJobIdBySession = { ...state.activeJobIdBySession, [sessionId]: jobId }
@@ -191,6 +250,29 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
       const job = state.jobs[jobId]
       if (!job) return state
       return { jobs: { ...state.jobs, [jobId]: { ...job, currentPhase, updatedAt: Date.now() } } }
+    }),
+  setWorkflowSkeleton: (jobId, skeleton) =>
+    set((state) => {
+      const job = state.jobs[jobId]
+      if (!job) return state
+      return { jobs: { ...state.jobs, [jobId]: { ...job, workflowSkeleton: skeleton, updatedAt: Date.now() } } }
+    }),
+  setPhaseState: (jobId, phaseType, status, params) =>
+    set((state) => {
+      const job = state.jobs[jobId]
+      if (!job) return state
+      const normalized = normalizePhaseStatus(status)
+      if (!normalized) return state
+      const existing = job.phaseStates[phaseType]
+      const phaseStates = {
+        ...job.phaseStates,
+        [phaseType]: {
+          status: normalized,
+          params: params ?? existing?.params,
+          updatedAt: Date.now(),
+        },
+      }
+      return { jobs: { ...state.jobs, [jobId]: { ...job, phaseStates, updatedAt: Date.now() } } }
     }),
   addLog: (jobId, entry) =>
     set((state) => {

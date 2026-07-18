@@ -27,6 +27,33 @@ interface ExecutionStatePayload {
   parent_id?: string
 }
 
+/**
+ * Domain-pipeline progress payloads (workflow skeleton + phase progress).
+ * The backend streams them on the execution SSE channel; depending on the
+ * final wiring they arrive either as a dedicated `progress` SSE event or
+ * embedded in a `state` payload, so both entry points funnel into the same
+ * handler.
+ */
+interface WorkflowProgressPayload {
+  type?: string
+  event?: string
+  job_id?: string
+  session_id?: string
+  domain?: string
+  phases?: Array<{ phase_type?: string; name?: string; skipped?: boolean }>
+  phase?: string
+  status?: string
+  params?: Record<string, unknown>
+}
+
+/** Detect a workflow progress payload regardless of the SSE event name it
+ * arrived on. */
+function isWorkflowProgressPayload(data: unknown): data is WorkflowProgressPayload {
+  if (!data || typeof data !== 'object') return false
+  const evt = (data as WorkflowProgressPayload).event
+  return evt === 'workflow_skeleton' || evt === 'phase'
+}
+
 const MAX_RECONNECT_RETRIES = 5
 const RECONNECT_BASE_DELAY_MS = 1000
 const POLL_INTERVAL_MS = 3000
@@ -67,6 +94,8 @@ export function useExecutionSSE(jobId: string | null) {
   const setStatus = useExecutionStore((state) => state.setStatus)
   const setCurrentPhase = useExecutionStore((state) => state.setCurrentPhase)
   const setResult = useExecutionStore((state) => state.setResult)
+  const setWorkflowSkeleton = useExecutionStore((state) => state.setWorkflowSkeleton)
+  const setPhaseState = useExecutionStore((state) => state.setPhaseState)
   const setTaskTree = useTaskStore((state) => state.setTaskTree)
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
   const setProgress = useTaskStore((state) => state.setProgress)
@@ -100,6 +129,41 @@ export function useExecutionSSE(jobId: string | null) {
     // All store writes below are scoped to this job; other sessions' jobs keep
     // streaming/retaining their own runtime state independently.
     const jid = jobId as string
+
+    /**
+     * Handle a domain-pipeline progress payload (see WorkflowProgressPayload).
+     * Fault-tolerant by design: malformed entries are dropped silently so a
+     * contract drift on the backend never breaks the main state stream.
+     */
+    function applyWorkflowProgress(data: WorkflowProgressPayload) {
+      if (data.event === 'workflow_skeleton') {
+        const domain = typeof data.domain === 'string' ? data.domain : ''
+        const phases = Array.isArray(data.phases)
+          ? data.phases
+              .filter((p) => p && typeof p === 'object' && typeof p.phase_type === 'string' && p.phase_type)
+              .map((p) => ({
+                phase_type: p.phase_type as string,
+                name: typeof p.name === 'string' && p.name ? p.name : (p.phase_type as string),
+                skipped: p.skipped === true,
+              }))
+          : []
+        if (!domain || phases.length === 0) return
+        setWorkflowSkeleton(jid, { domain, phases })
+        addLog(jid, {
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: t('executionLog.workflowSkeleton', { domain }) || `Workflow pipeline: ${domain}`,
+        })
+      } else if (data.event === 'phase') {
+        if (typeof data.phase !== 'string' || !data.phase) return
+        if (typeof data.status !== 'string' || !data.status) return
+        const params =
+          data.params && typeof data.params === 'object' && !Array.isArray(data.params)
+            ? data.params
+            : undefined
+        setPhaseState(jid, data.phase, data.status, params)
+      }
+    }
 
     function applyPayload(data: ExecutionStatePayload) {
       const status = data.status.toLowerCase()
@@ -394,14 +458,34 @@ export function useExecutionSSE(jobId: string | null) {
 
       es.addEventListener('state', (event) => {
         try {
-          const data: ExecutionStatePayload = JSON.parse(event.data)
-          applyPayload(data)
+          const data = JSON.parse(event.data)
+          // Workflow progress payloads share the state channel: the backend
+          // emits them as full ExecutionState dicts with extra top-level keys
+          // (type/event/domain/phases/phase). Feed the workflow handler first,
+          // then let the regular state processing apply to the same payload.
+          if (isWorkflowProgressPayload(data)) {
+            applyWorkflowProgress(data)
+            if (typeof data.status !== 'string') return
+          }
+          applyPayload(data as ExecutionStatePayload)
         } catch {
           addLog(jid, {
             timestamp: new Date().toISOString(),
             level: 'info',
             message: event.data,
           })
+        }
+      })
+
+      // Dedicated channel for domain-pipeline progress (skeleton + phases).
+      es.addEventListener('progress', (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (isWorkflowProgressPayload(data)) {
+            applyWorkflowProgress(data)
+          }
+        } catch {
+          // Ignore malformed progress events; the state stream is unaffected.
         }
       })
 
@@ -514,5 +598,5 @@ export function useExecutionSSE(jobId: string | null) {
         pollTimerRef.current = null
       }
     }
-  }, [jobId, addLog, setConnected, setStatus, setResult, setTaskTree, updateTaskStatus, setProgress, t])
+  }, [jobId, addLog, setConnected, setStatus, setResult, setWorkflowSkeleton, setPhaseState, setTaskTree, updateTaskStatus, setProgress, t])
 }

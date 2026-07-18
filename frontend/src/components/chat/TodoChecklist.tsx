@@ -3,8 +3,10 @@ import { clsx } from 'clsx'
 import { Loader2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Workflow } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useActiveExecutionJob } from '@/hooks/useActiveExecutionJob'
+import { useChatStore } from '@/stores/chatStore'
 import { useOverlayStore } from '@/stores/overlayStore'
 import { usePlanStore } from '@/stores/planStore'
+import { resolveWorkflowAvailability } from '@/utils/workflowPhases'
 import { useTranslation } from '@/i18n'
 import type { TaskNode, TaskStatus } from '@/types/tasks'
 
@@ -78,6 +80,7 @@ function deriveGroupStatus(tasks: TaskNode[]): 'running' | 'completed' | 'failed
 export function TodoChecklist() {
   const { t } = useTranslation()
   const tasks = useTaskStore((state) => state.tasks)
+  const messages = useChatStore((state) => state.messages)
   // The active job is tracked per session, so this checklist always reflects
   // the session on screen; other sessions' jobs keep running in the store.
   const { job } = useActiveExecutionJob()
@@ -88,6 +91,12 @@ export function TodoChecklist() {
 
   const items = useMemo(() => flattenTasks(tasks), [tasks])
   const groupStatus = useMemo(() => deriveGroupStatus(tasks), [tasks])
+  // The workflow DAG view is domain-scoped: hide the entry for tasks we can
+  // positively identify as generic (no domain skeleton, generic domain hint).
+  const workflowAvailability = useMemo(
+    () => resolveWorkflowAvailability({ job, messages, hasTaskTree: tasks.length > 0 }),
+    [job, messages, tasks.length]
+  )
 
   // Auto-expand while running so the user sees live progress; collapse by
   // default when done to avoid covering the chat content.
@@ -173,17 +182,19 @@ export function TodoChecklist() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              discardDraft()
-              openWorkflow()
-            }}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
-          >
-            <Workflow className="h-3.5 w-3.5" />
-            {t('todoList.viewWorkflow')}
-          </button>
+          {workflowAvailability !== 'generic' && (
+            <button
+              type="button"
+              onClick={() => {
+                discardDraft()
+                openWorkflow()
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
+            >
+              <Workflow className="h-3.5 w-3.5" />
+              {t('todoList.viewWorkflow')}
+            </button>
+          )}
         </div>
       )}
     </div>

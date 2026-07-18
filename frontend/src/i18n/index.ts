@@ -315,6 +315,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'workspace.noProvenanceDataDesc': 'Run an analysis workflow to generate a lineage graph.',
     'workspace.provenanceHint': 'Provenance shows how analysis steps, data and files are linked. It is useful for tracing the origin of a result.',
 
+    // Workflow canvas (domain pipeline view)
+    'workflow.domainLabel': 'Domain: {{domain}}',
+    'workflow.emptyTitle': 'No workflow to display',
+    'workflow.emptyDesc': 'The workflow view is available for domain analysis tasks. Run a domain analysis to see its pipeline here.',
+
     // Detail Panel
     'detail.selectHint': 'Click a node to view details, or upload data to start analysis',
     'detail.basicInfo': 'Basic Info',
@@ -323,6 +328,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'detail.minutes': '{{minutes}} min',
     'detail.requiredSkills': 'Required Skills',
     'detail.parameters': 'Parameters',
+    'detail.noParams': 'No parameters reported yet.',
     'detail.result': 'Result',
     'detail.error': 'Error',
 
@@ -343,6 +349,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.subagentCompleted': '{{actor}} completed',
     'executionLog.subagentFailed': '{{actor}} failed',
     'executionLog.finishedSummary': 'Finished · {{count}} steps',
+    'executionLog.workflowSkeleton': 'Pipeline: {{domain}}',
 
     // Domain Marketplace
     'domain.title': 'Domain Marketplace',
@@ -967,6 +974,11 @@ const resources: Record<Locale, Record<string, string>> = {
     'workspace.noProvenanceDataDesc': '运行分析流程以生成血缘图。',
     'workspace.provenanceHint': '血缘图展示分析步骤、数据与文件之间的溯源关系，可用于追踪结果的来源。',
 
+    // Workflow canvas (domain pipeline view)
+    'workflow.domainLabel': '领域：{{domain}}',
+    'workflow.emptyTitle': '暂无工作流',
+    'workflow.emptyDesc': '工作流视图适用于领域分析任务，运行领域分析后将在此展示流程图。',
+
     // Detail Panel
     'detail.selectHint': '点击节点查看详情，或上传数据开始分析',
     'detail.basicInfo': '基本信息',
@@ -975,6 +987,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'detail.minutes': '{{minutes}} 分钟',
     'detail.requiredSkills': '所需 Skills',
     'detail.parameters': '参数',
+    'detail.noParams': '尚未上报参数。',
     'detail.result': '结果',
     'detail.error': '错误',
 
@@ -995,6 +1008,7 @@ const resources: Record<Locale, Record<string, string>> = {
     'executionLog.subagentCompleted': '{{actor}} 已完成',
     'executionLog.subagentFailed': '{{actor}} 失败',
     'executionLog.finishedSummary': '执行完成 · {{count}} 步',
+    'executionLog.workflowSkeleton': '流程管线：{{domain}}',
 
     // Domain Marketplace
     'domain.title': 'Domain 市场',

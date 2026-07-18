@@ -21,6 +21,8 @@ function terminalJob(updatedAt: number): JobRuntime {
     percent: 100,
     currentPhase: null,
     result: null,
+    workflowSkeleton: null,
+    phaseStates: {},
     updatedAt,
   }
 }
@@ -193,5 +195,87 @@ describe('executionStore multi-job model', () => {
     const state = useExecutionStore.getState()
     expect(state.jobs).toEqual({})
     expect(state.activeJobIdBySession).toEqual({})
+  })
+})
+
+describe('executionStore workflow skeleton', () => {
+  const skeleton = {
+    domain: 'single-cell-transcriptomics',
+    phases: [
+      { phase_type: 'qc', name: 'Quality Control', skipped: false },
+      { phase_type: 'doublet', name: 'Doublet Detection', skipped: true },
+      { phase_type: 'normalization', name: 'Normalization', skipped: false },
+    ],
+  }
+
+  it('stores the skeleton for a known job and ignores unknown ids', () => {
+    const store = useExecutionStore.getState()
+    store.startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().setWorkflowSkeleton('job_1', skeleton)
+    useExecutionStore.getState().setWorkflowSkeleton('ghost', skeleton)
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toEqual(skeleton)
+    expect(useExecutionStore.getState().jobs['ghost']).toBeUndefined()
+  })
+
+  it('normalizes raw phase statuses and keeps params', () => {
+    const store = useExecutionStore.getState()
+    store.startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'start')
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'done', { min_genes: 200 })
+    useExecutionStore.getState().setPhaseState('job_1', 'normalization', 'failed')
+
+    const { phaseStates } = useExecutionStore.getState().jobs['job_1']
+    expect(phaseStates['qc'].status).toBe('completed')
+    expect(phaseStates['qc'].params).toEqual({ min_genes: 200 })
+    expect(phaseStates['normalization'].status).toBe('failed')
+  })
+
+  it('keeps previous params when a later report omits them', () => {
+    const store = useExecutionStore.getState()
+    store.startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'start', { min_genes: 200 })
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'done')
+
+    const { phaseStates } = useExecutionStore.getState().jobs['job_1']
+    expect(phaseStates['qc'].status).toBe('completed')
+    expect(phaseStates['qc'].params).toEqual({ min_genes: 200 })
+  })
+
+  it('ignores unrecognized phase statuses and unknown jobs', () => {
+    const store = useExecutionStore.getState()
+    store.startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'bogus')
+    useExecutionStore.getState().setPhaseState('ghost', 'qc', 'start')
+
+    expect(useExecutionStore.getState().jobs['job_1'].phaseStates).toEqual({})
+  })
+
+  it('restoreJob preserves skeleton and phase states', () => {
+    const store = useExecutionStore.getState()
+    store.startJob('job_1', 'sess_a')
+    useExecutionStore.getState().setWorkflowSkeleton('job_1', skeleton)
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'start')
+
+    useExecutionStore.getState().restoreJob('job_1', 'sess_a', [], 'running', 40)
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toEqual(skeleton)
+    expect(job.phaseStates['qc'].status).toBe('running')
+  })
+
+  it('evicts skeleton data together with its terminal job', () => {
+    seedTerminalJobs(MAX_TERMINAL_JOBS + 1)
+    // Give the oldest job a skeleton; eviction must drop it with the job.
+    useExecutionStore.getState().jobs['job_0'].workflowSkeleton = skeleton
+    useExecutionStore.getState().setStatus(`job_${MAX_TERMINAL_JOBS}`, 'completed')
+
+    expect(useExecutionStore.getState().jobs['job_0']).toBeUndefined()
+    expect(Object.keys(useExecutionStore.getState().jobs)).toHaveLength(MAX_TERMINAL_JOBS)
   })
 })
