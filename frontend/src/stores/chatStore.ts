@@ -137,13 +137,14 @@ function _findRecentJob(messages: ChatMessage[]): { jobId: string; status: strin
   return null
 }
 
-async function _fetchTraceLogs(jobId: string) {
+async function _fetchTraceRestore(jobId: string): Promise<{ logs: LogEntry[]; nodes: unknown[] }> {
   try {
     const res = await executionApi.getTrace(jobId)
     const trace = res.data
-    const logs: import('@/stores/executionStore').LogEntry[] = []
+    const nodes: unknown[] = Array.isArray(trace.nodes) ? trace.nodes : []
+    const logs: LogEntry[] = []
     let counter = 0
-    trace.nodes?.forEach((node: any) => {
+    nodes.forEach((node: any) => {
       const ts = node.started_at || new Date().toISOString()
       logs.push({
         id: `trace_${jobId.slice(0, 8)}_${++counter}`,
@@ -173,9 +174,9 @@ async function _fetchTraceLogs(jobId: string) {
         })
       }
     })
-    return logs
+    return { logs, nodes }
   } catch {
-    return []
+    return { logs: [], nodes: [] }
   }
 }
 
@@ -325,7 +326,7 @@ export const useChatStore = create<ChatState>()(
               })
             }
 
-            const traceLogs = await _fetchTraceLogs(recentJob.jobId)
+            const { logs: traceLogs, nodes: traceNodes } = await _fetchTraceRestore(recentJob.jobId)
             const initialLogs = traceLogs.length > 0 ? traceLogs : liveLogs
             const terminalStatuses = ['completed', 'failed', 'cancelled']
             const normalizedStatus = terminalStatuses.includes(liveStatus)
@@ -339,6 +340,9 @@ export const useChatStore = create<ChatState>()(
               livePercent,
               livePhase
             )
+            // Rebuild the domain pipeline view lost on page refresh. A live
+            // skeleton already in memory (SSE) wins; the action is a no-op then.
+            useExecutionStore.getState().restoreWorkflowFromTrace(recentJob.jobId, traceNodes)
           } else {
             if (extracted && extracted.tasks.length > 0) {
               useTaskStore.getState().setTaskTree(extracted.tasks)

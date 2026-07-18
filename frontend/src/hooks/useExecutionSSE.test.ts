@@ -115,6 +115,64 @@ describe('useExecutionSSE', () => {
     expect(job.logs.some((l) => l.level === 'success')).toBe(true)
   })
 
+  it('restores the workflow skeleton from the trace on terminal state', async () => {
+    useExecutionStore.getState().restoreJob('job_1', 'sess_1')
+    const loadSessionMessages = vi.fn().mockResolvedValue(undefined)
+    useChatStore.setState({
+      loadSessionMessages,
+      currentSessionId: 'sess_1',
+      messages: [
+        {
+          id: 'm_final',
+          type: 'text',
+          content: 'analysis done',
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    })
+    vi.spyOn(executionApi, 'getTrace').mockResolvedValue({
+      data: {
+        nodes: [
+          { node_id: 'root', node_type: 'plan', name: 'job', status: 'completed', metadata: {} },
+          {
+            node_id: 'skel',
+            node_type: 'plan',
+            name: 'workflow_skeleton:single-cell-transcriptomics',
+            metadata: {
+              event: 'workflow_skeleton',
+              domain: 'single-cell-transcriptomics',
+              phases: [{ phase_type: 'qc', name: 'Quality Control', skipped: false }],
+              task_id: 'task_1',
+            },
+          },
+          {
+            node_id: 'p1',
+            node_type: 'phase',
+            name: 'phase:qc:done',
+            metadata: { event: 'phase', phase: 'qc', status: 'done', params: { min_genes: 200 }, task_id: 'task_1' },
+          },
+        ],
+      },
+    } as any)
+
+    renderHook(() => useExecutionSSE('job_1'))
+    const es = MockEventSource.instances[0]
+
+    act(() => {
+      es.emit('state', { job_id: 'job_1', status: 'completed', progress_pct: 100 })
+    })
+
+    await waitFor(() =>
+      expect(useExecutionStore.getState().jobs['job_1'].workflowSkeleton?.domain).toBe(
+        'single-cell-transcriptomics'
+      )
+    )
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.phaseStates['qc'].status).toBe('completed')
+    expect(job.phaseStates['qc'].params).toEqual({ min_genes: 200 })
+  })
+
   it('tags subagent events without overwriting the parent job status', () => {
     useExecutionStore.getState().restoreJob('job_1', 'sess_1', [], 'running', 30, 'qc')
     renderHook(() => useExecutionSSE('job_1'))

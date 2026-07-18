@@ -96,6 +96,7 @@ export function useExecutionSSE(jobId: string | null) {
   const setResult = useExecutionStore((state) => state.setResult)
   const setWorkflowSkeleton = useExecutionStore((state) => state.setWorkflowSkeleton)
   const setPhaseState = useExecutionStore((state) => state.setPhaseState)
+  const restoreWorkflowFromTrace = useExecutionStore((state) => state.restoreWorkflowFromTrace)
   const setTaskTree = useTaskStore((state) => state.setTaskTree)
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
   const setProgress = useTaskStore((state) => state.setProgress)
@@ -389,6 +390,10 @@ export function useExecutionSSE(jobId: string | null) {
         try {
           const res = await executionApi.getTrace(jid)
           const trace = res.data
+          // Restore the domain pipeline view when this client missed the
+          // one-shot skeleton event (e.g. page refreshed mid-run). A live
+          // skeleton already in memory wins; the action is a no-op then.
+          restoreWorkflowFromTrace(jid, trace.nodes)
           const resultNode =
             trace.nodes?.find((n: any) => n.outputs?.result?.success !== undefined) ||
             trace.nodes?.find((n: any) => n.outputs?.success !== undefined) ||
@@ -598,5 +603,5 @@ export function useExecutionSSE(jobId: string | null) {
         pollTimerRef.current = null
       }
     }
-  }, [jobId, addLog, setConnected, setStatus, setResult, setWorkflowSkeleton, setPhaseState, setTaskTree, updateTaskStatus, setProgress, t])
+  }, [jobId, addLog, setConnected, setStatus, setResult, setWorkflowSkeleton, setPhaseState, restoreWorkflowFromTrace, setTaskTree, updateTaskStatus, setProgress, t])
 }

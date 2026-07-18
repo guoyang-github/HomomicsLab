@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { extractWorkflowFromTrace } from '@/utils/traceWorkflow'
 
 export interface LogEntry {
   id: string
@@ -85,6 +86,13 @@ export interface ExecutionState {
    * are ignored.
    */
   setPhaseState: (jobId: string, phaseType: string, status: string, params?: Record<string, unknown>) => void
+  /**
+   * Rebuild workflowSkeleton/phaseStates from trace nodes mirrored by the
+   * backend (see `extractWorkflowFromTrace`). Merge policy matches restoreJob:
+   * richer in-memory data wins, so a job that already holds a live skeleton
+   * is left untouched.
+   */
+  restoreWorkflowFromTrace: (jobId: string, nodes: unknown) => void
   addLog: (jobId: string, entry: Omit<LogEntry, 'id'>) => void
   clearLogs: (jobId: string) => void
   setResult: (jobId: string, result: Record<string, any> | null) => void
@@ -273,6 +281,28 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
         },
       }
       return { jobs: { ...state.jobs, [jobId]: { ...job, phaseStates, updatedAt: Date.now() } } }
+    }),
+  restoreWorkflowFromTrace: (jobId, nodes) =>
+    set((state) => {
+      const job = state.jobs[jobId]
+      if (!job) return state
+      // Live data streamed via SSE outranks anything recovered from the trace.
+      if (job.workflowSkeleton) return state
+      const { skeleton, phaseEvents } = extractWorkflowFromTrace(nodes)
+      if (!skeleton) return state
+      const phaseStates = { ...job.phaseStates }
+      for (const evt of phaseEvents) {
+        const normalized = normalizePhaseStatus(evt.status)
+        if (!normalized) continue
+        phaseStates[evt.phase] = {
+          status: normalized,
+          params: evt.params ?? phaseStates[evt.phase]?.params,
+          updatedAt: Date.now(),
+        }
+      }
+      return {
+        jobs: { ...state.jobs, [jobId]: { ...job, workflowSkeleton: skeleton, phaseStates, updatedAt: Date.now() } },
+      }
     }),
   addLog: (jobId, entry) =>
     set((state) => {

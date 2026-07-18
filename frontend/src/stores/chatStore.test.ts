@@ -280,4 +280,116 @@ describe('chatStore.selectSession', () => {
     expect(job.percent).toBe(40)
     expect(job.logs.some((l) => l.message === 'live line A')).toBe(true)
   })
+
+  it('restores the workflow skeleton and phase states from trace nodes', async () => {
+    const messages = [
+      makeMessage({
+        id: 'm1',
+        type: 'todo_list',
+        content: {
+          text: 'done',
+          status: 'completed',
+          job_id: 'job_1',
+          tasks: [makeTask('qc', 'completed')],
+        },
+      }),
+    ]
+    vi.spyOn(chatApi, 'getMessages').mockResolvedValue({ data: messages } as any)
+    vi.spyOn(executionApi, 'getStatus').mockResolvedValue({
+      data: { latest_state: { status: 'completed', progress_pct: 100 } },
+    } as any)
+    vi.spyOn(executionApi, 'getTrace').mockResolvedValue({
+      data: {
+        nodes: [
+          { node_id: 'root', node_type: 'plan', name: 'job', status: 'completed', metadata: {} },
+          {
+            node_id: 'skel',
+            node_type: 'plan',
+            name: 'workflow_skeleton:single-cell-transcriptomics',
+            status: 'running',
+            metadata: {
+              event: 'workflow_skeleton',
+              domain: 'single-cell-transcriptomics',
+              phases: [
+                { phase_type: 'qc', name: 'Quality Control', skipped: false },
+                { phase_type: 'normalization', name: 'Normalization', skipped: false },
+              ],
+              task_id: 'task_1',
+            },
+          },
+          {
+            node_id: 'p1',
+            node_type: 'phase',
+            name: 'phase:qc:done',
+            status: 'running',
+            metadata: { event: 'phase', phase: 'qc', status: 'done', params: { min_genes: 200 }, task_id: 'task_1' },
+          },
+        ],
+      },
+    } as any)
+
+    await useChatStore.getState().selectSession('sess_1')
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton?.domain).toBe('single-cell-transcriptomics')
+    expect(job.workflowSkeleton?.phases).toHaveLength(2)
+    expect(job.phaseStates['qc'].status).toBe('completed')
+    expect(job.phaseStates['qc'].params).toEqual({ min_genes: 200 })
+  })
+
+  it('keeps the live in-memory skeleton when switching sessions back', async () => {
+    const messagesA = [
+      makeMessage({
+        id: 'm1',
+        type: 'todo_list',
+        content: {
+          text: 'running',
+          status: 'running',
+          job_id: 'job_a',
+          tasks: [makeTask('qc', 'running')],
+        },
+      }),
+    ]
+    vi.spyOn(chatApi, 'getMessages').mockImplementation(async (id: string) => {
+      return { data: id === 'sess_a' ? messagesA : [] } as any
+    })
+    vi.spyOn(executionApi, 'getStatus').mockResolvedValue({
+      data: { latest_state: { status: 'running', progress_pct: 40, current_phase: 'qc' } },
+    } as any)
+    // The trace still holds the older skeleton mirror; the live one must win.
+    vi.spyOn(executionApi, 'getTrace').mockResolvedValue({
+      data: {
+        nodes: [
+          {
+            node_id: 'skel',
+            node_type: 'plan',
+            name: 'workflow_skeleton:genomics',
+            metadata: {
+              event: 'workflow_skeleton',
+              domain: 'genomics',
+              phases: [{ phase_type: 'qc', name: 'Trace QC', skipped: false }],
+              task_id: 'task_1',
+            },
+          },
+        ],
+      },
+    } as any)
+
+    const liveSkeleton = {
+      domain: 'single-cell-transcriptomics',
+      phases: [{ phase_type: 'qc', name: 'Live QC', skipped: false }],
+    }
+
+    await useChatStore.getState().selectSession('sess_a')
+    // A live SSE skeleton event lands after the trace restore.
+    useExecutionStore.getState().setWorkflowSkeleton('job_a', liveSkeleton)
+    useExecutionStore.getState().setPhaseState('job_a', 'qc', 'start')
+
+    await useChatStore.getState().selectSession('sess_b')
+    await useChatStore.getState().selectSession('sess_a')
+
+    const job = useExecutionStore.getState().jobs['job_a']
+    expect(job.workflowSkeleton).toEqual(liveSkeleton)
+    expect(job.phaseStates['qc'].status).toBe('running')
+  })
 })

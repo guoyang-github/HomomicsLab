@@ -279,3 +279,100 @@ describe('executionStore workflow skeleton', () => {
     expect(Object.keys(useExecutionStore.getState().jobs)).toHaveLength(MAX_TERMINAL_JOBS)
   })
 })
+
+describe('executionStore.restoreWorkflowFromTrace', () => {
+  // Trace nodes as mirrored by the backend (orchestrator_executors): the
+  // workflow_skeleton plan node and per-marker phase nodes, alongside the
+  // trace root and per-task phase nodes that must be ignored.
+  const traceNodes = [
+    { node_id: 'root', node_type: 'plan', name: 'job', status: 'completed', metadata: {} },
+    {
+      node_id: 'skel',
+      node_type: 'plan',
+      name: 'workflow_skeleton:single-cell-transcriptomics',
+      metadata: {
+        event: 'workflow_skeleton',
+        domain: 'single-cell-transcriptomics',
+        phases: [
+          { phase_type: 'qc', name: 'Quality Control', skipped: false },
+          { phase_type: 'normalization', name: 'Normalization', skipped: false },
+        ],
+        task_id: 'task_1',
+      },
+    },
+    { node_id: 't1', node_type: 'phase', name: 'QC step', metadata: { phase: 'qc', task_id: 'task_1' } },
+    {
+      node_id: 'p1',
+      node_type: 'phase',
+      name: 'phase:qc:start',
+      metadata: { event: 'phase', phase: 'qc', status: 'start', task_id: 'task_1' },
+    },
+    {
+      node_id: 'p2',
+      node_type: 'phase',
+      name: 'phase:qc:done',
+      metadata: { event: 'phase', phase: 'qc', status: 'done', params: { min_genes: 200 }, task_id: 'task_1' },
+    },
+    {
+      node_id: 'p3',
+      node_type: 'phase',
+      name: 'phase:normalization:failed',
+      metadata: { event: 'phase', phase: 'normalization', status: 'failed', task_id: 'task_1' },
+    },
+  ]
+
+  it('rebuilds skeleton and normalized phase states from trace nodes', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().restoreWorkflowFromTrace('job_1', traceNodes)
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toEqual({
+      domain: 'single-cell-transcriptomics',
+      phases: [
+        { phase_type: 'qc', name: 'Quality Control', skipped: false },
+        { phase_type: 'normalization', name: 'Normalization', skipped: false },
+      ],
+    })
+    expect(job.phaseStates['qc'].status).toBe('completed')
+    expect(job.phaseStates['qc'].params).toEqual({ min_genes: 200 })
+    expect(job.phaseStates['normalization'].status).toBe('failed')
+  })
+
+  it('is a no-op when the trace carries no mirrored workflow nodes', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_a')
+
+    useExecutionStore.getState().restoreWorkflowFromTrace('job_1', [
+      { node_id: 'root', node_type: 'plan', name: 'job', metadata: {} },
+      { node_id: 't1', node_type: 'phase', name: 'QC step', metadata: { phase: 'qc', task_id: 'task_1' } },
+    ])
+    useExecutionStore.getState().restoreWorkflowFromTrace('job_1', undefined)
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toBeNull()
+    expect(job.phaseStates).toEqual({})
+  })
+
+  it('never overwrites a live in-memory skeleton', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_a')
+    const liveSkeleton = {
+      domain: 'spatial-transcriptomics',
+      phases: [{ phase_type: 'qc', name: 'Live QC', skipped: false }],
+    }
+    useExecutionStore.getState().setWorkflowSkeleton('job_1', liveSkeleton)
+    useExecutionStore.getState().setPhaseState('job_1', 'qc', 'start')
+
+    useExecutionStore.getState().restoreWorkflowFromTrace('job_1', traceNodes)
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    expect(job.workflowSkeleton).toEqual(liveSkeleton)
+    // Phase states from the live stream are also left untouched.
+    expect(job.phaseStates['qc'].status).toBe('running')
+    expect(job.phaseStates['normalization']).toBeUndefined()
+  })
+
+  it('ignores unknown job ids', () => {
+    useExecutionStore.getState().restoreWorkflowFromTrace('ghost', traceNodes)
+    expect(useExecutionStore.getState().jobs).toEqual({})
+  })
+})
