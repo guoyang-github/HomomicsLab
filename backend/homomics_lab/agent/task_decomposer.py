@@ -608,6 +608,7 @@ class TaskDecomposer:
         if effective_intent.sub_intents and not plan.is_fallback:
             plan, tree = self._filter_plan_by_sub_intents(plan, effective_intent)
             plan.display_steps = self._build_display_steps_from_plan(plan)
+            self._stamp_domain_pipeline(plan, tree, effective_intent.domain or intent.domain)
             return plan, tree
 
         if plan.is_fallback and not plan.phases:
@@ -616,7 +617,36 @@ class TaskDecomposer:
             return plan, tree
 
         plan.display_steps = self._build_display_steps_from_plan(plan)
-        return plan, self._plan_result_to_task_tree(plan)
+        tree = self._plan_result_to_task_tree(plan)
+        self._stamp_domain_pipeline(plan, tree, effective_intent.domain or intent.domain)
+        return plan, tree
+
+    @staticmethod
+    def _stamp_domain_pipeline(
+        plan: PlanResult,
+        tree: TaskTree,
+        domain: Optional[str],
+    ) -> None:
+        """Stamp domain ownership and the (preflight-trimmed) pipeline phases
+        onto each task's parameters.
+
+        CodeAct executions read this back (see ``agent/workflow_markers.py``)
+        to inject the phase-marker convention into generated scripts and to
+        emit the ``workflow_skeleton`` / ``phase`` progress events.  Generic
+        or domain-less intents stamp nothing, which downstream treats as
+        "no workflow DAG".
+        """
+        if not domain:
+            return
+        phases = [
+            {"phase_type": p.phase_type, "name": p.description or p.phase_type}
+            for p in plan.phases
+            if p.required
+        ]
+        for task in tree.tasks:
+            task.parameters.setdefault("domain", domain)
+            if phases:
+                task.parameters.setdefault("domain_phases", phases)
 
     async def decompose(self, intent: UserIntent, context: Dict[str, Any]) -> TaskTree:
         """Decompose intent into a TaskTree.
@@ -696,6 +726,10 @@ class TaskDecomposer:
                 "preflight": preflight,
                 "user_request": intent.original_message,
             }
+            if intent.domain:
+                # Domain ownership without a domain pipeline: the workflow
+                # skeleton degrades to display_subtasks / the task's phase.
+                parameters["domain"] = intent.domain
             if display_subtasks:
                 parameters["display_subtasks"] = display_subtasks
             phases.append(

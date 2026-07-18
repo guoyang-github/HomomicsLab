@@ -16,11 +16,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from homomics_lab.agent.progress_events import build_agent_event
+from homomics_lab.agent.workflow_markers import (
+    build_marker_convention,
+    extract_domain_pipeline,
+    scan_marker_lines,
+)
 from homomics_lab.config import settings
 from homomics_lab.execution.code_act import run_code_act
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import TaskStatus
+from homomics_lab.observability.trace_store import TraceStore
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.viz.chart_critic import ChartCritic, ChartCritique, collect_chart_paths
 
@@ -66,6 +72,9 @@ class TaskExecutors:
                 parts.append(f"Parameters: {params}")
         if original_error:
             parts.append(f"Original error: {original_error}")
+        convention = self._marker_convention_for(task)
+        if convention:
+            parts.append(convention)
         return "\n".join(parts)
 
     def _fallback_working_dir(self, context: Dict[str, Any]) -> Optional[Path]:
@@ -74,6 +83,168 @@ class TaskExecutors:
         if project_id:
             return settings.data_dir / "workspaces" / project_id
         return None
+
+    # ------------------------------------------------------------------
+    # Domain workflow DAG events (CodeAct single-script path).
+    #
+    # For domain-owned tasks the generated script is asked to print
+    # ``__homomics_phase__`` marker lines (see ``agent/workflow_markers.py``).
+    # A ``workflow_skeleton`` event is emitted once when execution starts;
+    # each parsed marker becomes a ``phase`` event.  Both travel as
+    # ``ExecutionState.extra`` top-level payload keys (job_id/session_id are
+    # stamped by the job runner) and are mirrored into the trace store so the
+    # DAG state can be recovered after a session switch.  Everything here is
+    # best effort: no domain or no markers means zero events and zero errors.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _marker_convention_for(task: TaskNode) -> Optional[str]:
+        """Return the marker convention prompt snippet, or None to inject nothing."""
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return None
+        _, phases = pipeline
+        return build_marker_convention(phases)
+
+    def _emit_workflow_event(
+        self,
+        task: TaskNode,
+        payload: Dict[str, Any],
+        progress_pct: float = 0.0,
+    ) -> None:
+        """Emit one workflow progress event as top-level payload keys.
+
+        Top-level execution: no ``actor``/``parent_id`` (progress_events
+        contract).  ``type: "progress"`` is included so consumers can route
+        the event without a side channel.
+        """
+        try:
+            self._orch._report_progress(
+                ExecutionState(
+                    job_id="",
+                    status="RUNNING",
+                    current_phase=task.name,
+                    progress_pct=progress_pct,
+                    scheduler_type="agent",
+                    extra={"type": "progress", **payload},
+                )
+            )
+        except Exception:
+            pass
+
+    async def _trace_workflow_event(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        *,
+        node_type: str,
+        name: str,
+        metadata: Dict[str, Any],
+    ) -> None:
+        """Mirror a workflow event into the trace store (best effort)."""
+        trace_id = context.get("trace_id") if context else None
+        if not trace_id:
+            return
+        try:
+            store = TraceStore()
+            await store.add_node(
+                trace_id=trace_id,
+                node_type=node_type,
+                name=name,
+                parent_id="root",
+                inputs={},
+                metadata={**metadata, "task_id": task.id},
+            )
+        except Exception:
+            # Trace recording must not break execution.
+            pass
+
+    async def _emit_workflow_skeleton(
+        self, task: TaskNode, context: Dict[str, Any]
+    ) -> None:
+        """Emit the one-shot ``workflow_skeleton`` event for a domain task.
+
+        The skeleton is the task's domain pipeline phases (already trimmed by
+        ``preflight.skip_phases`` at plan time), or the degraded
+        display_subtasks / own-phase list when no full pipeline is available.
+        """
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return
+        domain, phases = pipeline
+        skeleton = [
+            {
+                "phase_type": p["phase_type"],
+                "name": p.get("name") or p["phase_type"],
+                "skipped": False,
+            }
+            for p in phases
+        ]
+        self._emit_workflow_event(
+            task,
+            {"event": "workflow_skeleton", "domain": domain, "phases": skeleton},
+            progress_pct=5.0,
+        )
+        await self._trace_workflow_event(
+            task,
+            context,
+            node_type="plan",
+            name=f"workflow_skeleton:{domain}",
+            metadata={
+                "event": "workflow_skeleton",
+                "domain": domain,
+                "phases": skeleton,
+            },
+        )
+
+    async def _emit_phase_markers(
+        self,
+        task: TaskNode,
+        context: Dict[str, Any],
+        codeact_result: Dict[str, Any],
+    ) -> None:
+        """Scan captured CodeAct output for phase markers and emit ``phase`` events.
+
+        Successful runs carry markers in ``stdout``; failed runs surface the
+        merged stream as ``stderr`` (see ``execution/code_act.execute_code``),
+        so both are scanned.  No markers -> no events (phases stay pending).
+        """
+        pipeline = extract_domain_pipeline(task)
+        if pipeline is None:
+            return
+        _, phases = pipeline
+        order = {p["phase_type"]: idx for idx, p in enumerate(phases)}
+        total = max(1, len(phases))
+        text = "\n".join(
+            part
+            for part in (codeact_result.get("stdout"), codeact_result.get("stderr"))
+            if part
+        )
+        for phase, status, params in scan_marker_lines(text):
+            idx = order.get(phase)
+            if idx is None:
+                progress_pct = 50.0
+            else:
+                # start advances half a step, done/failed a full step.
+                step = idx + (0.5 if status == "start" else 1.0)
+                progress_pct = min(95.0, 10.0 + 80.0 * step / total)
+            self._emit_workflow_event(
+                task,
+                {"event": "phase", "phase": phase, "status": status, "params": params},
+                progress_pct=progress_pct,
+            )
+            await self._trace_workflow_event(
+                task,
+                context,
+                node_type="phase",
+                name=f"phase:{phase}:{status}",
+                metadata={
+                    "event": "phase",
+                    "phase": phase,
+                    "status": status,
+                    "params": params,
+                },
+            )
 
     async def _try_codeact_fallback(
         self,
@@ -91,6 +262,7 @@ class TaskExecutors:
         if self._orch._execution_mode(context) == "fixed_pipeline":
             return None
 
+        await self._emit_workflow_skeleton(task, context)
         codeact_result = await self._run_codeact_for_task(
             task, context, original_error=original_error
         )
@@ -112,6 +284,7 @@ class TaskExecutors:
         entrypoints, so the agent can generate bridging code as needed.
         """
         self._orch.state_machine.transition(task, TaskStatus.RUNNING)
+        await self._emit_workflow_skeleton(task, context)
         codeact_result = await self._run_codeact_for_task(task, context)
         return self._normalize_codeact_result(
             task, codeact_result, skill_name="codeact"
@@ -200,13 +373,32 @@ class TaskExecutors:
                             tool_registry=None,
                         )
 
-                    return await self._critique_charts_and_repair(
-                        task, context, codeact_result, attempt_prompt, llm_client, _rerun
+                    final_result = await self._critique_charts_and_repair(
+                        task,
+                        context,
+                        codeact_result,
+                        attempt_prompt,
+                        llm_client,
+                        _rerun,
                     )
-                last_error = codeact_result.get("stderr") or codeact_result.get("error") or "unknown error"
+                    await self._emit_phase_markers(task, context, final_result)
+                    return final_result
+                last_error = (
+                    codeact_result.get("stderr")
+                    or codeact_result.get("error")
+                    or "unknown error"
+                )
+                # A failed script may still have reported phase start/failed
+                # markers before crashing; surface them as phase events.
+                await self._emit_phase_markers(task, context, codeact_result)
             except Exception as exc:
                 last_error = str(exc)
-                logger.warning("CodeAct execution failed for task %s (attempt %d): %s", task.name, attempt, exc)
+                logger.warning(
+                    "CodeAct execution failed for task %s (attempt %d): %s",
+                    task.name,
+                    attempt,
+                    exc,
+                )
 
             if attempt < max_attempts:
                 self._orch._emit_progress(
@@ -217,7 +409,10 @@ class TaskExecutors:
                 )
                 await asyncio.sleep(backoff * (2 ** (attempt - 1)))
 
-        return {"success": False, "error": last_error or "CodeAct execution failed after retries"}
+        return {
+            "success": False,
+            "error": last_error or "CodeAct execution failed after retries",
+        }
 
     @staticmethod
     def _normalize_codeact_result(
@@ -306,7 +501,9 @@ class TaskExecutors:
                 try:
                     repaired = await rerun(repair_prompt)
                 except Exception as exc:
-                    logger.warning("chart repair run failed for task %s: %s", task.name, exc)
+                    logger.warning(
+                        "chart repair run failed for task %s: %s", task.name, exc
+                    )
                     break
                 if not repaired.get("success"):
                     break
@@ -329,7 +526,9 @@ class TaskExecutors:
             )
             return codeact_result
         except Exception:
-            logger.debug("chart critique loop failed; keeping original result", exc_info=True)
+            logger.debug(
+                "chart critique loop failed; keeping original result", exc_info=True
+            )
             return codeact_result
 
     async def _critique_all(
@@ -395,7 +594,9 @@ class TaskExecutors:
         if skill.body_path and skill.body_path.is_file():
             try:
                 text = skill.body_path.read_text(encoding="utf-8", errors="ignore")
-                parts.append(f"=== SKILL DOCUMENTATION ({skill.id}) ===\n{text[:12000]}")
+                parts.append(
+                    f"=== SKILL DOCUMENTATION ({skill.id}) ===\n{text[:12000]}"
+                )
             except Exception as exc:
                 logger.warning("Failed to read skill body for %s: %s", skill.id, exc)
 
@@ -438,9 +639,7 @@ class TaskExecutors:
     ) -> str:
         """Build a CodeAct prompt that treats a skill as reference material."""
         user_request = (
-            task.parameters.get("user_request")
-            or task.description
-            or task.name
+            task.parameters.get("user_request") or task.description or task.name
         )
         preflight = task.parameters.get("preflight") or {}
 
@@ -490,6 +689,9 @@ class TaskExecutors:
             "include the comparison and report agreement metrics (ARI, NMI, confusion matrix). "
             "Print a brief summary of results at the end and assign it to the `result` variable."
         )
+        convention = self._marker_convention_for(task)
+        if convention:
+            parts.append(convention)
         return "\n\n".join(parts)
 
     async def _run_codeact_with_prompt(
@@ -539,7 +741,7 @@ class TaskExecutors:
         llm_client = self._new_llm_client()
 
         try:
-            return await run_code_act(
+            result = await run_code_act(
                 task=prompt,
                 language="python",
                 context=code_context,
@@ -549,6 +751,8 @@ class TaskExecutors:
                 tool_registry=None,
                 max_tokens=8000,
             )
+            await self._emit_phase_markers(task, context, result)
+            return result
         except Exception as exc:
             logger.warning("CodeAct execution failed for task %s: %s", task.name, exc)
             return {"success": False, "error": str(exc)}
@@ -576,6 +780,7 @@ class TaskExecutors:
         prompt = self._build_skill_reference_prompt(task, context, reference_text)
 
         self._orch.state_machine.transition(task, TaskStatus.RUNNING)
+        await self._emit_workflow_skeleton(task, context)
         max_attempts = max(1, task.retry_policy.max_attempts)
         backoff = task.retry_policy.backoff_seconds
         last_error: Optional[str] = None
@@ -603,9 +808,15 @@ class TaskExecutors:
                 return self._normalize_codeact_result(
                     task, codeact_result, skill_name=skill.id
                 )
-            last_error = codeact_result.get("stderr") or codeact_result.get("error") or "unknown error"
+            last_error = (
+                codeact_result.get("stderr")
+                or codeact_result.get("error")
+                or "unknown error"
+            )
             if attempt < max_attempts:
-                prompt = self._build_skill_reference_prompt(task, context, reference_text)
+                prompt = self._build_skill_reference_prompt(
+                    task, context, reference_text
+                )
                 prompt += (
                     f"\n\nThe previous attempt failed with the following error. "
                     f"Please fix the script and try again.\nError: {last_error[:2000]}"
@@ -644,7 +855,9 @@ class TaskExecutors:
             try:
                 worker = await self._orch.supervisor.delegate(task, context)
                 if worker is None:
-                    raise RuntimeError(f"Supervisor could not delegate task {task.name}")
+                    raise RuntimeError(
+                        f"Supervisor could not delegate task {task.name}"
+                    )
 
                 raw_result = await worker.run(task, context)
             except Exception as e:
@@ -664,7 +877,9 @@ class TaskExecutors:
                 }
 
             task.attempt_count = attempt
-            task.error_message = raw_result.get("error") if isinstance(raw_result, dict) else None
+            task.error_message = (
+                raw_result.get("error") if isinstance(raw_result, dict) else None
+            )
 
             # If the worker returned a structured failure, retry internally.
             if isinstance(raw_result, dict) and raw_result.get("status") == "failure":

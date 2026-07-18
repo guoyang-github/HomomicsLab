@@ -4,6 +4,29 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+# Keys explicitly serialized by ``ExecutionState.to_dict`` / consumed by
+# ``from_dict``.  Any additional key found during deserialization is preserved
+# in ``ExecutionState.extra`` so custom payloads survive a round-trip.
+_SERIALIZED_FIELDS = frozenset({
+    "job_id",
+    "status",
+    "current_phase",
+    "progress_pct",
+    "started_at",
+    "estimated_completion",
+    "resource_usage",
+    "logs",
+    "error_message",
+    "scheduler_type",
+    "tasks",
+    "active_task_id",
+    "result",
+    "messages",
+    "actor",
+    "parent_id",
+    "extra",
+})
+
 
 @dataclass
 class ExecutionState:
@@ -31,11 +54,19 @@ class ExecutionState:
     # executions leave both unset and the keys are omitted from to_dict().
     actor: Optional[str] = None
     parent_id: Optional[str] = None
+    # Optional extra top-level payload keys merged into to_dict() (e.g. the
+    # domain workflow skeleton / phase marker events).  None for all
+    # pre-existing state kinds, so their serialized shape is unchanged.
+    extra: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
         started_at = data.get("started_at")
         estimated_completion = data.get("estimated_completion")
+        extra = dict(data.get("extra") or {})
+        for key, value in data.items():
+            if key not in _SERIALIZED_FIELDS:
+                extra[key] = value
         return cls(
             job_id=data["job_id"],
             status=data["status"],
@@ -55,6 +86,7 @@ class ExecutionState:
             messages=data.get("messages"),
             actor=data.get("actor"),
             parent_id=data.get("parent_id"),
+            extra=extra or None,
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -84,4 +116,6 @@ class ExecutionState:
         if self.actor is not None and self.parent_id is not None:
             payload["actor"] = self.actor
             payload["parent_id"] = self.parent_id
+        if self.extra:
+            payload.update(self.extra)
         return payload

@@ -145,7 +145,7 @@ class BackgroundJobRunner:
             self._publish_state(job_id, JobStatus.RUNNING, "Job started")
             await self._update_active_jobs()
 
-            progress_callback = self._make_progress_callback(job_id)
+            progress_callback = self._make_progress_callback(job_id, session_id=job.session_id)
             runner = self._runner_factory(progress_callback, self._skill_executor, job_id=job_id)
 
             # Start reproducibility tracking for this job.
@@ -914,9 +914,15 @@ class BackgroundJobRunner:
         except Exception:
             logger.exception("Failed to update plan status for %s", plan_id)
 
-    def _make_progress_callback(self, job_id: str) -> Callable[[ExecutionState], None]:
+    def _make_progress_callback(
+        self, job_id: str, session_id: Optional[str] = None
+    ) -> Callable[[ExecutionState], None]:
         def callback(state: ExecutionState) -> None:
             state.job_id = job_id
+            if session_id and state.extra is not None:
+                # Workflow DAG events carry session_id as a top-level payload
+                # key (see the {"type": "progress", "event": ...} contract).
+                state.extra.setdefault("session_id", session_id)
             self._pubsub.publish(job_id, state)
 
         return callback
