@@ -402,6 +402,62 @@ async def test_codeact_mode_skips_agent(failing_orchestrator, monkeypatch, tmp_p
     assert result["t1"].get("fallback") is False
 
 
+class TrackingSupervisor:
+    """Minimal supervisor stand-in that records delegation attempts."""
+
+    def __init__(self, worker):
+        self._worker = worker
+        self.delegate_calls = 0
+
+    async def delegate(self, task, context):
+        self.delegate_calls += 1
+        return self._worker
+
+
+@pytest.mark.asyncio
+async def test_codeact_mode_bypasses_supervisor(monkeypatch):
+    """A registered supervisor must not shadow the codeact dispatch.
+
+    Regression test: the server path always registers a SupervisorAgent, and
+    the unconditional supervisor branch used to shadow the codeact branch, so
+    ModeSelector's codeact decision never took effect there.
+    """
+    registry = AgentRegistry()
+    registry.register(FailingAgent())
+    supervisor = TrackingSupervisor(FailingAgent())
+    orchestrator = Orchestrator(registry=registry, supervisor=supervisor)
+
+    async def fake_run_code_act(*args, **kwargs):
+        return {
+            "success": True,
+            "result": {"cells": 42},
+            "stdout": "codeact mode",
+            "code": "print('codeact')",
+        }
+
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.run_code_act", fake_run_code_act
+    )
+
+    tree = TaskTree([
+        TaskNode(
+            id="t1",
+            name="quality_control",
+            description="QC",
+            skills_required=["failing_skill"],
+        ),
+    ])
+
+    result = await orchestrator.run_tree(
+        tree, context={"project_id": "proj1", "execution_mode": "codeact"}
+    )
+
+    assert supervisor.delegate_calls == 0
+    assert result["t1"]["status"] == "success"
+    assert result["t1"]["skill"] == "codeact"
+    assert result["t1"].get("fallback") is False
+
+
 @pytest.mark.asyncio
 async def test_fixed_pipeline_mode_disables_codeact_fallback(
     failing_orchestrator, monkeypatch

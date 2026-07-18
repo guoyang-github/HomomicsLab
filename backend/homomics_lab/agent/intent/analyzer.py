@@ -19,7 +19,6 @@ from homomics_lab.agent.intent.classifiers import (
     LLMIntentClassifier,
 )
 from homomics_lab.agent.intent.calibration import (
-    ConfidenceCalibrator,
     IntentDecisionLogger,
     IntentDecisionRecord,
 )
@@ -33,7 +32,7 @@ from homomics_lab.agent.intent.result_cache import (
     IntentResultCache,
     get_shared_intent_result_cache,
 )
-from homomics_lab.agent.debate import LightweightDebate
+from homomics_lab.agent.debate import LightweightDebate, RuleBasedDebateJudge
 from homomics_lab.context.working_memory import WorkingMemory
 
 
@@ -42,6 +41,71 @@ from homomics_lab.context.working_memory import WorkingMemory
 BARE_ANALYSIS_PATTERN = re.compile(
     r"^\s*(分析|analyze|run|do|做个)\s*(数据|data|analysis|analyses)?\s*$",
     re.IGNORECASE,
+)
+
+
+# Concrete analysis verbs: their presence in a message means the user is asking
+# for a specific analysis, so an open-ended research question containing any of
+# them stays on the normal workflow path instead of being routed to
+# hypothesis-driven exploration (consumed by
+# ``agent.turn_intent_router.IntentRouter._should_route_to_exploration``).
+# This is the single home for the analysis-verb vocabulary: keep it in sync
+# with the analysis-intent keyword tables in ``_load_builtin_definitions``
+# below (e.g. 聚类/cluster, 差异表达/differential, 物种注释/taxonomy).
+EXPLORATION_ANALYSIS_VERBS = (
+    "质控",
+    "聚类",
+    "注释",
+    "差异表达",
+    "降维",
+    "比对",
+    "定量",
+    "富集",
+    "标准化",
+    "归一化",
+    "过滤",
+    "整合",
+    "去批次",
+    "批次校正",
+    "轨迹",
+    "拟时序",
+    "通讯分析",
+    "变异检测",
+    "拼接",
+    "物种注释",
+    "多样性",
+    "画",
+    "可视化",
+    "转换",
+    "下载",
+    "运行",
+    "跑一下",
+    "跑个",
+    "qc",
+    "cluster",
+    "annotat",
+    "differential",
+    "pca",
+    "umap",
+    "tsne",
+    "align",
+    "quantif",
+    "enrich",
+    "normaliz",
+    "filter",
+    "integrat",
+    "batch",
+    "trajectory",
+    "pseudotime",
+    "cellchat",
+    "variant",
+    "assembl",
+    "taxonomy",
+    "diversity",
+    "plot",
+    "visualiz",
+    "convert",
+    "download",
 )
 
 
@@ -94,7 +158,6 @@ class CascadeIntentAnalyzer:
         debate: Optional[LightweightDebate] = None,
         cbkb: Optional[Any] = None,
         decision_logger: Optional[IntentDecisionLogger] = None,
-        calibrator: Optional[ConfidenceCalibrator] = None,
         llm_client: Optional[Any] = None,
         result_cache: Union[IntentResultCache, bool, None] = None,
     ):
@@ -115,7 +178,6 @@ class CascadeIntentAnalyzer:
         self.debate = debate
         self.cbkb = cbkb
         self.decision_logger = decision_logger if decision_logger is not None else IntentDecisionLogger()
-        self.calibrator = calibrator if calibrator is not None else ConfidenceCalibrator(self.decision_logger)
 
         # Short-term classification cache. The analyzer is rebuilt per chat
         # message, so the default cache is the process-wide shared instance.
@@ -355,10 +417,19 @@ class CascadeIntentAnalyzer:
 
         if cache is not None and cache_key is not None:
             # Clarification intents produced with a debate attached carry
-            # debate-instance-specific metadata; keep them out of the cache.
-            if not (self.debate is not None and intent.analysis_type == "clarification"):
+            # debate-outcome metadata. They are cacheable when the debate judge
+            # is deterministic (the default rule-based judge); an LLM judge
+            # makes the outcome non-reproducible, so those stay out of the
+            # cache.
+            if intent.analysis_type != "clarification" or self._debate_is_deterministic():
                 cache.put(cache_key, intent, refs=cache_refs)
         return intent
+
+    def _debate_is_deterministic(self) -> bool:
+        """Return True when no debate is attached or its judge is rule-based."""
+        if self.debate is None:
+            return True
+        return isinstance(getattr(self.debate, "judge", None), RuleBasedDebateJudge)
 
     def _make_cache_key(
         self,
@@ -389,8 +460,23 @@ class CascadeIntentAnalyzer:
         effective_cbkb = cbkb or self.cbkb
         cbkb_token = f"cbkb:{id(effective_cbkb)}" if effective_cbkb is not None else "cbkb:none"
 
+        # Debate configuration affects cached clarification outcomes (the
+        # debate metadata is part of the intent), so pin its deterministic
+        # fingerprint into the key.
+        if self.debate is None:
+            debate_token = "debate:none"
+        else:
+            judge = getattr(self.debate, "judge", None)
+            expert_roles = tuple(
+                sorted(
+                    getattr(getattr(e, "role", None), "role_id", "") or ""
+                    for e in (getattr(self.debate, "experts", None) or [])
+                )
+            )
+            debate_token = f"debate:{type(judge).__name__}:{expert_roles}"
+
         parts = {
-            "v": 1,
+            "v": 2,
             "session": session_id or "",
             "message": IntentResultCache.normalize_message(message),
             # Classification-relevant context only: the LLM prompt and the
@@ -422,6 +508,7 @@ class CascadeIntentAnalyzer:
             ),
             "llm": llm_token,
             "cbkb": cbkb_token,
+            "debate": debate_token,
         }
         digest = hashlib.sha256(
             json.dumps(parts, sort_keys=True, ensure_ascii=False, default=repr).encode("utf-8")
@@ -808,9 +895,8 @@ class CascadeIntentAnalyzer:
 
         # Explicit sequential markers ("先...再...") indicate a multi-step workflow.
         # Surface all strong, specific step intents as sub-intents.
-        sequential_markers = ["然后", "再", "接着", "and then", "followed by", "first", "先"]
         text = message.lower()
-        has_sequential_markers = any(m in text for m in sequential_markers)
+        has_sequential_markers = any(m in text for m in self._SEQUENTIAL_MARKERS)
         if has_sequential_markers:
             min_step_score = 0.05
             direct_response_types = {"qa", "information_request", "general_help", "greeting", "clarification"}
@@ -884,19 +970,17 @@ class CascadeIntentAnalyzer:
                     + "\n\n请告诉我更具体一些。"
                 )
 
-        # Fallback: bare analysis verbs (e.g. "分析数据", "analyze data") with no
-        # domain, data type, or target are ambiguous and should ask for clarification
-        # instead of silently falling back to a generic answer.
+        # Fallback: a generic/unknown low-confidence primary with no alternatives
+        # is ambiguous and should ask for clarification instead of silently
+        # falling back to a generic answer. (Bare analysis verbs like "分析数据"
+        # are already handled by the early return above.)
         if not needs_clarification:
             primary_weighted = (primary.confidence * primary.weight) if primary else 0.0
             if (
-                BARE_ANALYSIS_PATTERN.match(message.strip())
-                or (
-                    primary
-                    and primary.analysis_type in {"general", "unknown"}
-                    and primary_weighted < self.clarification_threshold
-                    and not alternatives
-                )
+                primary
+                and primary.analysis_type in {"general", "unknown"}
+                and primary_weighted < self.clarification_threshold
+                and not alternatives
             ):
                 needs_clarification = True
                 clarification_question = (

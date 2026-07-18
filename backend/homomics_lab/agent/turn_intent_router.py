@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
 from homomics_lab.agent.data_preflight import DataPreflight, resolve_preflight_file_paths
+from homomics_lab.agent.intent.analyzer import EXPLORATION_ANALYSIS_VERBS
 from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
 from homomics_lab.config import settings
 from homomics_lab.context.project_state import ProjectStateManager
@@ -49,7 +50,8 @@ REAL_DOMAIN_VALUES = {
 
 # Open-question phrasing that signals hypothesis-driven exploration. Kept
 # deliberately tight: matched messages must ALSO carry no explicit analysis
-# verb (see EXPLORATION_ANALYSIS_VERBS) and reference project data.
+# verb (see EXPLORATION_ANALYSIS_VERBS, single-sourced in
+# ``agent.intent.analyzer``) and reference project data.
 EXPLORATION_QUESTION_PATTERNS = (
     "为什么",
     "为何",
@@ -71,63 +73,10 @@ EXPLORATION_QUESTION_PATTERNS = (
     "what patterns",
 )
 
-# Concrete analysis verbs: their presence means the user is asking for a
-# specific analysis, so the request stays on the normal workflow path.
-EXPLORATION_ANALYSIS_VERBS = (
-    "质控",
-    "聚类",
-    "注释",
-    "差异表达",
-    "降维",
-    "比对",
-    "定量",
-    "富集",
-    "标准化",
-    "归一化",
-    "过滤",
-    "整合",
-    "去批次",
-    "批次校正",
-    "轨迹",
-    "拟时序",
-    "通讯分析",
-    "变异检测",
-    "拼接",
-    "物种注释",
-    "多样性",
-    "画",
-    "可视化",
-    "转换",
-    "下载",
-    "运行",
-    "跑一下",
-    "跑个",
-    "qc",
-    "cluster",
-    "annotat",
-    "differential",
-    "pca",
-    "umap",
-    "tsne",
-    "align",
-    "quantif",
-    "enrich",
-    "normaliz",
-    "filter",
-    "integrat",
-    "batch",
-    "trajectory",
-    "pseudotime",
-    "cellchat",
-    "variant",
-    "assembl",
-    "taxonomy",
-    "diversity",
-    "plot",
-    "visualiz",
-    "convert",
-    "download",
-)
+
+# Fallback ProjectStateManager cache for IntentRouter._project_state_manager,
+# keyed by data_dir so tests that relocate settings.data_dir stay isolated.
+_FALLBACK_STATE_MANAGERS: Dict[str, ProjectStateManager] = {}
 
 
 class IntentRouter:
@@ -135,6 +84,26 @@ class IntentRouter:
 
     def __init__(self, runner: "TurnRunner"):
         self._runner = runner
+
+    def _project_state_manager(self) -> ProjectStateManager:
+        """Return a shared ProjectStateManager instead of a per-call new one.
+
+        The app-level instance injected into the runner is preferred. The
+        fallback is a module-level cache keyed by ``data_dir``: CBKB opens a
+        fresh SQLite connection per operation and keeps no mutable connection
+        state, so sharing instances across threads/async tasks is safe — unlike
+        the previous per-enqueue construction, which paid a database open plus
+        schema-init round-trip on every call just to read plan signatures.
+        """
+        manager = getattr(self._runner, "project_state_manager", None)
+        if manager is not None:
+            return manager
+        key = str(settings.data_dir)
+        manager = _FALLBACK_STATE_MANAGERS.get(key)
+        if manager is None:
+            manager = ProjectStateManager(CBKB(settings.data_dir))
+            _FALLBACK_STATE_MANAGERS[key] = manager
+        return manager
 
     async def route(
         self,
@@ -670,7 +639,7 @@ class IntentRouter:
             domain_def=domain_def, role_id=None, settings=settings
         )
         # Load persisted approved plan signatures for first_time strategy.
-        project_state_manager = ProjectStateManager(CBKB(settings.data_dir))
+        project_state_manager = self._project_state_manager()
         project_state = project_state_manager.load(project_id or "default")
         seen_signatures = project_state.approved_plan_signatures
         needs_approval, updated_signatures = should_require_approval(
@@ -705,7 +674,7 @@ class IntentRouter:
             and (
                 is_high_risk
                 or len(tree.tasks) > 1
-                or intent.complexity in ("complex", "multi_step")
+                or intent.complexity == "complex"
             )
         ):
             try:

@@ -1180,7 +1180,13 @@ class Orchestrator:
             finally:
                 await self._finish_trace_node(task, context, trace_node_id, results)
 
-        if self.supervisor is not None:
+        # Supervisor delegation serves the auto/fixed_pipeline (and unset) modes.
+        # In codeact mode the plan explicitly asks for direct CodeAct execution,
+        # so the supervisor branch must be skipped — otherwise it always wins
+        # (a supervisor is always registered on the server path) and shadows the
+        # codeact dispatch below, making the ModeSelector's codeact decision a
+        # no-op.
+        if self.supervisor is not None and mode != "codeact":
             try:
                 return await self._execute_task_with_supervisor(task, context, results)
             finally:

@@ -25,13 +25,11 @@ class Route(str, Enum):
     CLARIFICATION = "clarification"
     FILE_CONVERSION = "file_conversion"
     QA = "qa"
-    DIRECT_RESPONSE = "direct_response"
     STANDALONE_SKILL = "standalone_skill"
     DESCRIPTIVE_STATISTICS = "descriptive_statistics"
     DOMAIN_TEMPLATE = "domain_template"
     CROSS_DOMAIN = "cross_domain"
     OPEN_AGENT = "open_agent"
-    FALLBACK_SUGGESTION = "fallback_suggestion"
 
 
 @dataclass
