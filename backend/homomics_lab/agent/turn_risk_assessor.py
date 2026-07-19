@@ -33,7 +33,7 @@ class RiskAssessor:
             "Evaluate the risk that executing this user request will lead to "
             "data loss, destruction, or unintended modification of project state.\n\n"
             f"User message: {user_message}\n"
-            f"Intent: {intent.analysis_type}\n"
+            f"Intent: {intent.intent_type} (mode={intent.interaction_mode}, scope={intent.scope})\n"
             f"Intent confidence: {intent.confidence:.2f}\n"
             f"Project ID: {project_id or 'unknown'}\n\n"
             'Respond with a JSON object: {"risk_score": 0.0} where the score is '
@@ -83,6 +83,6 @@ class RiskAssessor:
             score += 0.7
         if any(kw in message_lower for kw in low_risk_keywords):
             score -= 0.3
-        if intent.analysis_type in ("file_conversion", "qa", "information_request"):
+        if intent.interaction_mode == "answer" or intent.target == "convert_file":
             score -= 0.2
         return max(0.0, min(1.0, score))

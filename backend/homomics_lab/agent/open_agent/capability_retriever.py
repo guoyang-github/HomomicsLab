@@ -8,6 +8,7 @@ user's intent.
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.open_agent.models import CapabilityCandidate
 from homomics_lab.agent.plan.models import DataState
 from homomics_lab.skills.capability_index import (
@@ -187,7 +188,7 @@ class CapabilityRetriever:
         parts = []
         if intent.original_message:
             parts.append(intent.original_message)
-        parts.append(intent.analysis_type)
+        parts.append(intent_strategy_key(intent))
         if intent.target:
             parts.append(intent.target)
         if intent.domain:

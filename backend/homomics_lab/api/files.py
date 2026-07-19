@@ -17,6 +17,9 @@ from homomics_lab.workspace.manager import WorkspaceManager
 
 router = APIRouter()
 
+# Per-file upload cap (formerly HOMOMICS_MAX_UPLOAD_FILE_BYTES; default kept).
+MAX_UPLOAD_FILE_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB
+
 
 class FileListEntry(BaseModel):
     name: str
@@ -302,7 +305,7 @@ async def upload_file(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    max_bytes = settings.max_upload_file_bytes
+    max_bytes = MAX_UPLOAD_FILE_BYTES
     tmp_path = ""
     try:
         with tempfile.NamedTemporaryFile(delete=False) as tmp:

@@ -58,7 +58,6 @@ def resolve_strategy(
     global_strategy = getattr(settings, "plan_approval_strategy", None) if settings else None
     return normalize_strategy(global_strategy)
 
-
 def plan_signature(tree: Any, strategy_name: Optional[str] = None) -> str:
     """Stable identity for a plan shape, used by the ``first_time`` strategy.
 

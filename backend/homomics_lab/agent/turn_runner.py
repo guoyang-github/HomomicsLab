@@ -52,7 +52,6 @@ from homomics_lab.agent.permission_ruleset import (
     PermissionRegistry,
     get_permission_registry,
 )
-from homomics_lab.config import settings
 from homomics_lab.workflow.execution_service import WorkflowExecutionService
 from homomics_lab.context.compressor import ContextCompressor
 from homomics_lab.context.context_engine.engine import ContextEngine
@@ -73,6 +72,11 @@ from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
+
+# HITL / debate thresholds (formerly HOMOMICS_HITL_RISK_THRESHOLD /
+# HOMOMICS_DEBATE_JUDGE_BACKEND; defaults kept).
+HITL_RISK_THRESHOLD = 0.6
+DEBATE_JUDGE_BACKEND = "rule"  # "rule" | "llm"
 
 
 class ExecutionMode(str, Enum):
@@ -226,7 +230,7 @@ class TurnRunner:
             self._debate = debate
         else:
             judge = None
-            if settings.debate_judge_backend == "llm" and self._llm_client is not None:
+            if DEBATE_JUDGE_BACKEND == "llm" and self._llm_client is not None:
                 from homomics_lab.agent.debate import LLMDebateJudge
 
                 judge = LLMDebateJudge(self._llm_client)
@@ -923,9 +927,8 @@ class TurnRunner:
 
         confidence = getattr(intent, "confidence", 1.0) if intent is not None else 1.0
         context["confidence"] = confidence
-        context["confidence_threshold"] = settings.hitl_confidence_threshold
 
-        risk_threshold = settings.hitl_risk_threshold
+        risk_threshold = HITL_RISK_THRESHOLD
         context["risk_threshold"] = risk_threshold
 
         if (

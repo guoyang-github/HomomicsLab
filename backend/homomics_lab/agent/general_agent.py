@@ -75,10 +75,7 @@ class GeneralScientificAgent:
             return await self._handle_tool_call(intent, working_memory, context)
 
         # General help / code requests can use CodeAct if available.
-        if (
-            intent.analysis_type == "general_help"
-            or getattr(structured, "intent_type", None) == "general_help"
-        ):
+        if intent.intent_type == "general_help":
             return await self._handle_general_help(intent, working_memory, context)
 
         # Default: direct LLM answer.

@@ -26,6 +26,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Consecutive successful runs required for an observed skill transition to be
+# promoted to a CONFIRMED SkillDAG edge (formerly
+# HOMOMICS_SEED_OBSERVED_PROMOTION_THRESHOLD; default kept).
+SEED_OBSERVED_PROMOTION_THRESHOLD = 3
+
 
 class FeedbackRecorder:
     """Record skill execution feedback into CapabilityIndex, MemoryBackend and SkillDAG."""
@@ -40,24 +45,21 @@ class FeedbackRecorder:
         self._capability_index = capability_index
         self._memory_backend = memory_backend
         self._skill_dag = skill_dag
-        # None means "not injected": lazily built from settings on first use
-        # when HOMOMICS_SKILL_GENESIS_ENABLED is on. False disables the hook.
+        # None means "not injected": lazily built on first use (genesis is
+        # always on). False disables the hook.
         self._skill_genesis = skill_genesis
         self._genesis_checked = skill_genesis is not None
 
     def _get_skill_genesis(self) -> Optional[Any]:
         """Return the SkillGenesis service, lazily building the default one.
 
-        The default build is lazy and settings-gated so turns pay nothing
-        when the opt-in feature is disabled, and no TurnRunner call site
-        needs new wiring.
+        The default build is lazy so turns pay nothing until the first
+        CodeAct success is recorded, and no TurnRunner call site needs new
+        wiring.
         """
         if self._genesis_checked:
             return self._skill_genesis or None
         self._genesis_checked = True
-        if not getattr(settings, "skill_genesis_enabled", False):
-            self._skill_genesis = None
-            return None
         try:
             from homomics_lab.skills.genesis import SkillGenesis
 
@@ -185,7 +187,7 @@ class FeedbackRecorder:
                     record_observed_seed_edges(
                         self._skill_dag,
                         observed_pairs,
-                        threshold=settings.seed_observed_promotion_threshold,
+                        threshold=SEED_OBSERVED_PROMOTION_THRESHOLD,
                     )
             except Exception:
                 logger.warning("Failed to record SkillDAG observations", exc_info=True)

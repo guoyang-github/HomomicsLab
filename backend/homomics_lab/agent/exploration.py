@@ -29,11 +29,15 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from homomics_lab.agent.plan.display_plan import DisplayStep
-from homomics_lab.config import settings
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
+
+# Blueprint bounds (formerly HOMOMICS_EXPLORATION_MAX_HYPOTHESES /
+# HOMOMICS_EXPLORATION_MAX_DEPTH; defaults kept).
+EXPLORATION_MAX_HYPOTHESES = 4  # blueprint size cap (2..N hypotheses)
+EXPLORATION_MAX_DEPTH = 2  # max hypothesis layers incl. follow-ups
 
 VERDICTS = {"supported", "refuted", "inconclusive"}
 
@@ -156,9 +160,9 @@ class ExplorationEngine:
     ):
         self._llm_client = llm_client
         self.max_hypotheses = max(
-            2, max_hypotheses or settings.exploration_max_hypotheses
+            2, max_hypotheses or EXPLORATION_MAX_HYPOTHESES
         )
-        self.max_depth = max(1, max_depth or settings.exploration_max_depth)
+        self.max_depth = max(1, max_depth or EXPLORATION_MAX_DEPTH)
 
     # ------------------------------------------------------------------
     # a. Blueprint generation

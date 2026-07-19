@@ -7,6 +7,7 @@ validation into a single planner that returns a standard PlanResult.
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.open_agent.capability_retriever import CapabilityRetriever
 from homomics_lab.agent.open_agent.code_generation import CodeActPlanner
 from homomics_lab.agent.open_agent.models import (
@@ -137,7 +138,7 @@ class OpenAgentPlanner:
             "cross_domain_analysis",
             "general_scientific",
         }
-        if intent.analysis_type in open_types:
+        if intent.intent_type in open_types:
             return True
 
         # Diagnostic or comparative language in the original message.
@@ -156,7 +157,7 @@ class OpenAgentPlanner:
             return True
 
         # No domain signal and no known domain strategy: let open agent try.
-        if intent.domain is None and intent.analysis_type in {"general", "analysis", "unknown"}:
+        if intent.domain is None and intent.intent_type in {"general", "analysis", "unknown"}:
             return True
 
         return False
@@ -204,7 +205,7 @@ class OpenAgentPlanner:
             reproducibility_context={
                 "plan_engine_version": "0.5.0",
                 "strategy": "open-agent",
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
                 "source_capabilities": [c.id for c in capabilities],
                 "open_agent_plan": open_plan.model_dump(),
             },
@@ -261,7 +262,7 @@ class OpenAgentPlanner:
             is_fallback=True,
             suggestion_text=message,
             reproducibility_context={
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
                 "original_message": intent.original_message,
             },
         )

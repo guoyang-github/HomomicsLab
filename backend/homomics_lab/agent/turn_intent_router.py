@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from homomics_lab.agent.approval_policy import resolve_strategy, should_require_approval
 from homomics_lab.agent.data_preflight import DataPreflight, resolve_preflight_file_paths
 from homomics_lab.agent.intent.analyzer import EXPLORATION_ANALYSIS_VERBS
-from homomics_lab.agent.subagents import SpecialistCriticOrchestrator
+from homomics_lab.agent.intent.models import intent_plan_complexity, intent_strategy_key
 from homomics_lab.config import settings
 from homomics_lab.context.project_state import ProjectStateManager
 from homomics_lab.domain.registry import get_domain_registry
@@ -34,6 +34,11 @@ if TYPE_CHECKING:
     from homomics_lab.tasks.task_tree import TaskTree
 
 logger = logging.getLogger(__name__)
+
+# Routing gates (formerly HOMOMICS_EXPLORATION_ENABLED /
+# HOMOMICS_OPEN_AGENT_FALLBACK_ENABLED; defaults kept: both on).
+EXPLORATION_ENABLED = True
+OPEN_AGENT_FALLBACK_ENABLED = True
 
 # Domain values used by the domain registry for real analysis workflows.
 # Builtin intent definitions use placeholder domains such as "builtin" or
@@ -119,24 +124,13 @@ class IntentRouter:
     ) -> "TurnResult":
         """Route a user intent to the right execution path.
 
-        Uses the structured ``interaction_mode`` and ``scope`` fields when
-        available, with backward-compatible fallbacks to ``analysis_type`` and
-        ``complexity``.
+        Routing is driven by the v2 ``interaction_mode`` / ``scope`` / ``target``
+        fields on the intent.
         """
         from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
 
         interaction_mode = intent.interaction_mode
         scope = intent.scope
-
-        # Backward compatibility for legacy intents that don't set the new fields.
-        if not interaction_mode:
-            if intent.analysis_type == "clarification":
-                interaction_mode = "clarify"
-            elif (
-                intent.interaction_mode == "answer"
-                or intent.complexity == "direct_response"
-            ):
-                interaction_mode = "answer"
 
         if interaction_mode == "clarify":
             return self._runner._handle_clarification(intent, working_memory)
@@ -147,7 +141,7 @@ class IntentRouter:
             )
 
         # Fast-path natural-language figure editing.
-        if intent.analysis_type == "visualization_edit":
+        if intent.target == "visualization_edit":
             from homomics_lab.agent.turn_viz_handler import VisualizationEditHandler
 
             handler = VisualizationEditHandler(self._runner)
@@ -209,7 +203,7 @@ class IntentRouter:
         # after clarify/answer (and the fast-path handlers above) but before
         # the generic workflow path. The gate is deliberately conservative —
         # when in doubt we fall through to the normal execution path.
-        if settings.exploration_enabled:
+        if EXPLORATION_ENABLED:
             if self._should_route_to_exploration(
                 intent, user_message, file_paths, project_id, project_has_data
             ):
@@ -235,7 +229,7 @@ class IntentRouter:
         preflight = await DataPreflight(self._runner._llm_client).run(
             user_request=user_message,
             file_paths=file_paths,
-            intent_type=intent.analysis_type,
+            intent_type=intent_strategy_key(intent),
         )
         plan_context = {
             "project_id": project_id,
@@ -258,7 +252,7 @@ class IntentRouter:
         if (
             plan_result.is_fallback
             and not self._runner._is_fallback_suggestion(tree)
-            and getattr(settings, "open_agent_fallback_enabled", True)
+            and OPEN_AGENT_FALLBACK_ENABLED
         ):
             open_plan = (
                 await self._runner.task_decomposer._get_open_agent_planner().plan(
@@ -311,17 +305,16 @@ class IntentRouter:
                 project_id=project_id,
                 status=PlanStatus.PENDING_APPROVAL,
                 is_fallback=plan_result.is_fallback,
-                intent_analysis_type=intent.analysis_type,
-                intent_complexity=intent.complexity,
+                intent_analysis_type=intent_strategy_key(intent),
+                intent_complexity=intent_plan_complexity(intent),
                 original_intent={
-                    "analysis_type": intent.analysis_type,
-                    "complexity": intent.complexity,
+                    "intent_type": intent.intent_type,
+                    "interaction_mode": intent.interaction_mode,
+                    "scope": intent.scope,
                     "confidence": intent.confidence,
                     "original_message": intent.original_message,
                     "domain": intent.domain,
                     "target": intent.target,
-                    "scope": intent.scope,
-                    "interaction_mode": intent.interaction_mode,
                     "metadata": (
                         dict(intent.metadata)
                         if isinstance(intent.metadata, dict)
@@ -401,7 +394,7 @@ class IntentRouter:
         by the caller (it is gathered concurrently with file-path resolution);
         when omitted it is scanned here.
         """
-        if not settings.exploration_enabled:
+        if not EXPLORATION_ENABLED:
             return False
         # clarify/answer intents have already returned above; only genuine
         # execution-style intents qualify.
@@ -511,17 +504,16 @@ class IntentRouter:
             project_id=project_id,
             status=PlanStatus.PENDING_APPROVAL,
             is_fallback=False,
-            intent_analysis_type=intent.analysis_type,
-            intent_complexity=intent.complexity,
+            intent_analysis_type=intent_strategy_key(intent),
+            intent_complexity=intent_plan_complexity(intent),
             original_intent={
-                "analysis_type": intent.analysis_type,
-                "complexity": intent.complexity,
+                "intent_type": intent.intent_type,
+                "interaction_mode": intent.interaction_mode,
+                "scope": intent.scope,
                 "confidence": intent.confidence,
                 "original_message": intent.original_message,
                 "domain": intent.domain,
                 "target": intent.target,
-                "scope": intent.scope,
-                "interaction_mode": intent.interaction_mode,
                 "metadata": (
                     dict(intent.metadata)
                     if isinstance(intent.metadata, dict)
@@ -664,55 +656,9 @@ class IntentRouter:
         ):
             needs_approval = False
 
-        # Optional specialist + critic review for complex / high-risk plans.
-        review: Optional[Dict[str, Any]] = None
-        if (
-            settings.subagent_review_enabled
-            and plan is not None
-            and self._runner._llm_client is not None
-            and self._runner._tool_registry is not None
-            and (
-                is_high_risk
-                or len(tree.tasks) > 1
-                or intent.complexity == "complex"
-            )
-        ):
-            try:
-                review = await self.review_plan_with_subagents(
-                    request=user_message,
-                    plan=plan,
-                    intent=intent,
-                    domain_def=domain_def,
-                    working_memory=working_memory,
-                )
-                plan.metadata["critic_review"] = review
-                if plan_store is not None:
-                    await plan_store.update(plan)
-            except Exception:
-                logger.warning(
-                    "Sub-agent review failed; continuing without it", exc_info=True
-                )
-
         if plan is not None and needs_approval:
-            review_note = ""
-            if review:
-                summary = review.get("summary", "")
-                concerns = review.get("concerns", [])
-                suggestions = review.get("suggestions", [])
-                parts = []
-                if summary:
-                    parts.append(f"复核结论：{summary}")
-                if concerns:
-                    parts.append(f"关注点：{'; '.join(concerns)}")
-                if suggestions:
-                    parts.append(f"建议：{'; '.join(suggestions)}")
-                if parts:
-                    review_note = "\n\n" + "\n".join(parts)
-
             if is_domain:
-                response_text = (
-                    "我为您生成了一个分析计划，请确认后再执行。" + review_note
-                )
+                response_text = "我为您生成了一个分析计划，请确认后再执行。"
                 plan_payload = PlanPresenter.to_user_payload(plan)
                 agent_msg = ChatMessage(
                     id=f"msg_{len(working_memory.messages)}",
@@ -721,14 +667,11 @@ class IntentRouter:
                         "plan_id": plan.plan_id,
                         "plan": plan_payload,
                         "response_text": response_text,
-                        "critic_review": review,
                     },
                     sender="agent",
                 )
             else:
-                response_text = (
-                    "我为您规划了以下执行步骤，请确认后再执行。" + review_note
-                )
+                response_text = "我为您规划了以下执行步骤，请确认后再执行。"
                 estimates = {}
                 if plan is not None:
                     estimates = {
@@ -745,7 +688,6 @@ class IntentRouter:
                         "tasks": progress_tasks,
                         "progress": progress,
                         "estimates": estimates,
-                        "critic_review": review,
                     },
                     sender="agent",
                 )
@@ -817,32 +759,6 @@ class IntentRouter:
             job_id=job.job_id,
             plan_id=plan.plan_id if plan is not None else None,
         )
-
-    async def review_plan_with_subagents(
-        self,
-        request: str,
-        plan: Plan,
-        intent: "UserIntent",
-        domain_def: Any,
-        working_memory: "WorkingMemory",
-    ) -> Dict[str, Any]:
-        """Run a domain specialist + critic review on a plan before approval.
-
-        The review is best-effort: failures are logged and do not block execution.
-        """
-        role = None
-        if domain_def is not None and getattr(domain_def, "roles", None):
-            role = domain_def.roles[0]
-
-        orchestrator = SpecialistCriticOrchestrator(
-            llm_client=self._runner._llm_client,
-            tool_registry=self._runner._tool_registry,
-            role=role,
-            domain=intent.domain,
-        )
-        history = self._runner._working_memory_to_history(working_memory)
-        review = await orchestrator.review(request, plan, history=history)
-        return review.to_dict()
 
     @staticmethod
     def build_initial_progress(

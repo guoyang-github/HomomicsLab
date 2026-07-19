@@ -74,8 +74,10 @@ class SelfCorrectionHandler:
         # Build a PlanResult from the current task tree so the replanning engine
         # has a plan to mutate.
         placeholder_intent = intent or UserIntent(
-            analysis_type="runtime_replan",
-            complexity="single_step",
+            intent_type="analysis",
+            interaction_mode="execute",
+            scope="single_step",
+            target="runtime_replan",
         )
         current_plan = self._runner.task_decomposer._task_tree_to_plan_result(
             tree,

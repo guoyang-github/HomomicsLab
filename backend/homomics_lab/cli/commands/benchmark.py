@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
+from homomics_lab.agent.intent.models import intent_strategy_key
 
 
 def _build_intent_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -85,7 +86,11 @@ async def _evaluate_intent(
             continue
 
         intent = await analyzer.analyze(message)
-        actual = getattr(intent, field, None) or ""
+        if field == "analysis_type":
+            # The plan-layer intent key derived from the v2 intent fields.
+            actual = intent_strategy_key(intent)
+        else:
+            actual = getattr(intent, field, None) or ""
         alternatives = []
         for m in intent.metadata.get("alternatives", []):
             if isinstance(m, dict):
@@ -107,7 +112,7 @@ async def _evaluate_intent(
 
         confusion[str(expected)][str(actual)] += 1
 
-        if getattr(intent, "analysis_type", None) == "clarification":
+        if intent.interaction_mode == "clarify":
             clarification_count += 1
 
         details.append({

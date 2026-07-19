@@ -5,6 +5,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.intent.alias_registry import AliasRegistry
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.intent.routing_decision import Route, RoutingDecision
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.display_plan import DisplayStep
@@ -190,7 +191,10 @@ class TaskDecomposer:
             if keyword in lowered:
                 matched.add(analysis_type)
 
-        return [UserIntent(analysis_type=t, complexity="single_step") for t in sorted(matched)]
+        return [
+            UserIntent(target=t, intent_type="analysis", interaction_mode="execute", scope="single_step")
+            for t in sorted(matched)
+        ]
 
     def _merge_derived_sub_intents(self, intent: UserIntent) -> UserIntent:
         """Merge message-derived phase sub-intents with the classifier's sub-intents.
@@ -203,9 +207,9 @@ class TaskDecomposer:
         derived = self._derive_sub_intents_from_message(intent.original_message)
         if not derived:
             return intent
-        existing = {s.analysis_type for s in intent.sub_intents}
+        existing = {intent_strategy_key(s) for s in intent.sub_intents}
         combined = list(intent.sub_intents) + [
-            s for s in derived if s.analysis_type not in existing
+            s for s in derived if intent_strategy_key(s) not in existing
         ]
         if combined == intent.sub_intents:
             return intent
@@ -327,17 +331,22 @@ class TaskDecomposer:
         if not plan.is_fallback or not intent.sub_intents:
             return intent, plan
         plan_engine = self._get_plan_engine()
-        seen: set[str] = {intent.analysis_type}
+        seen: set[str] = {intent_strategy_key(intent)}
         for sub in intent.sub_intents:
-            if sub.analysis_type in seen:
+            sub_key = intent_strategy_key(sub)
+            if sub_key in seen:
                 continue
-            seen.add(sub.analysis_type)
-            if not self._has_domain_strategy(sub.analysis_type):
+            seen.add(sub_key)
+            if not self._has_domain_strategy(sub_key):
                 continue
             promoted = dataclasses.replace(
                 intent,
-                analysis_type=sub.analysis_type,
-                complexity=sub.complexity or intent.complexity,
+                intent_type=sub.intent_type,
+                interaction_mode=sub.interaction_mode,
+                domain=sub.domain or intent.domain,
+                target=sub.target,
+                scope=sub.scope or intent.scope,
+                structured_intent=None,
             )
             new_plan = await plan_engine.plan(
                 promoted,
@@ -360,21 +369,21 @@ class TaskDecomposer:
         any pre-resolved skills/template, forming an auditable record that
         downstream code can execute without re-interpreting the intent.
         """
-        if intent.analysis_type == "clarification":
+        if intent.interaction_mode == "clarify":
             return RoutingDecision.direct(
                 Route.CLARIFICATION, "Intent classified as clarification"
             )
-        if intent.analysis_type == "file_conversion":
+        if intent.target == "convert_file":
             return RoutingDecision.direct(
                 Route.FILE_CONVERSION, "Intent classified as file conversion"
             )
-        if intent.analysis_type == "qa":
+        if intent.intent_type == "qa":
             return RoutingDecision.direct(Route.QA, "Intent classified as QA")
 
         # Data exploration / descriptive statistics should not be forced into a
         # domain template; generate targeted summary code via CodeAct with the
         # general coding skill as reference (fast, single-shot path).
-        if intent.analysis_type == "descriptive_statistics":
+        if intent.target == "descriptive_statistics":
             return RoutingDecision.direct(
                 Route.DESCRIPTIVE_STATISTICS,
                 "Descriptive statistics: fast CodeAct summary",
@@ -389,7 +398,7 @@ class TaskDecomposer:
         # single shot (e.g. "run CellTypist and compare labels" needs no qc,
         # normalization, or clustering). In that case, prefer an explicit skill
         # target over a full domain phase pipeline, even when the classifier
-        # mapped the request to a phase-level analysis_type.
+        # mapped the request to a phase-level intent target.
         preflight = context.get("preflight") or {}
         preflight_required = preflight.get("required_steps") or []
         is_single_shot = (
@@ -429,7 +438,7 @@ class TaskDecomposer:
         # by the domain strategy, not delegated to the open agent.
         if (
             assembly.route == "open_agent"
-            and self._has_domain_strategy(intent.analysis_type)
+            and self._has_domain_strategy(intent_strategy_key(intent))
         ):
             domains = [intent.domain] if intent.domain else []
             if not domains:
@@ -438,9 +447,9 @@ class TaskDecomposer:
                         domains.append(sub.domain)
                         break
             reason = (
-                f"Phase-level intent '{intent.analysis_type}' mapped to domain strategy"
-                if self._ensure_alias_registry().is_phase_level(intent.analysis_type)
-                else f"Domain-level intent '{intent.analysis_type}' mapped to domain strategy"
+                f"Phase-level intent '{intent_strategy_key(intent)}' mapped to domain strategy"
+                if self._ensure_alias_registry().is_phase_level(intent_strategy_key(intent))
+                else f"Domain-level intent '{intent_strategy_key(intent)}' mapped to domain strategy"
             )
             return RoutingDecision(
                 route=Route.DOMAIN_TEMPLATE,
@@ -664,14 +673,14 @@ class TaskDecomposer:
         """Decompose intent into a canonical PlanResult and executable TaskTree."""
         decision = await self._make_routing_decision(intent, context)
         logger.info(
-            "TaskDecomposer routing decision route=%s reason=%s analysis_type=%s confidence=%.2f",
+            "TaskDecomposer routing decision route=%s reason=%s intent_key=%s confidence=%.2f",
             decision.route.value,
             decision.reason,
-            intent.analysis_type,
+            intent_strategy_key(intent),
             decision.confidence,
         )
         if decision.trace:
-            logger.debug("Routing trace for %s: %s", intent.analysis_type, decision.trace)
+            logger.debug("Routing trace for %s: %s", intent_strategy_key(intent), decision.trace)
         plan, tree = await self._execute_routing_decision(decision, intent, context)
         if plan.routing_trace is None or not plan.routing_trace:
             plan.routing_trace = list(decision.trace)
@@ -916,7 +925,7 @@ class TaskDecomposer:
             reproducibility_context={
                 "plan_engine_version": "0.5.0",
                 "strategy": strategy_name,
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
             },
             is_fallback=is_fallback,
             derivation="hardcoded",
@@ -958,7 +967,7 @@ class TaskDecomposer:
         target_phase_ids = set()
         alias_registry = self._ensure_alias_registry()
         for sub in intent.sub_intents:
-            phase_id = alias_registry.resolve_phase(sub.analysis_type)
+            phase_id = alias_registry.resolve_phase(intent_strategy_key(sub))
             if phase_id is not None:
                 target_phase_ids.add(phase_id)
 
@@ -1045,7 +1054,7 @@ class TaskDecomposer:
             ],
             reproducibility_context={
                 **plan.reproducibility_context,
-                "sub_intents": [sub.analysis_type for sub in intent.sub_intents],
+                "sub_intents": [intent_strategy_key(sub) for sub in intent.sub_intents],
             },
             is_fallback=plan.is_fallback,
             suggestion_text=plan.suggestion_text,

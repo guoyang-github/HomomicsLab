@@ -34,6 +34,11 @@ from homomics_lab.database.models import User
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 logger = logging.getLogger(__name__)
 
+# JWT tuning (formerly HOMOMICS_JWT_ALGORITHM /
+# HOMOMICS_JWT_ACCESS_TOKEN_EXPIRE_MINUTES; defaults kept).
+JWT_ALGORITHM = "HS256"
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
+
 # ---------------------------------------------------------------------------
 # Role constants
 # ---------------------------------------------------------------------------
@@ -112,9 +117,9 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=JWT_ALGORITHM)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +196,7 @@ def verify_oidc_token(token: str) -> Optional[Dict[str, Any]]:
         payload = jwt.decode(
             token,
             key,
-            algorithms=[settings.jwt_algorithm],
+            algorithms=[JWT_ALGORITHM],
             audience=settings.oidc_client_id or None,
         )
     except JWTError:
@@ -232,7 +237,7 @@ def _decode_local_token(token: str) -> Optional[Dict[str, Any]]:
     if not settings.jwt_secret_key:
         return None
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[JWT_ALGORITHM])
     except JWTError:
         return None
 

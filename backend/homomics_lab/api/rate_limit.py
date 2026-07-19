@@ -16,6 +16,10 @@ from fastapi import HTTPException, Request, status
 
 from homomics_lab.config import settings
 
+# Fixed rate-limit tuning (formerly HOMOMICS_RATE_LIMIT_* config fields;
+# defaults kept). Backend/window sizing are deliberately not user-tunable.
+RATE_LIMIT_TRUST_PROXY = False
+
 
 class InMemoryRateLimiter:
     """Sliding-window rate limiter keyed by client identity."""
@@ -28,7 +32,7 @@ class InMemoryRateLimiter:
     def _client_ip(self, request: Request) -> str:
         """Return the client IP, optionally trusting ``X-Forwarded-For``."""
         forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded and settings.rate_limit_trust_proxy:
+        if forwarded and RATE_LIMIT_TRUST_PROXY:
             # Use the rightmost address as the most trustworthy client IP when
             # the app is behind known proxies.
             return forwarded.split(",")[-1].strip()
@@ -78,7 +82,7 @@ class RedisRateLimiter:
     ):
         self.window_seconds = window_seconds
         self.max_requests = max_requests
-        self._redis_url = redis_url or settings.rate_limit_redis_url or settings.redis_url
+        self._redis_url = redis_url or settings.redis_url
         self._client = redis_client
 
     @property
@@ -91,7 +95,7 @@ class RedisRateLimiter:
 
     def _client_ip(self, request: Request) -> str:
         forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded and settings.rate_limit_trust_proxy:
+        if forwarded and RATE_LIMIT_TRUST_PROXY:
             return forwarded.split(",")[-1].strip()
         return request.client.host if request.client else "unknown"
 
@@ -127,15 +131,10 @@ RateLimiter = Union[InMemoryRateLimiter, RedisRateLimiter]
 
 
 def get_rate_limiter() -> RateLimiter:
-    """Factory returning the configured rate limiter backend."""
-    if settings.rate_limit_backend == "redis":
-        return RedisRateLimiter(
-            window_seconds=60,
-            max_requests=settings.rate_limit_requests_per_minute,
-        )
+    """Factory returning the in-memory rate limiter."""
     return InMemoryRateLimiter(
         window_seconds=60,
-        max_requests=settings.rate_limit_requests_per_minute,
+        max_requests=60,
     )
 
 
@@ -144,14 +143,9 @@ _rate_limiter: RateLimiter = get_rate_limiter()
 
 
 def update_limiter_config() -> None:
-    """Synchronize limiter configuration with settings, swapping backend if needed."""
+    """Synchronize limiter configuration with settings."""
     global _rate_limiter
-    backend = settings.rate_limit_backend
-    current_backend = "redis" if isinstance(_rate_limiter, RedisRateLimiter) else "memory"
-    if backend != current_backend:
-        _rate_limiter = get_rate_limiter()
-    else:
-        _rate_limiter.max_requests = settings.rate_limit_requests_per_minute
+    _rate_limiter.max_requests = 60
 
 
 async def rate_limit_dependency(request: Request = None) -> None:  # type: ignore[assignment]

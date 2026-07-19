@@ -39,7 +39,7 @@ class AuditLogger:
         if self._configured or not settings.audit_log_enabled:
             return
 
-        log_path = settings.audit_log_path or Path(settings.data_dir) / "logs" / "audit.log"
+        log_path = Path(settings.data_dir) / "logs" / "audit.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
         handler = RotatingFileHandler(
@@ -94,7 +94,7 @@ class AuditLogger:
         if not settings.audit_log_enabled:
             return []
 
-        log_path = settings.audit_log_path or Path(settings.data_dir) / "logs" / "audit.log"
+        log_path = Path(settings.data_dir) / "logs" / "audit.log"
         if not log_path.exists():
             return []
 

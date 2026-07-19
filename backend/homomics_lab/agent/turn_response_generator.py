@@ -156,8 +156,8 @@ class ResponseGenerator:
         else:
             # Fallback minimal context when the context engine is not used.
             context_parts: List[str] = [
-                f"Intent: type={intent.analysis_type}, domain={intent.domain or 'none'}, "
-                f"analysis_type={intent.analysis_type or 'none'}, confidence={intent.confidence:.2f}"
+                f"Intent: type={intent.intent_type or 'general'}, domain={intent.domain or 'none'}, "
+                f"mode={intent.interaction_mode}, confidence={intent.confidence:.2f}"
             ]
             recent_messages = working_memory.get_recent_messages()[-6:]
             if recent_messages:
@@ -250,9 +250,9 @@ class ResponseGenerator:
         falls back to a static template if no LLM is configured or the call fails.
         """
         greeting_intent = UserIntent(
-            analysis_type="greeting",
-            domain="general",
-            complexity="direct_response",
+            intent_type="greeting",
+            interaction_mode="answer",
+            scope="single_step",
             original_message=user_message,
         )
         llm_response = await self.generate_direct_response_via_llm(
@@ -298,7 +298,7 @@ class ResponseGenerator:
         if llm_response:
             return llm_response
 
-        domain = intent.domain or intent.analysis_type
+        domain = intent.domain or intent.intent_type or "general"
         qa_responses = {
             "single-cell-transcriptomics": (
                 "单细胞测序（scRNA-seq）是一种在单个细胞水平上分析基因表达的技术。"

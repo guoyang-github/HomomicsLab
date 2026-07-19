@@ -10,6 +10,7 @@ domain strategy.
 from typing import List, Optional
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
@@ -96,7 +97,7 @@ class StandaloneSkillPlanner:
         # semantic signal. Fall back to structured fields for robustness.
         if intent.original_message:
             return intent.original_message
-        parts = [intent.analysis_type]
+        parts = [intent_strategy_key(intent)]
         if intent.target:
             parts.append(intent.target)
         if intent.domain:

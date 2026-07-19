@@ -178,7 +178,13 @@ def _sc_strategy(name: str, skeleton: List[Phase]) -> AnalysisStrategy:
 
 
 def _intent(analysis_type: str = "single_cell_analysis") -> UserIntent:
-    return UserIntent(analysis_type=analysis_type, complexity="complex", confidence=0.9)
+    return UserIntent(
+        intent_type="analysis",
+        interaction_mode="execute",
+        scope="full",
+        target=analysis_type,
+        confidence=0.9,
+    )
 
 
 # Descriptions must not contain the tokens "analysis"/"step" (they appear in

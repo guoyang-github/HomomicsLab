@@ -13,6 +13,10 @@ from homomics_lab.workspace.manager import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 
+# nf-core integration (formerly HOMOMICS_NFCORE_* config fields; on).
+NFCORE_ENABLED = True
+NFCORE_DEFAULT_PROFILES = ["docker"]
+
 router = APIRouter()
 
 
@@ -117,7 +121,7 @@ async def list_nfcore_pipelines(
     Args:
         cached_only: Only return pipelines already downloaded locally.
     """
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -146,7 +150,7 @@ async def download_nfcore_pipeline(
     version: Optional[str] = None,
 ):
     """Download/cache an nf-core pipeline."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -166,7 +170,7 @@ async def run_nfcore_pipeline(
 
     The actual execution is delegated to the existing Nextflow/HPC runtime.
     """
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -174,7 +178,7 @@ async def run_nfcore_pipeline(
             request.pipeline,
             params=request.params,
             version=request.version,
-            profiles=request.profiles or settings.nfcore_default_profiles,
+            profiles=request.profiles or NFCORE_DEFAULT_PROFILES,
         )
     except Exception as exc:
         logger.exception("nf-core pipeline run failed (pipeline=%s)", request.pipeline)
@@ -188,7 +192,7 @@ async def suggest_nfcore_pipeline(
     intent: str,
 ):
     """Suggest an nf-core pipeline for a given analysis intent."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     suggestion = get_nfcore_manager().suggest_pipeline(intent)
@@ -202,7 +206,7 @@ async def list_nfcore_releases(
     pipeline: str,
 ):
     """List available releases/tags for an nf-core pipeline."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -220,7 +224,7 @@ async def get_nfcore_schema(
     version: Optional[str] = None,
 ):
     """Return the parameter schema for an nf-core pipeline as a user-friendly form."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -244,7 +248,7 @@ async def validate_nfcore_params(
     request: ValidateParamsRequest,
 ):
     """Validate user-provided params against a pipeline schema."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     try:
@@ -263,14 +267,14 @@ async def validate_nfcore_params(
 @router.get("/profiles", response_model=NFCoreProfilesResponse)
 async def detect_nfcore_profiles():
     """Detect available container/conda profiles on the host."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     available, recommended = get_nfcore_manager().detect_profiles()
     return {
         "available": available,
         "recommended": recommended,
-        "default": settings.nfcore_default_profiles,
+        "default": NFCORE_DEFAULT_PROFILES,
     }
 
 
@@ -284,7 +288,7 @@ class IngestResultsRequest(BaseModel):
 @router.post("/ingest", response_model=NFCoreIngestResponse)
 async def ingest_nfcore_results(request: IngestResultsRequest):
     """Scan an nf-core output directory and register artifacts in a workspace."""
-    if not settings.nfcore_enabled:
+    if not NFCORE_ENABLED:
         raise HTTPException(status_code=404, detail="nf-core integration is disabled")
 
     output_dir = Path(request.output_dir)

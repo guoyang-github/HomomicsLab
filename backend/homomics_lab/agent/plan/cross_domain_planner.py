@@ -11,6 +11,7 @@ import dataclasses
 from typing import Dict, List, Optional, Set, Tuple
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import ANALYSIS_KEY_TO_DOMAIN, intent_strategy_key
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 
@@ -109,7 +110,7 @@ class CrossDomainPlanner:
             reproducibility_context={
                 "plan_engine_version": "0.5.0",
                 "strategy": "cross-domain-composition",
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
                 "composed_from": composed_from,
             },
             phase_transitions=merged_transitions,
@@ -155,23 +156,26 @@ class CrossDomainPlanner:
     def _build_domain_sub_intent(self, intent: UserIntent, domain: str) -> UserIntent:
         """Create a sub-intent scoped to a single domain.
 
-        The analysis type is chosen to match the domain strategy's
+        The v2 domain tag is chosen to match the domain strategy's
         ``applicable_intents`` so the PlanEngine selects the real domain
         skeleton instead of falling back to the generic/LLM planner.
         """
         strategy = self.plan_engine.strategy_library.get(domain)
         if strategy is not None:
-            analysis_type = next(
+            analysis_key = next(
                 (i for i in strategy.applicable_intents if i.endswith("_analysis")),
                 f"{domain}_analysis",
             )
         else:
-            analysis_type = f"{domain}_analysis"
+            analysis_key = f"{domain}_analysis"
 
         return dataclasses.replace(
             intent,
-            analysis_type=analysis_type,
-            domain=domain,
+            intent_type="analysis",
+            interaction_mode="execute",
+            domain=ANALYSIS_KEY_TO_DOMAIN.get(analysis_key, domain),
+            target=None,
+            structured_intent=None,
             sub_intents=[
                 sub for sub in intent.sub_intents if sub.domain == domain
             ],

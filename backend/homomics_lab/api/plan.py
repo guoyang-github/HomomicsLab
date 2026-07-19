@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from homomics_lab.agent.intent.models import UserIntent
+from homomics_lab.agent.intent.models import (
+    ANALYSIS_KEY_TO_DOMAIN,
+    UserIntent,
+    intent_plan_complexity,
+    intent_strategy_key,
+)
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import PlanResult
 from homomics_lab.agent.plan.template import AnalysisTemplate
@@ -36,6 +41,10 @@ from homomics_lab.tasks.task_tree import (
 )
 
 router = APIRouter()
+
+# Field filter for re-parsing a persisted ``original_intent`` dict; unknown
+# (legacy v1) keys are ignored.
+_USER_INTENT_FIELDS = frozenset(UserIntent.__dataclass_fields__)
 
 
 class SaveTemplateRequest(BaseModel):
@@ -512,11 +521,24 @@ async def switch_plan_strategy(
             detail="Can only switch strategy for plans awaiting approval",
         )
 
-    intent_data = plan.original_intent or {
-        "analysis_type": plan.intent_analysis_type,
-        "complexity": plan.intent_complexity or "complex",
-    }
-    intent = UserIntent(**intent_data)
+    intent_data = plan.original_intent
+    if not intent_data:
+        # Records without a serialized intent rebuild a minimal v2 intent from
+        # the plan-layer fields.
+        key = plan.intent_analysis_type or ""
+        domain = ANALYSIS_KEY_TO_DOMAIN.get(key)
+        complexity = plan.intent_complexity or "complex"
+        intent_data = {
+            "intent_type": "analysis",
+            "interaction_mode": "answer" if complexity == "direct_response" else "execute",
+            "scope": "full" if complexity == "complex" else "single_step",
+            "domain": domain,
+            "target": None if domain else (key or None),
+        }
+    # Legacy v1 keys (analysis_type/complexity) in persisted records are ignored.
+    intent = UserIntent(
+        **{k: v for k, v in intent_data.items() if k in _USER_INTENT_FIELDS}
+    )
     data_state = plan.plan_result.data_state
 
     template: Optional[AnalysisTemplate] = None
@@ -548,8 +570,8 @@ async def switch_plan_strategy(
         project_id=plan.project_id,
         status=PlanStatus.PENDING_APPROVAL,
         is_fallback=new_plan_result.is_fallback,
-        intent_analysis_type=intent.analysis_type,
-        intent_complexity=intent.complexity,
+        intent_analysis_type=intent_strategy_key(intent),
+        intent_complexity=intent_plan_complexity(intent),
         original_intent=intent_data,
         plan_result=new_plan_result,
         task_tree=new_task_tree,

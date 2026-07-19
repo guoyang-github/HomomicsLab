@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ValidationError
 
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
@@ -69,7 +70,7 @@ class LLMFallbackPlanner:
     ) -> PlanResult:
         """Generate an executable fallback plan for an unknown intent."""
         data_state = data_state or DataState()
-        user_message = getattr(intent, "original_message", None) or intent.analysis_type
+        user_message = getattr(intent, "original_message", None) or intent_strategy_key(intent)
 
         # 1. Retrieve candidate skills.
         candidate_skills = self._retrieve_skills(intent)
@@ -155,7 +156,7 @@ class LLMFallbackPlanner:
             reproducibility_context={
                 "plan_engine_version": "0.4.1",
                 "strategy": "llm_fallback",
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
                 "data_state": data_state.to_context(),
                 "candidate_skills": [s.id for s in candidate_skills],
                 "llm_selected_skills": [p.selected_skill.id for p in phases if p.selected_skill],
@@ -194,7 +195,7 @@ class LLMFallbackPlanner:
                 {
                     "skill_id": skill.id,
                     "phase": category,
-                    "reason": f"Run {skill.name} for {intent.analysis_type}",
+                    "reason": f"Run {skill.name} for {intent_strategy_key(intent)}",
                     "parameters": {},
                 }
             )
@@ -209,7 +210,7 @@ class LLMFallbackPlanner:
         and finally to the general code assistant for code/data tasks,
         so the LLM always has something to reason about.
         """
-        query = intent.original_message or intent.analysis_type
+        query = intent.original_message or intent_strategy_key(intent)
         results = self.skill_registry.semantic_search(query, top_k=self.top_k)
         if not results:
             results = [(skill, 0.0) for skill in self.skill_registry.search(query)]
@@ -279,8 +280,9 @@ Respond with a single JSON object in this exact format (no markdown fences):
 }"""
 
         user_prompt = f"""User request: {user_message}
-Intent analysis type: {intent.analysis_type}
-Complexity: {intent.complexity}
+Intent type: {intent.intent_type or intent_strategy_key(intent)}
+Interaction mode: {intent.interaction_mode}
+Scope: {intent.scope}
 Data state: {data_state.to_context()}
 
 Available skills:
@@ -331,7 +333,7 @@ Generate the JSON plan now."""
             reproducibility_context={
                 "plan_engine_version": "0.4.1",
                 "strategy": "llm_fallback",
-                "intent": intent.analysis_type,
+                "intent": intent_strategy_key(intent),
                 "data_state": data_state.to_context(),
             },
             is_fallback=True,

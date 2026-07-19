@@ -10,6 +10,7 @@ from typing import Any, List, Optional
 from pydantic import ValidationError
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.open_agent.models import (
     OpenAgentPhase,
     OpenAgentPlan,
@@ -153,8 +154,8 @@ Output a single JSON object matching this schema (no markdown fences):
         data_state_text = data_state.to_context() if data_state else "unknown"
 
         parts = [
-            f"User request: {intent.original_message or intent.analysis_type}",
-            f"Analysis type: {intent.analysis_type}",
+            f"User request: {intent.original_message or intent_strategy_key(intent)}",
+            f"Intent type: {intent.intent_type or intent_strategy_key(intent)}",
             f"Target: {intent.target or 'none'}",
             f"Domain: {intent.domain or 'none'}",
             f"Data state: {data_state_text}",
@@ -229,7 +230,7 @@ Output a single JSON object matching this schema (no markdown fences):
             )
         ]
         return OpenAgentPlan(
-            goal=intent.original_message or intent.analysis_type,
+            goal=intent.original_message or intent_strategy_key(intent),
             reasoning_trace=trace,
             phases=phases,
             source_capabilities=[c.id for c in capabilities],

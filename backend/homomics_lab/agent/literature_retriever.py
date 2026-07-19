@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
-from homomics_lab.config import settings
 
 try:
     import aiohttp
@@ -20,6 +19,14 @@ except Exception:  # pragma: no cover - aiohttp may be unavailable in minimal in
     aiohttp = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+# NCBI / literature-retrieval defaults (formerly HOMOMICS_NCBI_* /
+# HOMOMICS_LITERATURE_* config fields; defaults kept — no credentials, so the
+# retriever stays inert unless constructed with explicit credentials).
+NCBI_EMAIL = None
+NCBI_API_KEY = None
+LITERATURE_CACHE_TTL_SECONDS = 3600.0
+LITERATURE_MAX_RESULTS = 10
 
 
 class LiteratureRetrieverError(Exception):
@@ -80,8 +87,8 @@ class PubMedAdapter(LiteratureAdapter):
         api_key: Optional[str] = None,
         session: Optional[Any] = None,
     ):
-        self.email = email or settings.ncbi_email
-        self.api_key = api_key or settings.ncbi_api_key
+        self.email = email or NCBI_EMAIL
+        self.api_key = api_key or NCBI_API_KEY
         delay = 0.1 if self.api_key else 0.34
         self._rate_limiter = _RateLimiter(delay)
         self._session = session
@@ -317,9 +324,9 @@ class LiteratureRetriever:
         self.cache_ttl_seconds = (
             cache_ttl_seconds
             if cache_ttl_seconds is not None
-            else settings.literature_cache_ttl_seconds
+            else LITERATURE_CACHE_TTL_SECONDS
         )
-        self.max_results = max_results if max_results is not None else settings.literature_max_results
+        self.max_results = max_results if max_results is not None else LITERATURE_MAX_RESULTS
         self._cache: Dict[_CacheKey, _CacheEntry] = {}
 
     async def retrieve(

@@ -36,6 +36,10 @@ from homomics_lab.embeddings.factory import get_embedding_provider, reset_embedd
 
 logger = logging.getLogger(__name__)
 
+# Semantic memory is always on when an embedding model is configured
+# (formerly HOMOMICS_ENABLE_SEMANTIC_MEMORY; default kept).
+ENABLE_SEMANTIC_MEMORY = True
+
 _COLLECTION = "memories"
 _RRF_K = 60
 
@@ -836,9 +840,9 @@ class MemoryBackend:
 def create_semantic_memory(settings: Optional[Settings] = None) -> Optional[MemoryBackend]:
     """Factory that mirrors the legacy ``create_semantic_memory`` signature."""
     settings = settings or default_settings
-    if not getattr(settings, "enable_semantic_memory", True):
+    if not ENABLE_SEMANTIC_MEMORY:
         return None
-    model_name = settings.embedding_model or settings.semantic_search_model
+    model_name = settings.embedding_model
     if not model_name:
         return None
     return MemoryBackend(settings=settings)

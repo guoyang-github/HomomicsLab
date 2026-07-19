@@ -22,6 +22,10 @@ from homomics_lab.llm.providers import (
 from homomics_lab.llm.model_catalog import ModelCatalog
 from homomics_lab.llm.runtime_config import DEFAULT_FALLBACK_MODELS, LLMRuntimeConfig
 
+# Capability/complexity-aware model routing (formerly
+# HOMOMICS_LLM_COMPLEXITY_ROUTING_ENABLED; default kept: on).
+LLM_COMPLEXITY_ROUTING_ENABLED = True
+
 
 @dataclass
 class RouteDecision:
@@ -278,7 +282,7 @@ class LLMRouter:
             return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
         # If complexity routing is disabled, fall back to the standard selection.
-        if not getattr(settings, "llm_complexity_routing_enabled", True):
+        if not LLM_COMPLEXITY_ROUTING_ENABLED:
             return self.select(expected_input_tokens=input_token_count, expected_output_tokens=expected_output_tokens)
 
         candidates = self._build_capability_candidates(intent_type, input_token_count)

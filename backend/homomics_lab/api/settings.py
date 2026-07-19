@@ -235,32 +235,12 @@ class SystemSettingsOut(BaseModel):
     """Current effective system settings exposed to the frontend."""
 
     skill_sandbox_backend: str
-    enable_semantic_memory: bool
-    semantic_search_model: Optional[str]
-    session_ttl_days: int
-    default_job_timeout_seconds: float
-    max_skill_timeout_seconds: float
-    result_inline_size_limit_bytes: int
-    max_llm_cost_per_request_usd: Optional[float]
-    monthly_budget_usd: Optional[float]
-    skill_hot_reload_enabled: bool
-    open_exploration_mode_enabled: bool
 
 
 class SystemSettingsUpdate(BaseModel):
     """Subset of settings that can be updated at runtime."""
 
     skill_sandbox_backend: Optional[str] = None
-    enable_semantic_memory: Optional[bool] = None
-    semantic_search_model: Optional[str] = None
-    session_ttl_days: Optional[int] = None
-    default_job_timeout_seconds: Optional[float] = None
-    max_skill_timeout_seconds: Optional[float] = None
-    result_inline_size_limit_bytes: Optional[int] = None
-    max_llm_cost_per_request_usd: Optional[float] = None
-    monthly_budget_usd: Optional[float] = None
-    skill_hot_reload_enabled: Optional[bool] = None
-    open_exploration_mode_enabled: Optional[bool] = None
 
 
 @router.get("/system", response_model=SystemSettingsOut)
@@ -272,36 +252,6 @@ async def get_system_settings() -> SystemSettingsOut:
     return SystemSettingsOut(
         skill_sandbox_backend=overrides.get(
             "skill_sandbox_backend", settings.skill_sandbox_backend
-        ),
-        enable_semantic_memory=overrides.get(
-            "enable_semantic_memory", settings.enable_semantic_memory
-        ),
-        semantic_search_model=overrides.get(
-            "semantic_search_model", settings.semantic_search_model
-        ),
-        session_ttl_days=overrides.get(
-            "session_ttl_days", settings.session_ttl_days
-        ),
-        default_job_timeout_seconds=overrides.get(
-            "default_job_timeout_seconds", settings.default_job_timeout_seconds
-        ),
-        max_skill_timeout_seconds=overrides.get(
-            "max_skill_timeout_seconds", settings.max_skill_timeout_seconds
-        ),
-        result_inline_size_limit_bytes=overrides.get(
-            "result_inline_size_limit_bytes", settings.result_inline_size_limit_bytes
-        ),
-        max_llm_cost_per_request_usd=overrides.get(
-            "max_llm_cost_per_request_usd", settings.max_llm_cost_per_request_usd
-        ),
-        monthly_budget_usd=overrides.get(
-            "monthly_budget_usd", settings.monthly_budget_usd
-        ),
-        skill_hot_reload_enabled=overrides.get(
-            "skill_hot_reload_enabled", settings.skill_hot_reload_enabled
-        ),
-        open_exploration_mode_enabled=overrides.get(
-            "open_exploration_mode_enabled", settings.open_exploration_mode_enabled
         ),
     )
 

@@ -16,6 +16,16 @@ from typing import Dict, Optional
 
 from homomics_lab.config import settings
 
+# Budget caps (formerly HOMOMICS_MONTHLY_BUDGET_USD /
+# HOMOMICS_MAX_LLM_COST_PER_REQUEST_USD; defaults kept: no cap).
+MONTHLY_BUDGET_USD: Optional[float] = None
+MAX_LLM_COST_PER_REQUEST_USD: Optional[float] = None
+
+# Cost caps (formerly HOMOMICS_MONTHLY_BUDGET_USD /
+# HOMOMICS_MAX_LLM_COST_PER_REQUEST_USD; defaults kept: no cap).
+MONTHLY_BUDGET_USD = None
+MAX_LLM_COST_PER_REQUEST_USD = None
+
 
 @dataclass
 class CostSnapshot:
@@ -154,14 +164,14 @@ class CostController:
         llm = self.get_monthly_llm_cost()
         compute = self.get_monthly_compute_cost()
         total = round(llm + compute, 6)
-        budget = settings.monthly_budget_usd
+        budget = MONTHLY_BUDGET_USD
         remaining = round(budget - total, 6) if budget is not None else None
         return CostSnapshot(
             llm_cost_usd=llm,
             compute_cost_usd=compute,
             total_cost_usd=total,
             monthly_budget_usd=budget,
-            max_request_cost_usd=settings.max_llm_cost_per_request_usd,
+            max_request_cost_usd=MAX_LLM_COST_PER_REQUEST_USD,
             remaining_monthly_budget_usd=remaining,
         )
 
@@ -174,7 +184,7 @@ class CostController:
         allows callers (e.g. ``LLMRouter``) to enforce a stricter per-request
         limit than the global setting.
         """
-        global_cap = settings.max_llm_cost_per_request_usd
+        global_cap = MAX_LLM_COST_PER_REQUEST_USD
         caps = [c for c in (cap, global_cap) if c is not None]
         max_request = min(caps) if caps else None
         if max_request is not None and estimated_cost_usd > max_request:
@@ -183,7 +193,7 @@ class CostController:
                 f"per-request cap ${max_request:.4f}"
             )
 
-        monthly = settings.monthly_budget_usd
+        monthly = MONTHLY_BUDGET_USD
         if monthly is not None:
             snapshot = self.get_snapshot()
             if snapshot.remaining_monthly_budget_usd is not None and snapshot.remaining_monthly_budget_usd <= 0:

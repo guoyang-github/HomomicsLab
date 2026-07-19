@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from homomics_lab.config import settings
 from homomics_lab.domain.models import (
     DomainDefinition,
     DomainStateCheck,
@@ -23,6 +22,10 @@ from homomics_lab.skills.registry import SkillRegistry
 
 
 logger = logging.getLogger(__name__)
+
+# If False, missing skills become warnings instead of failing the whole domain
+# (formerly HOMOMICS_DOMAIN_STRICT_VALIDATION; default kept).
+DOMAIN_STRICT_VALIDATION = False
 
 
 class DomainLoaderError(Exception):
@@ -376,7 +379,7 @@ class DomainLoader:
         self.cbkb = cbkb
         self.validator = DomainValidator(skill_registry, strategy_lib)
         self.strict = (
-            strict if strict is not None else getattr(settings, "domain_strict_validation", False)
+            strict if strict is not None else DOMAIN_STRICT_VALIDATION
         )
         self.prompt_registry = prompt_registry or get_prompt_registry()
 

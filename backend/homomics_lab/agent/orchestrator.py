@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from homomics_lab.agent.agent_registry import AgentRegistry, get_default_registry
-from homomics_lab.config import settings
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.orchestrator_executors import TaskExecutors
 from homomics_lab.agent.interpretation import InterpretationEngine
@@ -31,6 +30,9 @@ from homomics_lab.workspace.context import workspace_context
 from homomics_lab.workflow.cache import WorkflowCache
 
 logger = logging.getLogger(__name__)
+
+# Workflow result caching (formerly HOMOMICS_WORKFLOW_CACHE_ENABLED; on).
+WORKFLOW_CACHE_ENABLED = True
 
 _UNSET = object()
 
@@ -139,7 +141,7 @@ class Orchestrator:
 
         Returns True when the task was completed from cache.
         """
-        if self.workflow_cache is None or not getattr(settings, "workflow_cache_enabled", True):
+        if self.workflow_cache is None or not WORKFLOW_CACHE_ENABLED:
             return False
 
         skill = self._resolve_skill_definition(task)
@@ -200,7 +202,7 @@ class Orchestrator:
         context: Dict[str, Any],
     ) -> None:
         """Store a successful task result in the workflow cache."""
-        if self.workflow_cache is None or not getattr(settings, "workflow_cache_enabled", True):
+        if self.workflow_cache is None or not WORKFLOW_CACHE_ENABLED:
             return
         if task.cache_hit:
             return
@@ -1027,7 +1029,12 @@ class Orchestrator:
         decomposer = TaskDecomposer()
         return decomposer._task_tree_to_plan_result(
             tree,
-            intent=UserIntent(analysis_type="replan", complexity="complex"),
+            intent=UserIntent(
+                intent_type="analysis",
+                interaction_mode="execute",
+                scope="full",
+                target="replan",
+            ),
         )
 
     def _merge_replan_into_tree(

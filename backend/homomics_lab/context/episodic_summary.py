@@ -11,11 +11,16 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.models.common import ChatMessage
 
 logger = logging.getLogger(__name__)
+
+# Episodic-summary throttling (formerly HOMOMICS_EPISODIC_SUMMARY_* config
+# fields; defaults kept): skip very short sessions and only recompute when the
+# message count has grown by at least the interval.
+EPISODIC_SUMMARY_MIN_MESSAGES = 6
+EPISODIC_SUMMARY_MIN_INTERVAL = 3
 
 _MAX_CACHED_SESSIONS = 256
 
@@ -87,12 +92,12 @@ class EpisodicSummarizer:
 
     The summarizer is throttled to keep it off the chat critical path:
 
-    - Sessions with fewer than ``settings.episodic_summary_min_messages``
+    - Sessions with fewer than ``EPISODIC_SUMMARY_MIN_MESSAGES``
       messages are not summarized at all (the last cached/previous summary,
       if any, is returned instead).
     - Summaries are cached per ``session_id`` and only recomputed when the
       session's message count has moved by at least
-      ``settings.episodic_summary_min_interval`` since the cached entry.
+      ``EPISODIC_SUMMARY_MIN_INTERVAL`` since the cached entry.
 
     The LLM client is injected by the caller (shared instance). When it is
     ``None`` the LLM path is skipped and the rule-based fallback is used.
@@ -130,14 +135,14 @@ class EpisodicSummarizer:
             return previous_summary or cached_summary or EpisodicSummary()
 
         # Too early in the session to be worth a summary.
-        if count < settings.episodic_summary_min_messages:
+        if count < EPISODIC_SUMMARY_MIN_MESSAGES:
             return cached_summary or previous_summary or EpisodicSummary()
 
         # Reuse the cached summary until the session has grown enough.
         if (
             cached_summary is not None
             and cached_count is not None
-            and abs(count - cached_count) < settings.episodic_summary_min_interval
+            and abs(count - cached_count) < EPISODIC_SUMMARY_MIN_INTERVAL
         ):
             return cached_summary
 

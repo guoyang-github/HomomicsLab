@@ -23,10 +23,13 @@ from homomics_lab.agent.intent.calibration import (
     IntentDecisionRecord,
 )
 from homomics_lab.agent.intent.models import (
+    ANALYSIS_KEY_TO_DOMAIN,
+    DIRECT_INTENT_TYPES,
     IntentClassificationResult,
     IntentMatch,
     StructuredIntent,
     UserIntent,
+    intent_strategy_key,
 )
 from homomics_lab.agent.intent.result_cache import (
     IntentResultCache,
@@ -421,7 +424,7 @@ class CascadeIntentAnalyzer:
             # is deterministic (the default rule-based judge); an LLM judge
             # makes the outcome non-reproducible, so those stay out of the
             # cache.
-            if intent.analysis_type != "clarification" or self._debate_is_deterministic():
+            if intent.interaction_mode != "clarify" or self._debate_is_deterministic():
                 cache.put(cache_key, intent, refs=cache_refs)
         return intent
 
@@ -1061,33 +1064,27 @@ class CascadeIntentAnalyzer:
                 return match.group(0)
         return None
 
-    def _determine_complexity(
+    def _determine_scope(
         self,
         match: IntentMatch,
         message: str,
         definition: Optional[IntentDefinition],
         has_sub_intents: bool = False,
     ) -> str:
-        """Determine complexity from indicators and message."""
-        # Tool-only intents are always direct responses regardless of how the
-        # LLM structured classifier labelled scope/complexity.
+        """Determine the v2 scope (``single_step`` | ``partial`` | ``full``).
+
+        Only called on the synthesized path (``match.structured is None``);
+        classifier-provided structured intents keep their own scope after
+        normalization in :meth:`_to_user_intent`.
+        """
+        # Tool-only intents are always single-shot executions regardless of how
+        # the LLM structured classifier labelled scope.
         if match.analysis_type in (
             "pubmed_search",
             "pubmed_fetch",
             "uniprot_search",
             "geo_search",
         ):
-            return "direct_response"
-
-        # Honor structured intent first.
-        if match.structured is not None:
-            s = match.structured
-            if s.intent_type in ("qa", "information_request", "general_help", "greeting", "clarification"):
-                return "direct_response"
-            if s.scope == "single_step":
-                return "single_step"
-            if s.scope in ("partial", "full"):
-                return "complex"
             return "single_step"
 
         text = message.lower()
@@ -1100,31 +1097,24 @@ class CascadeIntentAnalyzer:
             "greeting",
             "clarification",
         ):
-            return "direct_response"
+            return "single_step"
 
         # Sequential markers (e.g. "先...再...") strongly imply a multi-step workflow.
         if any(m in text for m in self._SEQUENTIAL_MARKERS):
-            if match.structured is None or match.structured.intent_type == "analysis":
-                return "complex"
+            return "partial" if has_sub_intents else "full"
 
-        # Multiple explicit sub-intents always imply a complex workflow.
+        # Multiple explicit sub-intents always imply a multi-step workflow.
         if has_sub_intents:
-            return "complex"
+            return "partial"
 
         if definition:
             indicators = definition.complexity_indicators
             if any(kw.lower() in text for kw in indicators):
-                return "complex"
+                return "full"
 
         # Heuristic: long message (character count, so it is language-agnostic).
         if len(text) > self._COMPLEX_MESSAGE_CHAR_THRESHOLD:
-            return "complex"
-
-        # Multi-intent domain requests default to complex unless sequential markers
-        # are absent and the message is short.
-        if match.analysis_type in ("single_cell_analysis", "spatial_analysis", "metagenomics_analysis"):
-            if any(m in text for m in self._SEQUENTIAL_MARKERS):
-                return "complex"
+            return "full"
 
         return "single_step"
 
@@ -1230,7 +1220,6 @@ class CascadeIntentAnalyzer:
         """Convert an IntentMatch to the public UserIntent object."""
         definition = self._find_definition(match.analysis_type)
         has_sub_intents = bool(sub_intents)
-        complexity = self._determine_complexity(match, message, definition, has_sub_intents)
         data_scale = self._extract_data_scale(message, definition)
         domain_knowledge = [definition.domain] if definition and definition.domain else []
 
@@ -1254,18 +1243,17 @@ class CascadeIntentAnalyzer:
             metadata["tool_name"] = match.analysis_type
             metadata["tool_inputs"] = self._extract_mcp_inputs(match.analysis_type, message)
 
-        # Structured intent decomposition (best-practice v2).
+        # Structured intent decomposition (best-practice v2). The v2 fields are
+        # the single source of truth carried by the returned UserIntent.
         structured = match.structured
         if structured is None:
             # Synthesize a StructuredIntent from the canonical classifier signals.
-            # v2 fields are the source of truth; legacy analysis_type/complexity
-            # are only used as raw input to this synthesis.
             structured = StructuredIntent(
-                intent_type=self._derive_intent_type(match.analysis_type, complexity, metadata),
-                interaction_mode=self._determine_interaction_mode(match, complexity, metadata),
+                intent_type=self._derive_intent_type(match, metadata),
+                interaction_mode=self._determine_interaction_mode(match, metadata),
                 domain=self._determine_domain(match, definition),
                 target=self._determine_target(match, definition),
-                scope=self._determine_scope(complexity, has_sub_intents),
+                scope=self._determine_scope(match, message, definition, has_sub_intents),
                 confidence=match.confidence,
                 reason=match.reason,
             )
@@ -1276,26 +1264,28 @@ class CascadeIntentAnalyzer:
             canonical_target = self._determine_target(match, definition)
             if canonical_target:
                 structured.target = canonical_target
-            # Ensure the structured scope matches the complexity heuristic when
-            # the LLM returns an inconsistent scope.
+            # Tool intents always execute; direct-response intent types always
+            # produce a single-step answer.
             if metadata.get("tool_name"):
                 structured.interaction_mode = "execute"
                 structured.intent_type = "tool_call"
-            elif complexity == "direct_response":
                 structured.scope = "single_step"
-                structured.interaction_mode = "answer"
-            elif complexity == "complex" and structured.scope == "single_step":
-                structured.scope = "full"
+            elif structured.intent_type in DIRECT_INTENT_TYPES:
+                structured.interaction_mode = (
+                    "clarify" if structured.intent_type == "clarification" else "answer"
+                )
+                structured.scope = "single_step"
+            elif structured.scope not in ("single_step", "partial", "full"):
+                structured.scope = "single_step"
 
         return UserIntent(
-            analysis_type=match.analysis_type,
-            complexity=complexity,
             confidence=match.confidence,
             original_message=message,
             data_scale=data_scale,
             domain_knowledge=domain_knowledge,
             sub_intents=sub_user_intents,
             metadata=metadata,
+            intent_type=structured.intent_type,
             interaction_mode=structured.interaction_mode,
             domain=structured.domain,
             target=structured.target,
@@ -1318,10 +1308,9 @@ class CascadeIntentAnalyzer:
             return
 
         try:
-            canonical_domain = UserIntent(
-                analysis_type=intent.analysis_type, complexity="single_step"
-            ).domain
-            categories = {intent.domain, canonical_domain, intent.analysis_type} - {None, ""}
+            intent_key = intent_strategy_key(intent)
+            canonical_domain = ANALYSIS_KEY_TO_DOMAIN.get(intent_key)
+            categories = {intent.domain, canonical_domain, intent_key} - {None, ""}
             sops = []
             seen_sop_ids = set()
             for category in categories:
@@ -1329,16 +1318,16 @@ class CascadeIntentAnalyzer:
                     if sop.id not in seen_sop_ids:
                         seen_sop_ids.add(sop.id)
                         sops.append(sop)
-            anomalies = cbkb.query_anomalies(phase_type=intent.analysis_type, limit=3)
+            anomalies = cbkb.query_anomalies(phase_type=intent_key, limit=3)
 
             # Parameter lore: use any known skill ids referenced by the intent or
             # its sub-intents. Domain-level intents do not yet resolve to skills,
             # so this list may be empty until execution-time retrieval.
             skill_ids = []
-            if intent.target and intent.target != intent.analysis_type:
+            if intent.target and intent.target != intent_key:
                 skill_ids.append(intent.target)
             for sub in intent.sub_intents:
-                if sub.target and sub.target != sub.analysis_type:
+                if sub.target and sub.target != intent_strategy_key(sub):
                     skill_ids.append(sub.target)
             lore: List[Dict[str, Any]] = []
             for skill_id in skill_ids[:5]:
@@ -1380,16 +1369,11 @@ class CascadeIntentAnalyzer:
 
     @staticmethod
     def _derive_intent_type(
-        analysis_type: str,
-        complexity: str,
+        match: IntentMatch,
         metadata: Dict[str, Any],
     ) -> str:
-        """Map classifier outputs to the canonical v2 intent_type.
-
-        This is a one-way normalization: legacy ``analysis_type``/``complexity``
-        are consumed at construction time and then discarded.  Downstream code
-        should read ``interaction_mode``/``scope``/``intent_type`` instead.
-        """
+        """Map classifier outputs to the canonical v2 intent_type."""
+        analysis_type = match.analysis_type
         if analysis_type == "clarification":
             return "clarification"
         if analysis_type in ("qa", "information_request"):
@@ -1402,37 +1386,27 @@ class CascadeIntentAnalyzer:
             return "file_conversion"
         if metadata.get("tool_name"):
             return "tool_call"
-        if complexity == "direct_response":
-            return "qa"
         return "analysis"
 
     @staticmethod
     def _determine_interaction_mode(
         match: IntentMatch,
-        complexity: str,
         metadata: Dict[str, Any],
     ) -> str:
-        # MCP tool intents must always execute, even if the LLM structured
-        # classifier labelled them as a plain answer.
+        # MCP tool intents must always execute, even if a classifier labelled
+        # them as a plain answer.
         if metadata.get("tool_name"):
             return "execute"
-        if match.structured is not None:
-            return match.structured.interaction_mode
         if match.analysis_type == "clarification":
             return "clarify"
-        if complexity == "direct_response":
+        if match.analysis_type in (
+            "qa",
+            "information_request",
+            "general_help",
+            "greeting",
+        ):
             return "answer"
         return "execute"
-
-    @staticmethod
-    def _determine_scope(complexity: str, has_sub_intents: bool) -> str:
-        if complexity in ("single_step", "direct_response"):
-            return "single_step"
-        if has_sub_intents:
-            return "partial"
-        if complexity == "complex":
-            return "full"
-        return "full"
 
     def _determine_domain(
         self,
@@ -1443,8 +1417,7 @@ class CascadeIntentAnalyzer:
             return match.structured.domain
         if definition and definition.domain:
             return definition.domain
-        domain_from_analysis = UserIntent(analysis_type=match.analysis_type, complexity="single_step").domain
-        return domain_from_analysis
+        return ANALYSIS_KEY_TO_DOMAIN.get(match.analysis_type)
 
     def _determine_target(
         self,
@@ -1460,6 +1433,9 @@ class CascadeIntentAnalyzer:
             return "answer_question"
         if match.analysis_type == "general_help":
             return "generate_code"
+        # Self-contained analysis actions are their own target.
+        if match.analysis_type in ("descriptive_statistics", "visualization_edit"):
+            return match.analysis_type
         # Tool-only intents are their own target.
         if match.analysis_type in (
             "pubmed_search",
@@ -1470,6 +1446,11 @@ class CascadeIntentAnalyzer:
             return match.analysis_type
         # If the analysis_type itself is a known phase id, treat it as the target.
         if self._is_known_phase(match.analysis_type):
+            return match.analysis_type
+        # A declared domain-level intent id (from domain.yaml or the builtins)
+        # is its own target, keeping the plan-layer strategy key exact for
+        # domain strategies.
+        if definition is not None:
             return match.analysis_type
         return None
 
@@ -1523,14 +1504,11 @@ class CascadeIntentAnalyzer:
             metadata["debate"] = debate_result.to_dict()
 
         return UserIntent(
-            analysis_type="clarification",
-            complexity="direct_response",
+            intent_type="clarification",
+            interaction_mode="clarify",
+            scope="single_step",
             confidence=0.0,
             original_message=message,
             metadata=metadata,
-            interaction_mode="clarify",
-            scope="single_step",
-            target=None,
-            domain=None,
             structured_intent=structured,
         )

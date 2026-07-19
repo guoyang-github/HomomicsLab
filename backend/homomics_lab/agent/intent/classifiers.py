@@ -13,7 +13,6 @@ from homomics_lab.agent.intent.models import (
     IntentMatch,
     StructuredIntent,
 )
-from homomics_lab.config import settings
 from homomics_lab.llm_client import LLMClient
 
 
@@ -26,6 +25,30 @@ from homomics_lab.llm_client import LLMClient
 _DEFINITION_INDEX_CACHE_MAXSIZE = 64
 _definition_index_cache: "OrderedDict[str, Tuple[Any, Any]]" = OrderedDict()
 _definition_index_lock = threading.Lock()
+
+
+def _structured_match_label(structured: StructuredIntent) -> str:
+    """Derive the IntentMatch label (classifier vocabulary) for an LLM match.
+
+    The label is only used inside the classification cascade (fusion, dedup,
+    metrics, MCP tool detection); downstream code reads the v2 fields on
+    ``UserIntent`` instead.
+    """
+    if structured.intent_type in ("qa", "information_request"):
+        return "qa"
+    if structured.intent_type == "general_help":
+        return "general_help"
+    if structured.intent_type == "greeting":
+        return "greeting"
+    if structured.intent_type == "clarification":
+        return "clarification"
+    if structured.intent_type == "file_conversion":
+        return "file_conversion"
+    if structured.target:
+        return structured.target
+    if structured.domain:
+        return f"{structured.domain}_analysis"
+    return "general"
 
 
 def _definitions_fingerprint(definitions: List[IntentDefinition]) -> str:
@@ -280,7 +303,7 @@ class EmbeddingIntentClassifier(IntentClassifier):
         super().__init__(weight=weight)
         # Only use dense embeddings when explicitly configured. Otherwise the
         # default TF-IDF fallback avoids network/model download stalls.
-        self._model_name = model_name or settings.semantic_search_model
+        self._model_name = model_name
         self._model = None
         self._vectorizer = None
         self._embeddings = None
@@ -510,7 +533,7 @@ class LLMIntentClassifier(IntentClassifier):
             structured = self._parse_structured_intent(primary)
             matches.append(
                 IntentMatch(
-                    analysis_type=structured.to_legacy_analysis_type(),
+                    analysis_type=_structured_match_label(structured),
                     confidence=structured.confidence,
                     source="llm",
                     reason=structured.reason,
@@ -524,7 +547,7 @@ class LLMIntentClassifier(IntentClassifier):
                 structured = self._parse_structured_intent(alt)
                 matches.append(
                     IntentMatch(
-                        analysis_type=structured.to_legacy_analysis_type(),
+                        analysis_type=_structured_match_label(structured),
                         confidence=structured.confidence,
                         source="llm",
                         reason="alternative",
@@ -540,7 +563,7 @@ class LLMIntentClassifier(IntentClassifier):
                 structured = self._parse_structured_intent(sub)
                 matches.append(
                     IntentMatch(
-                        analysis_type=structured.to_legacy_analysis_type(),
+                        analysis_type=_structured_match_label(structured),
                         confidence=structured.confidence,
                         source="llm",
                         reason="sub_intent",

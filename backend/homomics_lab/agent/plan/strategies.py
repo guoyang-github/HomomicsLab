@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from homomics_lab.agent.plan.models import DataState, Phase
-from homomics_lab.config import settings
 
 
 @dataclass
@@ -155,14 +154,12 @@ class StrategyLibrary:
     def _register_defaults(self) -> None:
         """Register default strategies.
 
-        Domain declarations take precedence over the generic fallback when
-        ``settings.auto_load_domain_strategies`` is enabled. The generic
-        strategy is always registered as the ultimate fallback for unknown
-        intents.
+        Domain declarations take precedence over the generic fallback; the
+        generic strategy is always registered as the ultimate fallback for
+        unknown intents.
         """
-        # 1. Load domain strategies first so they take priority (when enabled).
-        if settings.auto_load_domain_strategies:
-            self._load_domain_strategies()
+        # 1. Load domain strategies first so they take priority.
+        self._load_domain_strategies()
 
         # 2. Always register the generic fallback.
         if "generic" not in self._strategies:

@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.context.reranker import BiEncoderReranker
 from homomics_lab.knowledge.cbkb import CBKB
 
@@ -103,8 +104,7 @@ class CBKBRetriever:
         try:
             categories = set()
             if intent:
-                for attr in ("domain", "analysis_type"):
-                    val = getattr(intent, attr, None)
+                for val in (intent.domain, intent_strategy_key(intent)):
                     if val:
                         categories.add(val)
             sops = []
@@ -132,7 +132,7 @@ class CBKBRetriever:
 
         # 4. Anomalies
         try:
-            phase_type = getattr(intent, "analysis_type", None) if intent else None
+            phase_type = intent_strategy_key(intent) if intent else None
             anomalies = self.cbkb.query_anomalies(
                 project_id=project_id,
                 phase_type=phase_type,

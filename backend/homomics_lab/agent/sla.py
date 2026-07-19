@@ -11,10 +11,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from homomics_lab.agent.intent.models import UserIntent
+from homomics_lab.agent.intent.models import (
+    UserIntent,
+    intent_plan_complexity,
+    intent_strategy_key,
+)
 from homomics_lab.config import settings
 from homomics_lab.cost_control import CostController, get_cost_controller
 from homomics_lab.skills.registry import SkillRegistry
+
+# nf-core integration is always on (formerly HOMOMICS_NFCORE_ENABLED).
+NFCORE_ENABLED = True
 
 
 @dataclass
@@ -60,11 +67,11 @@ class SLAEngine:
 
     def assess(self, intent: UserIntent) -> AgentSLA:
         """Return an SLA estimate for the intent."""
-        analysis_type = intent.analysis_type or "unknown"
-        complexity = intent.complexity or "direct_response"
+        intent_key = intent_strategy_key(intent)
+        complexity = intent_plan_complexity(intent)
 
         # Direct response / QA / pubmed search can be answered directly.
-        if complexity == "direct_response" or analysis_type in (
+        if intent.interaction_mode in ("answer", "clarify") or intent_key in (
             "qa", "pubmed_search", "uniprot_search", "geo_search", "general_help"
         ):
             return AgentSLA(
@@ -81,19 +88,18 @@ class SLAEngine:
 
         # Known curated templates or nf-core pipelines give highest auto-execute confidence.
         from homomics_lab.hpc.template_registry import get_template_registry
-        from homomics_lab.config import settings
         from homomics_lab.nfcore_integration import get_nfcore_manager
 
-        template = get_template_registry().resolve_for_intent(analysis_type)
+        template = get_template_registry().resolve_for_intent(intent_key)
         has_template = template is not None
         nfcore_suggestion = None
-        if getattr(settings, "nfcore_enabled", True):
-            nfcore_suggestion = get_nfcore_manager().suggest_pipeline(analysis_type)
+        if NFCORE_ENABLED:
+            nfcore_suggestion = get_nfcore_manager().suggest_pipeline(intent_key)
             if nfcore_suggestion is not None and not has_template:
                 has_template = True
 
         # Required skill set heuristic.
-        required_skills = self._required_skills_for(analysis_type)
+        required_skills = self._required_skills_for(intent_key)
         available = set()
         missing = []
         if self.skill_registry is not None:
@@ -134,8 +140,8 @@ class SLAEngine:
         # Cost estimate (rough upper bound).
         self.cost_controller.get_snapshot()
         llm_cost = self._estimate_llm_cost(complexity, has_template)
-        compute_cost = self._estimate_compute_cost(analysis_type)
-        risks = self._risks_for(analysis_type, missing)
+        compute_cost = self._estimate_compute_cost(intent_key)
+        risks = self._risks_for(intent_key, missing)
 
         return AgentSLA(
             execution_mode=execution_mode,

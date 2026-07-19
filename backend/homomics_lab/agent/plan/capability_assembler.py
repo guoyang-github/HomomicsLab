@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.plan.models import DataState
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
@@ -29,6 +30,10 @@ from homomics_lab.agent.intent.alias_registry import AliasRegistry
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry, get_default_registry
+
+# Open exploration routing (formerly HOMOMICS_OPEN_EXPLORATION_MODE_ENABLED;
+# default kept: off — weak-domain requests follow the standard gates).
+OPEN_EXPLORATION_MODE_ENABLED = False
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +157,7 @@ class CapabilityAssembler:
     ) -> CapabilityAssembly:
         """Return the best routing decision for ``intent``."""
         data_state = data_state or DataState()
-        is_phase_level = self._ensure_alias_registry().is_phase_level(intent.analysis_type)
+        is_phase_level = self._ensure_alias_registry().is_phase_level(intent_strategy_key(intent))
 
         # 0. Explicit skill target. When the user names a concrete skill (or the
         # classifier resolves the request to a registered skill_id), use it directly
@@ -201,7 +206,7 @@ class CapabilityAssembler:
             # requests are handled by the open agent instead of forcing a
             # domain pipeline.
             if (
-                self.settings.open_exploration_mode_enabled
+                OPEN_EXPLORATION_MODE_ENABLED
                 and coverage >= self.OPEN_EXPLORATION_TEMPLATE_THRESHOLD
             ):
                 result = CapabilityAssembly(
@@ -226,7 +231,7 @@ class CapabilityAssembler:
                 # In open exploration mode, only a clear standalone skill match
                 # is allowed to bypass the open agent.
                 if (
-                    self.settings.open_exploration_mode_enabled
+                    OPEN_EXPLORATION_MODE_ENABLED
                     and score < self.OPEN_EXPLORATION_CLEAR_STANDALONE_THRESHOLD
                 ):
                     result = CapabilityAssembly(
@@ -291,18 +296,20 @@ class CapabilityAssembler:
         """Return True when the intent names a concrete analysis domain."""
         if intent.domain is not None:
             return True
-        if intent.analysis_type not in self._BROAD_ANALYSIS_TYPES:
+        if intent.target is not None or intent.intent_type not in self._BROAD_ANALYSIS_TYPES:
             return True
         for sub in intent.sub_intents:
             if sub.domain is not None:
                 return True
-            if sub.analysis_type not in self._BROAD_ANALYSIS_TYPES:
+            if sub.target is not None or sub.intent_type not in self._BROAD_ANALYSIS_TYPES:
                 return True
         structured = getattr(intent, "structured_intent", None)
         if structured is not None:
             if getattr(structured, "domain", None) is not None:
                 return True
-            if getattr(structured, "analysis_type", None) not in self._BROAD_ANALYSIS_TYPES:
+            structured_target = getattr(structured, "target", None)
+            structured_type = getattr(structured, "intent_type", "general")
+            if structured_target is not None or structured_type not in self._BROAD_ANALYSIS_TYPES:
                 return True
         return False
 
@@ -518,7 +525,7 @@ class CapabilityAssembler:
 
         signals = set()
         for text in [
-            intent.analysis_type,
+            intent_strategy_key(intent),
             intent.target or "",
             intent.domain or "",
             intent.original_message or "",
@@ -534,7 +541,7 @@ class CapabilityAssembler:
 
         for sub in intent.sub_intents:
             for text in [
-                sub.analysis_type,
+                intent_strategy_key(sub),
                 sub.target or "",
                 sub.domain or "",
                 sub.original_message or "",
@@ -582,7 +589,7 @@ class CapabilityAssembler:
             except Exception as exc:
                 logger.warning("Standalone skill search via capability index failed: %s", exc)
 
-        query = intent.original_message or intent.analysis_type
+        query = intent.original_message or intent_strategy_key(intent)
         if query:
             # Semantic search.
             try:

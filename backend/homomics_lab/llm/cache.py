@@ -19,6 +19,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# LLM response-cache defaults (formerly HOMOMICS_LLM_RESPONSE_CACHE_* config
+# fields; defaults kept).
+LLM_RESPONSE_CACHE_ENABLED = True
+LLM_RESPONSE_CACHE_BACKEND = "local"  # "local" | "redis"
+LLM_RESPONSE_CACHE_TTL_SECONDS = 3600.0
+LLM_RESPONSE_CACHE_MAX_ENTRIES = 1000
+LLM_RESPONSE_CACHE_DIR = Path("./data/llm_cache")
+
 
 def _make_key(
     model: str,
@@ -259,22 +267,22 @@ LLMResponseCache = LocalLLMResponseCache
 
 def get_llm_response_cache(settings) -> Optional[BaseLLMResponseCache]:
     """Factory that builds the configured LLM response cache backend."""
-    if not settings.llm_response_cache_enabled:
+    if not LLM_RESPONSE_CACHE_ENABLED:
         return None
 
-    if settings.llm_response_cache_backend == "redis":
+    if LLM_RESPONSE_CACHE_BACKEND == "redis":
         from redis.asyncio import Redis
 
-        redis_url = settings.llm_response_cache_redis_url or settings.redis_url
+        redis_url = settings.redis_url
         redis = Redis.from_url(redis_url)
         return RedisLLMResponseCache(
             redis=redis,
-            ttl_seconds=settings.llm_response_cache_ttl_seconds,
-            max_entries=settings.llm_response_cache_max_entries,
+            ttl_seconds=LLM_RESPONSE_CACHE_TTL_SECONDS,
+            max_entries=LLM_RESPONSE_CACHE_MAX_ENTRIES,
         )
 
     return LocalLLMResponseCache(
-        ttl_seconds=settings.llm_response_cache_ttl_seconds,
-        max_entries=settings.llm_response_cache_max_entries,
-        persist_dir=settings.llm_response_cache_dir,
+        ttl_seconds=LLM_RESPONSE_CACHE_TTL_SECONDS,
+        max_entries=LLM_RESPONSE_CACHE_MAX_ENTRIES,
+        persist_dir=LLM_RESPONSE_CACHE_DIR,
     )

@@ -144,10 +144,8 @@ def load_llm_runtime_config() -> LLMRuntimeConfig:
         or os.environ.get("HOMOMICS_LLM_MODEL")
     )
 
-    fallback_raw = (
-        _safe_get(mgr, "fallback_models")
-        or settings.llm_fallback_models
-        or os.environ.get("HOMOMICS_LLM_FALLBACK_MODELS")
+    fallback_raw = _safe_get(mgr, "fallback_models") or os.environ.get(
+        "HOMOMICS_LLM_FALLBACK_MODELS"
     )
     fallback_models = _split_fallback_models(fallback_raw) or list(DEFAULT_FALLBACK_MODELS)
 

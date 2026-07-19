@@ -10,6 +10,10 @@ from homomics_lab.config import settings
 from homomics_lab.doctor import HealthChecker
 from homomics_lab.version import app_version
 
+# Per-check timeout for /health probes (formerly
+# HOMOMICS_HEALTH_CHECK_TIMEOUT_SECONDS; default kept).
+HEALTH_CHECK_TIMEOUT_SECONDS = 5.0
+
 router = APIRouter()
 
 
@@ -87,7 +91,7 @@ async def health_ready(request: Request):
     skill_executor = getattr(request.app.state, "skill_executor", None)
     checker = HealthChecker(skill_executor=skill_executor)
     report = await checker.run_all_checks(
-        timeout_seconds=settings.health_check_timeout_seconds
+        timeout_seconds=HEALTH_CHECK_TIMEOUT_SECONDS
     )
     status_code = 200 if report.overall == "healthy" else 503
     return JSONResponse(content=report.to_dict(), status_code=status_code)
@@ -99,6 +103,6 @@ async def health_detail(request: Request):
     skill_executor = getattr(request.app.state, "skill_executor", None)
     checker = HealthChecker(skill_executor=skill_executor)
     report = await checker.run_all_checks(
-        timeout_seconds=settings.health_check_timeout_seconds
+        timeout_seconds=HEALTH_CHECK_TIMEOUT_SECONDS
     )
     return report.to_dict()

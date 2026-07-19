@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from homomics_lab.api.auth import get_current_user
+from homomics_lab.api.files import MAX_UPLOAD_FILE_BYTES
 from homomics_lab.config import settings
 from homomics_lab.database.connection import get_async_session
 from homomics_lab.knowledge.ingestion import CognifyOptions, KnowledgeIndex
@@ -135,7 +136,7 @@ async def ingest_upload(
     project_id = _validate_project(project_id)
     await require_project_permission(project_id, "write", db, user_id)
     content = await file.read()
-    max_bytes = settings.max_upload_file_bytes
+    max_bytes = MAX_UPLOAD_FILE_BYTES
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,
