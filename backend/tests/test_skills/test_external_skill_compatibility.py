@@ -42,9 +42,11 @@ def registry_with_external_skills():
         # These NanoResearch skills have no scripts/ dir; they are pure documentation/agent skills
         ("bio-single-cell-preprocessing", "mixed", False),
         ("bio-single-cell-clustering", "mixed", False),
-        # paperwriting skills: no tool_type, defaults to python but acts as agent
+        # paperwriting skills: scientific-manuscript declares no tool_type but has
+        # flat scripts/*.py, so it is inferred as python; scientific-research-design
+        # has neither tool_type nor scripts/, so it is inferred as an agentic skill.
         ("scientific-manuscript", "python", True),
-        ("scientific-research-design", "python", False),
+        ("scientific-research-design", "agent", False),
     ],
 )
 def test_external_skill_classification(
@@ -92,7 +94,9 @@ def test_doublet_scrublet_body_loaded_on_activation(registry_with_external_skill
     assert skill.metadata.get("disclosure_level") == "discovery"
     assert skill.metadata.get("instructions") == ""
 
-    activated = registry_with_external_skills.activate("bio-single-cell-doublet-scrublet")
+    activated = registry_with_external_skills.activate(
+        "bio-single-cell-doublet-scrublet"
+    )
     assert activated is not None
     assert activated.metadata.get("disclosure_level") == "activated"
     assert activated.metadata.get("instructions") != ""

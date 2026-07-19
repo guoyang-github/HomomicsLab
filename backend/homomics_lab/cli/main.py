@@ -15,9 +15,13 @@ from homomics_lab.cli.commands.benchmark import register_benchmark_parser, run_b
 from homomics_lab.cli.commands.run import register_run_parser, run_run
 from homomics_lab.cli.commands.plans import register_plans_parser, run_plans
 from homomics_lab.cli.commands.jobs import register_jobs_parser, run_jobs
-from homomics_lab.cli.commands.init_project import register_init_project_parser, init_project
+from homomics_lab.cli.commands.init_project import (
+    register_init_project_parser,
+    init_project,
+)
 from homomics_lab.cli.commands.export import register_export_parser, run_export
 from homomics_lab.cli.commands.seed import register_seed_parser, run_seed
+from homomics_lab.cli.commands.skill import register_skill_parser, run_skill
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -144,6 +148,9 @@ def create_parser() -> argparse.ArgumentParser:
     # seed
     register_seed_parser(subparsers)
 
+    # skill
+    register_skill_parser(subparsers)
+
     return parser
 
 
@@ -185,6 +192,8 @@ def main(argv=None):
             return run_export(args)
         elif args.command == "seed":
             return run_seed(args)
+        elif args.command == "skill":
+            return run_skill(args)
         return 0
     except Exception as e:
         if args.verbose:

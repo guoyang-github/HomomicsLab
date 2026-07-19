@@ -3,6 +3,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
+# Minimal SKILL.md frontmatter contract, aligned with the agentskills.org
+# (Claude Code) de-facto standard so skills from the open ecosystem load
+# out of the box:
+#   required:    ``name``, ``description`` (a missing ``name`` is inferred
+#                from the directory name at load time; a missing
+#                ``description`` only logs a warning)
+#   recommended: ``tool_type``, ``keywords``, ``inputs``, ``outputs``
+#   optional:    everything else (``requirements.txt``, ``environment.yml``,
+#                ``assets/``, ``trust_level``, ``scripts/`` and any custom
+#                frontmatter fields, which the loader ignores)
+REQUIRED_FRONTMATTER_FIELDS = ("name", "description")
+RECOMMENDED_FRONTMATTER_FIELDS = ("tool_type", "keywords", "inputs", "outputs")
+
 
 class SkillInputSchema(BaseModel):
     """Input schema for a skill.
@@ -134,14 +147,10 @@ class SkillDefinition(BaseModel):
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             minimum = prop.get("minimum")
             if minimum is not None and value < minimum:
-                raise ValueError(
-                    f"Parameter '{key}' must be >= {minimum}, got {value}"
-                )
+                raise ValueError(f"Parameter '{key}' must be >= {minimum}, got {value}")
             maximum = prop.get("maximum")
             if maximum is not None and value > maximum:
-                raise ValueError(
-                    f"Parameter '{key}' must be <= {maximum}, got {value}"
-                )
+                raise ValueError(f"Parameter '{key}' must be <= {maximum}, got {value}")
 
         # string length
         if isinstance(value, str):
@@ -157,9 +166,7 @@ class SkillDefinition(BaseModel):
                 )
             pattern = prop.get("pattern")
             if pattern is not None and not re.search(pattern, value):
-                raise ValueError(
-                    f"Parameter '{key}' must match pattern {pattern!r}"
-                )
+                raise ValueError(f"Parameter '{key}' must match pattern {pattern!r}")
 
     @property
     def source_dir(self) -> Optional[Path]:
@@ -183,4 +190,3 @@ class SkillDefinition(BaseModel):
             return (src / "scripts").is_dir()
         # Discovery-level skills may record this hint before scripts_dir is resolved.
         return bool(self.metadata.get("has_scripts"))
-

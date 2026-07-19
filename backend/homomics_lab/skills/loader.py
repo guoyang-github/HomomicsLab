@@ -27,6 +27,7 @@ import asyncio
 import logging
 import re
 import shlex
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -35,6 +36,8 @@ import yaml
 
 from homomics_lab.config import settings
 from homomics_lab.skills.models import (
+    RECOMMENDED_FRONTMATTER_FIELDS,
+    REQUIRED_FRONTMATTER_FIELDS,
     SkillDefinition,
     SkillInputSchema,
     SkillOutputSchema,
@@ -73,12 +76,15 @@ def _parse_frontmatter(content: str) -> tuple[Dict[str, Any], str]:
         return {}, content
 
     yaml_text = match.group(1)
-    remaining = content[match.end():]
+    remaining = content[match.end() :]
 
     try:
         frontmatter = yaml.safe_load(yaml_text) or {}
     except yaml.YAMLError as exc:
         raise ValueError(f"Invalid YAML frontmatter: {exc}") from exc
+
+    if not isinstance(frontmatter, dict):
+        raise ValueError("Invalid frontmatter: expected a YAML mapping")
 
     return frontmatter, remaining
 
@@ -98,7 +104,9 @@ def _normalize_property_spec(spec: Any) -> Dict[str, Any]:
     return {}
 
 
-def _build_input_schema(inputs_raw: Any, top_level_required: Optional[List[str]]) -> SkillInputSchema:
+def _build_input_schema(
+    inputs_raw: Any, top_level_required: Optional[List[str]]
+) -> SkillInputSchema:
     """Build SkillInputSchema from frontmatter ``inputs`` block."""
     if not isinstance(inputs_raw, dict) or not inputs_raw:
         return SkillInputSchema()
@@ -190,6 +198,167 @@ def _parse_string_list(value: Any) -> List[str]:
     return []
 
 
+# Frontmatter keys the loader understands. Anything else is a custom field
+# from the open ecosystem and is ignored (with a debug log) rather than
+# rejected, per the minimal-contract rule.
+_KNOWN_FRONTMATTER_KEYS = {
+    *REQUIRED_FRONTMATTER_FIELDS,
+    *RECOMMENDED_FRONTMATTER_FIELDS,
+    "type",  # alias for tool_type (Claude Code ``type: prompt``)
+    "required",  # top-level input-required list
+    "version",
+    "author",
+    "license",
+    "primary_tool",
+    "supported_tools",
+    "depends_on",
+    "prerequisites",
+    "workflow",
+    "allowed-tools",
+    "disallowed-tools",
+    "resources",
+    "executor",
+    "disable-model-invocation",
+    "user-invocable",
+    "when_to_use",
+    "context",
+    "agent",
+    "model",
+    "model_tier",
+    "model-tier",
+    "argument-hint",
+    "arguments",
+    "multi_sample",
+    "code_act",
+    "trusted",
+    "trust_level",
+    "category",
+    "categories",
+    "domains",
+    "domain",  # legacy singular alias for domains
+}
+
+
+def _infer_tool_type(skill_dir: Path, frontmatter: Dict[str, Any]) -> str:
+    """Resolve the skill's tool_type, inferring from ``scripts/`` when omitted.
+
+    ``tool_type`` is a recommended (not required) field. When neither
+    ``tool_type`` nor its ``type`` alias is declared, inspect ``scripts/``:
+
+      - only Python scripts (``scripts/python/`` or flat ``*.py``) → ``python``
+      - only R scripts (``scripts/r/`` or flat ``*.R``/``*.r``) → ``r``
+      - both → ``mixed``
+      - no scripts at all → ``agent`` (agentic / knowledge skill)
+    """
+    declared = frontmatter.get("tool_type") or frontmatter.get("type")
+    if declared:
+        return str(declared)
+
+    scripts = skill_dir / "scripts"
+    if scripts.is_dir():
+        has_python = (scripts / "python").is_dir() or any(scripts.glob("*.py"))
+        has_r = (
+            (scripts / "r").is_dir()
+            or any(scripts.glob("*.R"))
+            or any(scripts.glob("*.r"))
+        )
+        if has_python and has_r:
+            inferred = "mixed"
+        elif has_python:
+            inferred = "python"
+        elif has_r:
+            inferred = "r"
+        else:
+            inferred = "agent"
+    else:
+        inferred = "agent"
+
+    logger.debug(
+        "Skill '%s' does not declare tool_type; inferred %r from scripts/",
+        frontmatter.get("name") or skill_dir.name,
+        inferred,
+    )
+    return inferred
+
+
+@dataclass
+class SkillValidationResult:
+    """Outcome of checking one skill directory against the minimal contract."""
+
+    path: str
+    name: str
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        """True when the skill has neither errors nor warnings."""
+        return not self.errors and not self.warnings
+
+
+def validate_skill_contract(skill_dir: Path) -> SkillValidationResult:
+    """Validate a skill directory against the minimal SKILL.md contract.
+
+    Errors (the skill should be fixed before publishing):
+      - ``SKILL.md`` missing
+      - frontmatter malformed or YAML parse failure
+      - required fields missing: ``name``, ``description``
+
+    Warnings (the skill still loads, but should be improved):
+      - recommended fields missing: ``tool_type`` (the loader infers it from
+        ``scripts/``), ``keywords``, ``inputs``, ``outputs``
+    """
+    skill_dir = Path(skill_dir)
+    result = SkillValidationResult(path=str(skill_dir), name=skill_dir.name)
+
+    if not skill_dir.is_dir():
+        result.errors.append(f"not a directory: {skill_dir}")
+        return result
+
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        result.errors.append("missing SKILL.md")
+        return result
+
+    content = skill_md.read_text(encoding="utf-8")
+    if content.startswith("---") and not re.search(
+        r"^---\s*\n(.*?)^---\s*\n", content, re.DOTALL | re.MULTILINE
+    ):
+        result.errors.append(
+            "malformed frontmatter: opening '---' has no closing '---'"
+        )
+        return result
+
+    try:
+        frontmatter, _ = _parse_frontmatter(content)
+    except ValueError as exc:
+        result.errors.append(" ".join(str(exc).split()))
+        return result
+
+    name = frontmatter.get("name")
+    if not name or not str(name).strip():
+        result.errors.append("missing required field: name")
+    else:
+        result.name = str(name).strip()
+
+    description = frontmatter.get("description")
+    if not description or not str(description).strip():
+        result.errors.append("missing required field: description")
+
+    if not (frontmatter.get("tool_type") or frontmatter.get("type")):
+        inferred = _infer_tool_type(skill_dir, frontmatter)
+        result.warnings.append(
+            f"missing recommended field: tool_type (loader infers '{inferred}' from scripts/)"
+        )
+    for field_name in RECOMMENDED_FRONTMATTER_FIELDS:
+        if field_name == "tool_type":
+            continue
+        if not frontmatter.get(field_name):
+            result.warnings.append(f"missing recommended field: {field_name}")
+
+    return result
+
+
 class SkillLoader:
     """Load skills from external NanoResearch-Skills compatible directories.
 
@@ -246,7 +415,9 @@ class SkillLoader:
         if skill.metadata.get("disclosure_level") == DisclosureLevel.ACTIVATED:
             return skill
 
-        source_path = skill.metadata.get("source_path") or skill.metadata.get("source_dir")
+        source_path = skill.metadata.get("source_path") or skill.metadata.get(
+            "source_dir"
+        )
         if not source_path:
             # Programmatic skills without a source directory are treated as fully materialized.
             skill.metadata["disclosure_level"] = DisclosureLevel.ACTIVATED
@@ -273,7 +444,7 @@ class SkillLoader:
 
         scripts_dir = self._find_scripts_dir(
             skill_dir,
-            frontmatter.get("tool_type") or frontmatter.get("type", "python"),
+            _infer_tool_type(skill_dir, frontmatter),
             frontmatter.get("primary_tool", ""),
         )
         requirements = self._read_requirements(skill_dir)
@@ -343,12 +514,21 @@ class SkillLoader:
         disclosure_level: DisclosureLevel,
     ) -> SkillDefinition:
         """Build a SkillDefinition from parsed frontmatter."""
-        name = frontmatter.get("name", skill_dir.name)
-        description = frontmatter.get("description", "")
+        # Minimal contract: ``name`` falls back to the directory name when
+        # absent or empty; ``description`` is recommended and only warns.
+        name = str(frontmatter.get("name") or skill_dir.name)
+        description = str(frontmatter.get("description") or "")
+        if not description and disclosure_level == DisclosureLevel.DISCOVERY:
+            logger.warning(
+                "Skill '%s' (%s) has no description; "
+                "a description is recommended for retrieval and planning",
+                name,
+                skill_dir,
+            )
         version = str(frontmatter.get("version", "1.0.0"))
         author = str(frontmatter.get("author", "community"))
         license_ = str(frontmatter.get("license", "unknown"))
-        tool_type = frontmatter.get("tool_type") or frontmatter.get("type", "python")
+        tool_type = _infer_tool_type(skill_dir, frontmatter)
         primary_tool = frontmatter.get("primary_tool", "")
         supported_tools = frontmatter.get("supported_tools", [])
         keywords = frontmatter.get("keywords", [])
@@ -360,6 +540,14 @@ class SkillLoader:
         resources = frontmatter.get("resources", {})
         executor = str(frontmatter.get("executor", "auto"))
 
+        unknown_keys = sorted(set(frontmatter) - _KNOWN_FRONTMATTER_KEYS)
+        if unknown_keys:
+            logger.debug(
+                "Skill '%s': ignoring unknown frontmatter fields: %s",
+                name,
+                ", ".join(unknown_keys),
+            )
+
         input_schema = _build_input_schema(
             frontmatter.get("inputs"), frontmatter.get("required")
         )
@@ -367,7 +555,9 @@ class SkillLoader:
 
         metadata: Dict[str, Any] = {
             "primary_tool": primary_tool,
-            "supported_tools": supported_tools if isinstance(supported_tools, list) else [],
+            "supported_tools": (
+                supported_tools if isinstance(supported_tools, list) else []
+            ),
             "keywords": keywords if isinstance(keywords, list) else [],
             "scripts_dir": str(scripts_dir) if scripts_dir else None,
             "source": "external",
@@ -382,9 +572,13 @@ class SkillLoader:
 
         # Claude Code / Agent Skills frontmatter extensions
         if "disable-model-invocation" in frontmatter:
-            metadata["disable_model_invocation"] = bool(frontmatter["disable-model-invocation"])
+            metadata["disable_model_invocation"] = bool(
+                frontmatter["disable-model-invocation"]
+            )
         if "user-invocable" in frontmatter:
-            metadata["user_invocable"] = self._parse_bool(frontmatter["user-invocable"], True)
+            metadata["user_invocable"] = self._parse_bool(
+                frontmatter["user-invocable"], True
+            )
         if "when_to_use" in frontmatter:
             metadata["when_to_use"] = str(frontmatter["when_to_use"])
         if "context" in frontmatter:
@@ -407,9 +601,13 @@ class SkillLoader:
         if "multi_sample" in frontmatter:
             metadata["multi_sample"] = frontmatter["multi_sample"]
         if depends_on:
-            metadata["depends_on"] = depends_on if isinstance(depends_on, list) else [depends_on]
+            metadata["depends_on"] = (
+                depends_on if isinstance(depends_on, list) else [depends_on]
+            )
         if prerequisites:
-            metadata["prerequisites"] = prerequisites if isinstance(prerequisites, list) else [prerequisites]
+            metadata["prerequisites"] = (
+                prerequisites if isinstance(prerequisites, list) else [prerequisites]
+            )
         if workflow:
             metadata["workflow"] = workflow
         if "code_act" in frontmatter:
@@ -476,7 +674,9 @@ class SkillLoader:
             categories=categories,
         )
 
-    def _find_scripts_dir(self, skill_dir: Path, tool_type: str, primary_tool: str) -> Optional[Path]:
+    def _find_scripts_dir(
+        self, skill_dir: Path, tool_type: str, primary_tool: str
+    ) -> Optional[Path]:
         """Find the appropriate scripts directory for a skill."""
         scripts_base = skill_dir / "scripts"
 
@@ -493,7 +693,15 @@ class SkillLoader:
                 return r_dir
         elif tool_type == "mixed":
             # Prefer Python for mixed unless primary_tool is R-based
-            r_tools = {"seurat", "monocle3", "archr", "signac", "harmony", "cellchat", "nichenet"}
+            r_tools = {
+                "seurat",
+                "monocle3",
+                "archr",
+                "signac",
+                "harmony",
+                "cellchat",
+                "nichenet",
+            }
             primary_lower = primary_tool.lower()
 
             if primary_lower in r_tools:
@@ -542,7 +750,16 @@ class SkillLoader:
         - prompt / agent / knowledge: agentic skills
         """
         tool_type_lower = tool_type.lower().strip()
-        valid_types = {"python", "r", "mixed", "cli", "workflow", "container", "agent", "knowledge"}
+        valid_types = {
+            "python",
+            "r",
+            "mixed",
+            "cli",
+            "workflow",
+            "container",
+            "agent",
+            "knowledge",
+        }
         if tool_type_lower in valid_types:
             return tool_type_lower
         # Claude Code ``type: prompt`` skills are agentic prompt templates.
@@ -713,6 +930,7 @@ class SkillLoader:
             return asyncio.run(sandbox.run_command(command, cwd=cwd))
         # Already inside an event loop: schedule on a new thread to avoid blocking.
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(asyncio.run, sandbox.run_command(command, cwd=cwd))
             return future.result(timeout=35)
