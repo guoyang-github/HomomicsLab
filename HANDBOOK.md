@@ -252,22 +252,26 @@ permissions:
 - **Nextflow**：可复现流程；
 - **nf-core**：社区精选流程。
 
-**执行路由决策（Orchestrator 内部）**：
+**执行路由决策（Orchestrator 内部，`orchestrator.py::_execute_task`）**：
 
 ```
 收到 TaskNode
    ↓
-execution_mode == fixed_pipeline?
-   ├─ 是 → 走 curated skill runtime
-   ↓
-use_skill_reference == True?
+use_skill_reference 且非 fixed_pipeline?
    ├─ 是 → _execute_task_with_skill_reference
+   │       （CodeAct 以 skill 文档/脚本为参考生成端到端脚本）
    ↓
 execution_mode == codeact?
-   ├─ 是 → _execute_task_codeact
+   ├─ 是 → _execute_task_codeact（跳过 supervisor 直达 CodeAct）
    ↓
-否则 → supervisor / agent 执行
+supervisor 存在（auto / fixed_pipeline / 未设模式）?
+   ├─ 是 → supervisor curated 执行
+   │       （fixed_pipeline 禁 CodeAct fallback；auto 失败时 _try_codeact_fallback）
+   ↓
+否则 → curated agent 循环（无 supervisor 的兜底）
 ```
+
+> 两条主执行路径：**`codeact(+skill_reference)`** 与 **`fixed_pipeline`**。`codeact` 模式跳过 supervisor 直达 CodeAct（修复了 supervisor 恒在遮蔽 codeact 分支的问题）；open_agent 独立执行路径已移除，无覆盖意图经 PlanEngine 的 domain → generic → LLM fallback 链落入 CodeAct。
 
 **执行后端选择（hpc/router.py）**：
 
@@ -494,22 +498,22 @@ root
 
 `Orchestrator` 拿到 `TaskTree` 和 `execution_mode` 后，开始逐节点执行。
 
-**路由逻辑**：
+**路由逻辑**（`orchestrator.py::_execute_task` 的实际分派顺序）：
 
 ```text
 收到 TaskNode
    ↓
-execution_mode == fixed_pipeline?
-   ├─ 是 → 走 curated skill runtime（按 phase 严格调用 skill 脚本）
-   ↓
-用户点名了具体 skill 且非 fixed_pipeline?
+use_skill_reference 且非 fixed_pipeline?
    ├─ 是 → use_skill_reference 路径：把 SKILL.md + scripts/ 注入 prompt，
    │       让 CodeAct 生成端到端脚本
    ↓
 execution_mode == codeact?
-   ├─ 是 → _execute_task_codeact（通用代码生成）
+   ├─ 是 → _execute_task_codeact（跳过 supervisor 直达 CodeAct）
    ↓
-否则 → supervisor / agent 执行
+supervisor 存在（auto / fixed_pipeline / 未设模式）?
+   ├─ 是 → supervisor curated 执行（fixed_pipeline 禁 fallback）
+   ↓
+否则 → curated agent 循环；失败且非 fixed_pipeline 时 _try_codeact_fallback
 ```
 
 **本例执行细节**：

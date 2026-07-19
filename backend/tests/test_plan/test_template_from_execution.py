@@ -57,29 +57,3 @@ class TestTemplateFromExecution:
         assert "qc" in template.phase_defaults
         assert "clustering" in template.phase_defaults
         assert "single_cell_analysis" in template.applicable_intents
-
-
-class TestTemplateFromOpenAgent:
-    def test_creates_template_from_open_agent(self, client, tmp_path):
-        response = client.post(
-            "/api/templates/from-open-agent",
-            json={
-                "name": "Open Agent Run",
-                "user_message": "Compare scRNA-seq and spatial transcriptomics",
-                "phase_outputs": [
-                    {"phase": "explore"},
-                    {"phase": "summarize"},
-                ],
-            },
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["template_id"]
-
-        store = AnalysisTemplateStore(data_dir=tmp_path)
-        template = store.get_template(data["template_id"])
-        assert template is not None
-        assert template.name == "Open Agent Run"
-        assert "explore" in template.phase_defaults
-        assert "summarize" in template.phase_defaults
-        assert "Compare scRNA-seq and spatial transcriptomics" in template.applicable_intents

@@ -13,7 +13,6 @@ class PlanPresenter:
         "domain-strategy": "来自领域策略模板",
         "standalone-skill": "来自独立技能匹配",
         "cross-domain-composition": "来自跨领域组合",
-        "open-agent": "来自开放智能体规划",
         "llm-fallback": "来自 LLM 兜底生成",
         "hardcoded": "来自系统内置快捷路径",
         "information-gathering": "来自信息收集建议",

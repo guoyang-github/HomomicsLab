@@ -151,12 +151,6 @@ class TemplateFromExecution(BaseModel):
     description: str = ""
 
 
-class TemplateFromOpenAgent(BaseModel):
-    phase_outputs: List[Dict[str, Any]] = Field(default_factory=list)
-    user_message: str
-    name: str
-    description: str = ""
-
 
 class TemplateCreatedResponse(BaseModel):
     template_id: str
@@ -216,34 +210,3 @@ async def create_template_from_execution(
     store.save_template(template)
     return TemplateCreatedResponse(template_id=template_id)
 
-
-@router.post(
-    "/from-open-agent",
-    response_model=TemplateCreatedResponse,
-    dependencies=[Depends(rate_limit_dependency), Depends(require_admin)],
-)
-async def create_template_from_open_agent(
-    body: TemplateFromOpenAgent,
-    request: Request,
-):
-    """Save an open-agent run as a lightweight reusable template."""
-    phase_types = [
-        po.get("phase")
-        for po in body.phase_outputs
-        if po.get("phase")
-    ]
-    applicable_intents = [body.user_message] if body.user_message else []
-
-    template_id = f"open_agent_{_slugify(body.name)}_{uuid.uuid4().hex[:8]}"
-    template = AnalysisTemplate(
-        template_id=template_id,
-        name=body.name,
-        description=body.description or f"Template saved from open-agent run: {body.user_message}",
-        applicable_intents=applicable_intents,
-        tags=["from_open_agent"],
-        phase_defaults={pt: {} for pt in phase_types},
-    )
-
-    store = _get_store(request)
-    store.save_template(template)
-    return TemplateCreatedResponse(template_id=template_id)
