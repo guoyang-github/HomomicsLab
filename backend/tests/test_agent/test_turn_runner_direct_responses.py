@@ -37,9 +37,7 @@ async def test_qa_fallback_when_llm_unavailable(working_memory):
     """Static QA template is used when no LLM client is configured."""
     runner = TurnRunner(llm_client=None)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="single-cell-transcriptomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="single-cell-transcriptomics",
         original_message="什么是单细胞测序？",
     )
     response = await runner._generate_qa_response(
@@ -53,9 +51,7 @@ async def test_information_request_fallback_when_llm_unavailable(working_memory)
     """Static information-request template is used when no LLM client is configured."""
     runner = TurnRunner(llm_client=None)
     intent = UserIntent(
-        analysis_type="information_request",
-        complexity="direct_response",
-        domain="single-cell-transcriptomics",
+        intent_type="information_request", interaction_mode="answer", scope="single_step", domain="single-cell-transcriptomics",
         original_message="单细胞分析包括哪些步骤？",
     )
     response = await runner._generate_information_request_response(
@@ -85,9 +81,7 @@ async def test_qa_uses_llm_when_available(mock_llm_client, working_memory):
     """LLM response is returned for QA when the LLM client is available."""
     runner = TurnRunner(llm_client=mock_llm_client)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="spatial-transcriptomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="spatial-transcriptomics",
         original_message="什么是空间转录组？",
     )
     response = await runner._generate_qa_response(
@@ -102,9 +96,7 @@ async def test_information_request_uses_llm_when_available(mock_llm_client, work
     """LLM response is returned for information requests when the LLM client is available."""
     runner = TurnRunner(llm_client=mock_llm_client)
     intent = UserIntent(
-        analysis_type="information_request",
-        complexity="direct_response",
-        domain="spatial-transcriptomics",
+        intent_type="information_request", interaction_mode="answer", scope="single_step", domain="spatial-transcriptomics",
         original_message="空间分析怎么做？",
     )
     response = await runner._generate_information_request_response(
@@ -132,9 +124,7 @@ async def test_qa_fallback_when_llm_raises(mock_llm_client, working_memory):
     mock_llm_client.chat_completion = AsyncMock(side_effect=RuntimeError("LLM error"))
     runner = TurnRunner(llm_client=mock_llm_client)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="metagenomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="metagenomics",
         original_message="什么是宏基因组？",
     )
     response = await runner._generate_qa_response(
@@ -149,9 +139,7 @@ async def test_information_request_fallback_when_llm_raises(mock_llm_client, wor
     mock_llm_client.chat_completion = AsyncMock(side_effect=RuntimeError("LLM error"))
     runner = TurnRunner(llm_client=mock_llm_client)
     intent = UserIntent(
-        analysis_type="information_request",
-        complexity="direct_response",
-        domain="spatial-transcriptomics",
+        intent_type="information_request", interaction_mode="answer", scope="single_step", domain="spatial-transcriptomics",
         original_message="空间分析有哪些步骤？",
     )
     response = await runner._generate_information_request_response(
@@ -175,9 +163,7 @@ async def test_direct_response_via_llm_includes_context(
         )
     )
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="single-cell-transcriptomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="single-cell-transcriptomics",
         confidence=0.95,
         original_message="What is single-cell RNA-seq?",
     )
@@ -216,9 +202,7 @@ async def test_qa_response_streams_tokens_when_event_callback_set(
 
     runner._event_callback = cb
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="spatial-transcriptomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="spatial-transcriptomics",
         original_message="什么是空间转录组？",
     )
     response = await runner._generate_qa_response(
@@ -252,9 +236,7 @@ async def test_qa_response_stream_failure_falls_back_to_one_shot(
 
     runner._event_callback = cb
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="metagenomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="metagenomics",
         original_message="什么是宏基因组？",
     )
     response = await runner._generate_qa_response(
@@ -275,9 +257,7 @@ async def test_qa_response_without_event_callback_uses_one_shot(
     mock_llm_client.chat_completion_stream = _make_stream(["streamed"])
     runner = TurnRunner(llm_client=mock_llm_client)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        domain="metagenomics",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", domain="metagenomics",
         original_message="什么是宏基因组？",
     )
     response = await runner._generate_qa_response(

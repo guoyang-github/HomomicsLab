@@ -33,14 +33,14 @@ def engine(monkeypatch):
 
 
 def test_direct_response_sla(engine):
-    intent = UserIntent(analysis_type="qa", complexity="direct_response")
+    intent = UserIntent(intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", )
     sla = engine.assess(intent)
     assert sla.execution_mode == "direct_response"
     assert sla.confidence > 0.9
 
 
 def test_single_cell_with_template(engine):
-    intent = UserIntent(analysis_type="single_cell_analysis", complexity="workflow")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", )
     sla = engine.assess(intent)
     assert sla.execution_mode == "auto"
     # Legacy hard-coded skill IDs have been removed; requirements are now dynamic.
@@ -50,7 +50,7 @@ def test_single_cell_with_template(engine):
 
 def test_known_domain_missing_skills_human_required():
     engine = SLAEngine(skill_registry=_empty_registry())
-    intent = UserIntent(analysis_type="spatial_analysis", complexity="workflow")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="spatial-transcriptomics", scope="full", )
     sla = engine.assess(intent)
     # Without a PlanEngine-driven skill resolution, SLA now treats this as a
     # multi-step workflow requiring user confirmation.
@@ -60,7 +60,7 @@ def test_known_domain_missing_skills_human_required():
 
 def test_known_domain_skills_present_auto():
     engine = SLAEngine(skill_registry=_registry_with("bio-single-cell-preprocessing", "bio-single-cell-clustering"))
-    intent = UserIntent(analysis_type="single_cell_analysis", complexity="workflow")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", )
     sla = engine.assess(intent)
     assert sla.execution_mode == "auto"
     assert not sla.missing_skills

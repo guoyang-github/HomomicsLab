@@ -1,7 +1,8 @@
 """OpenTelemetry tracing setup for HomomicsLab.
 
-Provides optional distributed tracing. When ``HOMOMICS_OTEL_ENABLED=true``,
-the FastAPI app is instrumented and spans are exported via OTLP (default) or
+Provides optional distributed tracing. Tracing is off by default (the former
+``HOMOMICS_OTEL_*`` config fields are now the module constants below); when
+enabled, the FastAPI app is instrumented and spans are exported via OTLP or
 printed to console for local development.
 """
 
@@ -10,17 +11,21 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from homomics_lab.config import settings
-
 logger = logging.getLogger(__name__)
 
+# Former HOMOMICS_OTEL_* config fields; defaults kept (tracing off).
+OTEL_ENABLED = False
+OTEL_EXPORTER = "console"  # console | otlp
+OTEL_OTLP_ENDPOINT = "http://localhost:4317"
+OTEL_SERVICE_NAME = "homomicslab"
 
-def setup_tracing(service_name: str = "homomicslab") -> Optional[object]:
-    """Initialize OpenTelemetry tracing if enabled in settings.
+
+def setup_tracing(service_name: str = OTEL_SERVICE_NAME) -> Optional[object]:
+    """Initialize OpenTelemetry tracing if enabled.
 
     Returns the tracer provider or None if tracing is disabled.
     """
-    if not getattr(settings, "otel_enabled", False):
+    if not OTEL_ENABLED:
         return None
 
     try:
@@ -37,10 +42,9 @@ def setup_tracing(service_name: str = "homomicslab") -> Optional[object]:
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)
 
-    exporter_type = getattr(settings, "otel_exporter", "console").lower()
+    exporter_type = OTEL_EXPORTER.lower()
     if exporter_type == "otlp":
-        endpoint = getattr(settings, "otel_otlp_endpoint", "http://localhost:4317")
-        exporter = OTLPSpanExporter(endpoint=endpoint)
+        exporter = OTLPSpanExporter(endpoint=OTEL_OTLP_ENDPOINT)
     else:
         exporter = ConsoleSpanExporter()
 
@@ -51,7 +55,7 @@ def setup_tracing(service_name: str = "homomicslab") -> Optional[object]:
 
 def instrument_fastapi(app) -> None:
     """Instrument a FastAPI app with OpenTelemetry if enabled."""
-    if not getattr(settings, "otel_enabled", False):
+    if not OTEL_ENABLED:
         return
 
     try:
@@ -73,7 +77,7 @@ def get_current_span():
 
 def get_tracer(name: str = "homomicslab") -> Optional[object]:
     """Return a tracer if OpenTelemetry is enabled and available, else None."""
-    if not getattr(settings, "otel_enabled", False):
+    if not OTEL_ENABLED:
         return None
     try:
         from opentelemetry import trace

@@ -82,9 +82,7 @@ async def test_fallback_triggered_for_unknown_intent(registry_with_skills, fake_
     engine = PlanEngine(skill_registry=registry_with_skills, llm_fallback=planner)
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="quality control and pca for single cell data",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="quality control and pca for single cell data",
     )
     plan = await engine.plan(intent, DataState())
 
@@ -116,9 +114,7 @@ async def test_fallback_ignores_unknown_skill_ids(registry_with_skills):
     planner = LLMFallbackPlanner(registry_with_skills, llm_client=fake_client)
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="make a plot",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="make a plot",
     )
     plan = await planner.generate_plan(intent, DataState())
 
@@ -132,9 +128,7 @@ async def test_fallback_graceful_without_api_key(registry_with_skills):
     planner = LLMFallbackPlanner(registry_with_skills, llm_client=FakeLLMClient(response=""))
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="do something weird",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="do something weird",
     )
     plan = await planner.generate_plan(intent, DataState())
 
@@ -150,9 +144,7 @@ async def test_fallback_plan_result_structure(registry_with_skills, fake_llm_res
     planner = LLMFallbackPlanner(registry_with_skills, llm_client=fake_client)
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="quality control and pca for single cell data",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="quality control and pca for single cell data",
     )
     plan = await planner.generate_plan(intent, DataState())
 
@@ -173,9 +165,7 @@ async def test_task_decomposer_uses_fallback_plan(registry_with_skills, fake_llm
     decomposer = TaskDecomposer(plan_engine=engine, skill_registry=registry_with_skills)
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="quality control and pca for single cell data",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="quality control and pca for single cell data",
     )
     tree = await decomposer.decompose(intent, context={"project_id": "proj_1"})
 
@@ -226,9 +216,7 @@ async def test_fallback_to_core_code_act(registry_with_code_act):
     planner = LLMFallbackPlanner(registry_with_code_act, llm_client=fake_client)
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="帮我写个脚本过滤 CSV 行",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="帮我写个脚本过滤 CSV 行",
         structured_intent=StructuredIntent(intent_type="general_help"),
     )
     plan = await planner.generate_plan(intent, DataState())
@@ -249,9 +237,7 @@ async def test_graceful_plan_hints_code_act(registry_with_code_act):
     )
 
     intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="rename sample files in batch",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="rename sample files in batch",
         structured_intent=StructuredIntent(intent_type="general_help"),
     )
     plan = await planner.generate_plan(intent, DataState())
@@ -271,18 +257,14 @@ async def test_code_fallback_uses_intent_not_keywords(registry_with_code_act):
     )
 
     code_intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="filter a CSV",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="filter a CSV",
         structured_intent=StructuredIntent(intent_type="general_help"),
     )
     code_plan = await planner.generate_plan(code_intent, DataState())
     assert "write a script" in code_plan.suggestion_text
 
     bio_intent = UserIntent(
-        analysis_type="unknown_type",
-        complexity="single_step",
-        original_message="single cell clustering",
+        intent_type="unknown_type", interaction_mode="execute", scope="single_step", original_message="single cell clustering",
         structured_intent=StructuredIntent(intent_type="analysis", domain="single-cell-transcriptomics"),
     )
     bio_plan = await planner.generate_plan(bio_intent, DataState())

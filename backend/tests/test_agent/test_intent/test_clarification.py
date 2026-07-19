@@ -36,7 +36,7 @@ def analyzer():
 async def test_low_confidence_returns_clarification(analyzer):
     # Both "single_cell" and "spatial" keywords are present but weakly.
     intent = await analyzer.analyze("做单细胞或空间分析")
-    assert intent.analysis_type == "clarification"
+    assert intent.interaction_mode == "clarify"
     assert "clarification_question" in intent.metadata
     assert intent.confidence == 0.0
 

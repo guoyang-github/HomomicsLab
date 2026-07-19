@@ -199,13 +199,11 @@ class ProjectExporter:
             database_url_driver = "unknown"
 
         return {
-            "app_name": masked.get("app_name"),
             "database_url_driver": database_url_driver,
             "storage_backend": masked.get("storage_backend"),
             "queue_backend": masked.get("queue_backend"),
             "llm_model": masked.get("llm_model"),
             "llm_provider": masked.get("llm_provider"),
-            "semantic_search_model": masked.get("semantic_search_model"),
         }
 
     def _gather_sop_references(self) -> List[str]:

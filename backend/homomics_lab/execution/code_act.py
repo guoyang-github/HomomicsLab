@@ -32,7 +32,13 @@ from typing import Any, Callable, Dict, List, Optional
 from homomics_lab.agent.retrieval import RetrievalContext
 from homomics_lab.llm_client import LLMClient
 from homomics_lab.skills.registry import SkillRegistry
+from homomics_lab.skills.sandbox import SKILL_CONTAINER_IMAGE
 from homomics_lab.tools.registry import ToolRegistry
+
+# CodeAct guardrails (formerly HOMOMICS_CODEACT_* config fields; defaults kept).
+CODEACT_MAX_FIX_ATTEMPTS = 3
+CODEACT_CACHE_ENABLED = True
+CODEACT_CACHE_DIR = Path("./data/codeact_cache")
 
 
 def generate_code(
@@ -78,15 +84,14 @@ async def generate_code_async(
 ) -> str:
     """Async version of ``generate_code`` for use inside async callers.
 
-    ``use_cache=None`` falls back to ``settings.codeact_cache_enabled``;
+    ``use_cache=None`` falls back to the module-level ``CODEACT_CACHE_ENABLED``;
     callers (e.g. the skill runtime) can force it off for low-trust skills.
     """
-    from homomics_lab.config import settings
     from homomics_lab.execution.code_cache import CodeActCache
 
     if use_cache is None:
-        use_cache = settings.codeact_cache_enabled
-    cache = CodeActCache(settings.codeact_cache_dir) if use_cache else None
+        use_cache = CODEACT_CACHE_ENABLED
+    cache = CodeActCache(CODEACT_CACHE_DIR) if use_cache else None
     if cache is not None:
         cached = cache.get(task, language, context, retrieval_context)
         if cached is not None:
@@ -570,7 +575,11 @@ async def execute_code(
     predate the callback silently degrade to batch collection.
     """
     from homomics_lab.config import settings
-    from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
+    from homomics_lab.execution.code_safety import (
+        CODEACT_HITL_LEVEL,
+        CodeSafetyScanner,
+        requires_hitl,
+    )
     from homomics_lab.skills.sandbox import (
         BubblewrapSandbox,
         ContainerSandbox,
@@ -581,7 +590,7 @@ async def execute_code(
     # Static safety scan and optional HITL gate.
     scanner = CodeSafetyScanner()
     safety = scanner.scan(code, language=language)
-    if requires_hitl(safety, min_risk_level=settings.codeact_hitl_level):
+    if requires_hitl(safety, min_risk_level=CODEACT_HITL_LEVEL):
         return {
             "success": False,
             "stdout": "",
@@ -645,7 +654,7 @@ async def execute_code(
             }
 
     sandbox = Sandbox.create(
-        backend, workdir, container_image=settings.skill_container_image
+        backend, workdir, container_image=SKILL_CONTAINER_IMAGE
     )
 
     # Map language to sandbox interpreter command.  Bubblewrap/Container bind
@@ -742,8 +751,8 @@ async def run_code_act(
     same sandbox constraints. The loop stops at the first success or after
     ``max_fix_attempts`` repair iterations (at most
     ``1 + max_fix_attempts`` executions). ``max_fix_attempts=None`` falls back
-    to ``settings.codeact_max_fix_attempts`` (default 3). Without an LLM the
-    engine performs a single attempt, exactly as before.
+    to the module-level ``CODEACT_MAX_FIX_ATTEMPTS`` (default 3). Without an
+    LLM the engine performs a single attempt, exactly as before.
 
     ``on_output_line`` (optional) is forwarded to every sandbox execution
     (the initial attempt and each repair re-run) so callers can react to
@@ -757,12 +766,11 @@ async def run_code_act(
     - ``attempts``: total number of executions (1 means no retry was needed).
     - ``fix_history``: one ``{"attempt", "stderr"}`` entry per failed attempt.
     """
-    from homomics_lab.config import settings
     from homomics_lab.execution.code_cache import CodeActCache
 
     context = context or {}
     if max_fix_attempts is None:
-        max_fix_attempts = settings.codeact_max_fix_attempts
+        max_fix_attempts = CODEACT_MAX_FIX_ATTEMPTS
 
     llm_ready = llm_client is not None and llm_client.is_configured()
     self_correct = llm_ready and max_fix_attempts > 0
@@ -773,9 +781,9 @@ async def run_code_act(
         # letting generate_code_async cache would persist the first,
         # unvalidated draft.
         if use_cache is None:
-            use_cache = settings.codeact_cache_enabled
+            use_cache = CODEACT_CACHE_ENABLED
         if use_cache:
-            cache = CodeActCache(settings.codeact_cache_dir)
+            cache = CodeActCache(CODEACT_CACHE_DIR)
         code = cache.get(task, language, context, retrieval_context) if cache else None
         if code is None:
             code = await generate_code_async(

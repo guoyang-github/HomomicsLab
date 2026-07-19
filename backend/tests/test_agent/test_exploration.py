@@ -433,10 +433,12 @@ def _router():
     return IntentRouter(SimpleNamespace(_llm_client=None))
 
 
-def _intent(analysis_type="single_cell_analysis", complexity="complex", message=""):
+def _intent(message=""):
     return UserIntent(
-        analysis_type=analysis_type,
-        complexity=complexity,
+        intent_type="analysis",
+        interaction_mode="execute",
+        scope="full",
+        domain="single-cell-transcriptomics",
         original_message=message,
     )
 
@@ -522,9 +524,7 @@ def test_non_question_with_data_not_routed():
 def test_answer_intent_not_routed():
     router = _router()
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是批次效应？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是批次效应？",
     )
     assert intent.interaction_mode == "answer"
     assert (
@@ -536,7 +536,7 @@ def test_answer_intent_not_routed():
 
 
 def test_exploration_disabled_not_routed(monkeypatch):
-    monkeypatch.setattr(settings, "exploration_enabled", False)
+    monkeypatch.setattr("homomics_lab.agent.turn_intent_router.EXPLORATION_ENABLED", False)
     router = _router()
     intent = _intent(message="探索一下这个数据有什么规律")
     assert (

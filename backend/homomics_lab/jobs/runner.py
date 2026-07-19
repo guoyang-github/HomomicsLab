@@ -27,6 +27,14 @@ from .repository import JobRepository
 
 logger = logging.getLogger(__name__)
 
+# Job/worker guardrails (formerly HOMOMICS_* config fields; defaults kept).
+DEFAULT_JOB_TIMEOUT_SECONDS = 3600.0
+WORKER_HEARTBEAT_TTL = 30  # seconds
+WORKER_LOCK_TTL = 600  # seconds
+# Hypothesis-driven exploration post-processing (always on; the routing gate
+# upstream decides whether a job is an exploration run).
+EXPLORATION_ENABLED = True
+
 
 class BackgroundJobRunner:
     """Long-running worker that dequeues jobs and executes them via TurnRunner."""
@@ -153,7 +161,7 @@ class BackgroundJobRunner:
 
             cognify_handled = False
             try:
-                timeout = settings.default_job_timeout_seconds
+                timeout = DEFAULT_JOB_TIMEOUT_SECONDS
                 if job.mode == JobMode.CHECKPOINT_RESUME:
                     cp = CheckpointRepository().get_latest(job_id, status="success")
                     if cp is None:
@@ -280,9 +288,9 @@ class BackgroundJobRunner:
                         )
 
             except asyncio.TimeoutError:
-                logger.error("Job %s timed out after %ss", job_id, settings.default_job_timeout_seconds)
+                logger.error("Job %s timed out after %ss", job_id, DEFAULT_JOB_TIMEOUT_SECONDS)
                 job.status = JobStatus.FAILED
-                job.error_message = f"Timeout after {settings.default_job_timeout_seconds}s"
+                job.error_message = f"Timeout after {DEFAULT_JOB_TIMEOUT_SECONDS}s"
                 job.updated_at = datetime.now(timezone.utc)
                 await self._repository.update(job)
                 await self._ingest_to_cbkb(job)
@@ -511,7 +519,7 @@ class BackgroundJobRunner:
         unavailable. Never raises.
         """
         try:
-            if not settings.exploration_enabled or not job.plan_id:
+            if not EXPLORATION_ENABLED or not job.plan_id:
                 return None
             plan = await PlanStore().get(job.plan_id)
             blueprint_data = None
@@ -1068,13 +1076,12 @@ class BackgroundJobRunner:
 
     async def _acquire_lock(self, job_id: str) -> bool:
         """Acquire a distributed lock for this job when using Redis."""
-        from homomics_lab.config import settings
         from homomics_lab.jobs.backends.redis import RedisQueueBackend
 
         if not isinstance(self._queue, RedisQueueBackend):
             return True
         acquired = await self._queue.acquire_lock(
-            job_id, self._worker_id, ttl=settings.worker_lock_ttl
+            job_id, self._worker_id, ttl=WORKER_LOCK_TTL
         )
         return bool(acquired)
 
@@ -1157,7 +1164,6 @@ class BackgroundJobRunner:
 
     async def _heartbeat_loop(self) -> None:
         """Periodically refresh this worker's liveness key when using Redis."""
-        from homomics_lab.config import settings
         from homomics_lab.jobs.backends.redis import RedisQueueBackend
 
         if not isinstance(self._queue, RedisQueueBackend):
@@ -1166,7 +1172,7 @@ class BackgroundJobRunner:
 
         while not self._shutdown_event.is_set():
             try:
-                await self._queue.heartbeat(self._worker_id, ttl=settings.worker_heartbeat_ttl)
+                await self._queue.heartbeat(self._worker_id, ttl=WORKER_HEARTBEAT_TTL)
             except Exception:
                 logger.exception("Worker heartbeat failed")
             try:

@@ -11,6 +11,11 @@ from sqlalchemy.pool import NullPool
 
 from homomics_lab.config import settings
 
+# PostgreSQL connection-pool sizing (formerly HOMOMICS_DATABASE_POOL_SIZE /
+# HOMOMICS_DATABASE_MAX_OVERFLOW; defaults kept).
+DATABASE_POOL_SIZE = 5
+DATABASE_MAX_OVERFLOW = 10
+
 
 # Module-level cache for the engine and session factory.
 # Tests can call ``reset_engine()`` to force recreation after changing settings.
@@ -43,12 +48,13 @@ def create_async_engine_from_settings():
         "connect_args": _connect_args_for_url(url),
     }
     # SQLite does not play well with connection pooling; use NullPool.
-    # PostgreSQL uses a real pool for performance.
+    # PostgreSQL uses a real pool for performance (pool sizing is fixed; see
+    # DATABASE_POOL_SIZE / DATABASE_MAX_OVERFLOW).
     if _is_sqlite_url(url):
         kwargs["poolclass"] = NullPool
     else:
-        kwargs["pool_size"] = settings.database_pool_size
-        kwargs["max_overflow"] = settings.database_max_overflow
+        kwargs["pool_size"] = DATABASE_POOL_SIZE
+        kwargs["max_overflow"] = DATABASE_MAX_OVERFLOW
     return create_async_engine(url, **kwargs)
 
 
@@ -61,14 +67,18 @@ def get_engine():
 
 
 def reset_engine() -> None:
-    """Dispose the cached engine and session factory.
+    """Clear the cached engine and session factory so they are recreated.
 
-    This is intended for tests and runtime configuration reloads.
+    This is intended for tests and runtime configuration reloads. The previous
+    engine is deliberately NOT disposed: module-level aliases (``async_engine``,
+    ``AsyncSessionLocal``) and already-imported references may still point at
+    it, and disposing it would break them (SQLAlchemy pool "engine disposed"
+    errors in unrelated tests). Dropping the cached references is enough to
+    force recreation on next ``get_engine()`` call; the abandoned engine is
+    reclaimed at process exit.
     """
     global _engine, _session_factory
-    if _engine is not None:
-        _engine.sync_engine.dispose()
-        _engine = None
+    _engine = None
     _session_factory = None
 
 
@@ -86,11 +96,18 @@ def get_session_factory():
     return _session_factory
 
 
-# Backward-compatible aliases used by repositories and tests.
-# ``async_engine`` is kept for code that expects the old module-level engine.
-# It is created lazily on first access via ``get_engine()``.
-async_engine = get_engine()
-AsyncSessionLocal = get_session_factory()
+# Backward-compatible aliases resolved lazily via module __getattr__ (PEP 562).
+# ``async_engine`` / ``AsyncSessionLocal`` used to be bound at import time,
+# which went stale whenever the cached engine was reset (tests switching the
+# database URL). Attribute access on this module now always resolves the
+# current engine/factory. Prefer calling get_engine()/get_session_factory()
+# directly in new code.
+def __getattr__(name: str):
+    if name == "async_engine":
+        return get_engine()
+    if name == "AsyncSessionLocal":
+        return get_session_factory()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 async def get_async_session():

@@ -26,10 +26,12 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def executor(tmp_path):
+def executor(tmp_path, monkeypatch):
     """Provide a SkillRuntimeExecutor with the viz skill installed and trusted."""
+    from homomics_lab.skills.environment_manager import EnvironmentManager
+
     settings.data_dir = tmp_path
-    settings.auto_install_dependencies = True
+    monkeypatch.setattr(EnvironmentManager, "AUTO_INSTALL_DEPENDENCIES", True)
     settings.skill_sandbox_backend = "local"
 
     env_dir = tmp_path / "environments" / "python" / SKILL_ID

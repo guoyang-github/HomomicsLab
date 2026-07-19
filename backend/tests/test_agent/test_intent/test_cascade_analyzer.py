@@ -3,7 +3,7 @@
 import pytest
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
-from homomics_lab.agent.intent.models import IntentDefinition
+from homomics_lab.agent.intent.models import IntentDefinition, intent_strategy_key
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def analyzer(definitions):
 @pytest.mark.asyncio
 async def test_analyze_single_cell(analyzer):
     intent = await analyzer.analyze("帮我分析单细胞数据")
-    assert intent.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
     assert intent.confidence > 0
     assert intent.domain_knowledge == ["single-cell-transcriptomics"]
 
@@ -45,22 +45,22 @@ async def test_analyze_single_cell(analyzer):
 @pytest.mark.asyncio
 async def test_analyze_file_conversion(analyzer):
     intent = await analyzer.analyze("把文件转成 h5ad 格式")
-    assert intent.analysis_type == "file_conversion"
+    assert intent.target == "convert_file"
 
 
 @pytest.mark.asyncio
 async def test_analyze_unknown_returns_general_or_clarification(analyzer):
     intent = await analyzer.analyze("hello world")
     # The keyword guardrail now confidently recognizes greetings as direct-response.
-    assert intent.analysis_type in ("general", "clarification", "greeting")
+    assert intent_strategy_key(intent) in ("general", "clarification", "greeting")
     assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio
 async def test_complexity_from_indicators(analyzer):
     intent = await analyzer.analyze("帮我做一个完整的单细胞分析流程")
-    assert intent.analysis_type == "single_cell_analysis"
-    assert intent.complexity == "complex"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
+    assert intent.scope in ("partial", "full")
 
 
 @pytest.mark.asyncio

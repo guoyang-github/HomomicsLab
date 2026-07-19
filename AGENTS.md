@@ -106,36 +106,54 @@ HomomicsLab/
 
 All backend settings are defined in `backend/homomics_lab/config.py` and read from environment variables with the prefix `HOMOMICS_`. Copy `.env.example` to `.env` and edit.
 
-Key variables:
+Per `docs/improvement-plan-v2.0.md` §2 the settings surface is deliberately small: thresholds, TTLs, cache sizes, container limits, schedules and feature behavior are **module-level constants at their call sites**, not config fields. Iron rule: a new config field must justify *which user, in which scenario, must change it* — otherwise it goes in as a constant.
+
+User-visible variables:
 
 | Variable | Typical value / default | Purpose |
 |---|---|---|
 | `HOMOMICS_DEBUG` | `false` | Verbose logging / dev behavior |
 | `HOMOMICS_PORT` | `8080` | API port |
+| `HOMOMICS_LOG_LEVEL` | `INFO` | Log level |
+| `HOMOMICS_DATA_DIR` | `./data` | Runtime data root |
 | `HOMOMICS_DATABASE_URL` | `sqlite+aiosqlite:///./homomics_lab.db` | Primary database |
+| `HOMOMICS_STORAGE_BACKEND` | `local` / `s3` | Object storage |
+| `HOMOMICS_LLM_PROVIDER` | `openai`, `ollama`, ... | LLM provider |
+| `HOMOMICS_LLM_MODEL` | `gpt-4o-mini` | Default model |
+| `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, `auto` |
+| `HOMOMICS_FORCE_SANDBOX` | `true` | Force sandbox for shell/code execution |
+| `HOMOMICS_CORS_ORIGINS` | — | Allowed CORS origins |
+| `HOMOMICS_AUTH_ENABLED` | `false` | API-key / JWT auth (opt-in) |
+| `HOMOMICS_API_KEY` | — | Shared API key / bootstrap key |
+
+LLM API keys/base URLs come from the provider env vars (`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, …) or the encrypted secrets store via the Settings panel, not from `Settings` fields.
+
+Internal / deployment-necessary variables (rarely touched; documented in `.env.example`):
+
+| Variable | Default | Purpose |
+|---|---|---|
 | `HOMOMICS_SESSION_STORE_URL` | `sqlite+aiosqlite:///./data/sessions.db` | Session store |
 | `HOMOMICS_QUEUE_BACKEND` | `memory` / `redis` | Job queue backend |
 | `HOMOMICS_REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
-| `HOMOMICS_STORAGE_BACKEND` | `local` / `s3` | Object storage |
-| `HOMOMICS_LLM_PROVIDER` | `openai`, `openai-compatible`, `ollama`, ... | LLM provider |
-| `HOMOMICS_LLM_MODEL` | `gpt-4o-mini` | Default model |
-| `HOMOMICS_AUTH_ENABLED` | `false` | API-key / JWT auth (opt-in) |
-| `HOMOMICS_FORCE_SANDBOX` | `true` | Force sandbox for shell/code execution |
-| `HOMOMICS_SKILL_SANDBOX_BACKEND` | `auto` | `local`, `bubblewrap`, `container`, `auto` |
-| `HOMOMICS_CODEACT_CACHE_ENABLED` | `true` | Cache CodeAct-generated code |
-| `HOMOMICS_CODEACT_MAX_FIX_ATTEMPTS` | `3` | In-engine self-correction: LLM repair iterations after a failed CodeAct execution (0 disables) |
-| `HOMOMICS_EXPLORATION_ENABLED` | `true` | Hypothesis-driven exploration mode: open-ended research questions with associated data files are routed to `agent/exploration.py` (blueprint → verify → critique → report); falls back to the workflow path when unsure or LLM-less |
-| `HOMOMICS_EXPLORATION_MAX_HYPOTHESES` | `4` | Max hypotheses in an exploration blueprint (2..N generated) |
-| `HOMOMICS_EXPLORATION_MAX_DEPTH` | `2` | Max hypothesis layers including critique-generated follow-ups |
-| `HOMOMICS_CHART_CRITIC_ENABLED` | `false` | VLM chart feedback loop: a vision-capable LLM critiques CodeAct-produced charts and high-severity issues trigger a bounded repair re-run (opt-in; silently no-op without a vision-capable model) |
-| `HOMOMICS_CHART_CRITIC_MAX_RETRIES` | `1` | Max chart regeneration re-runs after a failed chart critique |
-| `HOMOMICS_SKILL_CACHE_ENABLED` | `true` | Memoize deterministic skill results |
-| `HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS` | `4000` | Per-tool output budget before `_compact_tool_output` truncation (errors keep the tail, get 1.5x budget) |
 | `HOMOMICS_WORKER_MODE` | `true` | Run a local worker inside the API process |
-| `HOMOMICS_CURATION_ENABLED` | `false` | Nightly CBKB curation (disabled by default) |
-| `HOMOMICS_EVOLUTION_ENABLED` | `false` | Nightly agent evolution (disabled by default) |
-| `HOMOMICS_SKILL_GENESIS_ENABLED` | `false` | Skill genesis: crystallize repeatedly-validated CodeAct scripts into community-trust skills (opt-in; proposals always require HITL approval) |
-| `HOMOMICS_SKILL_GENESIS_MIN_SUCCESSES` | `3` | Accumulated successes of one normalized task signature before genesis proposes a skill (a post-self-correction success proposes immediately) |
+| `HOMOMICS_STORAGE_S3_*` | — | Bucket/endpoint/region/keys/public URL for `s3` storage |
+| `HOMOMICS_SKILLS_DIR` | `<repo>/skills` | Canonical skill drop-in directory |
+| `HOMOMICS_EXTERNAL_SKILLS_DIRS` | — | Extra skill directories loaded at startup |
+| `HOMOMICS_EMBEDDING_PROVIDER` / `HOMOMICS_EMBEDDING_MODEL` / `HOMOMICS_EMBEDDING_API_KEY` / `HOMOMICS_EMBEDDING_BASE_URL` | `sentence_transformers` / — / — / — | Embedding backend |
+| `HOMOMICS_VECTOR_STORE_BACKEND` / `HOMOMICS_VECTOR_STORE_URL` | `qdrant` / — | Vector store |
+| `HOMOMICS_GRAPH_BACKEND` | `networkx` | Graph backend (`networkx` / `neo4j`) |
+| `HOMOMICS_SKILL_PYTHON_PATH` | — | Explicit interpreter for skill sandboxes |
+| `HOMOMICS_ALLOWED_SKILL_GIT_URLS` | — | Git URL allowlist for skill/domain import |
+| `HOMOMICS_INTERACTIVE_MODE` | `false` | HITL approval for high-risk tool calls |
+| `HOMOMICS_ALLOW_PICKLE_SERIALIZATION` | `false` | DataStore pickle fallback (trusted envs only) |
+| `HOMOMICS_NEXTFLOW_WEBHOOK_SECRET` | — | Nextflow weblog callback auth |
+| `HOMOMICS_ADMIN_INITIAL_PASSWORD` | — | First-boot admin password |
+| `HOMOMICS_JWT_SECRET_KEY` | — | JWT signing secret |
+| `HOMOMICS_OIDC_DISCOVERY_URL` / `HOMOMICS_OIDC_CLIENT_ID` | — | OIDC SSO |
+| `HOMOMICS_RATE_LIMIT_ENABLED` | `false` | Request rate limiting |
+| `HOMOMICS_AUDIT_LOG_ENABLED` | `false` | Rotating audit log |
+| `HOMOMICS_SECRETS_MASTER_KEY` | — | Master key for the encrypted secrets store |
+| `HOMOMICS_TRUSTED_HOSTS` | — | TrustedHost middleware allowlist |
 
 The frontend uses `VITE_API_BASE_URL` and `VITE_WS_URL` for build-time/dev proxy configuration (see `frontend/vite.config.ts`).
 
@@ -285,8 +303,8 @@ mocks should be fixed in the same commit as the production change.
 - All environment-driven config belongs in `backend/homomics_lab/config.py`.
 - Self-improvement data:
   - `agent/plan/mode_selection_lore.py` stores `(intent_features → execution_mode)` statistics learned from `evaluation/mode_benchmark.py`; `ModeSelector` uses them as a prior when confidence and sample thresholds are met.
-  - `knowledge/seed.py` / `skills/skill_dag.py` distinguish `source="seed"` (hand-curated YAML) from `source="observed"` (auto-promoted from consecutive successful skill transitions via `_record_execution_feedback`). Observed edges are promoted to `CONFIRMED` only after `seed_observed_promotion_threshold` consecutive successes and zero failures.
-  - `skills/genesis.py` (`SkillGenesis`, opt-in via `HOMOMICS_SKILL_GENESIS_ENABLED`) crystallizes repeatedly-validated CodeAct scripts into community-trust skills: candidates are a post-self-correction success or `skill_genesis_min_successes` successes of one normalized task signature, tracked as namespaced rows (`genesis:<hash>`) in the CBKB `parameter_lore` table (no new table). Proposals are staged under `data/skill_genesis/`, gated by a `PersistentApprovalStore` HITL request (`call_id: skill-genesis:<hash>`, visible via the existing `GET /api/skills/tools/pending` + approve/reject endpoints), and decisions are applied by `finalize_resolved()` on the next recorded execution. Approval imports the package via `SkillStore.import_skill` (SKILL.md carries `trust_level: community`); rejection is recorded and the signature is never re-proposed. The hook lives in `agent/turn_feedback_recorder.py` (CodeAct results are recognized by their `code` key); DAG linking uses the standard `propose_edge` CANDIDATE path — never bypass `skills/promotion.py`/`trust_skill` for trust changes.
+  - `knowledge/seed.py` / `skills/skill_dag.py` distinguish `source="seed"` (hand-curated YAML) from `source="observed"` (auto-promoted from consecutive successful skill transitions via `_record_execution_feedback`). Observed edges are promoted to `CONFIRMED` only after `SEED_OBSERVED_PROMOTION_THRESHOLD` (constant in `agent/turn_feedback_recorder.py`, 3) consecutive successes and zero failures.
+  - `skills/genesis.py` (`SkillGenesis`, always on) crystallizes repeatedly-validated CodeAct scripts into community-trust skills: candidates are a post-self-correction success or `SKILL_GENESIS_MIN_SUCCESSES` (constant in `skills/genesis.py`, 3) successes of one normalized task signature, tracked as namespaced rows (`genesis:<hash>`) in the CBKB `parameter_lore` table (no new table). Proposals are staged under `data/skill_genesis/`, gated by a `PersistentApprovalStore` HITL request (`call_id: skill-genesis:<hash>`, visible via the existing `GET /api/skills/tools/pending` + approve/reject endpoints), and decisions are applied by `finalize_resolved()` on the next recorded execution. Approval imports the package via `SkillStore.import_skill` (SKILL.md carries `trust_level: community`); rejection is recorded and the signature is never re-proposed. The hook lives in `agent/turn_feedback_recorder.py` (CodeAct results are recognized by their `code` key); DAG linking uses the standard `propose_edge` CANDIDATE path — never bypass `skills/promotion.py`/`trust_skill` for trust changes.
 
 ## Project conventions
 
@@ -345,11 +363,11 @@ External/imported skills default to the `experimental` trust tier and will not e
 
 ### Skill retrieval
 
-Skill candidates from hybrid retrieval are reranked by `agent/retrieval_rerank.py` (pure-Python BM25 over skill docs, blended 0.4 semantic / 0.5 BM25 / 0.1 graph boost) before reaching the planner. Generic phase-text queries (e.g. `"{phase_type} analysis step"`) score ~0.16-0.19 cosine against arbitrary skills, so both the retrieval path (`rerank_min_score=0.1`) and the PlanEngine fallback matcher (`fallback_min_similarity=0.15`) apply explicit thresholds — never lower them to force a match; an unmatched step should fall through to CodeAct instead of binding a wrong skill.
+Skill candidates from hybrid retrieval are reranked by `SkillReranker` in `agent/retrieval.py` (pure-Python BM25 over skill docs, blended 0.4 semantic / 0.5 BM25 / 0.1 graph boost) before reaching the planner. Generic phase-text queries (e.g. `"{phase_type} analysis step"`) score ~0.16-0.19 cosine against arbitrary skills, so both the retrieval path (`rerank_min_score=0.1`) and the PlanEngine fallback matcher (`fallback_min_similarity=0.15`) apply explicit thresholds — never lower them to force a match; an unmatched step should fall through to CodeAct instead of binding a wrong skill.
 
 ### Hot reload
 
-`domain.yaml` files and external skill directories can be watched at runtime. This is enabled by `HOMOMICS_SKILL_HOT_RELOAD_ENABLED` (default `true`) and started in `main.py` lifespan.
+`domain.yaml` files and external skill directories are watched at runtime (hot reload is always on; `SKILL_HOT_RELOAD_ENABLED` constant in `main.py`), started in `main.py` lifespan.
 
 ### API structure
 

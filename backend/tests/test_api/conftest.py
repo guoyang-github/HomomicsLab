@@ -14,17 +14,24 @@ import tempfile
 _test_data_dir = tempfile.mkdtemp(prefix="homomics_api_test_")
 os.environ["HOMOMICS_DATA_DIR"] = _test_data_dir
 os.environ["HOMOMICS_DATABASE_URL"] = f"sqlite+aiosqlite:///{_test_data_dir}/homomics_lab.db"
-
-# Disable heavy startup paths that are unnecessary for API tests.
-os.environ.setdefault("HOMOMICS_SKILL_HOT_RELOAD_ENABLED", "false")
-os.environ.setdefault("HOMOMICS_SKILL_SIBLING_DISCOVERY_ENABLED", "false")
-os.environ.setdefault("HOMOMICS_CONTEXT_ENABLE_EPISODIC_SUMMARY", "false")
-os.environ.setdefault("HOMOMICS_LITERATURE_RETRIEVAL_ENABLED", "false")
+os.environ["HOMOMICS_SESSION_STORE_URL"] = f"sqlite+aiosqlite:///{_test_data_dir}/sessions.db"
 
 from unittest.mock import patch  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+# The global settings singleton and cached DB engine may already have been
+# initialised by tests that ran earlier in this pytest process (pydantic
+# BaseSettings does not re-read env vars once constructed). Force both to
+# point at the isolated test data directory before importing the app.
+from homomics_lab.config import settings as _settings  # noqa: E402
+from homomics_lab.database.connection import reset_engine as _reset_engine  # noqa: E402
+
+_settings.data_dir = __import__("pathlib").Path(_test_data_dir)
+_settings.database_url = os.environ["HOMOMICS_DATABASE_URL"]
+_settings.session_store_url = os.environ["HOMOMICS_SESSION_STORE_URL"]
+_reset_engine()
 
 from homomics_lab.main import app  # noqa: E402
 
@@ -36,9 +43,31 @@ atexit.register(lambda: shutil.rmtree(_test_data_dir, ignore_errors=True))
 @pytest.fixture(scope="module")
 def client():
     """Module-scoped TestClient to avoid full app bootstrap per test."""
-    # Skip starting background scheduler/worker; they are not needed for chat endpoints.
+    # Force the global settings singleton and cached DB engine to point at the
+    # isolated test data directory. This must happen at fixture time, not only
+    # at conftest import time: earlier tests in the same pytest process may
+    # have polluted settings/engine after collection, and pydantic BaseSettings
+    # does not re-read env vars once constructed.
     from homomics_lab.scheduler import HomomicsScheduler
     from homomics_lab.jobs import JobService
+
+    _settings.data_dir = __import__("pathlib").Path(_test_data_dir)
+    _settings.database_url = os.environ["HOMOMICS_DATABASE_URL"]
+    _settings.session_store_url = os.environ["HOMOMICS_SESSION_STORE_URL"]
+    _reset_engine()
+
+    # Ensure schema exists in the isolated database — do not rely on the app
+    # lifespan having run migrations against this particular engine.
+    import asyncio as _asyncio
+
+    from homomics_lab.database import Base as _Base
+    from homomics_lab.database.connection import get_engine as _get_engine
+
+    async def _create_schema() -> None:
+        async with _get_engine().begin() as conn:
+            await conn.run_sync(_Base.metadata.create_all)
+
+    _asyncio.run(_create_schema())
 
     async def _noop(_self) -> None:
         return None
@@ -64,26 +93,18 @@ def mock_llm_and_intent_for_api(monkeypatch):
         msg = str(message or "").lower()
         if "单细胞" in msg or "single cell" in msg or "scrna" in msg:
             return UserIntent(
-                analysis_type="single_cell_analysis",
-                complexity="complex",
-                original_message=message,
+                intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", original_message=message,
             )
         if "csv" in msg or "转换" in msg or "convert" in msg:
             return UserIntent(
-                analysis_type="file_conversion",
-                complexity="single_step",
-                original_message=message,
+                intent_type="file_conversion", interaction_mode="execute", target="convert_file", scope="single_step", original_message=message,
             )
         if "选择" in msg or "debate" in msg:
             return UserIntent(
-                analysis_type="general_help",
-                complexity="direct_response",
-                original_message=message,
+                intent_type="general_help", interaction_mode="answer", target="generate_code", scope="single_step", original_message=message,
             )
         return UserIntent(
-            analysis_type="qa",
-            complexity="single_step",
-            original_message=message,
+            intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message=message,
         )
 
     monkeypatch.setattr(CascadeIntentAnalyzer, "analyze", fake_analyze)

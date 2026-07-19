@@ -9,6 +9,11 @@ import re
 from dataclasses import dataclass, field
 from typing import List
 
+# Minimum risk level that triggers the CodeAct HITL gate (formerly the
+# HOMOMICS_CODEACT_HITL_LEVEL config field; default kept).
+# One of "low" | "medium" | "high" | "critical" | "never".
+CODEACT_HITL_LEVEL = "high"
+
 
 @dataclass
 class SafetyScanResult:

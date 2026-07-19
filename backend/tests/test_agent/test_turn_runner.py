@@ -256,9 +256,7 @@ def test_handle_clarification_with_debate_recommendation(runner, working_memory)
     """Clarification intent carrying debate metadata with a recommendation
     yields a debate request card."""
     intent = UserIntent(
-        analysis_type="clarification",
-        complexity="direct_response",
-        metadata={
+        intent_type="clarification", interaction_mode="clarify", scope="single_step", metadata={
             "debate": {
                 "topic": "请选择最符合您需求的选项",
                 "options": [
@@ -282,9 +280,7 @@ def test_handle_clarification_with_debate_no_recommendation(runner, working_memo
     """Debate metadata without a recommendation degrades to a plain-text
     question that still lists the candidate options."""
     intent = UserIntent(
-        analysis_type="clarification",
-        complexity="direct_response",
-        metadata={
+        intent_type="clarification", interaction_mode="clarify", scope="single_step", metadata={
             "debate": {
                 "topic": "请选择最符合您需求的选项",
                 "options": [

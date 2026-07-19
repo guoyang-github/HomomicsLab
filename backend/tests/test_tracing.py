@@ -1,18 +1,17 @@
 """Tests for OpenTelemetry tracing setup."""
 
 
-from homomics_lab.config import settings
-
-
 class TestTracingSetup:
     def test_disabled_by_default(self):
-        assert settings.otel_enabled is False
+        from homomics_lab import tracing
+
+        assert tracing.OTEL_ENABLED is False
 
     def test_setup_tracing_returns_none_when_disabled(self, monkeypatch):
-        monkeypatch.setattr(settings, "otel_enabled", False)
-        from homomics_lab.tracing import setup_tracing
+        import homomics_lab.tracing as tracing
 
-        assert setup_tracing() is None
+        monkeypatch.setattr(tracing, "OTEL_ENABLED", False)
+        assert tracing.setup_tracing() is None
 
     def test_setup_tracing_console_when_enabled(self, monkeypatch):
         pytest = __import__("pytest")
@@ -32,15 +31,15 @@ class TestTracingSetup:
         except ImportError:
             pytest.skip("opentelemetry packages not installed")
 
-        monkeypatch.setattr(settings, "otel_enabled", True)
-        monkeypatch.setattr(settings, "otel_exporter", "console")
-        from homomics_lab.tracing import setup_tracing
+        import homomics_lab.tracing as tracing
 
-        provider = setup_tracing()
+        monkeypatch.setattr(tracing, "OTEL_ENABLED", True)
+        monkeypatch.setattr(tracing, "OTEL_EXPORTER", "console")
+        provider = tracing.setup_tracing()
         assert provider is not None
 
     def test_set_attribute_when_disabled_does_not_crash(self, monkeypatch):
-        monkeypatch.setattr(settings, "otel_enabled", False)
-        from homomics_lab.tracing import set_attribute
+        import homomics_lab.tracing as tracing
 
-        set_attribute("key", "value")  # should be a no-op
+        monkeypatch.setattr(tracing, "OTEL_ENABLED", False)
+        tracing.set_attribute("key", "value")  # should be a no-op

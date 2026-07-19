@@ -45,6 +45,18 @@ from homomics_lab.workspace.context import current_workspace
 
 logger = logging.getLogger(__name__)
 
+# Runtime guardrails (formerly HOMOMICS_* config fields; defaults kept).
+# Results larger than this are stored as file references instead of inline.
+RESULT_INLINE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024
+SKILL_CACHE_ENABLED = True
+SKILL_CACHE_DIR = Path("./data/skill_cache")
+# Default timeout for background jobs / skill executions, and the upper clamp
+# for any per-skill timeout.
+DEFAULT_JOB_TIMEOUT_SECONDS = 3600.0
+MAX_SKILL_TIMEOUT_SECONDS = 86400.0
+# nf-core pipeline defaults (formerly HOMOMICS_NFCORE_* config fields).
+NFCORE_DEFAULT_PROFILES = ["docker"]
+
 
 class UntrustedSkillError(ValueError):
     """Raised when an external/community skill is executed before being trusted."""
@@ -87,11 +99,11 @@ class SkillRuntimeExecutor:
         self._agent_executor: Optional[AgentSkillExecutor] = None
         self.data_store = DataStore(
             working_dir or Path.cwd(),
-            inline_size_limit=settings.result_inline_size_limit_bytes,
+            inline_size_limit=RESULT_INLINE_SIZE_LIMIT_BYTES,
         )
         self.cache = (
-            SkillCache(settings.skill_cache_dir)
-            if settings.skill_cache_enabled
+            SkillCache(SKILL_CACHE_DIR)
+            if SKILL_CACHE_ENABLED
             else None
         )
 
@@ -143,7 +155,7 @@ class SkillRuntimeExecutor:
         self,
         plan,
         inputs: Dict[str, Any],
-        timeout_seconds: float = settings.default_job_timeout_seconds,
+        timeout_seconds: float = DEFAULT_JOB_TIMEOUT_SECONDS,
         intent_analysis_type: Optional[str] = None,
         resume: bool = True,
     ) -> Dict[str, Any]:
@@ -177,16 +189,14 @@ class SkillRuntimeExecutor:
         if template_path is not None:
             # nf-core pipelines are full directories with relative imports;
             # run them in-place instead of copying main.nf.
-            nfcore_cache = getattr(settings, "nfcore_cache_dir", None) or (
-                settings.data_dir / "nfcore_pipelines"
-            )
+            nfcore_cache = settings.data_dir / "nfcore_pipelines"
             try:
                 is_nfcore = str(template_path.resolve()).startswith(str(Path(nfcore_cache).resolve()))
             except Exception:
                 is_nfcore = False
 
             if is_nfcore:
-                profiles = getattr(settings, "nfcore_default_profiles", ["docker"])
+                profiles = NFCORE_DEFAULT_PROFILES
                 return await scheduler.run_pipeline_dir(
                     template_path,
                     inputs,
@@ -526,7 +536,7 @@ class SkillRuntimeExecutor:
             self.working_dir = ws_dir
             self.data_store = DataStore(
                 ws_dir,
-                inline_size_limit=settings.result_inline_size_limit_bytes,
+                inline_size_limit=RESULT_INLINE_SIZE_LIMIT_BYTES,
             )
             self._scheduler = None
 
@@ -1032,8 +1042,8 @@ class SkillRuntimeExecutor:
         ``scripts_dir`` so the agent/sandbox sees the complete helper library.
         """
         # Dependency preparation is now handled by the scheduler's EnvironmentManager,
-        # which creates isolated venvs/project libraries and installs dependencies when
-        # settings.auto_install_dependencies is enabled.
+        # which creates isolated venvs/project libraries (auto-install is off by
+        # default; see EnvironmentManager.AUTO_INSTALL_DEPENDENCIES).
         task_override = inputs.get("timeout_seconds") or inputs.get("_timeout_seconds")
         timeout = self._parse_timeout(task_override or skill.runtime.resources.time)
 
@@ -1089,12 +1099,12 @@ class SkillRuntimeExecutor:
     def _parse_timeout(self, time_str: str) -> float:
         """Parse time string like '30m' or '1h' into seconds.
 
-        - Empty/None values fall back to ``settings.default_job_timeout_seconds``.
-        - Results are clamped to ``settings.max_skill_timeout_seconds``.
+        - Empty/None values fall back to ``DEFAULT_JOB_TIMEOUT_SECONDS``.
+        - Results are clamped to ``MAX_SKILL_TIMEOUT_SECONDS``.
         - Always returns at least 1 second.
         """
         if time_str is None or str(time_str).strip() == "":
-            seconds = settings.default_job_timeout_seconds
+            seconds = DEFAULT_JOB_TIMEOUT_SECONDS
         else:
             time_str = str(time_str).strip()
             if time_str.endswith("m"):
@@ -1106,5 +1116,5 @@ class SkillRuntimeExecutor:
             else:
                 seconds = float(time_str)
 
-        seconds = min(seconds, settings.max_skill_timeout_seconds)
+        seconds = min(seconds, MAX_SKILL_TIMEOUT_SECONDS)
         return max(seconds, 1.0)

@@ -72,10 +72,10 @@ def build_executor(
 ):
     monkeypatch.setattr(settings, "interactive_mode", interactive)
     if cache_enabled:
-        monkeypatch.setattr(settings, "skill_cache_enabled", True)
-        monkeypatch.setattr(settings, "skill_cache_dir", tmp_path / "skill_cache")
+        monkeypatch.setattr("homomics_lab.skills.runtime.SKILL_CACHE_ENABLED", True)
+        monkeypatch.setattr("homomics_lab.skills.runtime.SKILL_CACHE_DIR", tmp_path / "skill_cache")
     else:
-        monkeypatch.setattr(settings, "skill_cache_enabled", False)
+        monkeypatch.setattr("homomics_lab.skills.runtime.SKILL_CACHE_ENABLED", False)
 
     registry = SkillRegistry()
     loader = SkillLoader(registry=registry)

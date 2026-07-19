@@ -60,9 +60,7 @@ def registry() -> SkillRegistry:
 def test_standalone_planner_returns_plan_for_matching_skill(registry):
     planner = StandaloneSkillPlanner(skill_registry=registry, top_k=3)
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="summarize this article",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="summarize this article",
     )
 
     plan = planner.plan(intent)
@@ -79,9 +77,7 @@ def test_standalone_planner_returns_plan_for_matching_skill(registry):
 def test_standalone_planner_ignores_domain_skills(registry):
     planner = StandaloneSkillPlanner(skill_registry=registry, top_k=3)
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="biology question",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="biology question",
     )
 
     plan = planner.plan(intent)
@@ -95,9 +91,7 @@ def test_standalone_planner_ignores_domain_skills(registry):
 def test_standalone_planner_returns_none_when_no_match(registry):
     planner = StandaloneSkillPlanner(skill_registry=registry, top_k=3)
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="xyz nonexistent thing",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="xyz nonexistent thing",
     )
 
     plan = planner.plan(intent)
@@ -118,9 +112,7 @@ def test_standalone_planner_respects_top_k():
         )
     planner = StandaloneSkillPlanner(skill_registry=reg, top_k=2)
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="skill",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="skill",
     )
 
     plan = planner.plan(intent)

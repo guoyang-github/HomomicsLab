@@ -133,7 +133,7 @@ class TestCapabilityRouting:
         assert decision.model == "o3-mini"
 
     def test_complexity_routing_disabled_falls_back_to_select(self, monkeypatch, mock_registry):
-        monkeypatch.setattr("homomics_lab.config.settings.llm_complexity_routing_enabled", False)
+        monkeypatch.setattr("homomics_lab.llm.router.LLM_COMPLEXITY_ROUTING_ENABLED", False)
         router = LLMRouter(registry=mock_registry, primary_model="gpt-4o")
         decision = router.select_by_complexity(intent_type="greeting")
         assert decision.model == "gpt-4o"

@@ -1,63 +1,31 @@
-"""Tests for open exploration mode routing and settings."""
+"""Tests for capability-assembler routing with open exploration fixed off."""
 
 import pytest
 
 from homomics_lab.agent.intent import UserIntent
-from homomics_lab.agent.plan.capability_assembler import CapabilityAssembler
+from homomics_lab.agent.plan.capability_assembler import (
+    OPEN_EXPLORATION_MODE_ENABLED,
+    CapabilityAssembler,
+)
 from homomics_lab.agent.plan.models import DataState
 from homomics_lab.agent.plan.template import AnalysisTemplate
-from homomics_lab.config import Settings
 
 
 @pytest.fixture
-def assembler_open():
-    settings = Settings()
-    settings.open_exploration_mode_enabled = True
-    return CapabilityAssembler(settings=settings)
+def assembler():
+    return CapabilityAssembler()
 
 
-@pytest.fixture
-def assembler_closed():
-    settings = Settings()
-    settings.open_exploration_mode_enabled = False
-    return CapabilityAssembler(settings=settings)
+def test_open_exploration_constant_is_disabled():
+    # Open exploration routing is a product decision, not a config knob.
+    assert OPEN_EXPLORATION_MODE_ENABLED is False
 
 
 @pytest.mark.asyncio
-async def test_open_exploration_routes_weak_domain_to_open_agent(assembler_open):
-    # Coverage is 0.5 (two of four applicable tokens match), below the normal
-    # 0.7 threshold but above the open-exploration 0.45 threshold.
-    intent = UserIntent(
-        analysis_type="analysis",
-        domain="single-cell-transcriptomics",
-        complexity="multi_step",
-        original_message="single-cell analysis",
-    )
-
-    class FakeTemplateStore:
-        def list_templates(self):
-            return [
-                AnalysisTemplate(
-                    template_id="sc",
-                    name="Single-cell",
-                    domain="single-cell-transcriptomics",
-                    applicable_intents=["single-cell analysis clustering annotation"],
-                )
-            ]
-
-    assembler_open.template_store = FakeTemplateStore()
-    decision = await assembler_open.assemble(intent, data_state=DataState())
-    assert decision.route == "open_agent"
-    assert "Weak domain signal" in decision.reason
-
-
-@pytest.mark.asyncio
-async def test_closed_mode_keeps_strong_domain_template(assembler_closed):
+async def test_strong_domain_keeps_template(assembler):
     # Full match keeps the request on the domain template path.
     intent = UserIntent(
-        analysis_type="analysis",
-        domain="single-cell-transcriptomics",
-        complexity="multi_step",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics",
         original_message="single-cell analysis clustering annotation",
     )
 
@@ -72,31 +40,33 @@ async def test_closed_mode_keeps_strong_domain_template(assembler_closed):
                 )
             ]
 
-    assembler_closed.template_store = FakeTemplateStore()
-    decision = await assembler_closed.assemble(intent, data_state=DataState())
+    assembler.template_store = FakeTemplateStore()
+    decision = await assembler.assemble(intent, data_state=DataState())
     assert decision.route == "domain_template"
 
 
 @pytest.mark.asyncio
-async def test_open_exploration_prefers_open_agent_for_uncertain_standalone(assembler_open):
+async def test_weak_domain_does_not_route_to_open_agent(assembler):
+    # With open exploration off, a weak domain match must not be rerouted to
+    # the open agent by the exploration gate.
     intent = UserIntent(
-        analysis_type="general_help",
-        domain=None,
-        complexity="direct_response",
-        original_message="run some tool",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics",
+        original_message="single-cell analysis",
     )
-    decision = await assembler_open.assemble(intent, data_state=DataState())
-    assert decision.route == "open_agent"
 
+    class FakeTemplateStore:
+        def list_templates(self):
+            return [
+                AnalysisTemplate(
+                    template_id="sc",
+                    name="Single-cell",
+                    domain="single-cell-transcriptomics",
+                    applicable_intents=["single-cell analysis clustering annotation"],
+                )
+            ]
 
-def test_config_default_is_disabled():
-    settings = Settings()
-    assert settings.open_exploration_mode_enabled is False
-
-
-def test_settings_runtime_whitelist(monkeypatch, tmp_path):
-    from homomics_lab.settings_store import save_runtime_settings
-
-    monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
-    validated = save_runtime_settings({"open_exploration_mode_enabled": True})
-    assert validated.open_exploration_mode_enabled is True
+    assembler.template_store = FakeTemplateStore()
+    decision = await assembler.assemble(intent, data_state=DataState())
+    assert not (
+        decision.route == "open_agent" and "Weak domain signal" in (decision.reason or "")
+    )

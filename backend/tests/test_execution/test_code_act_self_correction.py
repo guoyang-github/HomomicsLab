@@ -7,7 +7,6 @@ re-executed, and only the final working snippet reaches the CodeAct cache.
 
 import pytest
 
-from homomics_lab.config import settings
 from homomics_lab.execution import code_act
 from homomics_lab.execution.code_act import run_code_act
 from homomics_lab.execution.code_cache import CodeActCache
@@ -36,8 +35,10 @@ def _py(code: str) -> str:
 @pytest.fixture(autouse=True)
 def _isolated_cache(tmp_path, monkeypatch):
     """Give each test a cold, private CodeAct cache."""
-    monkeypatch.setattr(settings, "codeact_cache_enabled", True)
-    monkeypatch.setattr(settings, "codeact_cache_dir", tmp_path / "codeact_cache")
+    import homomics_lab.execution.code_act as code_act_module
+
+    monkeypatch.setattr(code_act_module, "CODEACT_CACHE_ENABLED", True)
+    monkeypatch.setattr(code_act_module, "CODEACT_CACHE_DIR", tmp_path / "codeact_cache")
 
 
 @pytest.mark.asyncio
@@ -201,7 +202,7 @@ async def test_cache_stores_only_final_working_code(tmp_path, monkeypatch):
     )
     assert result["success"] is True
 
-    cache = CodeActCache(settings.codeact_cache_dir)
+    cache = CodeActCache(tmp_path / "codeact_cache")
     cached = cache.get("cache me", "python", {})
     assert cached is not None
     assert "fixed" in cached
@@ -241,5 +242,5 @@ async def test_failed_run_caches_nothing(tmp_path):
     )
     assert result["success"] is False
 
-    cache = CodeActCache(settings.codeact_cache_dir)
+    cache = CodeActCache(tmp_path / "codeact_cache")
     assert cache.get("never cache me", "python", {}) is None

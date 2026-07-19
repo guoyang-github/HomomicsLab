@@ -179,7 +179,6 @@ def test_factory_returns_backend_with_default_path(tmp_path):
     settings = Settings(
         data_dir=tmp_path,
         embedding_model=CACHED_MODEL,
-        enable_semantic_memory=True,
         vector_store_backend="sqlite-vec",
     )
     memory = create_semantic_memory(settings)
@@ -187,11 +186,13 @@ def test_factory_returns_backend_with_default_path(tmp_path):
     assert memory.db_path == tmp_path / "memory_meta.db"
 
 
-def test_factory_returns_none_when_disabled(tmp_path):
+def test_factory_returns_none_when_disabled(tmp_path, monkeypatch):
+    import homomics_lab.context.memory_backend as memory_backend_module
+
+    monkeypatch.setattr(memory_backend_module, "ENABLE_SEMANTIC_MEMORY", False)
     settings = Settings(
         data_dir=tmp_path,
         embedding_model=CACHED_MODEL,
-        enable_semantic_memory=False,
     )
     assert create_semantic_memory(settings) is None
 
@@ -200,7 +201,6 @@ def test_factory_returns_none_without_model(tmp_path):
     settings = Settings(
         data_dir=tmp_path,
         embedding_model=None,
-        enable_semantic_memory=True,
     )
     assert create_semantic_memory(settings) is None
 

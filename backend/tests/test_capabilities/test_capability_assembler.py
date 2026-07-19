@@ -64,14 +64,11 @@ async def test_assemble_routes_cross_domain_when_multiple_domains_detected(
     skill_registry,
 ):
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="full", domain="single-cell-transcriptomics",
         original_message="先做单细胞聚类，再用空间转录组做反卷积",
         sub_intents=[
             UserIntent(
-                analysis_type="spatial_deconvolution",
-                complexity="single_step",
+                intent_type="analysis", interaction_mode="execute", target="spatial_deconvolution", scope="single_step",
                 domain="spatial-transcriptomics",
             ),
         ],
@@ -108,9 +105,7 @@ async def test_assemble_routes_domain_template_when_coverage_high(skill_registry
     )
 
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        original_message="10x scrna-seq analysis",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", original_message="10x scrna-seq analysis",
     )
     assembly = await assembler.assemble(intent)
 
@@ -137,9 +132,7 @@ async def test_assemble_routes_standalone_skill_when_score_high(skill_registry):
     )
 
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="summarize this article",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="summarize this article",
     )
     assembly = await assembler.assemble(intent)
 
@@ -154,9 +147,7 @@ async def test_assemble_falls_back_to_open_agent(skill_registry):
     assembler = CapabilityAssembler(skill_registry=skill_registry)
 
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="something completely unrelated",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="something completely unrelated",
     )
     assembly = await assembler.assemble(intent)
 
@@ -180,9 +171,7 @@ async def test_assemble_ignores_domain_skills_for_standalone(skill_registry):
     )
 
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="biology question",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="biology question",
     )
     assembly = await assembler.assemble(intent)
 
@@ -194,9 +183,7 @@ async def test_assemble_ignores_domain_skills_for_standalone(skill_registry):
 async def test_assemble_returns_none_template_when_no_templates(skill_registry):
     assembler = CapabilityAssembler(skill_registry=skill_registry)
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-    )
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
     assembly = await assembler.assemble(intent)
 
     # single_cell_analysis carries a domain signal, so standalone routing is
@@ -214,9 +201,7 @@ async def test_capability_first_routing_through_task_decomposer(monkeypatch):
 
     decomposer = TaskDecomposer(skill_registry=reg)
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="summarize this article",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="summarize this article",
     )
 
     plan, tree = await decomposer.decompose_with_plan(intent, context={})
@@ -232,9 +217,7 @@ async def test_assemble_routes_explicit_target_skill(skill_registry):
     assembler = CapabilityAssembler(skill_registry=skill_registry)
 
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="single_step",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="single_step", domain="single-cell-transcriptomics",
         target="bio_qa",
     )
     assembly = await assembler.assemble(intent)
@@ -263,9 +246,7 @@ async def test_assemble_resolves_skill_name_from_message(skill_registry):
     assembler = CapabilityAssembler(skill_registry=reg)
 
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="single_step",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="single_step", domain="single-cell-transcriptomics",
         original_message="使用 CellTypist 对 h5ad 中的免疫细胞进行自动注释",
     )
     assembly = await assembler.assemble(intent)

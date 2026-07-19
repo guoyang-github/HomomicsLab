@@ -3,7 +3,7 @@
 import pytest
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
-from homomics_lab.agent.intent.models import IntentDefinition
+from homomics_lab.agent.intent.models import IntentDefinition, intent_strategy_key
 
 
 @pytest.fixture
@@ -41,8 +41,8 @@ def analyzer():
 @pytest.mark.asyncio
 async def test_detects_sub_intents(analyzer):
     intent = await analyzer.analyze("先做单细胞质控，然后聚类")
-    assert intent.analysis_type == "single_cell_analysis"
-    sub_types = {sub.analysis_type for sub in intent.sub_intents}
+    assert intent_strategy_key(intent) == "single_cell_analysis"
+    sub_types = {intent_strategy_key(sub) for sub in intent.sub_intents}
     assert "qc" in sub_types
     assert "clustering" in sub_types
 
@@ -51,6 +51,6 @@ async def test_detects_sub_intents(analyzer):
 async def test_complexity_from_sequential_markers(analyzer):
     intent = await analyzer.analyze("先质控再聚类")
     # With explicit sub-intents the request is treated as a workflow.
-    assert intent.complexity == "complex"
-    sub_types = {sub.analysis_type for sub in intent.sub_intents}
+    assert intent.scope in ("partial", "full")
+    sub_types = {intent_strategy_key(sub) for sub in intent.sub_intents}
     assert "qc" in sub_types

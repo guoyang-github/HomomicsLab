@@ -32,7 +32,7 @@ def log_tool_call(
         return
 
     try:
-        log_path = settings.audit_log_path or (settings.data_dir / "audit.log")
+        log_path = settings.data_dir / "audit.log"
         log_path = Path(log_path)
         log_path.parent.mkdir(parents=True, exist_ok=True)
 

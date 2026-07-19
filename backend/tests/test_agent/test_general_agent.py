@@ -48,9 +48,7 @@ def agent():
 @pytest.mark.asyncio
 async def test_qa_returns_direct_response(agent):
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是 UMAP？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是 UMAP？",
     )
     wm = WorkingMemory()
 
@@ -63,9 +61,7 @@ async def test_qa_returns_direct_response(agent):
 @pytest.mark.asyncio
 async def test_information_request_returns_direct_response(agent):
     intent = UserIntent(
-        analysis_type="information_request",
-        complexity="direct_response",
-        original_message="单细胞有哪些分析内容？",
+        intent_type="information_request", interaction_mode="answer", scope="single_step", original_message="单细胞有哪些分析内容？",
     )
     wm = WorkingMemory()
 
@@ -77,9 +73,7 @@ async def test_information_request_returns_direct_response(agent):
 @pytest.mark.asyncio
 async def test_general_help_returns_direct_response(agent):
     intent = UserIntent(
-        analysis_type="general_help",
-        complexity="single_step",
-        original_message="帮我写个 Python 脚本过滤 CSV",
+        intent_type="general_help", interaction_mode="answer", target="generate_code", scope="single_step", original_message="帮我写个 Python 脚本过滤 CSV",
     )
     wm = WorkingMemory()
 
@@ -96,9 +90,7 @@ async def test_unconfigured_llm_returns_fallback_message():
 
     agent = GeneralScientificAgent(llm_client=UnconfiguredLLM())
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是 UMAP？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是 UMAP？",
     )
     wm = WorkingMemory()
 
@@ -114,9 +106,7 @@ async def test_direct_answer_streams_tokens_via_event_callback():
     llm = StreamingFakeLLM()
     agent = GeneralScientificAgent(llm_client=llm)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是 UMAP？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是 UMAP？",
     )
     wm = WorkingMemory()
     events = []
@@ -144,9 +134,7 @@ async def test_direct_answer_stream_failure_falls_back_to_one_shot():
     llm = FailingStreamFakeLLM()
     agent = GeneralScientificAgent(llm_client=llm)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是 UMAP？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是 UMAP？",
     )
     wm = WorkingMemory()
     events = []
@@ -169,9 +157,7 @@ async def test_direct_answer_without_callback_keeps_one_shot_path():
     llm = StreamingFakeLLM()
     agent = GeneralScientificAgent(llm_client=llm)
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="什么是 UMAP？",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="什么是 UMAP？",
     )
     wm = WorkingMemory()
 

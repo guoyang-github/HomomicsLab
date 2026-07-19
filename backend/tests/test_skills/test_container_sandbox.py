@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pytest
 
-from homomics_lab.config import settings
 from homomics_lab.skills.sandbox import ContainerSandbox
 
 
@@ -29,10 +28,10 @@ class _MockProcess:
 
 @pytest.mark.asyncio
 async def test_container_sandbox_mounts_venv_and_applies_resource_limits(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "skill_container_memory_mb", 512)
-    monkeypatch.setattr(settings, "skill_container_cpus", 0.5)
-    monkeypatch.setattr(settings, "skill_container_pids_limit", 32)
-    monkeypatch.setattr(settings, "skill_container_readonly_root", True)
+    monkeypatch.setattr("homomics_lab.skills.sandbox.SKILL_CONTAINER_MEMORY_MB", 512)
+    monkeypatch.setattr("homomics_lab.skills.sandbox.SKILL_CONTAINER_CPUS", 0.5)
+    monkeypatch.setattr("homomics_lab.skills.sandbox.SKILL_CONTAINER_PIDS_LIMIT", 32)
+    monkeypatch.setattr("homomics_lab.skills.sandbox.SKILL_CONTAINER_READONLY_ROOT", True)
 
     sandbox = ContainerSandbox(tmp_path)
     sandbox._engine = "docker"  # force a container engine for the test
@@ -75,7 +74,7 @@ async def test_container_sandbox_mounts_venv_and_applies_resource_limits(tmp_pat
 
 @pytest.mark.asyncio
 async def test_container_sandbox_falls_back_to_image_python_without_venv(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "skill_container_readonly_root", False)
+    monkeypatch.setattr("homomics_lab.skills.sandbox.SKILL_CONTAINER_READONLY_ROOT", False)
 
     sandbox = ContainerSandbox(tmp_path)
     sandbox._engine = "docker"

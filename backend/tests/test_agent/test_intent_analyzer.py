@@ -1,5 +1,6 @@
 import pytest
 
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer
 
 
@@ -55,22 +56,22 @@ def analyzer_with_single_cell_domain(analyzer):
 @pytest.mark.asyncio
 async def test_detect_single_cell_analysis(analyzer_with_single_cell_domain):
     intent = await analyzer_with_single_cell_domain.analyze("帮我分析这组单细胞数据")
-    assert intent.analysis_type == "single_cell_analysis"
-    assert intent.complexity == "complex"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
+    assert intent.scope in ("partial", "full")
 
 
 @pytest.mark.asyncio
 async def test_detect_simple_task(analyzer_with_single_cell_domain):
     intent = await analyzer_with_single_cell_domain.analyze("把文件转换成 h5ad 格式")
-    assert intent.analysis_type == "file_conversion"
-    assert intent.complexity == "single_step"
+    assert intent.target == "convert_file"
+    assert intent.scope == "single_step"
 
 
 @pytest.mark.asyncio
 async def test_detect_qa(analyzer):
     intent = await analyzer.analyze("什么是 UMAP？")
-    assert intent.analysis_type == "qa"
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type == "qa"
+    assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio
@@ -78,8 +79,8 @@ async def test_detect_information_request_suppresses_workflow(analyzer_with_sing
     """Knowledge-seeking questions about analysis types must not trigger execution."""
     intent = await analyzer_with_single_cell_domain.analyze("单细胞转录组有哪些分析内容？")
     # With the v2 schema these map to the dedicated ``information_request`` intent.
-    assert intent.analysis_type in ("qa", "information_request")
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type in ("qa", "information_request")
+    assert intent.interaction_mode == "answer"
     assert intent.interaction_mode == "answer"
 
 
@@ -87,31 +88,31 @@ async def test_detect_information_request_suppresses_workflow(analyzer_with_sing
 async def test_detect_generic(analyzer):
     intent = await analyzer.analyze("hello world")
     # Greeting intent is recognized directly.
-    assert intent.analysis_type == "greeting"
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type == "greeting"
+    assert intent.interaction_mode == "answer"
     assert intent.confidence >= 0.0
 
 
 @pytest.mark.asyncio
 async def test_detect_general_help_chinese(analyzer):
     intent = await analyzer.analyze("帮我写个 Python 脚本过滤 CSV")
-    assert intent.analysis_type == "general_help"
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type == "general_help"
+    assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio
 async def test_detect_general_help_english(analyzer):
     intent = await analyzer.analyze("generate code to rename sample files")
-    assert intent.analysis_type == "general_help"
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type == "general_help"
+    assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio
 async def test_general_help_overrides_unknown_domain(analyzer):
     """Coding requests should be recognized as general help even without domain knowledge."""
     intent = await analyzer.analyze("show me an example of parsing a tsv file")
-    assert intent.analysis_type == "general_help"
-    assert intent.complexity == "direct_response"
+    assert intent.intent_type == "general_help"
+    assert intent.interaction_mode == "answer"
 
 
 @pytest.mark.asyncio
@@ -125,7 +126,7 @@ async def test_structured_intent_fields_for_qa(analyzer):
 @pytest.mark.asyncio
 async def test_structured_intent_fields_for_execution(analyzer_with_single_cell_domain):
     intent = await analyzer_with_single_cell_domain.analyze("帮我分析这组单细胞数据")
-    assert intent.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
     assert intent.interaction_mode == "execute"
     assert intent.domain == "single_cell_standard"
     assert intent.scope == "full"
@@ -134,7 +135,7 @@ async def test_structured_intent_fields_for_execution(analyzer_with_single_cell_
 @pytest.mark.asyncio
 async def test_structured_intent_fields_for_single_step(analyzer_with_single_cell_domain):
     intent = await analyzer_with_single_cell_domain.analyze("把文件转换成 h5ad 格式")
-    assert intent.analysis_type == "file_conversion"
+    assert intent.target == "convert_file"
     assert intent.interaction_mode == "execute"
     assert intent.scope == "single_step"
     assert intent.target == "convert_file"
@@ -144,7 +145,7 @@ async def test_structured_intent_fields_for_single_step(analyzer_with_single_cel
 async def test_pubmed_meta_source_question_routes_to_qa(analyzer):
     """A question about whether information came from PubMed should not run pubmed_search."""
     intent = await analyzer.analyze("你这个信息是从 pubmed 查的？")
-    assert intent.analysis_type == "qa"
+    assert intent.intent_type == "qa"
     assert intent.interaction_mode == "answer"
     assert intent.metadata.get("tool_name") is None
 
@@ -153,7 +154,7 @@ async def test_pubmed_meta_source_question_routes_to_qa(analyzer):
 async def test_pubmed_meaningless_query_routes_to_qa(analyzer):
     """If no usable query can be extracted, do not invoke the PubMed tool."""
     intent = await analyzer.analyze("pubmed 查")
-    assert intent.analysis_type == "qa"
+    assert intent.intent_type == "qa"
     assert intent.interaction_mode == "answer"
     assert intent.metadata.get("tool_name") is None
 
@@ -162,7 +163,7 @@ async def test_pubmed_meaningless_query_routes_to_qa(analyzer):
 async def test_pubmed_real_search_still_routes_to_tool(analyzer):
     """A normal PubMed search request should still route to the tool."""
     intent = await analyzer.analyze("pubmed 搜索 single-cell RNA-seq")
-    assert intent.analysis_type == "pubmed_search"
+    assert intent.target == "pubmed_search"
     assert intent.interaction_mode == "execute"
     assert intent.metadata.get("tool_name") == "pubmed_search"
     assert "single-cell" in intent.metadata.get("tool_inputs", {}).get("query", "")

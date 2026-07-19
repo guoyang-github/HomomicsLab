@@ -45,13 +45,10 @@ class WorkflowCache:
     def __init__(self, cache_dir: Optional[Path] = None):
         self.cache_dir = (
             cache_dir
-            or getattr(settings, "workflow_cache_dir", None)
             or (Path(settings.data_dir) / ".cache" / "workflow")
         )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._content_hash_limit = getattr(
-            settings, "workflow_cache_content_hash_limit", DEFAULT_CONTENT_HASH_LIMIT
-        )
+        self._content_hash_limit = DEFAULT_CONTENT_HASH_LIMIT
 
     @staticmethod
     def compute_hash(data: Any) -> str:

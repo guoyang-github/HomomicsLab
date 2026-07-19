@@ -36,8 +36,16 @@ from homomics_lab.api.router import api_router
 from homomics_lab.tracing import instrument_fastapi, setup_tracing
 
 
-configure_logging(level=settings.log_level, json_format=settings.log_json_format)
-setup_tracing(service_name=settings.otel_service_name)
+APP_NAME = "HomomicsLab"
+# JSON-lines logging and OpenAPI docs are fixed on; hot reload of skill/domain
+# files is fixed on (formerly HOMOMICS_LOG_JSON_FORMAT /
+# HOMOMICS_OPENAPI_DOCS_ENABLED / HOMOMICS_SKILL_HOT_RELOAD_ENABLED).
+LOG_JSON_FORMAT = True
+OPENAPI_DOCS_ENABLED = True
+SKILL_HOT_RELOAD_ENABLED = True
+
+configure_logging(level=settings.log_level, json_format=LOG_JSON_FORMAT)
+setup_tracing()
 
 
 @asynccontextmanager
@@ -46,7 +54,7 @@ async def lifespan(app: FastAPI):
     apply_runtime_settings(settings)
 
     ctx = await bootstrap_worker_context(
-        enable_hot_reload=settings.skill_hot_reload_enabled
+        enable_hot_reload=SKILL_HOT_RELOAD_ENABLED
     )
 
     # Expose initialized registries for API endpoints
@@ -144,11 +152,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.app_name,
+    title=APP_NAME,
     version=app_version(),
-    docs_url="/docs" if settings.openapi_docs_enabled else None,
-    redoc_url="/redoc" if settings.openapi_docs_enabled else None,
-    openapi_url="/openapi.json" if settings.openapi_docs_enabled else None,
+    docs_url="/docs" if OPENAPI_DOCS_ENABLED else None,
+    redoc_url="/redoc" if OPENAPI_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if OPENAPI_DOCS_ENABLED else None,
     lifespan=lifespan,
 )
 
@@ -237,7 +245,7 @@ if getattr(settings, "trusted_hosts", None):
 
 @app.get("/")
 async def root():
-    return {"name": settings.app_name, "version": app_version()}
+    return {"name": APP_NAME, "version": app_version()}
 
 
 @app.get("/health")

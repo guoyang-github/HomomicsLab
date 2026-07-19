@@ -72,16 +72,16 @@ def analyzer():
 @pytest.mark.asyncio
 async def test_detect_visualization_edit_intent_color(analyzer):
     intent = await analyzer.analyze("把颜色改成蓝色")
-    assert intent.analysis_type == "visualization_edit"
-    assert intent.complexity == "single_step"
+    assert intent.target == "visualization_edit"
+    assert intent.scope == "single_step"
     assert intent.interaction_mode == "modify"
 
 
 @pytest.mark.asyncio
 async def test_detect_visualization_edit_intent_boxplot(analyzer):
     intent = await analyzer.analyze("换成箱线图")
-    assert intent.analysis_type == "visualization_edit"
-    assert intent.complexity == "single_step"
+    assert intent.target == "visualization_edit"
+    assert intent.scope == "single_step"
 
 
 @pytest.mark.asyncio
@@ -92,13 +92,12 @@ async def test_visualization_edit_changes_color():
 
     result = await runner._route_by_intent(
         intent=MagicMock(
-            analysis_type="visualization_edit",
-            complexity="single_step",
+            intent_type="analysis",
             interaction_mode="modify",
             scope="single_step",
             metadata={},
             domain=None,
-            target=None,
+            target="visualization_edit",
         ),
         user_message="把颜色改成蓝色",
         working_memory=wm,
@@ -126,13 +125,12 @@ async def test_visualization_edit_converts_violin_to_box():
 
     result = await runner._route_by_intent(
         intent=MagicMock(
-            analysis_type="visualization_edit",
-            complexity="single_step",
+            intent_type="analysis",
             interaction_mode="modify",
             scope="single_step",
             metadata={},
             domain=None,
-            target=None,
+            target="visualization_edit",
         ),
         user_message="换成箱线图",
         working_memory=wm,
@@ -158,13 +156,12 @@ async def test_visualization_edit_adds_error_bars():
 
     result = await runner._route_by_intent(
         intent=MagicMock(
-            analysis_type="visualization_edit",
-            complexity="single_step",
+            intent_type="analysis",
             interaction_mode="modify",
             scope="single_step",
             metadata={},
             domain=None,
-            target=None,
+            target="visualization_edit",
         ),
         user_message="加误差线",
         working_memory=wm,
@@ -188,13 +185,12 @@ async def test_visualization_edit_fallback_without_recent_plot():
 
     result = await runner._route_by_intent(
         intent=MagicMock(
-            analysis_type="visualization_edit",
-            complexity="single_step",
+            intent_type="analysis",
             interaction_mode="modify",
             scope="single_step",
             metadata={},
             domain=None,
-            target=None,
+            target="visualization_edit",
         ),
         user_message="把颜色改成蓝色",
         working_memory=wm,

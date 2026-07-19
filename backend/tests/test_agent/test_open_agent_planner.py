@@ -67,9 +67,7 @@ async def test_open_agent_planner_triggers_on_explore_intent(skill_registry, too
         tool_registry=tool_registry,
     )
     intent = UserIntent(
-        analysis_type="explore",
-        complexity="single_step",
-        interaction_mode="explore",
+        intent_type="explore", scope="single_step", interaction_mode="explore",
         original_message="查一下 CD3E 相关的文献",
     )
 
@@ -88,9 +86,7 @@ async def test_open_agent_planner_returns_none_for_domain_intent(skill_registry,
         tool_registry=tool_registry,
     )
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="full", domain="single-cell-transcriptomics",
         original_message="帮我做一个完整的单细胞分析",
     )
 
@@ -108,9 +104,7 @@ async def test_open_agent_planner_returns_suggestion_when_no_capabilities():
         tool_registry=ToolRegistry(),
     )
     intent = UserIntent(
-        analysis_type="open_ended",
-        complexity="single_step",
-        original_message="abcdefg_unknown_topic",
+        intent_type="analysis", interaction_mode="execute", target="open_ended", scope="single_step", original_message="abcdefg_unknown_topic",
     )
 
     plan = await planner.plan(intent)
@@ -156,9 +150,7 @@ async def test_open_agent_planner_generates_structured_plan(skill_registry, tool
         tool_registry=tool_registry,
     )
     intent = UserIntent(
-        analysis_type="compare",
-        complexity="single_step",
-        original_message="比较单细胞和空间转录组聚类方法",
+        intent_type="analysis", interaction_mode="execute", target="compare", scope="single_step", original_message="比较单细胞和空间转录组聚类方法",
     )
 
     plan = await planner.plan(intent)
@@ -197,9 +189,7 @@ async def test_open_agent_planner_drops_unknown_tools(skill_registry, tool_regis
         tool_registry=tool_registry,
     )
     intent = UserIntent(
-        analysis_type="explore",
-        complexity="single_step",
-        interaction_mode="explore",
+        intent_type="explore", scope="single_step", interaction_mode="explore",
         original_message="test",
     )
 

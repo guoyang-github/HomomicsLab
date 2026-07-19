@@ -259,10 +259,12 @@ class TestSandboxAllowLocalByLevel:
 class TestCodeActCacheSwitch:
     @pytest.mark.asyncio
     async def test_use_cache_false_bypasses_code_cache(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(settings, "codeact_cache_enabled", True)
-        monkeypatch.setattr(settings, "codeact_cache_dir", tmp_path / "cache")
+        import homomics_lab.execution.code_act as code_act_module
 
-        cache = CodeActCache(settings.codeact_cache_dir)
+        monkeypatch.setattr(code_act_module, "CODEACT_CACHE_ENABLED", True)
+        monkeypatch.setattr(code_act_module, "CODEACT_CACHE_DIR", tmp_path / "cache")
+
+        cache = CodeActCache(tmp_path / "cache")
         cache.put("unique task for trust test", "python", "CACHED_CODE", {})
 
         # With cache enabled, the cached snippet is returned.
@@ -271,21 +273,23 @@ class TestCodeActCacheSwitch:
         ) == "CACHED_CODE"
 
         # With cache disabled, code is regenerated and the cache is untouched.
-        files_before = sorted((settings.codeact_cache_dir).rglob("*.json"))
+        files_before = sorted((tmp_path / "cache").rglob("*.json"))
         regenerated = await generate_code_async(
             "unique task for trust test", "python", {}, use_cache=False
         )
         assert regenerated != "CACHED_CODE"
-        assert sorted((settings.codeact_cache_dir).rglob("*.json")) == files_before
+        assert sorted((tmp_path / "cache").rglob("*.json")) == files_before
 
     @pytest.mark.asyncio
     async def test_use_cache_none_follows_settings(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(settings, "codeact_cache_enabled", False)
-        monkeypatch.setattr(settings, "codeact_cache_dir", tmp_path / "cache")
+        import homomics_lab.execution.code_act as code_act_module
+
+        monkeypatch.setattr(code_act_module, "CODEACT_CACHE_ENABLED", False)
+        monkeypatch.setattr(code_act_module, "CODEACT_CACHE_DIR", tmp_path / "cache")
         code = await generate_code_async("another trust task", "python", {})
         assert "CACHED_CODE" not in code
-        assert not (settings.codeact_cache_dir).exists() or not list(
-            (settings.codeact_cache_dir).rglob("*.json")
+        assert not (tmp_path / "cache").exists() or not list(
+            (tmp_path / "cache").rglob("*.json")
         )
 
     @pytest.mark.asyncio

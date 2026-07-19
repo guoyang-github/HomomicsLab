@@ -70,9 +70,7 @@ class _SentinelError(Exception):
 
 def _make_execute_intent(message: str = "run qc on sample.h5ad") -> UserIntent:
     return UserIntent(
-        analysis_type="single_cell_qc",
-        complexity="complex",
-        original_message=message,
+        intent_type="analysis", target="single_cell_qc", scope="full", original_message=message,
         interaction_mode="execute",
         domain="single-cell-transcriptomics",
     )
@@ -189,15 +187,10 @@ def test_exploration_gate_uses_precomputed_project_has_data():
     """The gate accepts a precomputed data scan (gathered concurrently)."""
     router = IntentRouter(SimpleNamespace(_event_callback=None))
     intent = UserIntent(
-        analysis_type="single_cell",
-        complexity="complex",
-        original_message="为什么这些细胞聚在一起？",
+        intent_type="analysis", target="single_cell", scope="full", original_message="为什么这些细胞聚在一起？",
         interaction_mode="execute",
     )
-    with patch(
-        "homomics_lab.agent.turn_intent_router.settings"
-    ) as mock_settings:
-        mock_settings.exploration_enabled = True
+    with patch("homomics_lab.agent.turn_intent_router.settings"):
         # Without the precomputed flag a project with no data returns False;
         # passing project_has_data=True must skip the filesystem scan.
         with patch.object(

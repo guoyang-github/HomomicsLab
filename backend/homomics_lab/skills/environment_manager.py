@@ -52,10 +52,14 @@ class EnvironmentInfo:
 class EnvironmentManager:
     """Prepare and cache isolated environments for skills."""
 
+    # Create venvs and install skill dependencies automatically (formerly
+    # HOMOMICS_AUTO_INSTALL_DEPENDENCIES; default kept: off).
+    AUTO_INSTALL_DEPENDENCIES = False
+
     def __init__(self, base_dir: Optional[Path] = None, auto_install: Optional[bool] = None):
         self.base_dir = (base_dir or settings.data_dir / "environments").resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.auto_install = auto_install if auto_install is not None else settings.auto_install_dependencies
+        self.auto_install = auto_install if auto_install is not None else self.AUTO_INSTALL_DEPENDENCIES
 
     def _env_hash(self, skill_id: str, dependency_file: Optional[Path]) -> str:
         """Stable hash used as the environment cache key."""

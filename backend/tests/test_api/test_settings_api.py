@@ -26,7 +26,6 @@ def _isolate_settings(monkeypatch, tmp_path):
     # Make sure env-level defaults do not leak into these tests.
     monkeypatch.setattr(settings, "llm_provider", None)
     monkeypatch.setattr(settings, "llm_model", None)
-    monkeypatch.setattr(settings, "llm_fallback_models", None)
 
 
 class TestLlmSettingsApi:
@@ -141,26 +140,16 @@ class TestSystemSettingsApi:
         assert response.status_code == 200
         data = response.json()
         assert "skill_sandbox_backend" in data
-        assert "enable_semantic_memory" in data
-        assert "session_ttl_days" in data
 
     def test_update_system_settings_persists(self, client, tmp_path):
         response = client.put(
             "/api/settings/system",
-            json={
-                "skill_sandbox_backend": "container",
-                "enable_semantic_memory": False,
-                "session_ttl_days": 30,
-                "max_llm_cost_per_request_usd": 0.5,
-            },
+            json={"skill_sandbox_backend": "container"},
             headers={"X-API-Key": "test-api-key"},
         )
         assert response.status_code == 200, response.text
         data = response.json()
         assert data["skill_sandbox_backend"] == "container"
-        assert data["enable_semantic_memory"] is False
-        assert data["session_ttl_days"] == 30
-        assert data["max_llm_cost_per_request_usd"] == 0.5
 
         # Verify persistence by reading back
         response = client.get("/api/settings/system", headers={"X-API-Key": "test-api-key"})

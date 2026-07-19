@@ -6,7 +6,7 @@ import pytest
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
 from homomics_lab.agent.intent.classifiers import LLMIntentClassifier
-from homomics_lab.agent.intent.models import IntentDefinition
+from homomics_lab.agent.intent.models import IntentDefinition, intent_strategy_key
 
 
 class _FakeLLMClient:
@@ -67,7 +67,7 @@ async def test_malformed_entities_do_not_crash_intent_analysis(analyzer, entitie
 
     intent = await analyzer.analyze("对 PA12 单细胞数据执行 Louvain 聚类")
 
-    assert intent.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
     assert isinstance(intent.metadata, dict)
     # The malformed payload should be preserved under _raw for observability.
     assert "_raw" in intent.structured_intent.entities

@@ -31,6 +31,7 @@ from homomics_lab.context.vector_store.base import VectorStoreBackend
 from homomics_lab.context.vector_store.factory import get_vector_store, reset_vector_store
 from homomics_lab.embeddings.base import EmbeddingProvider
 from homomics_lab.agent.intent import UserIntent
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.embeddings.factory import get_embedding_provider, reset_embedding_provider
 
 logger = logging.getLogger(__name__)
@@ -603,7 +604,7 @@ class CapabilityIndex:
         """
         parts: List[str] = [
             intent.original_message or "",
-            intent.analysis_type or "",
+            intent_strategy_key(intent),
         ]
         if intent.target:
             parts.append(intent.target)

@@ -17,7 +17,8 @@ def reset_singleton():
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "secrets_db_path", tmp_path / "secrets.db")
+    # The secrets DB lives at <data_dir>/secrets.db.
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "secrets_master_key", "api-test-master-key")
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "api_key", "test-api-key")

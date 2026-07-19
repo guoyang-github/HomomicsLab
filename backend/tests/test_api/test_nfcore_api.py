@@ -5,23 +5,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from homomics_lab.config import settings
 from homomics_lab.main import app
 
 
 @pytest.fixture
 def client():
     return TestClient(app)
-
-
-@pytest.fixture
-def enable_nfcore(monkeypatch):
-    monkeypatch.setattr(settings, "nfcore_enabled", True)
-
-
-@pytest.fixture
-def disable_nfcore(monkeypatch):
-    monkeypatch.setattr(settings, "nfcore_enabled", False)
 
 
 class FakePipeline:
@@ -34,12 +23,7 @@ class FakePipeline:
     latest_release = "3.14.0"
 
 
-def test_nfcore_disabled_returns_404(client, disable_nfcore):
-    response = client.get("/api/nfcore/pipelines")
-    assert response.status_code == 404
-
-
-def test_list_pipelines(client, enable_nfcore):
+def test_list_pipelines(client):
     manager = MagicMock()
     manager.list_pipelines.return_value = [FakePipeline()]
     with patch("homomics_lab.api.nfcore.get_nfcore_manager", return_value=manager):
@@ -50,7 +34,7 @@ def test_list_pipelines(client, enable_nfcore):
     assert data[0]["name"] == "nf-core-rnaseq"
 
 
-def test_get_schema(client, enable_nfcore):
+def test_get_schema(client):
     manager = MagicMock()
     manager.load_schema.return_value = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -74,7 +58,7 @@ def test_get_schema(client, enable_nfcore):
     assert any(field["name"] == "input" for field in data["fields"])
 
 
-def test_validate_params(client, enable_nfcore):
+def test_validate_params(client):
     manager = MagicMock()
     manager.load_schema.return_value = {
         "type": "object",
@@ -93,7 +77,7 @@ def test_validate_params(client, enable_nfcore):
     assert response.json()["valid"] is True
 
 
-def test_ingest_endpoint(client, enable_nfcore, tmp_path):
+def test_ingest_endpoint(client, tmp_path):
     output_dir = tmp_path / "results"
     output_dir.mkdir()
     (output_dir / "multiqc_report.html").write_text("<html>report</html>")

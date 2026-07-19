@@ -41,16 +41,13 @@ def _domain_skill_registry() -> SkillRegistry:
 
 @pytest.fixture
 def domain_decomposer(monkeypatch):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     return TaskDecomposer(skill_registry=_domain_skill_registry())
 
 
 @pytest.mark.asyncio
 async def test_decompose_single_cell_pipeline(domain_decomposer):
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-    )
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
 
     tree = await domain_decomposer.decompose(intent, context={"sample_count": 1})
 
@@ -64,9 +61,7 @@ async def test_decompose_single_cell_pipeline(domain_decomposer):
 @pytest.mark.asyncio
 async def test_decompose_file_conversion(decomposer):
     intent = UserIntent(
-        analysis_type="file_conversion",
-        complexity="single_step",
-    )
+        intent_type="file_conversion", interaction_mode="execute", target="convert_file", scope="single_step", )
 
     tree = await decomposer.decompose(intent, context={})
 
@@ -77,9 +72,7 @@ async def test_decompose_file_conversion(decomposer):
 @pytest.mark.asyncio
 async def test_task_dependencies(domain_decomposer):
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-    )
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
 
     tree = await domain_decomposer.decompose(intent, context={})
 
@@ -92,11 +85,10 @@ async def test_task_dependencies(domain_decomposer):
 @pytest.mark.asyncio
 async def test_decompose_sub_intents(domain_decomposer):
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full",
         sub_intents=[
-            UserIntent(analysis_type="qc", complexity="single_step"),
-            UserIntent(analysis_type="clustering", complexity="single_step"),
+            UserIntent(intent_type="analysis", interaction_mode="execute", target="qc", scope="single_step"),
+            UserIntent(intent_type="analysis", interaction_mode="execute", target="clustering", scope="single_step"),
         ],
     )
 
@@ -109,9 +101,7 @@ async def test_decompose_sub_intents(domain_decomposer):
 @pytest.mark.asyncio
 async def test_decompose_clarification(decomposer):
     intent = UserIntent(
-        analysis_type="clarification",
-        complexity="direct_response",
-        metadata={"clarification_question": "请问您想分析什么数据？"},
+        intent_type="clarification", interaction_mode="clarify", scope="single_step", metadata={"clarification_question": "请问您想分析什么数据？"},
     )
 
     tree = await decomposer.decompose(intent, context={})
@@ -124,9 +114,7 @@ async def test_decompose_clarification(decomposer):
 async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
     """When domain skills are present, the single-cell-transcriptomics domain.yaml drives execution."""
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-    )
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
 
     plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
 
@@ -150,10 +138,9 @@ async def test_decompose_single_cell_uses_domain_template(domain_decomposer):
 async def test_decompose_sub_intents_uses_domain_template(domain_decomposer):
     """Sub-intents filter the domain DAG to the requested phases + prerequisites."""
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full",
         sub_intents=[
-            UserIntent(analysis_type="clustering", complexity="single_step"),
+            UserIntent(intent_type="analysis", interaction_mode="execute", target="clustering", scope="single_step"),
         ],
     )
 
@@ -174,9 +161,7 @@ async def test_decompose_sub_intents_uses_domain_template(domain_decomposer):
 async def test_decompose_derives_sub_intents_from_message(domain_decomposer):
     """When no sub-intents are provided but the message names a phase, the plan is narrowed."""
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
     )
 
     plan, tree = await domain_decomposer.decompose_with_plan(intent, context={})
@@ -196,11 +181,9 @@ async def test_decompose_derives_sub_intents_when_classifier_returns_broad_inten
     """If the classifier returns a broad sub-intent like 'single_cell_analysis',
     explicit phase keywords in the message still narrow the plan."""
     intent = UserIntent(
-        analysis_type="builtin_analysis",
-        complexity="single_step",
-        original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
+        intent_type="builtin_analysis", interaction_mode="execute", scope="single_step", original_message="对 PA12_sc.h5ad 做单细胞 Louvain 聚类分析",
         sub_intents=[
-            UserIntent(analysis_type="single_cell_analysis", complexity="single_step"),
+            UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="single_step"),
         ],
     )
 
@@ -245,9 +228,7 @@ def standalone_decomposer():
 async def test_decompose_routes_to_standalone_planner(standalone_decomposer):
     """A generic request with no domain signal should use standalone skills."""
     intent = UserIntent(
-        analysis_type="general",
-        complexity="single_step",
-        original_message="summarize this text",
+        intent_type="general", interaction_mode="execute", scope="single_step", original_message="summarize this text",
     )
 
     plan, tree = await standalone_decomposer.decompose_with_plan(intent, context={})
@@ -263,9 +244,7 @@ async def test_decompose_routes_to_standalone_planner(standalone_decomposer):
 async def test_decompose_does_not_route_domain_request_to_standalone(standalone_decomposer):
     """A request carrying a domain signal should not be hijacked by standalone skills."""
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="full", domain="single-cell-transcriptomics",
         original_message="run single cell qc",
     )
 
@@ -306,9 +285,7 @@ async def test_decompose_explicit_skill_target_avoids_full_pipeline(monkeypatch)
 
     decomposer = TaskDecomposer(skill_registry=registry)
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="single_step",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="single_step", domain="single-cell-transcriptomics",
         target="bio-single-cell-annotation-celltypist",
         original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释",
     )
@@ -379,9 +356,7 @@ async def test_decompose_populates_routing_trace():
 
     decomposer = TaskDecomposer(skill_registry=registry)
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="single_step",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="single_step", domain="single-cell-transcriptomics",
         target="bio-single-cell-annotation-celltypist",
         original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释",
     )
@@ -416,9 +391,7 @@ async def test_preflight_single_shot_overrides_domain_template():
 
     decomposer = TaskDecomposer(skill_registry=registry)
     intent = UserIntent(
-        analysis_type="annotation",
-        complexity="single_step",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", target="annotation", scope="single_step", domain="single-cell-transcriptomics",
         original_message="使用 CellTypist 对 PA12_sc.h5ad 中的免疫细胞进行自动注释并比较 all_celltype 一致性",
     )
     context = {

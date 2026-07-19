@@ -16,7 +16,7 @@ class FakeAnalyzer:
     async def analyze(self, *args, **kwargs):
         if self.exc is not None:
             raise self.exc
-        return self.intent or UserIntent(analysis_type="qa", complexity="direct_response")
+        return self.intent or UserIntent(intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", )
 
 
 @pytest.mark.asyncio

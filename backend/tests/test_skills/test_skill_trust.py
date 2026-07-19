@@ -2,7 +2,6 @@
 
 import pytest
 
-from homomics_lab.config import settings
 from homomics_lab.skills.loader import SkillLoader
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.runtime import SkillRuntimeExecutor, UntrustedSkillError
@@ -90,7 +89,7 @@ class TestSkillTrustEnforcement:
         assert result["doubled"] == 10
 
     def test_untrusted_external_skill_disables_shell_injection(
-        self, external_skill_dir
+        self, external_skill_dir, monkeypatch
     ):
         skill_dir = external_skill_dir
         (skill_dir / "SKILL.md").write_text(
@@ -108,7 +107,7 @@ tool_type: agent
         )
 
         # Ensure shell execution is globally enabled; only trust should block.
-        settings.skills_shell_execution_enabled = True
+        monkeypatch.setattr("homomics_lab.skills.loader.SKILLS_SHELL_EXECUTION_ENABLED", True)
 
         loader = SkillLoader()
         skill = loader.load_discovery(skill_dir)
@@ -119,7 +118,7 @@ tool_type: agent
         assert "should-not-run" not in skill.metadata["instructions"]
         assert "untrusted skill" in skill.metadata["instructions"].lower()
 
-    def test_trusted_external_skill_allows_shell_injection(self, external_skill_dir):
+    def test_trusted_external_skill_allows_shell_injection(self, external_skill_dir, monkeypatch):
         skill_dir = external_skill_dir
         (skill_dir / "SKILL.md").write_text(
             """\
@@ -135,7 +134,7 @@ tool_type: agent
             encoding="utf-8",
         )
 
-        settings.skills_shell_execution_enabled = True
+        monkeypatch.setattr("homomics_lab.skills.loader.SKILLS_SHELL_EXECUTION_ENABLED", True)
 
         loader = SkillLoader()
         skill = loader.load_discovery(skill_dir)

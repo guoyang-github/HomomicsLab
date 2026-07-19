@@ -45,9 +45,7 @@ def planner_with_skills():
 async def test_deterministic_fallback_without_llm(planner_with_skills):
     """When LLM is unavailable, planner still builds executable phases from skills."""
     intent = UserIntent(
-        analysis_type="generic_analysis",
-        complexity="complex",
-        original_message="quality control and normalize my single-cell data",
+        intent_type="analysis", interaction_mode="execute", target="generic_analysis", scope="full", original_message="quality control and normalize my single-cell data",
     )
     plan = await planner_with_skills.generate_plan(intent)
 

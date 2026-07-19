@@ -3,6 +3,7 @@
 import pytest
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.knowledge.cbkb import AnomalyRecord, CBKB, LabSOP
 
 
@@ -40,7 +41,7 @@ async def test_intent_enriched_with_sops_and_anomalies(cbkb):
     analyzer = CascadeIntentAnalyzer(use_domain_registry=False, cbkb=cbkb)
     intent = await analyzer.analyze("帮我分析这组单细胞数据")
 
-    assert intent.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
     enrichment = intent.metadata.get("cbkb")
     assert enrichment is not None
     assert len(enrichment["sops"]) == 1

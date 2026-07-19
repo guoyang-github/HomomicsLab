@@ -1,9 +1,9 @@
 """Runtime settings store for non-sensitive configuration overrides.
 
-Allows the frontend Settings panel to update operational parameters (sandbox
-backend, memory toggles, budgets, retention) without restarting the server.
-Values are persisted to a JSON file under ``settings.data_dir`` and applied to
-the in-memory ``Settings`` object immediately.
+Allows the frontend Settings panel to update operational parameters (currently
+just the sandbox backend) without restarting the server. Values are persisted
+to a JSON file under ``settings.data_dir`` and applied to the in-memory
+``Settings`` object immediately.
 """
 
 import json
@@ -26,56 +26,6 @@ class RuntimeSettings(BaseModel):
     skill_sandbox_backend: Optional[str] = Field(
         default=None,
         description="Sandbox backend: auto | local | bubblewrap | container",
-    )
-    enable_semantic_memory: Optional[bool] = Field(
-        default=None,
-        description="Whether semantic memory (sqlite-vec) is enabled.",
-    )
-    semantic_search_model: Optional[str] = Field(
-        default=None,
-        description="Sentence-transformers model name; empty disables semantic memory.",
-    )
-    session_ttl_days: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Session retention period in days.",
-    )
-    default_job_timeout_seconds: Optional[float] = Field(
-        default=None,
-        ge=1,
-        description="Default timeout for background jobs.",
-    )
-    max_skill_timeout_seconds: Optional[float] = Field(
-        default=None,
-        ge=1,
-        description="Maximum allowed per-skill timeout.",
-    )
-    result_inline_size_limit_bytes: Optional[int] = Field(
-        default=None,
-        ge=0,
-        description="Results larger than this are stored as file references.",
-    )
-    max_llm_cost_per_request_usd: Optional[float] = Field(
-        default=None,
-        ge=0,
-        description="Per-request LLM cost cap.",
-    )
-    monthly_budget_usd: Optional[float] = Field(
-        default=None,
-        ge=0,
-        description="Monthly spend cap (enforced when auth is enabled).",
-    )
-    skill_hot_reload_enabled: Optional[bool] = Field(
-        default=None,
-        description="Watch sibling skill repos and domain files at startup.",
-    )
-    open_exploration_mode_enabled: Optional[bool] = Field(
-        default=None,
-        description="Allow weak-domain requests to be routed to the open agent.",
-    )
-    auto_install_dependencies: Optional[bool] = Field(
-        default=None,
-        description="Automatically install skill requirements into isolated venvs.",
     )
 
     @field_validator("skill_sandbox_backend")
@@ -164,14 +114,5 @@ def apply_runtime_settings(target: Optional[Settings] = None) -> Settings:
             logger.debug("Applied runtime setting: %s = %s", key, value)
         else:
             logger.warning("Runtime setting '%s' does not exist on Settings", key)
-
-    # If semantic memory is enabled but no model is configured, disable it to
-    # avoid startup failures when sentence-transformers is unavailable.
-    if target.enable_semantic_memory and not target.semantic_search_model:
-        logger.warning(
-            "enable_semantic_memory is true but semantic_search_model is unset; "
-            "disabling semantic memory"
-        )
-        target.enable_semantic_memory = False
 
     return target

@@ -343,7 +343,7 @@ async def test_codeact_fallback_on_success_false(success_false_orchestrator, mon
 @pytest.mark.asyncio
 async def test_codeact_fallback_disabled_raises(failing_orchestrator, monkeypatch):
     monkeypatch.setattr(
-        "homomics_lab.agent.orchestrator.settings.codeact_fallback_enabled", False
+        "homomics_lab.agent.orchestrator_executors.CODEACT_FALLBACK_ENABLED", False
     )
 
     tree = TaskTree([

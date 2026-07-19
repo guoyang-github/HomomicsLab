@@ -3,7 +3,8 @@
 import pytest
 import pytest_asyncio
 
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base
+from homomics_lab.database.connection import get_engine
 from homomics_lab.reports.generator import ReportGenerator
 from homomics_lab.reports.models import SectionType
 from homomics_lab.reports.store import ReportStore
@@ -11,10 +12,10 @@ from homomics_lab.reports.store import ReportStore
 
 @pytest_asyncio.fixture(autouse=True, loop_scope="function")
 async def _create_tables():
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 

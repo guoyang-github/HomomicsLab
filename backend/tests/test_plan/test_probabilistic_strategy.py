@@ -38,7 +38,9 @@ def spatial_strategy():
 
 
 @pytest.fixture
-def populated_library(single_cell_strategy, spatial_strategy):
+def populated_library(single_cell_strategy, spatial_strategy, monkeypatch):
+    # Disable domain strategy auto-loading so only fixture registrations compete.
+    monkeypatch.setattr(StrategyLibrary, "_load_domain_strategies", lambda self: None)
     lib = StrategyLibrary()
     lib.register(single_cell_strategy)
     lib.register(spatial_strategy)
@@ -133,7 +135,7 @@ class TestPlanEngineBeamSearch:
         )
 
         engine = PlanEngine(skill_registry=reg, strategy_library=populated_library)
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState(), top_k=2)
 
         assert "single_cell" in plan.strategy_name

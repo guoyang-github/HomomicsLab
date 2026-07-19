@@ -22,11 +22,10 @@ def enable_audit(tmp_path, monkeypatch):
     # Reset singleton so each test gets a fresh logger configuration.
     AuditLogger._instance = None
 
-    log_path = tmp_path / "audit.log"
     monkeypatch.setattr(settings, "audit_log_enabled", True)
-    monkeypatch.setattr(settings, "audit_log_path", log_path)
     monkeypatch.setattr(settings, "data_dir", tmp_path)
-    yield log_path
+    # The audit log path is fixed at <data_dir>/logs/audit.log.
+    yield tmp_path / "logs" / "audit.log"
     AuditLogger._instance = None
 
 
@@ -61,9 +60,9 @@ def test_audit_log_includes_user_when_auth_enabled(client, enable_audit, monkeyp
 
 
 def test_audit_log_disabled_by_default(client, tmp_path, monkeypatch):
-    log_path = tmp_path / "audit.log"
     monkeypatch.setattr(settings, "audit_log_enabled", False)
-    monkeypatch.setattr(settings, "audit_log_path", log_path)
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    log_path = tmp_path / "logs" / "audit.log"
 
     response = client.get("/api/skills/")
     assert response.status_code == 200

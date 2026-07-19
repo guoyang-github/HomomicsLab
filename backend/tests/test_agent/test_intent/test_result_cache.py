@@ -11,7 +11,7 @@ from homomics_lab.agent.intent.classifiers import (
     IntentClassifier,
     LLMIntentClassifier,
 )
-from homomics_lab.agent.intent.models import IntentDefinition, IntentMatch
+from homomics_lab.agent.intent.models import IntentDefinition, IntentMatch, intent_strategy_key
 from homomics_lab.agent.intent.result_cache import IntentResultCache
 from homomics_lab.llm_client import LLMClient
 
@@ -122,7 +122,7 @@ async def test_cache_hit_skips_llm_across_analyzer_instances(definitions):
     )
 
     assert client.calls == 1
-    assert second.analysis_type == first.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(second) == intent_strategy_key(first) == "single_cell_analysis"
     assert second.confidence == first.confidence
 
 
@@ -136,13 +136,13 @@ async def test_cached_result_is_isolated_from_caller_mutation(definitions):
         message, session_id="s1"
     )
     first.metadata["polluted"] = True
-    first.analysis_type = "mutated"
+    first.intent_type = "mutated"
 
     second = await _make_analyzer(definitions, client, cache).analyze(
         message, session_id="s1"
     )
     assert client.calls == 1
-    assert second.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(second) == "single_cell_analysis"
     assert "polluted" not in second.metadata
 
 
@@ -289,7 +289,7 @@ async def test_llm_and_embedding_classify_concurrently_and_arbitrate(definitions
     assert client.calls == 1
     # Arbitration unchanged: the LLM match stays the primary intent; the
     # embedding match survives as an alternative.
-    assert intent.analysis_type == "single_cell_analysis"
+    assert intent_strategy_key(intent) == "single_cell_analysis"
     assert intent.metadata["source"] == "llm"
     alt_types = {a["analysis_type"] for a in intent.metadata.get("alternatives", [])}
     assert "spatial_analysis" in alt_types
@@ -321,7 +321,7 @@ async def test_embedding_only_when_llm_unavailable(definitions, monkeypatch):
         result_cache=False,
     )
     intent = await analyzer.analyze("zxqw 看看这批材料", session_id="s1")
-    assert intent.analysis_type == "spatial_analysis"
+    assert intent_strategy_key(intent) == "spatial_analysis"
     assert intent.metadata["source"] == "embedding"
 
 

@@ -53,6 +53,14 @@ from homomics_lab.workflow.execution_service import WorkflowExecutionService
 
 logger = logging.getLogger(__name__)
 
+# Fixed bootstrap behavior (formerly HOMOMICS_* config fields; defaults kept).
+SKILL_SIBLING_DISCOVERY_ENABLED = False  # auto-discover ../<domain>-Skills/skills
+MCP_MARKETPLACE_ENABLED = True
+SCIENCE_CONNECTORS_ENABLED = True  # science_search / science_list_dbs tools
+CONTEXT_ENGINE_MODEL = None  # default model for the context token budget
+CONTEXT_ENABLE_EPISODIC_SUMMARY = True
+SEMANTIC_SEARCH_MODEL = None  # deprecated; semantic memory uses embedding_model
+
 
 def _discover_external_skill_dirs() -> List[Path]:
     """Discover sibling skill repositories for local development.
@@ -66,7 +74,7 @@ def _discover_external_skill_dirs() -> List[Path]:
       - ../mRNAseq-Skills/skills
       - ../riboseq-Skills/skills
     """
-    if not settings.skill_sibling_discovery_enabled:
+    if not SKILL_SIBLING_DISCOVERY_ENABLED:
         return []
     # bootstrap.py is at backend/homomics_lab/bootstrap.py
     # project root is two levels up: backend/homomics_lab -> backend -> HomomicsLab
@@ -172,12 +180,12 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
 
     # MCP server marketplace: load catalog, install/enable user servers.
     mcp_marketplace = MCPMarketplace()
-    if settings.mcp_marketplace_enabled:
+    if MCP_MARKETPLACE_ENABLED:
         try:
             await mcp_marketplace.register_enabled_servers(tool_registry)
         except Exception as exc:
             logger.warning("Failed to register enabled MCP servers: %s", exc)
-    if settings.science_connectors_enabled:
+    if SCIENCE_CONNECTORS_ENABLED:
         try:
             from homomics_lab.tools.science import register_science_tools
 
@@ -306,7 +314,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
                 print(f"Warning: Failed to import skill from {skill_path}: {exc}")
 
     # Wrap MCP tools as skills so the planner can orchestrate them
-    if settings.mcp_marketplace_enabled:
+    if MCP_MARKETPLACE_ENABLED:
         register_mcp_skills(skill_executor, tool_registry)
 
     # Register default agents now that the skill runtime and tool registry are ready.
@@ -477,7 +485,7 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     # optional LLM-powered context summarization by default so the chat pipeline
     # does not block on multiple LLM calls for every turn.
     enable_llm_summary = (
-        settings.context_enable_episodic_summary and not is_local_llm_provider()
+        CONTEXT_ENABLE_EPISODIC_SUMMARY and not is_local_llm_provider()
     )
     logger.info(
         "ContextEngine LLM summary enabled: %s (provider=%s)",
@@ -488,8 +496,8 @@ async def bootstrap_worker_context(enable_hot_reload: bool = False) -> Dict[str,
     context_engine = ContextEngine(
         cbkb=cbkb,
         semantic_memory=semantic_memory,
-        default_model=settings.context_engine_model or settings.llm_model or "default",
-        embedding_model_name=settings.semantic_search_model,
+        default_model=CONTEXT_ENGINE_MODEL or settings.llm_model or "default",
+        embedding_model_name=SEMANTIC_SEARCH_MODEL,
         enable_llm_summary=enable_llm_summary,
         llm_client=llm_client,
         knowledge_index=knowledge_index,

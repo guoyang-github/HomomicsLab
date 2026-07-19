@@ -6,16 +6,17 @@ import pytest_asyncio
 from httpx import ASGITransport
 
 from homomics_lab.api.execution import router
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base
+from homomics_lab.database.connection import get_engine
 from homomics_lab.jobs import Job, JobMode, JobRepository, JobService, JobStatus
 
 
 @pytest_asyncio.fixture(autouse=True, loop_scope="function")
 async def _create_tables():
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 

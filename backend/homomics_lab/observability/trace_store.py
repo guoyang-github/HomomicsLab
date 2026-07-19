@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import selectinload
 
-from homomics_lab.database.connection import AsyncSessionLocal
+from homomics_lab.database.connection import get_session_factory
 from homomics_lab.database.models import TraceNodeRecord, TraceRecord
 
 
@@ -62,7 +62,8 @@ class ExecutionTrace(BaseModel):
 class TraceStore:
     """Persist and retrieve execution traces from SQLite."""
 
-    def __init__(self, session_factory=AsyncSessionLocal):
+    def __init__(self, session_factory=None):
+        session_factory = session_factory or get_session_factory()
         self._session_factory = session_factory
 
     async def start_trace(

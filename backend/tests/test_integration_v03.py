@@ -182,9 +182,7 @@ class TestPlanEngineAgentCoreIntegration:
         """PlanEngine output phases should be resolvable by AgentCore."""
         engine = PlanEngine(skill_registry=SkillRegistry())
         intent = UserIntent(
-            analysis_type="single_cell",
-            complexity="complex",
-            data_scale="medium",
+            intent_type="analysis", interaction_mode="execute", target="single_cell", scope="full", data_scale="medium",
         )
         data_state = DataState()
         plan = await engine.plan(intent, data_state)

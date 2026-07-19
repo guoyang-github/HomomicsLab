@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from homomics_lab.api.auth import get_current_user
 from homomics_lab.config import settings
 from homomics_lab.database import Base
-from homomics_lab.database.connection import async_engine
+from homomics_lab.database.connection import get_engine
 from homomics_lab.main import app
 
 
@@ -18,7 +18,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "auth_enabled", True)
 
     async def reset_db():
-        async with async_engine.begin() as conn:
+        async with get_engine().begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
@@ -54,7 +54,8 @@ def test_audit_log_endpoint_returns_entries(client, tmp_path, monkeypatch):
     )
 
     monkeypatch.setattr(settings, "audit_log_enabled", True)
-    monkeypatch.setattr(settings, "audit_log_path", log_file)
+    # The audit log path is fixed at <data_dir>/logs/audit.log.
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
 
     response = client.get(f"/api/projects/{project_id}/audit")
     assert response.status_code == 200

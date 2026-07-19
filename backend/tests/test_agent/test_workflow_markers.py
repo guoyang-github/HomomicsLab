@@ -700,12 +700,9 @@ def _domain_skill_registry() -> SkillRegistry:
 
 @pytest.mark.asyncio
 async def test_decompose_stamps_domain_and_trimmed_pipeline(monkeypatch):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     decomposer = TaskDecomposer(skill_registry=_domain_skill_registry())
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-    )
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
 
     tree = await decomposer.decompose(
         intent, context={"preflight": {"skip_phases": ["qc"]}}

@@ -50,49 +50,59 @@ from homomics_lab.tools.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
-# Convergence guardrails (read from settings with safe fallbacks so tests that
-# construct the executor without a fully wired settings object still pass).
-def _cfg(name: str, default: Any) -> Any:
-    return getattr(settings, name, default)
+# Convergence guardrails (formerly HOMOMICS_AGENT_* config fields; defaults
+# kept). These keep a slow / flaky LLM provider from hanging a job indefinitely
+# and let the executor recover the common "wrote a script but never ran it"
+# case without extra round-trips.
+AGENT_LLM_CALL_TIMEOUT_SECONDS = 240.0
+AGENT_MAX_CONSECUTIVE_LLM_FAILURES = 3
+AGENT_SKILL_WALL_CLOCK_SECONDS = 1500.0
+AGENT_SOURCE_READ_HARD_LIMIT = 12
+AGENT_AUTO_RUN_SCRIPT = True
+AGENT_RETRY_BACKOFF_BASE_SECONDS = 2.0
+AGENT_MAX_IDLE_ITERATIONS = 3
+AGENT_SCRIPT_FIRST_ENABLED = False
+# Per-field character budget for tool output text before it enters the LLM
+# context or the persisted tool_outputs list. Error outputs get 1.5x,
+# tail-priority.
+AGENT_TOOL_OUTPUT_MAX_CHARS = 4000
 
 
 def _llm_call_timeout() -> float:
-    return float(_cfg("agent_llm_call_timeout_seconds", 90.0))
+    return AGENT_LLM_CALL_TIMEOUT_SECONDS
 
 
 def _max_llm_failures() -> int:
-    return int(_cfg("agent_max_consecutive_llm_failures", 3))
+    return AGENT_MAX_CONSECUTIVE_LLM_FAILURES
 
 
 def _wall_clock() -> float:
-    return float(_cfg("agent_skill_wall_clock_seconds", 1500.0))
+    return AGENT_SKILL_WALL_CLOCK_SECONDS
 
 
 def _source_read_hard_limit() -> int:
-    return int(_cfg("agent_source_read_hard_limit", 12))
+    return AGENT_SOURCE_READ_HARD_LIMIT
 
 
 def _auto_run_enabled() -> bool:
-    return bool(_cfg("agent_auto_run_script", True))
+    return AGENT_AUTO_RUN_SCRIPT
 
 
 def _retry_backoff_base() -> float:
-    return float(_cfg("agent_retry_backoff_base_seconds", 2.0))
+    return AGENT_RETRY_BACKOFF_BASE_SECONDS
 
 
 def _max_idle_iterations() -> int:
-    return int(_cfg("agent_max_idle_iterations", 3))
+    return AGENT_MAX_IDLE_ITERATIONS
 
 
 def _tool_output_budget(is_error: bool) -> int:
     """Per-field character budget for tool output text.
 
-    Read from settings (``HOMOMICS_AGENT_TOOL_OUTPUT_MAX_CHARS``, default 4000)
-    so operators can tune it. Error outputs get a wider budget (1.5x): the tail
-    stack trace is the single most useful debugging signal and is worth the
-    extra tokens.
+    Error outputs get a wider budget (1.5x): the tail stack trace is the single
+    most useful debugging signal and is worth the extra tokens.
     """
-    base = max(500, int(_cfg("agent_tool_output_max_chars", 4000)))
+    base = max(500, AGENT_TOOL_OUTPUT_MAX_CHARS)
     return int(base * 1.5) if is_error else base
 
 
@@ -409,12 +419,10 @@ class AgentSkillExecutor:
             if count >= _MAX_SCAN_FILES:
                 break
 
-        # Optional fast path: single-shot driver-script generation. Enabled by
-        # default because it avoids the long-context doom loop for standard
-        # analysis tasks while still falling back to the interactive loop when
-        # the script fails.
+        # Optional fast path: single-shot driver-script generation. Disabled by
+        # default; the interactive tool loop is the standard path.
         script_first_result = None
-        if bool(_cfg("agent_script_first_enabled", False)):
+        if AGENT_SCRIPT_FIRST_ENABLED:
             script_first_result = await self._script_first_execute(
                 skill, inputs, working_dir, tools, preexisting_files=preexisting_files
             )
@@ -1282,7 +1290,7 @@ class AgentSkillExecutor:
                 call_kwargs["intent_type"] = "code_generation"
             coro = self.llm_client.chat_completion(messages, **call_kwargs)
             text = await asyncio.wait_for(coro, timeout=timeout)
-            if _cfg("debug", False):
+            if settings.debug:
                 print(
                     f"[AGENT-LLM] max_tokens={max_tokens} response_len={len(text)} "
                     f"response_head={text[:2000]!r}"

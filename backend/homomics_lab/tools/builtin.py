@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from homomics_lab.config import settings
 from homomics_lab.security import safe_open_path, safe_write_path
-from homomics_lab.skills.sandbox import Sandbox
+from homomics_lab.skills.sandbox import SKILL_CONTAINER_IMAGE, Sandbox
 from homomics_lab.workspace.context import get_current_workspace
 
 
@@ -174,7 +174,7 @@ async def shell_exec(command: str, cwd: Optional[str] = None, timeout: int = 60)
                 "shell_exec refused: force_sandbox is enabled and no isolated "
                 "sandbox (bubblewrap/container) is available."
             )
-        sandbox = Sandbox.create(backend, workdir, container_image=settings.skill_container_image)
+        sandbox = Sandbox.create(backend, workdir, container_image=SKILL_CONTAINER_IMAGE)
         detected_backend = backend if backend != "auto" else _detected_sandbox_name(sandbox)
         output = await sandbox.run_command(command, cwd=workdir, timeout_seconds=timeout)
         if backend == "auto" and _is_sandbox_infra_error(output):

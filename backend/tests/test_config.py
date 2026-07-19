@@ -8,7 +8,6 @@ from homomics_lab.config import Settings
 def test_default_port():
     settings = Settings()
     assert settings.port == 8080
-    assert settings.host == "0.0.0.0"
     assert settings.debug is False
     assert isinstance(settings.data_dir, Path)
 
@@ -19,36 +18,14 @@ def test_env_override(monkeypatch):
     assert settings.port == 9000
 
 
-def test_app_name_default():
-    settings = Settings()
-    assert settings.app_name == "HomomicsLab"
-
-
-def test_session_memory_settings():
-    settings = Settings()
+def test_session_store_url_anchored_to_backend():
+    # Pass the default value explicitly so the assertion does not depend on
+    # process env (other tests may override HOMOMICS_SESSION_STORE_URL).
+    settings = Settings(session_store_url="sqlite+aiosqlite:///./data/sessions.db")
     # Relative SQLite URLs are anchored to the backend directory at load time
     # (see _abs_sqlite_url), so the resolved value is an absolute path.
     assert settings.session_store_url.startswith("sqlite+aiosqlite:///")
     assert settings.session_store_url.endswith("/data/sessions.db")
-    assert settings.session_ttl_days == 90
-    assert settings.enable_semantic_memory is True
-    assert settings.semantic_memory_backend == "sqlite"
-    assert settings.semantic_memory_postgres_url is None
-
-
-def test_semantic_memory_backend_default_is_sqlite():
-    settings = Settings()
-    assert settings.semantic_memory_backend == "sqlite"
-
-
-def test_semantic_memory_backend_accepts_postgres():
-    settings = Settings(semantic_memory_backend="postgres")
-    assert settings.semantic_memory_backend == "postgres"
-
-
-def test_semantic_memory_backend_rejects_unknown():
-    with pytest.raises(ValueError):
-        Settings(semantic_memory_backend="redis")
 
 
 def test_database_url_validator_accepts_sqlite_async_driver():
@@ -109,21 +86,6 @@ def test_masked_dump_redacts_secrets():
     assert len(data["api_key"]) > 0
 
 
-def test_rate_limit_backend_defaults_to_memory():
-    settings = Settings()
-    assert settings.rate_limit_backend == "memory"
-
-
-def test_rate_limit_backend_rejects_unknown():
-    with pytest.raises(ValueError):
-        Settings(rate_limit_backend="memcached")
-
-
-def test_rate_limit_redis_url_defaults_to_redis_url():
-    settings = Settings(redis_url="redis://custom:6379/0")
-    assert settings.rate_limit_redis_url == "redis://custom:6379/0"
-
-
 def test_cors_origins_parses_comma_separated_string():
     settings = Settings(cors_origins="https://app.homomics.lab,https://admin.homomics.lab")
     assert settings.cors_origins == ["https://app.homomics.lab", "https://admin.homomics.lab"]
@@ -139,69 +101,63 @@ def test_cors_origins_empty_string_becomes_none():
     assert settings.cors_origins is None
 
 
-def test_hitl_threshold_defaults():
-    settings = Settings()
-    assert settings.hitl_confidence_threshold == 0.7
-    assert settings.hitl_risk_threshold == 0.6
+# ---------------------------------------------------------------------------
+# Former settings fields are now module-level constants at their call sites
+# (docs/improvement-plan-v2.0.md, section 2). These tests pin the effective
+# values so an accidental constant change is caught here.
+# ---------------------------------------------------------------------------
 
 
-def test_debate_judge_backend_defaults_to_rule():
-    settings = Settings()
-    assert settings.debate_judge_backend == "rule"
+def test_hitl_and_debate_constants():
+    from homomics_lab.agent.turn_runner import DEBATE_JUDGE_BACKEND, HITL_RISK_THRESHOLD
+
+    assert HITL_RISK_THRESHOLD == 0.6
+    assert DEBATE_JUDGE_BACKEND == "rule"
 
 
-def test_debate_judge_backend_accepts_llm():
-    settings = Settings(debate_judge_backend="llm")
-    assert settings.debate_judge_backend == "llm"
+def test_timeout_constants():
+    from homomics_lab.skills.runtime import (
+        DEFAULT_JOB_TIMEOUT_SECONDS,
+        MAX_SKILL_TIMEOUT_SECONDS,
+    )
+
+    assert DEFAULT_JOB_TIMEOUT_SECONDS == 3600.0
+    assert MAX_SKILL_TIMEOUT_SECONDS == 86400.0
 
 
-def test_debate_judge_backend_rejects_unknown():
-    with pytest.raises(ValueError):
-        Settings(debate_judge_backend="human")
+def test_literature_constants():
+    from homomics_lab.agent.literature_retriever import (
+        LITERATURE_CACHE_TTL_SECONDS,
+        LITERATURE_MAX_RESULTS,
+        NCBI_API_KEY,
+        NCBI_EMAIL,
+    )
+
+    assert NCBI_EMAIL is None
+    assert NCBI_API_KEY is None
+    assert LITERATURE_CACHE_TTL_SECONDS == 3600.0
+    assert LITERATURE_MAX_RESULTS == 10
 
 
-def test_literature_settings_defaults():
-    settings = Settings()
-    assert settings.literature_retrieval_enabled is False
-    assert settings.ncbi_email is None
-    assert settings.ncbi_api_key is None
-    assert settings.literature_cache_ttl_seconds == 3600.0
-    assert settings.literature_max_results == 10
+def test_semantic_memory_constant():
+    from homomics_lab.context.memory_backend import ENABLE_SEMANTIC_MEMORY
+
+    assert ENABLE_SEMANTIC_MEMORY is True
 
 
-def test_literature_settings_env_override(monkeypatch):
-    monkeypatch.setenv("HOMOMICS_LITERATURE_RETRIEVAL_ENABLED", "true")
-    monkeypatch.setenv("HOMOMICS_NCBI_EMAIL", "test@example.com")
-    monkeypatch.setenv("HOMOMICS_NCBI_API_KEY", "secret-key")
-    monkeypatch.setenv("HOMOMICS_LITERATURE_CACHE_TTL_SECONDS", "120.0")
-    monkeypatch.setenv("HOMOMICS_LITERATURE_MAX_RESULTS", "25")
-    settings = Settings()
-    assert settings.literature_retrieval_enabled is True
-    assert settings.ncbi_email == "test@example.com"
-    assert settings.ncbi_api_key == "secret-key"
-    assert settings.literature_cache_ttl_seconds == 120.0
-    assert settings.literature_max_results == 25
+def test_container_sandbox_constants():
+    from homomics_lab.skills.sandbox import (
+        R_CONTAINER_IMAGE,
+        SKILL_CONTAINER_CPUS,
+        SKILL_CONTAINER_IMAGE,
+        SKILL_CONTAINER_MEMORY_MB,
+        SKILL_CONTAINER_PIDS_LIMIT,
+        SKILL_CONTAINER_READONLY_ROOT,
+    )
 
-
-def test_timeout_settings_defaults():
-    settings = Settings()
-    assert settings.default_job_timeout_seconds == 3600.0
-    assert settings.max_skill_timeout_seconds == 86400.0
-
-
-def test_timeout_settings_env_override(monkeypatch):
-    monkeypatch.setenv("HOMOMICS_DEFAULT_JOB_TIMEOUT_SECONDS", "7200")
-    monkeypatch.setenv("HOMOMICS_MAX_SKILL_TIMEOUT_SECONDS", "43200")
-    settings = Settings()
-    assert settings.default_job_timeout_seconds == 7200.0
-    assert settings.max_skill_timeout_seconds == 43200.0
-
-
-def test_default_job_timeout_cannot_exceed_max():
-    with pytest.raises(ValueError):
-        Settings(default_job_timeout_seconds=90000.0, max_skill_timeout_seconds=3600.0)
-
-
-def test_max_skill_timeout_must_be_positive():
-    with pytest.raises(ValueError):
-        Settings(max_skill_timeout_seconds=0.5)
+    assert SKILL_CONTAINER_IMAGE == "python:3.10-slim"
+    assert R_CONTAINER_IMAGE == "r-base:4.3.0"
+    assert SKILL_CONTAINER_MEMORY_MB == 1024
+    assert SKILL_CONTAINER_CPUS == 1.0
+    assert SKILL_CONTAINER_PIDS_LIMIT == 64
+    assert SKILL_CONTAINER_READONLY_ROOT is True

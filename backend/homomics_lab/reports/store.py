@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy import desc, select
 
-from homomics_lab.database.connection import AsyncSessionLocal
+from homomics_lab.database.connection import get_session_factory
 from homomics_lab.database.models import ReportRecord
 
 from .models import (
@@ -23,7 +23,8 @@ from .models import (
 class ReportStore:
     """Persist and retrieve :class:`AnalysisReport` models from the database."""
 
-    def __init__(self, session_factory=AsyncSessionLocal):
+    def __init__(self, session_factory=None):
+        session_factory = session_factory or get_session_factory()
         self._session_factory = session_factory
 
     async def create(self, report: AnalysisReport) -> AnalysisReport:

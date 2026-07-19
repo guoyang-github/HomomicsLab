@@ -153,8 +153,7 @@ class TestSkillRuntimeExecutorActivation:
 
 
 class TestClaudeCodeSkillRendering:
-    def test_shell_command_placeholder_replaced(self, tmp_path):
-        from homomics_lab.config import settings
+    def test_shell_command_placeholder_replaced(self, tmp_path, monkeypatch):
 
         skill_dir = tmp_path / "inject-skill"
         skill_dir.mkdir()
@@ -176,7 +175,7 @@ Proceed.
         )
 
         # Enable shell execution and mark the skill as trusted for this test.
-        settings.skills_shell_execution_enabled = True
+        monkeypatch.setattr("homomics_lab.skills.loader.SKILLS_SHELL_EXECUTION_ENABLED", True)
         loader = SkillLoader()
         skill = loader.load_discovery(skill_dir)
         skill.metadata["trusted"] = True
@@ -209,8 +208,7 @@ Migrate $0 ($component) to $1 ($target).
         instructions = skill.metadata["instructions"]
         assert "Migrate SearchBar (SearchBar) to Vue (Vue)" in instructions
 
-    def test_multiline_shell_block_replaced(self, tmp_path):
-        from homomics_lab.config import settings
+    def test_multiline_shell_block_replaced(self, tmp_path, monkeypatch):
 
         skill_dir = tmp_path / "block-skill"
         skill_dir.mkdir()
@@ -233,7 +231,7 @@ Done.
             encoding="utf-8",
         )
 
-        settings.skills_shell_execution_enabled = True
+        monkeypatch.setattr("homomics_lab.skills.loader.SKILLS_SHELL_EXECUTION_ENABLED", True)
         loader = SkillLoader()
         skill = loader.load_discovery(skill_dir)
         skill.metadata["trusted"] = True

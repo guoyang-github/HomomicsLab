@@ -221,7 +221,7 @@ class TestTokenHelpers:
     async def test_resolve_oidc_token_with_cached_jwks(self, monkeypatch):
         monkeypatch.setattr(settings, "oidc_discovery_url", "https://example.com/.well-known/openid-configuration")
         monkeypatch.setattr(settings, "jwt_secret_key", "test-jwt-secret-key-for-unit-tests")
-        monkeypatch.setattr(settings, "jwt_algorithm", "HS256")
+        monkeypatch.setattr("homomics_lab.api.auth.JWT_ALGORITHM", "HS256")
 
         # Issue a token locally so we can mock the OIDC verifier to accept it.
         token = create_access_token({"sub": "oidc-user-1"})

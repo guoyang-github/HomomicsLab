@@ -127,7 +127,7 @@ def test_structured_fields_preserved() -> None:
 
 
 def test_budget_configurable_via_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(agent_executor.settings, "agent_tool_output_max_chars", 1000)
+    monkeypatch.setattr(agent_executor, "AGENT_TOOL_OUTPUT_MAX_CHARS", 1000)
 
     original = "x" * 10000
     compact = _compact_tool_output({"tool": "t", "success": True, "output": original})

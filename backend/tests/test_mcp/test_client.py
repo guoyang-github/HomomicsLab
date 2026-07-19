@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from homomics_lab.config import Settings
 from homomics_lab.mcp.client import BioMCPClient
 
 
@@ -118,17 +117,3 @@ async def test_sse_mode_connect_uses_sse_client():
                 await client.close()
 
 
-def test_mcp_mode_validator_accepts_valid_modes():
-    for mode in ("embedded", "stdio", "sse"):
-        settings = Settings(mcp_mode=mode)
-        assert settings.mcp_mode == mode
-
-
-def test_mcp_mode_validator_rejects_unknown_mode():
-    with pytest.raises(ValueError, match="mcp_mode"):
-        Settings(mcp_mode="websocket")
-
-
-def test_mcp_server_url_setting():
-    settings = Settings(mcp_server_url="http://localhost:8000/sse")
-    assert settings.mcp_server_url == "http://localhost:8000/sse"

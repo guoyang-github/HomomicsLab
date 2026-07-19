@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, select
 
 from homomics_lab.context.working_memory import WorkingMemory
-from homomics_lab.database.connection import AsyncSessionLocal
+from homomics_lab.database.connection import get_session_factory
 from homomics_lab.database.models import PlanRecord, PlanTemplateRecord
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.tasks.task_tree import (
@@ -46,7 +46,8 @@ def _deserialize_working_memory(raw: Optional[str]) -> Optional[WorkingMemory]:
 class PlanStore:
     """Persist and retrieve execution plans from SQLite."""
 
-    def __init__(self, session_factory=AsyncSessionLocal):
+    def __init__(self, session_factory=None):
+        session_factory = session_factory or get_session_factory()
         self._session_factory = session_factory
 
     async def create(self, plan: Plan) -> Plan:

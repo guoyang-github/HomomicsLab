@@ -307,7 +307,7 @@ async def test_clarification_flow_produces_recommendation_and_card():
         result_cache=False,
     )
     intent = await analyzer.analyze("做单细胞或空间分析可以吗")
-    assert intent.analysis_type == "clarification"
+    assert intent.interaction_mode == "clarify"
     debate_meta = intent.metadata.get("debate")
     assert debate_meta is not None
     assert debate_meta["recommendation"] is not None

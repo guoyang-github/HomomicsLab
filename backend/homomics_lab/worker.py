@@ -100,7 +100,7 @@ async def run_worker(shutdown: Optional[WorkerShutdown] = None) -> None:
 
 
 def main() -> None:
-    configure_logging(level=settings.log_level, json_format=settings.log_json_format)
+    configure_logging(level=settings.log_level, json_format=True)
     shutdown = WorkerShutdown()
 
     loop = asyncio.new_event_loop()

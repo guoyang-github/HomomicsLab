@@ -52,7 +52,7 @@ class TestInMemoryRateLimiter:
     @pytest.mark.asyncio
     async def test_ignores_x_forwarded_for_when_trust_proxy_false(self, monkeypatch):
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
-        monkeypatch.setattr(settings, "rate_limit_trust_proxy", False)
+        monkeypatch.setattr("homomics_lab.api.rate_limit.RATE_LIMIT_TRUST_PROXY", False)
         limiter = InMemoryRateLimiter(window_seconds=60, max_requests=1)
 
         req1 = _make_request(headers={"X-Forwarded-For": "10.0.0.1"})
@@ -66,7 +66,7 @@ class TestInMemoryRateLimiter:
     @pytest.mark.asyncio
     async def test_uses_x_forwarded_for_when_trust_proxy_true(self, monkeypatch):
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
-        monkeypatch.setattr(settings, "rate_limit_trust_proxy", True)
+        monkeypatch.setattr("homomics_lab.api.rate_limit.RATE_LIMIT_TRUST_PROXY", True)
         limiter = InMemoryRateLimiter(window_seconds=60, max_requests=1)
 
         req1 = _make_request(headers={"X-Forwarded-For": "10.0.0.1, 10.0.0.2"})
@@ -133,7 +133,7 @@ class TestRedisRateLimiter:
             pytest.skip("fakeredis not installed")
 
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
-        monkeypatch.setattr(settings, "rate_limit_trust_proxy", True)
+        monkeypatch.setattr("homomics_lab.api.rate_limit.RATE_LIMIT_TRUST_PROXY", True)
         fake_redis = fakeredis.aioredis.FakeRedis()
         limiter = RedisRateLimiter(
             window_seconds=60,
@@ -154,33 +154,13 @@ class TestRedisRateLimiter:
 
 class TestRateLimiterFactory:
     def test_factory_returns_in_memory_by_default(self):
-        original = settings.rate_limit_backend
-        settings.rate_limit_backend = "memory"
-        try:
-            limiter = get_rate_limiter()
-            assert isinstance(limiter, InMemoryRateLimiter)
-        finally:
-            settings.rate_limit_backend = original
+        limiter = get_rate_limiter()
+        assert isinstance(limiter, InMemoryRateLimiter)
 
-    def test_factory_returns_redis_when_configured(self):
-        original = settings.rate_limit_backend
-        settings.rate_limit_backend = "redis"
-        try:
-            limiter = get_rate_limiter()
-            assert isinstance(limiter, RedisRateLimiter)
-        finally:
-            settings.rate_limit_backend = original
-
-    def test_update_limiter_config_swaps_backend(self, monkeypatch):
-        original_backend = settings.rate_limit_backend
-        try:
-            monkeypatch.setattr(settings, "rate_limit_backend", "memory")
-            update_limiter_config()
-            assert isinstance(rate_limit_module._rate_limiter, InMemoryRateLimiter)
-
-            monkeypatch.setattr(settings, "rate_limit_backend", "redis")
-            update_limiter_config()
-            assert isinstance(rate_limit_module._rate_limiter, RedisRateLimiter)
-        finally:
-            settings.rate_limit_backend = original_backend
-            update_limiter_config()
+    def test_update_limiter_config_keeps_memory_backend(self, monkeypatch):
+        # The backend is fixed to in-memory; config sync only re-applies the
+        # request budget.
+        monkeypatch.setattr(rate_limit_module._rate_limiter, "max_requests", 5)
+        update_limiter_config()
+        assert isinstance(rate_limit_module._rate_limiter, InMemoryRateLimiter)
+        assert rate_limit_module._rate_limiter.max_requests == 60

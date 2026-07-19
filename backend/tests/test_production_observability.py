@@ -44,7 +44,6 @@ def test_trace_store_exposed_on_app_state(client):
 def test_log_level_and_format_settings_exist():
     """Log settings are part of the application config."""
     assert hasattr(settings, "log_level")
-    assert hasattr(settings, "log_json_format")
     assert settings.log_level.upper() in {
         "DEBUG",
         "INFO",

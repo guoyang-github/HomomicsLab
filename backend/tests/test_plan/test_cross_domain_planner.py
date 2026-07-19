@@ -5,7 +5,6 @@ import pytest
 from homomics_lab.agent.intent import UserIntent
 from homomics_lab.agent.plan.cross_domain_planner import CrossDomainPlanner
 from homomics_lab.agent.plan.engine import PlanEngine
-from homomics_lab.config import settings
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -40,7 +39,6 @@ def registry_with_domains() -> SkillRegistry:
 def plan_engine(registry_with_domains, monkeypatch):
     # Domain strategies are disabled by default in tests; enable them so the
     # PlanEngine can return real domain skeletons instead of the generic fallback.
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     return PlanEngine(skill_registry=registry_with_domains)
 
 
@@ -48,18 +46,12 @@ def plan_engine(registry_with_domains, monkeypatch):
 async def test_cross_domain_planner_composes_two_domains(plan_engine):
     planner = CrossDomainPlanner(plan_engine=plan_engine)
     intent = UserIntent(
-        analysis_type="cross_domain_analysis",
-        complexity="complex",
-        sub_intents=[
+        intent_type="analysis", interaction_mode="execute", scope="full", sub_intents=[
             UserIntent(
-                analysis_type="single_cell_analysis",
-                complexity="complex",
-                domain="single-cell-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full",
             ),
             UserIntent(
-                analysis_type="spatial_analysis",
-                complexity="complex",
-                domain="spatial-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="spatial-transcriptomics", scope="full",
             ),
         ],
     )
@@ -83,9 +75,7 @@ async def test_cross_domain_planner_composes_two_domains(plan_engine):
 async def test_cross_domain_planner_ignores_single_domain(plan_engine):
     planner = CrossDomainPlanner(plan_engine=plan_engine)
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="full", domain="single-cell-transcriptomics",
     )
 
     plan = await planner.plan(intent)
@@ -97,18 +87,12 @@ async def test_cross_domain_planner_ignores_single_domain(plan_engine):
 async def test_cross_domain_planner_deduplicates_overlapping_phases(plan_engine):
     planner = CrossDomainPlanner(plan_engine=plan_engine)
     intent = UserIntent(
-        analysis_type="cross_domain_analysis",
-        complexity="complex",
-        sub_intents=[
+        intent_type="analysis", interaction_mode="execute", scope="full", sub_intents=[
             UserIntent(
-                analysis_type="single_cell_analysis",
-                complexity="complex",
-                domain="single-cell-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full",
             ),
             UserIntent(
-                analysis_type="spatial_analysis",
-                complexity="complex",
-                domain="spatial-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="spatial-transcriptomics", scope="full",
             ),
         ],
     )

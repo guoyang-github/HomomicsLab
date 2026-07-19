@@ -42,9 +42,13 @@ from homomics_lab.skills.models import (
     SkillRuntime,
 )
 from homomics_lab.skills.registry import SkillRegistry
-from homomics_lab.skills.sandbox import Sandbox
+from homomics_lab.skills.sandbox import SKILL_CONTAINER_IMAGE, Sandbox
 
 logger = logging.getLogger(__name__)
+
+# Claude Code-style !`cmd` injection in skill docs (formerly
+# HOMOMICS_SKILLS_SHELL_EXECUTION_ENABLED; default kept: off).
+SKILLS_SHELL_EXECUTION_ENABLED = False
 
 
 class DisclosureLevel(str, Enum):
@@ -642,12 +646,12 @@ class SkillLoader:
         """Replace Claude Code-style shell placeholders with command output.
 
         Shell commands are only executed when:
-          1. ``settings.skills_shell_execution_enabled`` is True, and
+          1. ``SKILLS_SHELL_EXECUTION_ENABLED`` is True, and
           2. the skill is builtin or explicitly trusted.
 
         Otherwise the placeholder is replaced with a clear marker.
         """
-        shell_enabled = settings.skills_shell_execution_enabled
+        shell_enabled = SKILLS_SHELL_EXECUTION_ENABLED
         source = skill.metadata.get("source", "external")
         trusted = skill.metadata.get("trusted", source == "builtin")
         can_run_shell = shell_enabled and trusted
@@ -692,7 +696,7 @@ class SkillLoader:
             sandbox = Sandbox.create(
                 settings.skill_sandbox_backend,
                 cwd,
-                container_image=settings.skill_container_image,
+                container_image=SKILL_CONTAINER_IMAGE,
             )
             # run_command is async, but activation runs in a synchronous context.
             # Use a small helper that tolerates an already-running event loop.

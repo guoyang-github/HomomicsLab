@@ -124,7 +124,6 @@ class TestRichConfigExport:
             config = json.loads(zf.read("config.json"))
 
         snapshot = config["settings_snapshot"]
-        assert snapshot["app_name"] == settings.app_name
         assert snapshot["storage_backend"] == settings.storage_backend
         assert snapshot["queue_backend"] == settings.queue_backend
         assert "database_url_driver" in snapshot

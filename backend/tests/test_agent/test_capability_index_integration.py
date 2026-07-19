@@ -58,9 +58,7 @@ async def test_turn_runner_enriches_context_with_capability_index(
     mock_capability_index.search = AsyncMock(return_value=[candidate])
 
     intent = UserIntent(
-        analysis_type="qa",
-        complexity="direct_response",
-        original_message="how do I filter low quality cells",
+        intent_type="qa", interaction_mode="answer", target="answer_question", scope="single_step", original_message="how do I filter low quality cells",
     )
     intent_analyzer = MagicMock()
     intent_analyzer.analyze = AsyncMock(return_value=intent)
@@ -243,7 +241,7 @@ async def test_plan_engine_forwards_project_id_to_retriever():
         strategy_library=strategy_lib,
     )
 
-    intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
     result = await engine.plan(intent, data_state=DataState(), project_id="proj_42")
 
     assert result is not None

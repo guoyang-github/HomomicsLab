@@ -6,6 +6,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, StrategyTrace
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.main import app
@@ -327,7 +328,7 @@ class _FakePlanEngine:
         from homomics_lab.agent.plan.models import DataState as PlanDataState
         from homomics_lab.agent.plan.models import Phase, PlanResult
 
-        strategy_name = kwargs.get("strategy_name") or intent.analysis_type
+        strategy_name = kwargs.get("strategy_name") or intent_strategy_key(intent)
         # Always emit a single qc phase so parameter preservation can be asserted.
         return PlanResult(
             phases=[

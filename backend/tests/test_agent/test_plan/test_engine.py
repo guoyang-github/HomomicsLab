@@ -37,8 +37,13 @@ def registry():
 
 
 @pytest.fixture
-def strategy_library():
-    """A minimal test strategy library with a few common analysis skeletons."""
+def strategy_library(monkeypatch):
+    """A minimal test strategy library with a few common analysis skeletons.
+
+    Domain strategy auto-loading is disabled so the fixture's own
+    registrations are the only candidates (selection-mechanism isolation).
+    """
+    monkeypatch.setattr(StrategyLibrary, "_load_domain_strategies", lambda self: None)
     lib = StrategyLibrary()
     lib.register(
         AnalysisStrategy(
@@ -96,9 +101,7 @@ class TestPlanEngine:
     async def test_single_cell_standard_plan(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="single_cell_analysis",
-            complexity="complex",
-        )
+            intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState())
 
         phase_types = [p.phase_type for p in plan.phases]
@@ -112,9 +115,7 @@ class TestPlanEngine:
     async def test_plan_skips_completed_qc(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="single_cell_analysis",
-            complexity="complex",
-        )
+            intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState(has_qc=True)
         plan = await engine.plan(intent, data_state)
 
@@ -129,9 +130,7 @@ class TestPlanEngine:
     async def test_plan_inserts_batch_correction(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="single_cell_analysis",
-            complexity="complex",
-        )
+            intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState(batch_detected=True)
         plan = await engine.plan(intent, data_state)
 
@@ -142,9 +141,7 @@ class TestPlanEngine:
     async def test_spatial_strategy(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="spatial_analysis",
-            complexity="complex",
-        )
+            intent_type="analysis", interaction_mode="execute", domain="spatial-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState())
 
         assert plan.strategy_name == "spatial_transcriptomics"
@@ -156,9 +153,7 @@ class TestPlanEngine:
     async def test_qc_only_strategy(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="file_conversion",
-            complexity="single_step",
-        )
+            intent_type="file_conversion", interaction_mode="execute", target="convert_file", scope="single_step", )
         plan = await engine.plan(intent, DataState())
 
         assert plan.strategy_name == "qc_only"
@@ -169,9 +164,7 @@ class TestPlanEngine:
     async def test_plan_returns_reproducibility_context(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="single_cell_analysis",
-            complexity="complex",
-        )
+            intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState())
 
         assert "plan_engine_version" in plan.reproducibility_context
@@ -181,9 +174,7 @@ class TestPlanEngine:
     async def test_generic_fallback(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
         intent = UserIntent(
-            analysis_type="unknown_type",
-            complexity="single_step",
-        )
+            intent_type="unknown_type", interaction_mode="execute", scope="single_step", )
         plan = await engine.plan(intent, DataState())
 
         assert plan.is_fallback is True

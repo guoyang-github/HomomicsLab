@@ -12,22 +12,14 @@ from homomics_lab.config import settings
 # while still allowing locally cached models to load.
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
-# Disable external skill repository discovery and MCP client in tests. Both can
-# trigger network or subprocess calls during bootstrap, causing unrelated test
-# timeouts.
-settings.mcp_enabled = False
-settings.auto_load_domain_strategies = False
-settings.skill_sibling_discovery_enabled = False
+# Disable external skill repository discovery in tests: sibling-directory
+# skill discovery can trigger filesystem scans during bootstrap, causing
+# unrelated test timeouts.
 settings.external_skills_dirs = []
 
 # Use the locally cached sentence-transformers model to avoid network fallback
 # attempts for other default models.
 settings.embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
-
-# Do not let persisted runtime settings (e.g. from the user's data directory)
-# leak into the test suite. Tests that need dense semantic search set this
-# explicitly themselves.
-settings.semantic_search_model = None
 
 # Do not use a real LLM in the test suite. Intent-analyzer tests are expected
 # to be deterministic against keyword/embedding classifiers; LLM-specific tests
@@ -84,8 +76,8 @@ homomics_lab.bootstrap.bootstrap_worker_context = _bootstrap_without_hot_reload
 homomics_lab.main.bootstrap_worker_context = _bootstrap_without_hot_reload
 
 
-# Prevent persisted runtime settings (e.g. semantic_search_model) from leaking
-# into tests via app lifespan / apply_runtime_settings.
+# Prevent persisted runtime settings (e.g. skill_sandbox_backend overrides)
+# from leaking into tests via app lifespan / apply_runtime_settings.
 def _empty_runtime_settings():
     return {}
 

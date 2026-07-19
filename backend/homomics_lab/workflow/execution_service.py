@@ -24,6 +24,13 @@ from .nextflow_inputs import NextflowInputBuilder
 
 logger = logging.getLogger(__name__)
 
+# Workflow execution guardrails (formerly HOMOMICS_WORKFLOW_* /
+# HOMOMICS_DEFAULT_JOB_TIMEOUT_SECONDS config fields; defaults kept).
+DEFAULT_JOB_TIMEOUT_SECONDS = 3600.0
+WORKFLOW_CACHE_ENABLED = True
+WORKFLOW_CACHE_DIR = None  # defaults to <data_dir>/.cache/workflow
+WORKFLOW_NEXTFLOW_ENABLED = True
+
 
 class WorkflowExecutionService:
     """Execute an approved Plan through the best available backend.
@@ -60,8 +67,8 @@ class WorkflowExecutionService:
         self.workflow_cache: Optional[WorkflowCache]
         if workflow_cache is not None:
             self.workflow_cache = workflow_cache
-        elif getattr(settings, "workflow_cache_enabled", True):
-            cache_dir = getattr(settings, "workflow_cache_dir", None)
+        elif WORKFLOW_CACHE_ENABLED:
+            cache_dir = WORKFLOW_CACHE_DIR
             self.workflow_cache = WorkflowCache(cache_dir=cache_dir)
         else:
             self.workflow_cache = None
@@ -112,7 +119,7 @@ class WorkflowExecutionService:
 
     @staticmethod
     def _nextflow_enabled() -> bool:
-        return getattr(settings, "workflow_nextflow_enabled", True)
+        return WORKFLOW_NEXTFLOW_ENABLED
 
     def _build_data_state(self, plan_result: PlanResult, project_id: str) -> DataState:
         """Build a DataState for backend routing heuristics."""
@@ -178,7 +185,7 @@ class WorkflowExecutionService:
         timeout_seconds: Optional[float] = None,
     ) -> WorkflowResult:
         """Execute the plan as a Nextflow workflow."""
-        timeout = timeout_seconds or settings.default_job_timeout_seconds
+        timeout = timeout_seconds or DEFAULT_JOB_TIMEOUT_SECONDS
         working_dir = self._nextflow_working_dir(project_id, plan.plan_id).resolve()
 
         builder = NextflowInputBuilder(settings.data_dir, project_id)

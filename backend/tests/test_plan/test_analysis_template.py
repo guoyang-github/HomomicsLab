@@ -117,7 +117,7 @@ class TestPlanEngineTemplateIntegration:
             phase_defaults={"qc": {"min_genes": 200}},
             default_parameters={"organism": "human"},
         )
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="standard")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", )
         plan = await engine.plan(intent, DataState(), template=template)
 
         qc_phase = next(p for p in plan.phases if p.phase_type == "qc")
@@ -134,7 +134,7 @@ class TestPlanEngineTemplateIntegration:
             name="Test scRNA-seq",
             preferred_skills={"qc": "missing_skill"},
         )
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="standard")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", )
         plan = await engine.plan(intent, DataState(), template=template)
 
         qc_phase = next(p for p in plan.phases if p.phase_type == "qc")
@@ -150,7 +150,7 @@ class TestPlanEngineTemplateIntegration:
             name="Test scRNA-seq",
             preferred_skills={"qc": "custom_qc"},
         )
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="standard")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", )
         plan = await engine.plan(intent, DataState(), template=template)
         assert plan.reproducibility_context.get("template") is not None
         assert plan.reproducibility_context["template"]["template_id"] == "test_sc"

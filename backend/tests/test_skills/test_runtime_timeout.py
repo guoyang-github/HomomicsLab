@@ -2,7 +2,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from homomics_lab.config import settings
+from homomics_lab.skills.runtime import (
+    DEFAULT_JOB_TIMEOUT_SECONDS,
+    MAX_SKILL_TIMEOUT_SECONDS,
+)
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.runtime import SkillRuntimeExecutor
 from homomics_lab.skills.registry import SkillRegistry
@@ -50,15 +53,15 @@ def test_parse_timeout_seconds(executor):
 
 
 def test_parse_timeout_empty_returns_default(executor):
-    assert executor._parse_timeout("") == settings.default_job_timeout_seconds
-    assert executor._parse_timeout(None) == settings.default_job_timeout_seconds
-    assert executor._parse_timeout("   ") == settings.default_job_timeout_seconds
+    assert executor._parse_timeout("") == DEFAULT_JOB_TIMEOUT_SECONDS
+    assert executor._parse_timeout(None) == DEFAULT_JOB_TIMEOUT_SECONDS
+    assert executor._parse_timeout("   ") == DEFAULT_JOB_TIMEOUT_SECONDS
 
 
 def test_parse_timeout_clamped_to_max(executor):
-    over_max = settings.max_skill_timeout_seconds + 1000
-    assert executor._parse_timeout(f"{int(over_max)}s") == settings.max_skill_timeout_seconds
-    assert executor._parse_timeout("25h") == settings.max_skill_timeout_seconds
+    over_max = MAX_SKILL_TIMEOUT_SECONDS + 1000
+    assert executor._parse_timeout(f"{int(over_max)}s") == MAX_SKILL_TIMEOUT_SECONDS
+    assert executor._parse_timeout("25h") == MAX_SKILL_TIMEOUT_SECONDS
 
 
 def test_parse_timeout_minimum_one_second(executor):
@@ -96,8 +99,8 @@ async def test_per_task_timeout_override_clamped(executor, script_skill, tmp_pat
         skill=script_skill,
         scripts_dir=tmp_path / "scripts" / "python",
         exec_type="python",
-        inputs={"_timeout_seconds": f"{int(settings.max_skill_timeout_seconds + 3600)}s"},
+        inputs={"_timeout_seconds": f"{int(MAX_SKILL_TIMEOUT_SECONDS + 3600)}s"},
     )
 
     call_kwargs = scheduler_mock.execute.call_args.kwargs
-    assert call_kwargs["timeout_seconds"] == settings.max_skill_timeout_seconds
+    assert call_kwargs["timeout_seconds"] == MAX_SKILL_TIMEOUT_SECONDS

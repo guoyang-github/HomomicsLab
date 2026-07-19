@@ -6,7 +6,8 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from homomics_lab.config import settings
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base
+from homomics_lab.database.connection import get_engine
 from homomics_lab.database.models import ProjectRecord, Tenant, User
 from homomics_lab.projects.permissions import (
     add_project_member,
@@ -17,10 +18,11 @@ from homomics_lab.projects.permissions import (
 
 @pytest_asyncio.fixture(autouse=True, loop_scope="function")
 async def _create_tables():
-    async with async_engine.begin() as conn:
+    engine = get_engine()
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with async_engine.begin() as conn:
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 

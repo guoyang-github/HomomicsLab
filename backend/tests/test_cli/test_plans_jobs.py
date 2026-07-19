@@ -10,7 +10,8 @@ import pytest_asyncio
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.cli.commands.jobs import _list_jobs
 from homomics_lab.cli.commands.plans import _list_plans
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base
+from homomics_lab.database.connection import get_engine
 from homomics_lab.jobs import Job, JobMode, JobRepository, JobStatus
 from homomics_lab.plan import Plan, PlanStatus, PlanStore
 from homomics_lab.tasks.models import TaskNode
@@ -19,10 +20,10 @@ from homomics_lab.tasks.task_tree import TaskTree
 
 @pytest_asyncio.fixture(autouse=True, loop_scope="function")
 async def _create_tables():
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 

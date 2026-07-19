@@ -5,7 +5,6 @@ import pytest
 from homomics_lab.agent.intent import UserIntent
 from homomics_lab.agent.plan.composite_planner import CompositePlanner
 from homomics_lab.agent.plan.engine import PlanEngine
-from homomics_lab.config import settings
 from homomics_lab.skills.models import SkillDefinition, SkillInputSchema
 from homomics_lab.skills.registry import SkillRegistry
 
@@ -32,18 +31,12 @@ def _make_skill(
 @pytest.fixture
 def cross_domain_intent() -> UserIntent:
     return UserIntent(
-        analysis_type="cross_domain_analysis",
-        complexity="complex",
-        sub_intents=[
+        intent_type="analysis", interaction_mode="execute", scope="full", sub_intents=[
             UserIntent(
-                analysis_type="single_cell_analysis",
-                complexity="complex",
-                domain="single-cell-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full",
             ),
             UserIntent(
-                analysis_type="spatial_analysis",
-                complexity="complex",
-                domain="spatial-transcriptomics",
+                intent_type="analysis", interaction_mode="execute", domain="spatial-transcriptomics", scope="full",
             ),
         ],
     )
@@ -89,7 +82,6 @@ def registry_without_bridge() -> SkillRegistry:
 async def test_composite_planner_inserts_bridge_skill(
     registry_with_bridge, cross_domain_intent, monkeypatch
 ):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     engine = PlanEngine(skill_registry=registry_with_bridge)
     planner = CompositePlanner(
         plan_engine=engine,
@@ -111,7 +103,6 @@ async def test_composite_planner_inserts_bridge_skill(
 async def test_composite_planner_falls_back_to_category_bridge(
     cross_domain_intent, monkeypatch
 ):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     reg = SkillRegistry()
     reg.register(
         _make_skill("sc_data_io", "single-cell-transcriptomics", ["single-cell-transcriptomics"])
@@ -149,7 +140,6 @@ async def test_composite_planner_falls_back_to_category_bridge(
 async def test_composite_planner_no_bridge_when_none_exists(
     registry_without_bridge, cross_domain_intent, monkeypatch
 ):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     engine = PlanEngine(skill_registry=registry_without_bridge)
     planner = CompositePlanner(
         plan_engine=engine,
@@ -165,16 +155,13 @@ async def test_composite_planner_no_bridge_when_none_exists(
 async def test_composite_planner_returns_none_for_single_domain(
     registry_with_bridge, monkeypatch
 ):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     engine = PlanEngine(skill_registry=registry_with_bridge)
     planner = CompositePlanner(
         plan_engine=engine,
         skill_registry=registry_with_bridge,
     )
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        domain="single-cell-transcriptomics",
+        intent_type="analysis", interaction_mode="execute", scope="full", domain="single-cell-transcriptomics",
     )
     plan = await planner.plan(intent)
     assert plan is None
@@ -184,7 +171,6 @@ async def test_composite_planner_returns_none_for_single_domain(
 async def test_composite_planner_updates_transitions(
     registry_with_bridge, cross_domain_intent, monkeypatch
 ):
-    monkeypatch.setattr(settings, "auto_load_domain_strategies", True)
     engine = PlanEngine(skill_registry=registry_with_bridge)
     planner = CompositePlanner(
         plan_engine=engine,

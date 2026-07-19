@@ -3,7 +3,7 @@
 import pytest
 
 from homomics_lab.agent.intent.analyzer import CascadeIntentAnalyzer
-from homomics_lab.agent.intent.models import IntentDefinition
+from homomics_lab.agent.intent.models import IntentDefinition, intent_strategy_key
 from homomics_lab.context.working_memory import WorkingMemory
 from homomics_lab.models.common import ChatMessage, MessageType
 
@@ -30,7 +30,7 @@ async def test_analyzer_accepts_working_memory(analyzer):
     wm.add_message(ChatMessage(id="m1", type=MessageType.TEXT, content="加载了 PBMC 数据", sender="user"))
     intent = await analyzer.analyze("帮我分析它", working_memory=wm)
     # Should not crash; context is passed through.
-    assert intent.analysis_type in ("single_cell_analysis", "general", "clarification")
+    assert intent_strategy_key(intent) in ("single_cell_analysis", "general", "clarification")
 
 
 def test_build_context_includes_recent_messages(analyzer):

@@ -29,6 +29,16 @@ from homomics_lab.hpc.state import ExecutionState
 
 logger = logging.getLogger(__name__)
 
+# Container sandbox defaults (formerly HOMOMICS_SKILL_CONTAINER_* /
+# HOMOMICS_R_CONTAINER_IMAGE config fields; defaults kept).
+SKILL_CONTAINER_IMAGE = "python:3.10-slim"
+R_CONTAINER_IMAGE = "r-base:4.3.0"
+SKILL_CONTAINER_MEMORY_MB = 1024
+SKILL_CONTAINER_CPUS = 1.0
+SKILL_CONTAINER_PIDS_LIMIT = 64
+SKILL_CONTAINER_READONLY_ROOT = True
+SKILL_CONTAINER_VENV_MOUNT = True
+
 try:
     import resource as _resource_module
 except ImportError:
@@ -983,8 +993,7 @@ class ContainerSandbox(Sandbox):
     """Docker/Podman container isolation.
 
     The container image must contain the skill's language runtime and
-    dependencies. Use ``settings.skill_container_image`` to override the
-    default ``python:3.10-slim`` image.
+    dependencies (``SKILL_CONTAINER_IMAGE`` / ``R_CONTAINER_IMAGE``).
     """
 
     _digest_cache: Dict[str, Optional[str]] = {}
@@ -998,9 +1007,9 @@ class ContainerSandbox(Sandbox):
         super().__init__(working_dir)
         if container_image is None:
             if exec_type == "r":
-                container_image = settings.r_container_image
+                container_image = R_CONTAINER_IMAGE
             else:
-                container_image = settings.skill_container_image
+                container_image = SKILL_CONTAINER_IMAGE
         self.container_image = container_image
         self._engine = self._detect_engine()
 
@@ -1016,23 +1025,23 @@ class ContainerSandbox(Sandbox):
             "container_digest": self._get_image_digest(),
             "network": "none",
             "resource_limits": {
-                "memory_mb": settings.skill_container_memory_mb,
-                "cpus": settings.skill_container_cpus,
-                "pids_limit": settings.skill_container_pids_limit,
-                "readonly_root": settings.skill_container_readonly_root,
+                "memory_mb": SKILL_CONTAINER_MEMORY_MB,
+                "cpus": SKILL_CONTAINER_CPUS,
+                "pids_limit": SKILL_CONTAINER_PIDS_LIMIT,
+                "readonly_root": SKILL_CONTAINER_READONLY_ROOT,
             },
         }
 
     def _resource_args(self) -> List[str]:
         """Build Docker/Podman resource-limit flags."""
         args = [
-            "--memory", f"{settings.skill_container_memory_mb}m",
-            "--cpus", str(settings.skill_container_cpus),
-            "--pids-limit", str(settings.skill_container_pids_limit),
+            "--memory", f"{SKILL_CONTAINER_MEMORY_MB}m",
+            "--cpus", str(SKILL_CONTAINER_CPUS),
+            "--pids-limit", str(SKILL_CONTAINER_PIDS_LIMIT),
             "--stop-timeout", "10",
             "--init",
         ]
-        if settings.skill_container_readonly_root:
+        if SKILL_CONTAINER_READONLY_ROOT:
             args.extend(["--read-only", "--tmpfs", "/tmp:noexec,nosuid,size=100m"])
         return args
 
@@ -1115,7 +1124,7 @@ class ContainerSandbox(Sandbox):
         venv_mount_args: List[str] = []
         pythonpath_args: List[str] = []
         if (
-            settings.skill_container_venv_mount
+            SKILL_CONTAINER_VENV_MOUNT
             and python_path
             and Path(python_path).is_file()
         ):

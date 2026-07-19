@@ -11,7 +11,9 @@ from homomics_lab.skills.registry import SkillRegistry
 
 
 @pytest.fixture
-def populated_library():
+def populated_library(monkeypatch):
+    # Disable domain strategy auto-loading so only fixture registrations compete.
+    monkeypatch.setattr(StrategyLibrary, "_load_domain_strategies", lambda self: None)
     lib = StrategyLibrary()
     lib.register(
         AnalysisStrategy(
@@ -60,9 +62,7 @@ async def test_strategy_trace_populated(populated_library, skill_registry):
         strategy_library=populated_library,
     )
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="complex",
-        confidence=0.9,
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", confidence=0.9,
         metadata={"reason": "keyword match", "alternatives": []},
     )
     plan = await engine.plan(intent, DataState())
@@ -86,7 +86,7 @@ async def test_explicit_strategy_name_bypasses_selection(populated_library, skil
     )
     # Use an unknown intent so the default would fall back to generic/llm_fallback;
     # explicit strategy_name forces the chosen strategy.
-    intent = UserIntent(analysis_type="unknown_analysis", complexity="complex")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", target="unknown_analysis", scope="full", )
     plan = await engine.plan(intent, DataState(), strategy_name="single_cell_standard")
 
     assert plan.strategy_name == "single_cell_standard"
@@ -101,7 +101,7 @@ async def test_unknown_strategy_raises(populated_library, skill_registry):
         skill_registry=skill_registry,
         strategy_library=populated_library,
     )
-    intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
     with pytest.raises(ValueError, match="Unknown strategy"):
         await engine.plan(intent, DataState(), strategy_name="no_such_strategy")
 

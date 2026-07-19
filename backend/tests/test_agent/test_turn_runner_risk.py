@@ -20,7 +20,7 @@ def working_memory():
 
 @pytest.mark.asyncio
 async def test_evaluate_risk_heuristic_high_risk(runner, working_memory):
-    intent = UserIntent(analysis_type="general", complexity="single_step", confidence=0.9)
+    intent = UserIntent(intent_type="general", interaction_mode="execute", scope="single_step", confidence=0.9)
     score = await runner._evaluate_risk(
         intent,
         user_message="delete all old files and overwrite results",
@@ -32,7 +32,7 @@ async def test_evaluate_risk_heuristic_high_risk(runner, working_memory):
 
 @pytest.mark.asyncio
 async def test_evaluate_risk_heuristic_low_risk(runner, working_memory):
-    intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex", confidence=0.9)
+    intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", confidence=0.9)
     score = await runner._evaluate_risk(
         intent,
         user_message="run qc and plot UMAP",
@@ -48,7 +48,7 @@ async def test_evaluate_risk_uses_llm_when_available(runner, working_memory):
     mock_client.chat_completion = AsyncMock(return_value='{"risk_score": 0.85}')
     runner._llm_client = mock_client
 
-    intent = UserIntent(analysis_type="general", complexity="single_step", confidence=0.9)
+    intent = UserIntent(intent_type="general", interaction_mode="execute", scope="single_step", confidence=0.9)
     score = await runner._evaluate_risk(
         intent,
         user_message="drop the whole dataset",
@@ -66,7 +66,7 @@ async def test_evaluate_risk_falls_back_when_llm_fails(runner, working_memory):
     mock_client.chat_completion = AsyncMock(side_effect=RuntimeError("LLM unavailable"))
     runner._llm_client = mock_client
 
-    intent = UserIntent(analysis_type="general", complexity="single_step", confidence=0.9)
+    intent = UserIntent(intent_type="general", interaction_mode="execute", scope="single_step", confidence=0.9)
     score = await runner._evaluate_risk(
         intent,
         user_message="remove everything",
@@ -81,9 +81,7 @@ async def test_evaluate_risk_falls_back_when_llm_fails(runner, working_memory):
 @pytest.mark.asyncio
 async def test_build_orchestrator_context_propagates_confidence(runner, working_memory):
     intent = UserIntent(
-        analysis_type="single_cell_analysis",
-        complexity="single_step",
-        confidence=0.5,
+        intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="single_step", confidence=0.5,
     )
     context = await runner._build_orchestrator_context(
         project_id="proj_1",
@@ -92,7 +90,6 @@ async def test_build_orchestrator_context_propagates_confidence(runner, working_
         working_memory=working_memory,
     )
     assert context["confidence"] == 0.5
-    assert context["confidence_threshold"] == 0.7
 
 
 @pytest.mark.asyncio
@@ -104,4 +101,3 @@ async def test_build_orchestrator_context_default_values(runner, working_memory)
     assert context["confidence"] == 1.0
     assert context["risk_score"] == 0.0
     assert "risk_threshold" in context
-    assert "confidence_threshold" in context

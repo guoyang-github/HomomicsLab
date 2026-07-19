@@ -15,7 +15,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 from homomics_lab.llm.cache import BaseLLMResponseCache
 from homomics_lab.llm.cost import estimate_cost_usd
 from homomics_lab.llm.providers import get_provider_registry, reset_provider_registry
-from homomics_lab.llm.router import LLMRouter
+from homomics_lab.llm.router import LLM_COMPLEXITY_ROUTING_ENABLED, LLMRouter
 from homomics_lab.llm.runtime_config import load_llm_runtime_config
 
 logger = logging.getLogger(__name__)
@@ -495,7 +495,6 @@ class LLMClient:
         messages: List[Dict[str, str]],
     ) -> Any:
         """Choose an initial route, optionally using complexity or catalog routing."""
-        from homomics_lab.config import settings
 
         if task_type:
             return self._router.select(
@@ -504,7 +503,7 @@ class LLMClient:
                 task_type=task_type,
                 required_capabilities=required_capabilities,
             )
-        if intent_type and getattr(settings, "llm_complexity_routing_enabled", False):
+        if intent_type and LLM_COMPLEXITY_ROUTING_ENABLED:
             input_tokens = sum(len(m.get("content", "")) for m in messages) // 4
             return self._router.select_by_complexity(
                 intent_type=intent_type,

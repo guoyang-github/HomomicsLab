@@ -5,7 +5,6 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from homomics_lab.config import settings
 from homomics_lab.context.episodic_summary import EpisodicSummarizer, EpisodicSummary
 from homomics_lab.models.common import ChatMessage, MessageType
 
@@ -43,8 +42,10 @@ def llm_client():
 
 @pytest.fixture(autouse=True)
 def _default_thresholds(monkeypatch):
-    monkeypatch.setattr(settings, "episodic_summary_min_messages", 6)
-    monkeypatch.setattr(settings, "episodic_summary_min_interval", 3)
+    import homomics_lab.context.episodic_summary as episodic_summary_module
+
+    monkeypatch.setattr(episodic_summary_module, "EPISODIC_SUMMARY_MIN_MESSAGES", 6)
+    monkeypatch.setattr(episodic_summary_module, "EPISODIC_SUMMARY_MIN_INTERVAL", 3)
 
 
 @pytest.mark.asyncio

@@ -18,12 +18,17 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from typing_extensions import Literal
 
-from homomics_lab.config import settings
 from homomics_lab.mcp.client import BioMCPClient
 from homomics_lab.tools.models import ToolDefinition
 from homomics_lab.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+# MCP marketplace storage locations (formerly HOMOMICS_MCP_* config fields;
+# defaults kept).
+MCP_VENV_DIR = Path("./data/mcp_venvs")
+MCP_SERVERS_STATE_PATH = Path("./data/mcp_servers.json")
+MCP_MARKETPLACE_CATALOG_PATH = Path("./data/mcp_marketplace_catalog.json")
 
 Transport = Literal["embedded", "stdio", "sse"]
 
@@ -75,9 +80,9 @@ class MCPMarketplace:
         catalog_path: Optional[Path] = None,
         venv_dir: Optional[Path] = None,
     ):
-        self.state_path = Path(state_path or settings.mcp_servers_state_path)
-        self.catalog_path = Path(catalog_path or settings.mcp_marketplace_catalog_path)
-        self.venv_dir = Path(venv_dir or settings.mcp_venv_dir)
+        self.state_path = Path(state_path or MCP_SERVERS_STATE_PATH)
+        self.catalog_path = Path(catalog_path or MCP_MARKETPLACE_CATALOG_PATH)
+        self.venv_dir = Path(venv_dir or MCP_VENV_DIR)
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.catalog_path.parent.mkdir(parents=True, exist_ok=True)
         self.venv_dir.mkdir(parents=True, exist_ok=True)

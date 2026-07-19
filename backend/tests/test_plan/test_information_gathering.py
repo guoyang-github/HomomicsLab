@@ -58,7 +58,7 @@ def strategy_library():
 class TestInformationGatheringEngine:
     def test_decide_probes_for_missing_keys(self, registry):
         engine = InformationGatheringEngine(registry)
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState()
         probes = engine.decide_probes(intent, data_state)
         missing_keys = {p.missing_key for p in probes}
@@ -69,7 +69,7 @@ class TestInformationGatheringEngine:
 
     def test_no_probes_when_data_complete(self, registry):
         engine = InformationGatheringEngine(registry)
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState()
         data_state.set("organism", "human")
         data_state.set("data_type", "scRNA-seq")
@@ -80,7 +80,7 @@ class TestInformationGatheringEngine:
 
     def test_probe_includes_metadata_skill(self, registry):
         engine = InformationGatheringEngine(registry)
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState()
         probes = engine.decide_probes(intent, data_state)
         skill_ids = {p.skill_id for p in probes}
@@ -91,7 +91,7 @@ class TestPlanEngineInformationRequest:
     @pytest.mark.asyncio
     async def test_information_gathering_disabled_by_default(self, registry, strategy_library):
         engine = PlanEngine(skill_registry=registry, strategy_library=strategy_library)
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState())
         assert plan.is_information_request is False
         assert len(plan.phases) > 0
@@ -103,7 +103,7 @@ class TestPlanEngineInformationRequest:
             enable_information_gathering=True,
             strategy_library=strategy_library,
         )
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState())
         assert plan.is_information_request is True
         assert plan.phases == []
@@ -117,7 +117,7 @@ class TestPlanEngineInformationRequest:
             enable_information_gathering=True,
             strategy_library=strategy_library,
         )
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         data_state = DataState()
         data_state.set("organism", "human")
         data_state.set("data_type", "scRNA-seq")

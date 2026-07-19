@@ -56,7 +56,7 @@ def test_upload_file_rejects_oversized_stream(client: TestClient, tmp_path, monk
     """A file larger than max_upload_file_bytes should be rejected with 413."""
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "storage_backend", "local")
-    monkeypatch.setattr(settings, "max_upload_file_bytes", 10)
+    monkeypatch.setattr("homomics_lab.api.files.MAX_UPLOAD_FILE_BYTES", 10)
 
     response = client.post(
         "/api/files/upload",

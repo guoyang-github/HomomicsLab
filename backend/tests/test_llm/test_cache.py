@@ -80,39 +80,41 @@ class TestRedisLLMResponseCache:
 
 class TestCacheFactory:
     def test_factory_returns_local_by_default(self):
-        settings = Settings(llm_response_cache_enabled=True, llm_response_cache_backend="local")
+        settings = Settings()
         cache = get_llm_response_cache(settings)
         assert isinstance(cache, LocalLLMResponseCache)
 
-    def test_factory_returns_none_when_disabled(self):
-        settings = Settings(llm_response_cache_enabled=False)
-        assert get_llm_response_cache(settings) is None
+    def test_factory_returns_none_when_disabled(self, monkeypatch):
+        import homomics_lab.llm.cache as cache_module
+
+        monkeypatch.setattr(cache_module, "LLM_RESPONSE_CACHE_ENABLED", False)
+        assert get_llm_response_cache(Settings()) is None
 
     def test_factory_returns_redis_when_configured(self, monkeypatch):
+        import homomics_lab.llm.cache as cache_module
+
         server = FakeServer()
         monkeypatch.setattr(
             "redis.asyncio.Redis.from_url",
             lambda url, **kwargs: FakeAsyncRedis(server=server),
         )
-        settings = Settings(
-            llm_response_cache_enabled=True,
-            llm_response_cache_backend="redis",
-            llm_response_cache_redis_url="redis://localhost:6379/1",
-        )
-        cache = get_llm_response_cache(settings)
+        monkeypatch.setattr(cache_module, "LLM_RESPONSE_CACHE_BACKEND", "redis")
+        cache = get_llm_response_cache(Settings())
         assert isinstance(cache, RedisLLMResponseCache)
 
-    def test_factory_defaults_redis_url_to_redis_url_setting(self, monkeypatch):
+    def test_factory_uses_redis_url_setting(self, monkeypatch):
+        import homomics_lab.llm.cache as cache_module
+
         server = FakeServer()
-        monkeypatch.setattr(
-            "redis.asyncio.Redis.from_url",
-            lambda url, **kwargs: FakeAsyncRedis(server=server),
-        )
-        settings = Settings(
-            llm_response_cache_enabled=True,
-            llm_response_cache_backend="redis",
-            redis_url="redis://custom-redis:6380/2",
-        )
+        seen_urls = []
+
+        def _from_url(url, **kwargs):
+            seen_urls.append(url)
+            return FakeAsyncRedis(server=server)
+
+        monkeypatch.setattr("redis.asyncio.Redis.from_url", _from_url)
+        monkeypatch.setattr(cache_module, "LLM_RESPONSE_CACHE_BACKEND", "redis")
+        settings = Settings(redis_url="redis://custom-redis:6380/2")
         cache = get_llm_response_cache(settings)
         assert isinstance(cache, RedisLLMResponseCache)
-        assert settings.llm_response_cache_redis_url == "redis://custom-redis:6380/2"
+        assert seen_urls == ["redis://custom-redis:6380/2"]

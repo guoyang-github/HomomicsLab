@@ -1,13 +1,14 @@
 import pytest
 
-from homomics_lab.config import settings
 from homomics_lab.cost_control import BudgetExceeded, CostController
 
 
 @pytest.fixture
 def controller(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "monthly_budget_usd", 10.0)
-    monkeypatch.setattr(settings, "max_llm_cost_per_request_usd", 2.0)
+    import homomics_lab.cost_control as cost_control_module
+
+    monkeypatch.setattr(cost_control_module, "MONTHLY_BUDGET_USD", 10.0)
+    monkeypatch.setattr(cost_control_module, "MAX_LLM_COST_PER_REQUEST_USD", 2.0)
     return CostController(db_path=tmp_path / "costs.db")
 
 
