@@ -4,7 +4,7 @@ import pytest
 
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry
-from homomics_lab.skills.semantic_search_hybrid import HybridSkillSearch
+from homomics_lab.skills.semantic_search import HybridSkillSearch
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ class TestHybridSkillSearch:
     def test_falls_back_to_sparse_when_dense_unavailable(self, monkeypatch):
         """If dense model cannot be loaded, hybrid still returns sparse results."""
         monkeypatch.setattr(
-            "homomics_lab.skills.semantic_search_v2.SemanticSearchEngine",
+            "homomics_lab.skills.semantic_search._DenseSkillSearch",
             raise_on_init,
         )
         search = HybridSkillSearch()

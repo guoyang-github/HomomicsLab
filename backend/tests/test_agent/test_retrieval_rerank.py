@@ -12,7 +12,7 @@ import pytest
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase
 from homomics_lab.agent.retrieval import RetrievedSkill, SkillRetriever
-from homomics_lab.agent.retrieval_rerank import SkillReranker
+from homomics_lab.agent.retrieval import SkillReranker
 from homomics_lab.skills.models import SkillDefinition
 from homomics_lab.skills.registry import SkillRegistry
 

@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.skills.models import SkillDefinition
-from homomics_lab.config import settings
 
 
 class SkillRegistry:
@@ -12,14 +11,12 @@ class SkillRegistry:
         self._semantic = self._create_search_engine()
 
     def _create_search_engine(self):
-        """Create the semantic search engine based on config."""
-        if settings.semantic_search_model:
-            from homomics_lab.skills.semantic_search_v2 import SemanticSearchEngine
+        """Create the hybrid dense + sparse skill search engine.
 
-            return SemanticSearchEngine(model_name=settings.semantic_search_model)
-
-        # Default: hybrid dense + sparse retrieval.
-        from homomics_lab.skills.semantic_search_hybrid import HybridSkillSearch
+        The engine degrades to sparse-only search when the dense model is
+        unavailable, so it is always safe to construct.
+        """
+        from homomics_lab.skills.semantic_search import HybridSkillSearch
 
         return HybridSkillSearch()
 

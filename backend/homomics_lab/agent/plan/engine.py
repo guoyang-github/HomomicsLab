@@ -15,6 +15,7 @@ This separation ensures that:
 from typing import Any, Dict, List, Optional, Tuple
 
 from homomics_lab.agent.information_gathering import InformationGatheringEngine
+from homomics_lab.agent.intent.models import intent_strategy_key
 from homomics_lab.agent.intent_analyzer import UserIntent
 from homomics_lab.agent.literature_retriever import LiteratureRetriever
 from homomics_lab.agent.plan.estimator import default_tracker, estimate_phase
@@ -31,15 +32,17 @@ from homomics_lab.agent.plan.parameter_enricher import ParameterEnricher
 from homomics_lab.agent.plan.quality import PlanQualityEvaluator
 from homomics_lab.agent.plan.strategies import AnalysisStrategy, StrategyLibrary
 from homomics_lab.agent.plan.template import AnalysisTemplate
-from homomics_lab.agent.retrieval import RetrievedSkill, SkillRetriever
-from homomics_lab.agent.retrieval_rerank import SkillReranker
+from homomics_lab.agent.retrieval import RetrievedSkill, SkillReranker, SkillRetriever
 from homomics_lab.agent.plan.validator import PlanValidator
-from homomics_lab.config import settings
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.skills.capability_index import CapabilityIndex
 from homomics_lab.skills.registry import SkillRegistry
 from homomics_lab.skills.skill_dag import SkillDAG
 from homomics_lab.tools.registry import ToolRegistry
+
+# Literature/RAP retrieval requires network access and NCBI credentials; it
+# stays off (formerly HOMOMICS_LITERATURE_RETRIEVAL_ENABLED, default False).
+LITERATURE_RETRIEVAL_ENABLED = False
 
 
 class PlanEngine:
@@ -48,7 +51,7 @@ class PlanEngine:
     Usage:
         plan_engine = PlanEngine(skill_registry, skill_dag)
         plan = await plan_engine.plan(
-            intent=UserIntent(analysis_type="single_cell_analysis", ...),
+            intent=UserIntent(intent_type="analysis", domain="single-cell-transcriptomics", ...),
             data_state=DataState(has_qc=False, n_cells=5000),
         )
         # plan.phases -> [QC, Normalization, PCA, Clustering, ...]
@@ -76,7 +79,7 @@ class PlanEngine:
         self.skill_dag = skill_dag
         self.capability_index = capability_index
         self.enable_information_gathering = enable_information_gathering
-        if literature_retriever is None and settings.literature_retrieval_enabled:
+        if literature_retriever is None and LITERATURE_RETRIEVAL_ENABLED:
             literature_retriever = LiteratureRetriever()
         self.skill_retriever = skill_retriever or SkillRetriever(
             skill_registry=skill_registry,
@@ -151,7 +154,7 @@ class PlanEngine:
             probes = self.information_gathering.decide_probes(intent, data_state)
         else:
             probes = []
-        if probes and intent.analysis_type != "information_gathering":
+        if probes and intent_strategy_key(intent) != "information_gathering":
             probe_list = "\n".join(
                 f"- {p.skill_id}: {p.reason} (cost: {p.estimated_cost})"
                 for p in probes
@@ -173,7 +176,7 @@ class PlanEngine:
 
         # 2. Select strategy based on intent (or explicit override).
         ranked = self.strategy_library.select_top_k(
-            intent.analysis_type, data_state, top_k=max(top_k, 3)
+            intent_strategy_key(intent), data_state, top_k=max(top_k, 3)
         )
         if strategy_name is not None:
             strategy = self.strategy_library.get(strategy_name)
@@ -225,7 +228,7 @@ class PlanEngine:
         state_checks_triggered = self._collect_state_checks_triggered(plan_result, data_state)
         template_info = template.to_dict() if template is not None else None
         plan_result.strategy_trace = StrategyTrace(
-            intent_analysis_type=intent.analysis_type,
+            intent_analysis_type=intent_strategy_key(intent),
             intent_confidence=getattr(intent, "confidence", None),
             intent_reason=intent_metadata.get("reason"),
             intent_alternatives=intent_metadata.get("alternatives", []),
@@ -273,7 +276,7 @@ class PlanEngine:
         retrieval_query = self._build_retrieval_query(intent, phases)
         retrieval_context = await self.skill_retriever.retrieve(
             query=retrieval_query,
-            intent_type=intent.analysis_type,
+            intent_type=intent_strategy_key(intent),
             data_sources=strategy.data_sources,
             include_literature=self.skill_retriever.literature_retriever is not None,
             project_id=project_id,
@@ -299,7 +302,7 @@ class PlanEngine:
         reproducibility_context = {
             "plan_engine_version": "0.3.0",
             "strategy": strategy.name,
-            "intent": intent.analysis_type,
+            "intent": intent_strategy_key(intent),
             "data_state": data_state.to_context(),
             "retrieval_context": retrieval_context.to_prompt_context(),
             "learned_defaults": learned_defaults,
@@ -495,7 +498,7 @@ class PlanEngine:
     @staticmethod
     def _build_retrieval_query(intent: UserIntent, phases: List[Phase]) -> str:
         """Build a rich query for skill retrieval from intent and skeleton."""
-        parts = [intent.analysis_type]
+        parts = [intent_strategy_key(intent)]
         keywords = getattr(intent, "keywords", None) or []
         parts.extend(keywords)
         for phase in phases:
