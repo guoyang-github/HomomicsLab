@@ -36,6 +36,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# CodeAct fallback and chart-critic retry bounds (formerly
+# HOMOMICS_CODEACT_FALLBACK_ENABLED / HOMOMICS_CHART_CRITIC_MAX_RETRIES).
+CODEACT_FALLBACK_ENABLED = True
+CHART_CRITIC_MAX_RETRIES = 1
+
 
 class TaskExecutors:
     """Execute tasks via CodeAct, skill-as-reference, or supervisor delegation."""
@@ -471,7 +476,7 @@ class TaskExecutors:
         original_error: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate and run CodeAct for a task."""
-        if not getattr(settings, "codeact_fallback_enabled", True):
+        if not CODEACT_FALLBACK_ENABLED:
             return {"success": False, "error": "CodeAct execution disabled"}
 
         working_dir = self._fallback_working_dir(context)
@@ -640,23 +645,24 @@ class TaskExecutors:
     ) -> Dict[str, Any]:
         """VLM chart feedback loop: critique produced charts, repair at most N times.
 
-        Opt-in via ``settings.chart_critic_enabled`` (default off). Each
-        produced chart is assessed by :class:`ChartCritic` (cheap rule
-        pre-checks first, vision LLM second). When a high-severity problem is
-        found, the critique suggestion is fed back into one bounded repair run
-        (``settings.chart_critic_max_retries``, default 1). If the repair does
+        Always on and self-gating: skipped silently when no vision-capable
+        LLM is available. Each produced chart is assessed by
+        :class:`ChartCritic` (cheap rule pre-checks first, vision LLM
+        second). When a high-severity problem is found, the critique
+        suggestion is fed back into one bounded repair run
+        (``CHART_CRITIC_MAX_RETRIES``, default 1). If the repair does
         not converge, the original charts are kept and a note is attached to
         the result. Every failure inside this loop degrades to returning the
         original result unchanged — it must never break the main flow.
         """
-        if not getattr(settings, "chart_critic_enabled", False):
+        critic = ChartCritic(llm_client=llm_client)
+        if not critic.has_vision_capability():
             return codeact_result
         try:
             charts = collect_chart_paths(codeact_result.get("result") or {})
             if not charts:
                 return codeact_result
 
-            critic = ChartCritic(llm_client=llm_client)
             intent = task.description or task.name
             critiques = await self._critique_all(critic, charts, intent, task)
             codeact_result["chart_critiques"] = critiques
@@ -664,7 +670,7 @@ class TaskExecutors:
             if not bad:
                 return codeact_result
 
-            max_retries = max(0, int(getattr(settings, "chart_critic_max_retries", 1)))
+            max_retries = max(0, CHART_CRITIC_MAX_RETRIES)
             suggestions = "; ".join(
                 f"[{', '.join(c['issues'])}] {c['suggestion']}".strip() for c in bad
             )
@@ -883,7 +889,7 @@ class TaskExecutors:
         prompt: str,
     ) -> Dict[str, Any]:
         """Run CodeAct with a fully custom prompt."""
-        if not getattr(settings, "codeact_fallback_enabled", True):
+        if not CODEACT_FALLBACK_ENABLED:
             return {"success": False, "error": "CodeAct execution disabled"}
 
         working_dir = self._fallback_working_dir(context)

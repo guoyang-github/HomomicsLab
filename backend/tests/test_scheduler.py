@@ -1,20 +1,36 @@
 """Tests for the APScheduler-based scheduled task integration."""
 
+from types import SimpleNamespace
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
-from homomics_lab.database import Base, async_engine
+from homomics_lab.database import Base
+from homomics_lab.database.connection import get_engine
+from homomics_lab.database.connection import get_session_factory
+from homomics_lab.database.models import ScheduledJobRun
+from homomics_lab.knowledge.cbkb import CBKB, ExperimentNode
+from homomics_lab.knowledge.curator import CBKBCurator
 from homomics_lab.main import app
-from homomics_lab.scheduler import HomomicsScheduler
+from homomics_lab.scheduler import (
+    MIN_EXPERIMENTS_FOR_CURATION,
+    MIN_EXPERIMENTS_FOR_EVOLUTION,
+    MIN_EXPERIMENTS_FOR_NARRATIVE,
+    MIN_EXPERIMENTS_FOR_SOP_PROPOSAL,
+    HomomicsScheduler,
+)
+
+RESEARCH_JOBS = ("cbkb_full_curation", "narrative_report", "sop_proposal", "evolution_pass")
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def _create_tables():
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True))
     yield
-    async with async_engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
@@ -64,33 +80,17 @@ async def test_run_now_failure_records_failed(scheduler, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_start_shutdown_with_no_jobs(monkeypatch):
-    monkeypatch.setattr("homomics_lab.config.settings.curation_enabled", False)
-    monkeypatch.setattr("homomics_lab.config.settings.narrative_report_enabled", False)
-    monkeypatch.setattr("homomics_lab.config.settings.sop_proposal_enabled", False)
-    monkeypatch.setattr("homomics_lab.config.settings.evolution_enabled", False)
+async def test_scheduler_registers_research_jobs_by_default():
+    """All four research jobs register unconditionally (default awake).
 
-    sched = HomomicsScheduler()
-    await sched.start()
-    assert len(sched._scheduler.get_jobs()) == 0
-    await sched.shutdown()
-
-
-@pytest.mark.asyncio
-async def test_scheduler_registers_jobs_when_enabled(monkeypatch):
-    monkeypatch.setattr("homomics_lab.config.settings.curation_enabled", True)
-    monkeypatch.setattr("homomics_lab.config.settings.narrative_report_enabled", True)
-    monkeypatch.setattr("homomics_lab.config.settings.sop_proposal_enabled", True)
-    monkeypatch.setattr("homomics_lab.config.settings.evolution_enabled", True)
-    monkeypatch.setattr("homomics_lab.config.settings.scheduler_run_at_startup", False)
-
+    The scheduler no longer consults the legacy ``*_enabled`` settings
+    (which default to False), so registration must happen under defaults.
+    """
     sched = HomomicsScheduler()
     await sched.start()
     job_ids = {job.id for job in sched._scheduler.get_jobs()}
-    assert "cbkb_full_curation" in job_ids
-    assert "narrative_report" in job_ids
-    assert "sop_proposal" in job_ids
-    assert "evolution_pass" in job_ids
+    for name in RESEARCH_JOBS:
+        assert name in job_ids
     await sched.shutdown()
 
 
@@ -146,3 +146,117 @@ def test_api_list_scheduled_runs(monkeypatch):
         data = response.json()
         assert len(data) == 1
         assert data[0]["job_name"] == "cbkb_full_curation"
+
+
+# ── Data-volume gates ─────────────────────────────
+
+GATED_JOBS = [
+    ("cbkb_full_curation", "_run_full_curation", MIN_EXPERIMENTS_FOR_CURATION),
+    ("narrative_report", "_run_narrative_report", MIN_EXPERIMENTS_FOR_NARRATIVE),
+    ("sop_proposal", "_run_sop_proposal", MIN_EXPERIMENTS_FOR_SOP_PROPOSAL),
+    ("evolution_pass", "_run_evolution_pass", MIN_EXPERIMENTS_FOR_EVOLUTION),
+]
+
+
+def _arm_job_dependencies(scheduler):
+    """Give a non-started scheduler the attributes gated jobs touch."""
+    scheduler._curator = SimpleNamespace(
+        run_full_curation=lambda: None,
+        generate_narrative=lambda *args: None,
+        propose_sop_updates=lambda: None,
+    )
+    scheduler._evolution_engine = SimpleNamespace(run_evolution_pass=lambda: None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("job_name,runner_attr,minimum", GATED_JOBS)
+async def test_gate_skips_below_threshold(scheduler, monkeypatch, job_name, runner_attr, minimum):
+    """One experiment short of the minimum -> the job is skipped, not run."""
+    monkeypatch.setattr(
+        HomomicsScheduler, "_count_cbkb_experiments", lambda self: minimum - 1
+    )
+    _arm_job_dependencies(scheduler)
+    calls = []
+
+    async def fake_run_task(self, name, coro_fn, *args):
+        calls.append(name)
+
+    monkeypatch.setattr(HomomicsScheduler, "_run_task", fake_run_task)
+
+    await getattr(scheduler, runner_attr)()
+    assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("job_name,runner_attr,minimum", GATED_JOBS)
+async def test_gate_allows_at_threshold(scheduler, monkeypatch, job_name, runner_attr, minimum):
+    """Exactly at the minimum -> the job runs."""
+    monkeypatch.setattr(
+        HomomicsScheduler, "_count_cbkb_experiments", lambda self: minimum
+    )
+    _arm_job_dependencies(scheduler)
+    calls = []
+
+    async def fake_run_task(self, name, coro_fn, *args):
+        calls.append(name)
+
+    monkeypatch.setattr(HomomicsScheduler, "_run_task", fake_run_task)
+
+    await getattr(scheduler, runner_attr)()
+    assert calls == [job_name]
+
+
+def _seed_experiments(cbkb, count):
+    for i in range(count):
+        cbkb.add_experiment_node(
+            ExperimentNode(
+                bundle_id=f"b{i}",
+                project_id="p1",
+                created_at="2024-01-01T00:00:00+00:00",
+                skills_used=[],
+                phases=[],
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_gate_skip_writes_no_audit_record(scheduler, monkeypatch, tmp_path):
+    """A gated skip is normal: no audit row, curator never invoked."""
+    cbkb = CBKB(base_dir=tmp_path)
+    _seed_experiments(cbkb, MIN_EXPERIMENTS_FOR_CURATION - 1)
+    scheduler._curator = CBKBCurator(cbkb)
+    calls = []
+
+    async def fake_run_full_curation(self):
+        calls.append("curation")
+
+    monkeypatch.setattr(CBKBCurator, "run_full_curation", fake_run_full_curation)
+
+    await scheduler._run_full_curation()
+
+    assert calls == []
+    async with get_session_factory()() as session:
+        result = await session.execute(select(ScheduledJobRun))
+        assert result.scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_gate_allows_run_and_records_audit(scheduler, monkeypatch, tmp_path):
+    """With enough experiments the real count path runs the job and audits it."""
+    cbkb = CBKB(base_dir=tmp_path)
+    _seed_experiments(cbkb, MIN_EXPERIMENTS_FOR_CURATION)
+    scheduler._curator = CBKBCurator(cbkb)
+
+    async def fake_run_full_curation(self):
+        return {"links_added": 1}
+
+    monkeypatch.setattr(CBKBCurator, "run_full_curation", fake_run_full_curation)
+
+    await scheduler._run_full_curation()
+
+    async with get_session_factory()() as session:
+        result = await session.execute(select(ScheduledJobRun))
+        runs = result.scalars().all()
+    assert len(runs) == 1
+    assert runs[0].job_name == "cbkb_full_curation"
+    assert runs[0].status == "completed"

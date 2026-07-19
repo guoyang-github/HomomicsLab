@@ -65,7 +65,17 @@ class EvolutionEngine:
         apply_sops: bool = True,
         sop_confidence_threshold: float = 0.9,
     ) -> EvolutionReport:
-        """Execute one full evolution pass and return a report."""
+        """Execute one full evolution pass and return a report.
+
+        Proposal-only convention (安全门禁，保持现状，勿在不加 HITL 的情况下放宽):
+
+        - Role deltas from ``AgentEvolutionEngine.evolve_roles`` are
+          *proposals only* — this pass never calls ``apply_evolution``.
+          Applying role changes is a separate, explicitly invoked step.
+        - SOP updates are persisted only when their confidence meets
+          ``sop_confidence_threshold`` (default 0.9) and the existing SOP is
+          not ``locked`` (see ``_apply_sop_update``).
+        """
         report = EvolutionReport(
             timestamp=datetime.now(timezone.utc).isoformat(),
         )

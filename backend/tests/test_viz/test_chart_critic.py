@@ -12,7 +12,6 @@ from PIL import Image
 
 from homomics_lab.agent.orchestrator_executors import TaskExecutors
 from homomics_lab.agent.turn_result_assembler import ResultAssembler
-from homomics_lab.config import settings
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.viz.chart_critic import (
     ChartCritic,
@@ -66,6 +65,9 @@ class QueueCritic:
     def __init__(self, queue: List[ChartCritique]):
         self._queue = list(queue)
         self.calls: List[str] = []
+
+    def has_vision_capability(self) -> bool:
+        return True
 
     async def critique(self, image_path, intent: str = "", context=None) -> ChartCritique:
         self.calls.append(str(image_path))
@@ -201,6 +203,52 @@ class TestDegradation:
 
 
 # ---------------------------------------------------------------------------
+# Auto-detection: model resolved from the client, no enable switch
+# ---------------------------------------------------------------------------
+
+
+class TestAutoDetection:
+    @pytest.mark.asyncio
+    async def test_vision_model_from_client_activates_critic(self, tmp_path):
+        # No explicit model: resolved from the client; vision-capable -> active.
+        chart = _write_png(tmp_path / "content.png")
+        client = StubLLMClient(response='{"ok": true, "issues": [], "severity": "none"}')
+        client._legacy_model = "gpt-4o-mini"
+        critique = await ChartCritic(llm_client=client).critique(chart, intent="umap")
+        assert critique.ok is True
+        assert critique.source == "vlm"
+        assert len(client.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_text_only_model_from_client_skips_silently(self, tmp_path):
+        chart = _write_png(tmp_path / "content.png")
+        client = StubLLMClient(response='{"ok": false, "severity": "high"}')
+        client._legacy_model = "deepseek-chat"
+        critique = await ChartCritic(llm_client=client).critique(chart, intent="umap")
+        assert critique.ok is True
+        assert critique.source == "skipped"
+        assert client.calls == []
+
+    @pytest.mark.asyncio
+    async def test_model_resolved_from_router_primary(self, tmp_path):
+        chart = _write_png(tmp_path / "content.png")
+        client = StubLLMClient(response='{"ok": true, "issues": [], "severity": "none"}')
+        client.router = SimpleNamespace(primary_model="qwen-vl-max")
+        critique = await ChartCritic(llm_client=client).critique(chart, intent="umap")
+        assert critique.source == "vlm"
+        assert len(client.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_no_model_anywhere_skips_silently(self, tmp_path):
+        chart = _write_png(tmp_path / "content.png")
+        client = StubLLMClient(response='{"ok": false, "severity": "high"}')
+        critique = await ChartCritic(llm_client=client).critique(chart, intent="umap")
+        assert critique.ok is True
+        assert critique.source == "skipped"
+        assert client.calls == []
+
+
+# ---------------------------------------------------------------------------
 # VLM critique parsing
 # ---------------------------------------------------------------------------
 
@@ -270,31 +318,29 @@ class TestCollectChartPaths:
 
 
 def _enable_critic(monkeypatch, max_retries: int = 1):
-    monkeypatch.setattr(settings, "chart_critic_enabled", True)
-    monkeypatch.setattr(settings, "chart_critic_max_retries", max_retries)
+    # The opt-in switch was removed in Phase 2 (chart critic is always on and
+    # self-gates on vision capability); only the retry bound is configurable,
+    # as the CHART_CRITIC_MAX_RETRIES module constant.
+    monkeypatch.setattr(
+        "homomics_lab.agent.orchestrator_executors.CHART_CRITIC_MAX_RETRIES",
+        max_retries,
+    )
+
+
+def _vision_client(response: Optional[str] = None) -> StubLLMClient:
+    """Stub LLM client whose resolved model is vision-capable."""
+    client = StubLLMClient(response=response)
+    client._legacy_model = "gpt-4o"
+    return client
 
 
 class TestChartFeedbackLoop:
-    @pytest.mark.asyncio
-    async def test_disabled_is_passthrough(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(settings, "chart_critic_enabled", False)
-        executors, _ = _make_executors()
-        png = _write_png(tmp_path / "a.png")
-        result = {"success": True, "result": {"plot_path": str(png)}}
-
-        async def rerun(prompt):  # pragma: no cover - must not be called
-            raise AssertionError("rerun must not be called when disabled")
-
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, rerun)
-        assert out is result
-        assert "chart_critiques" not in out
-
     @pytest.mark.asyncio
     async def test_no_charts_is_passthrough(self, monkeypatch):
         _enable_critic(monkeypatch)
         executors, _ = _make_executors()
         result = {"success": True, "result": {"stats": {"n": 1}}}
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, lambda p: None)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", _vision_client(), lambda p: None)
         assert out is result
         assert "chart_critiques" not in out
 
@@ -313,7 +359,7 @@ class TestChartFeedbackLoop:
         async def rerun(prompt):  # pragma: no cover - must not be called
             raise AssertionError("rerun must not be called for ok charts")
 
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, rerun)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", _vision_client(), rerun)
         assert out is result
         assert out["chart_critiques"][0]["ok"] is True
         events = _chart_events(states)
@@ -347,7 +393,7 @@ class TestChartFeedbackLoop:
             rerun_prompts.append(prompt)
             return repaired
 
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "original prompt", None, rerun)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "original prompt", _vision_client(), rerun)
         assert out is repaired  # repaired result replaces the original
         assert len(rerun_prompts) == 1  # exactly one repair attempt
         assert "original prompt" in rerun_prompts[0]
@@ -383,7 +429,7 @@ class TestChartFeedbackLoop:
             rerun_calls += 1
             return {"success": True, "result": {"plot_path": str(png)}}
 
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, rerun)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", _vision_client(), rerun)
         assert out is result  # original charts kept
         assert rerun_calls == 1  # bounded: no infinite loop
         note = out.get("chart_critique_note", "")
@@ -411,7 +457,7 @@ class TestChartFeedbackLoop:
         async def rerun(prompt):
             raise RuntimeError("sandbox exploded")
 
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, rerun)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", _vision_client(), rerun)
         assert out is result
         assert "chart_critique_note" in out
 
@@ -423,6 +469,9 @@ class TestChartFeedbackLoop:
         result = {"success": True, "result": {"plot_path": str(png)}}
 
         class CrashCritic:
+            def has_vision_capability(self) -> bool:
+                return True
+
             async def critique(self, *a, **k):
                 raise RuntimeError("boom")
 
@@ -430,7 +479,7 @@ class TestChartFeedbackLoop:
             "homomics_lab.agent.orchestrator_executors.ChartCritic",
             lambda llm_client=None: CrashCritic(),
         )
-        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", None, lambda p: None)
+        out = await executors._critique_charts_and_repair(_make_task(), {}, result, "prompt", _vision_client(), lambda p: None)
         assert out is result  # never a new failure point
 
 

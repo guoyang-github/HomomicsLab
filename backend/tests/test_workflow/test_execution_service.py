@@ -68,7 +68,7 @@ class TestBackendSelection:
     async def test_routes_to_nextflow_when_available(self, service, plan, monkeypatch, tmp_path):
         monkeypatch.setattr("homomics_lab.hpc.scheduler.NextflowRunner.is_available", lambda: True)
         monkeypatch.setattr("homomics_lab.config.settings.data_dir", tmp_path)
-        monkeypatch.setattr("homomics_lab.config.settings.workflow_nextflow_min_phases", 3)
+        monkeypatch.setattr("homomics_lab.hpc.router.WORKFLOW_NEXTFLOW_MIN_PHASES", 3)
         # The current routing heuristic also requires a large workload
         # (effective_samples > 100) before promoting a plan to Nextflow.
         plan.plan_result.phases[0].parameters["n_samples"] = 200
@@ -96,7 +96,7 @@ class TestBackendSelection:
     @pytest.mark.asyncio
     async def test_nextflow_failure_falls_back_to_local(self, service, plan, monkeypatch):
         monkeypatch.setattr("homomics_lab.hpc.scheduler.NextflowRunner.is_available", lambda: True)
-        monkeypatch.setattr("homomics_lab.config.settings.workflow_nextflow_min_phases", 3)
+        monkeypatch.setattr("homomics_lab.hpc.router.WORKFLOW_NEXTFLOW_MIN_PHASES", 3)
 
         with patch.object(
             service.__class__,
@@ -117,7 +117,7 @@ class TestBackendSelection:
     async def test_nextflow_result_failure_falls_back_to_local(self, service, plan, monkeypatch):
         """A Nextflow run that returns a failed WorkflowResult also triggers local fallback."""
         monkeypatch.setattr("homomics_lab.hpc.scheduler.NextflowRunner.is_available", lambda: True)
-        monkeypatch.setattr("homomics_lab.config.settings.workflow_nextflow_min_phases", 3)
+        monkeypatch.setattr("homomics_lab.hpc.router.WORKFLOW_NEXTFLOW_MIN_PHASES", 3)
 
         with patch.object(
             service.__class__,

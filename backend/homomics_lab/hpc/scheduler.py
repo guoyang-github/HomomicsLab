@@ -22,7 +22,12 @@ from homomics_lab.hpc.pubsub import ExecutionPubSub, get_default_pubsub
 from homomics_lab.hpc.state import ExecutionState
 from homomics_lab.skills.environment_manager import EnvironmentManager
 from homomics_lab.skills.models import SkillDefinition
-from homomics_lab.skills.sandbox import LocalSandbox, Sandbox
+from homomics_lab.skills.sandbox import (
+    R_CONTAINER_IMAGE,
+    SKILL_CONTAINER_IMAGE,
+    LocalSandbox,
+    Sandbox,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +158,7 @@ class LocalScheduler(BaseScheduler):
     def _get_sandbox(self, exec_type: str, allow_local: bool = True) -> Sandbox:
         if self._sandbox_override is not None:
             return self._sandbox_override
-        container_image = settings.r_container_image if exec_type == "r" else settings.skill_container_image
+        container_image = R_CONTAINER_IMAGE if exec_type == "r" else SKILL_CONTAINER_IMAGE
         sandbox = Sandbox.create(
             settings.skill_sandbox_backend,
             self.working_dir,
@@ -224,13 +229,17 @@ class LocalScheduler(BaseScheduler):
         sandbox_metadata = sandbox.get_metadata()
 
         # Static safety scan for Python/R code.
-        from homomics_lab.execution.code_safety import CodeSafetyScanner, requires_hitl
+        from homomics_lab.execution.code_safety import (
+            CODEACT_HITL_LEVEL,
+            CodeSafetyScanner,
+            requires_hitl,
+        )
 
         scanner = CodeSafetyScanner()
         safety_result = scanner.scan(code, language=exec_type)
         hitl_required = (
             settings.interactive_mode
-            and requires_hitl(safety_result, min_risk_level=settings.codeact_hitl_level)
+            and requires_hitl(safety_result, min_risk_level=CODEACT_HITL_LEVEL)
         )
         if safety_result.risk_level == "critical":
             return {

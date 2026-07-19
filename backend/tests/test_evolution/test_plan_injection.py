@@ -64,7 +64,7 @@ class TestPlanParameterInjection:
     @pytest.mark.asyncio
     async def test_plan_injects_learned_default(self, plan_engine_with_cbkb):
         engine, _ = plan_engine_with_cbkb
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState(has_qc=False, n_cells=3000))
 
         qc_phase = next((p for p in plan.phases if p.phase_type == "qc"), None)
@@ -75,7 +75,7 @@ class TestPlanParameterInjection:
     @pytest.mark.asyncio
     async def test_plan_preserves_user_provided_param(self, plan_engine_with_cbkb):
         engine, _ = plan_engine_with_cbkb
-        intent = UserIntent(analysis_type="single_cell_analysis", complexity="complex")
+        intent = UserIntent(intent_type="analysis", interaction_mode="execute", domain="single-cell-transcriptomics", scope="full", )
         plan = await engine.plan(intent, DataState(has_qc=False, n_cells=3000))
 
         # Manually set a user-provided value and replan-ish: the engine should

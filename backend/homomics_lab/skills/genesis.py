@@ -4,26 +4,28 @@ This is the last mile of the self-improvement loop: the SkillDAG already
 evolves observed edges and CBKB already records execution feedback, but the
 *generated script itself* used to vanish after a successful CodeAct run, so
 the next similar task had to be generated from scratch. SkillGenesis detects
-proven scripts and proposes them as reusable community-trust skills:
+proven scripts and crystallizes them into reusable community-trust skills.
 
 Candidate signals (either is sufficient):
   a. The run succeeded *after* in-engine self-correction (``fix_history``
      non-empty) — the script has demonstrated robustness.
   b. The same normalized task signature (domain + action + input types, in
      the spirit of ``agent/plan/mode_selection_lore.IntentFeatures``) has
-     succeeded at least ``settings.skill_genesis_min_successes`` times.
+     succeeded at least ``SKILL_GENESIS_MIN_SUCCESSES`` times.
 
 Candidate bookkeeping reuses the CBKB ``parameter_lore`` table (Layer 2,
 "key parameter -> outcome quality") under the namespaced lore id
 ``genesis:<signature-hash>`` — no new table is introduced.
 
-Every proposal is gated by HITL: a request is created in the shared
-``PersistentApprovalStore`` (surfaced by the existing pending-approvals API)
-and only an explicit approval imports the staged package into the SkillStore
-as a COMMUNITY-trust skill. Rejection is recorded and the same signature is
-never proposed again. Crystallized skills keep ``trust_level: community`` in
-their SKILL.md frontmatter, so the existing trust model (no local sandbox,
-no code cache for untrusted tiers) applies unchanged, and the standard
+Genesis is always on (no opt-in switch) and notification-based instead of
+approval-based: a proven candidate is imported into the SkillStore directly
+as a COMMUNITY-trust skill and a notification ("learned a new skill X from N
+successful runs") is emitted through the injected ``notify`` channel. There
+is no approval state machine — the undo path is the existing skill deletion
+API (``DELETE /api/skills/{skill_id}``). A signature is crystallized at most
+once. Crystallized skills keep ``trust_level: community`` in their SKILL.md
+frontmatter, so the existing trust model (no local sandbox, no code cache
+for untrusted tiers) applies unchanged, and the standard
 ``SkillStore.trust_skill`` promotion path still works afterwards.
 """
 
@@ -47,17 +49,18 @@ from homomics_lab.knowledge.cbkb import CBKB, ParameterLoreEntry
 
 logger = logging.getLogger(__name__)
 
+# Accumulated successes of one normalized task signature before genesis
+# proposes a skill (formerly HOMOMICS_SKILL_GENESIS_MIN_SUCCESSES).
+SKILL_GENESIS_MIN_SUCCESSES = 3
+
 # Namespaced parameter-lore ids for genesis bookkeeping.
 LORE_PREFIX = "genesis:"
 METRIC_SUCCESS = "codeact_success"
-METRIC_PROPOSED = "genesis_proposed"
 METRIC_CRYSTALLIZED = "genesis_crystallized"
-METRIC_REJECTED = "genesis_rejected"
-STATUS_METRICS = (METRIC_PROPOSED, METRIC_CRYSTALLIZED, METRIC_REJECTED)
 
 GENESIS_AUTHOR = "homomics-genesis"
 
-# A notification describes one proposal; mirrors the pending-approval entry.
+# A notification describes one crystallized skill.
 GenesisNotification = Dict[str, Any]
 NotifyFn = Callable[[GenesisNotification], Any]
 
@@ -125,16 +128,6 @@ class GenesisCandidate:
     paths: Dict[str, str] = field(default_factory=dict)
 
 
-@dataclass
-class GenesisProposal:
-    """A staged skill package awaiting human approval."""
-
-    candidate: GenesisCandidate
-    skill_id: str
-    package_dir: Path
-    call_id: str
-
-
 class SkillGenesis:
     """Detect proven CodeAct scripts and crystallize them into community skills.
 
@@ -142,50 +135,38 @@ class SkillGenesis:
 
     Args:
         cbkb: Knowledge base used for candidate bookkeeping (parameter lore).
-        skill_store: Store used to import approved packages. May be None in
-            tests that only exercise detection/drafting.
-        approval_store: HITL gate. Defaults to the shared persistent store.
+        skill_store: Store used to import crystallized packages. May be None
+            in tests that only exercise detection/drafting.
         skill_dag: Optional DAG; crystallized skills are linked from their
             origin skill via the standard CANDIDATE proposal mechanism.
         llm_client: Optional LLM for drafting SKILL.md. When absent or
             unconfigured a deterministic template is used instead.
         notify: Optional callback invoked with a notification dict when a
-            proposal is created (e.g. to push a chat/WebSocket message).
+            skill is crystallized (e.g. to push a chat/WebSocket message).
         min_successes: Signature success threshold (defaults to
-            ``settings.skill_genesis_min_successes``).
-        enabled: Defaults to ``settings.skill_genesis_enabled``.
-        staging_dir: Where candidate packages are staged pending approval.
+            ``SKILL_GENESIS_MIN_SUCCESSES``).
+        staging_dir: Where candidate packages are staged before import.
     """
 
     def __init__(
         self,
         cbkb: CBKB,
         skill_store: Optional[Any] = None,
-        approval_store: Optional[Any] = None,
         skill_dag: Optional[Any] = None,
         llm_client: Optional[Any] = None,
         notify: Optional[NotifyFn] = None,
         min_successes: Optional[int] = None,
-        enabled: Optional[bool] = None,
         staging_dir: Optional[Path] = None,
     ):
         self.cbkb = cbkb
         self.skill_store = skill_store
-        if approval_store is None:
-            from homomics_lab.tools.approval import get_default_approval_store
-
-            approval_store = get_default_approval_store()
-        self.approval_store = approval_store
         self.skill_dag = skill_dag
         self.llm_client = llm_client
         self.notify = notify
         self.min_successes = (
             min_successes
             if min_successes is not None
-            else settings.skill_genesis_min_successes
-        )
-        self.enabled = (
-            enabled if enabled is not None else settings.skill_genesis_enabled
+            else SKILL_GENESIS_MIN_SUCCESSES
         )
         self.staging_dir = Path(staging_dir or settings.data_dir / "skill_genesis")
 
@@ -222,21 +203,12 @@ class SkillGenesis:
         project_id: str = "default",
         origin_skill: Optional[str] = None,
         paths: Optional[Dict[str, str]] = None,
-    ) -> Optional[GenesisProposal]:
-        """Record one CodeAct execution outcome; propose when it is proven.
+    ) -> Optional[Any]:
+        """Record one CodeAct execution outcome; crystallize when it is proven.
 
-        Returns a :class:`GenesisProposal` when this execution crossed a
-        candidacy threshold and a HITL request was created, else None.
+        Returns the newly registered skill when this execution crossed a
+        candidacy threshold, else None.
         """
-        if not self.enabled:
-            return None
-
-        # Pick up decisions on earlier proposals (best-effort).
-        try:
-            await self.finalize_resolved()
-        except Exception:
-            logger.warning("SkillGenesis finalize pass failed", exc_info=True)
-
         if not success or not code or not code.strip():
             return None
 
@@ -261,8 +233,8 @@ class SkillGenesis:
         )
 
         entries = self._lore_entries(lore_id)
-        if any(e.outcome_metric in STATUS_METRICS for e in entries):
-            # Already proposed / crystallized / rejected: never re-propose.
+        if any(e.outcome_metric == METRIC_CRYSTALLIZED for e in entries):
+            # Already crystallized: a signature is learned at most once.
             return None
 
         success_count = sum(1 for e in entries if e.outcome_metric == METRIC_SUCCESS)
@@ -282,14 +254,34 @@ class SkillGenesis:
             paths=paths or {},
         )
         try:
-            return await self.propose(candidate)
+            package_dir = await self.crystallize(candidate)
+            skill = self._register_crystallized(candidate, package_dir)
         except Exception:
             logger.warning(
-                "SkillGenesis proposal failed for signature %s",
+                "SkillGenesis crystallization failed for signature %s",
                 signature.key(),
                 exc_info=True,
             )
             return None
+        if skill is not None:
+            await self._emit_notification(
+                {
+                    "kind": "skill_genesis_crystallized",
+                    "skill_id": skill.id,
+                    "task_name": candidate.task_name,
+                    "success_count": candidate.success_count,
+                    "had_fixes": candidate.had_fixes,
+                    "project_id": candidate.project_id,
+                    "message": (
+                        f"已学会新技能 '{skill.id}'（来自 "
+                        f"{candidate.success_count} 次成功执行"
+                        + ("，经自我修复后验证通过" if candidate.had_fixes else "")
+                        + "）。已注册为 community 信任级别，可在技能列表中查看；"
+                        "如不需要可直接删除该技能。"
+                    ),
+                }
+            )
+        return skill
 
     # ─────────────────────────────────────────
     # Crystallization
@@ -315,120 +307,6 @@ class SkillGenesis:
         skill_md = self._build_skill_md(candidate, draft)
         (package_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
         return package_dir
-
-    async def propose(self, candidate: GenesisCandidate) -> GenesisProposal:
-        """Crystallize a candidate and open a HITL approval request."""
-        package_dir = await self.crystallize(candidate)
-        skill_id = self._skill_id_for(candidate)
-        call_id = self._call_id(candidate.signature)
-
-        self.approval_store.create_request(
-            tool_name=f"skill_genesis:{skill_id}",
-            arguments={
-                "skill_id": skill_id,
-                "task_signature": candidate.signature.key(),
-                "task_name": candidate.task_name,
-                "success_count": candidate.success_count,
-                "had_fixes": candidate.had_fixes,
-                "package_dir": str(package_dir),
-            },
-            risk_level="community",
-            metadata={
-                "kind": "skill_genesis",
-                "skill_id": skill_id,
-                "signature_hash": candidate.signature.hash(),
-                "package_dir": str(package_dir),
-                "project_id": candidate.project_id,
-            },
-            call_id=call_id,
-        )
-
-        self._add_lore(
-            self._lore_id(candidate.signature),
-            param_name="proposal",
-            param_value=skill_id,
-            outcome_metric=METRIC_PROPOSED,
-            outcome_value=1.0,
-            project_id=candidate.project_id,
-            context={
-                "call_id": call_id,
-                "skill_id": skill_id,
-                "package_dir": str(package_dir),
-            },
-        )
-
-        await self._emit_notification(
-            {
-                "kind": "skill_genesis_proposal",
-                "skill_id": skill_id,
-                "call_id": call_id,
-                "task_name": candidate.task_name,
-                "project_id": candidate.project_id,
-                "message": (
-                    f"系统从成功执行中沉淀了新 skill '{skill_id}'，待确认 "
-                    f"(approval call_id: {call_id})。"
-                ),
-            }
-        )
-        return GenesisProposal(
-            candidate=candidate,
-            skill_id=skill_id,
-            package_dir=package_dir,
-            call_id=call_id,
-        )
-
-    async def finalize_resolved(self) -> List[Any]:
-        """Apply human decisions on pending proposals.
-
-        Approved proposals are imported into the SkillStore as
-        community-trust skills, recorded as CBKB knowledge
-        ("task signature -> skill"), and linked into the SkillDAG through the
-        standard runtime-proposal mechanism. Rejected proposals are recorded
-        so the same signature is never proposed again. Returns the list of
-        newly registered skills.
-        """
-        proposed: Dict[str, ParameterLoreEntry] = {}
-        settled: set = set()
-        for entry in self.cbkb.query_parameter_lore_by_prefix(LORE_PREFIX):
-            lore_id = entry.skill_id
-            if entry.outcome_metric in (METRIC_CRYSTALLIZED, METRIC_REJECTED):
-                settled.add(lore_id)
-            elif entry.outcome_metric == METRIC_PROPOSED and lore_id not in proposed:
-                proposed[lore_id] = entry
-
-        registered: List[Any] = []
-        for lore_id, entry in proposed.items():
-            if lore_id in settled:
-                continue
-            try:
-                ctx = json.loads(entry.context or "{}")
-            except json.JSONDecodeError:
-                ctx = {}
-            call_id = (
-                ctx.get("call_id") or f"skill-genesis:{lore_id[len(LORE_PREFIX):]}"
-            )
-            resolution = self.approval_store.get_resolution(call_id)
-            if resolution is None:
-                continue  # still pending
-            if resolution:
-                skill = self._register_crystallized(lore_id, entry, ctx)
-                if skill is not None:
-                    registered.append(skill)
-            else:
-                self._add_lore(
-                    lore_id,
-                    param_name="rejection",
-                    param_value=entry.param_value,
-                    outcome_metric=METRIC_REJECTED,
-                    outcome_value=0.0,
-                    project_id=entry.project_id,
-                    context={"call_id": call_id},
-                )
-                logger.info(
-                    "Skill genesis proposal '%s' rejected; signature will not be re-proposed",
-                    entry.param_value,
-                )
-        return registered
 
     # ─────────────────────────────────────────
     # Drafting helpers
@@ -637,54 +515,48 @@ class SkillGenesis:
 
     def _register_crystallized(
         self,
-        lore_id: str,
-        proposal_entry: ParameterLoreEntry,
-        context: Dict[str, Any],
+        candidate: GenesisCandidate,
+        package_dir: Path,
     ) -> Optional[Any]:
-        """Import an approved package and record the resulting knowledge."""
-        skill_id = proposal_entry.param_value
-        package_dir = Path(context.get("package_dir") or self.staging_dir / skill_id)
-        if not package_dir.exists():
+        """Import a crystallized package and record the resulting knowledge."""
+        skill_id = self._skill_id_for(candidate)
+        lore_id = self._lore_id(candidate.signature)
+        if self.skill_store is None:
+            return None
+        try:
+            skill = self.skill_store.import_skill(
+                source=str(package_dir),
+                namespace="community",
+            )
+            # The SKILL.md frontmatter declares trust_level: community;
+            # make sure the runtime metadata keeps it regardless of the
+            # import-time source/trusted normalization.
+            skill.metadata["trust_level"] = "community"
+            self.skill_store.registry.register(skill)
+        except Exception:
             logger.warning(
-                "Approved genesis package %s no longer exists; skipping", package_dir
+                "Failed to import crystallized genesis skill '%s'",
+                skill_id,
+                exc_info=True,
             )
             return None
 
-        skill = None
-        if self.skill_store is not None:
-            try:
-                skill = self.skill_store.import_skill(
-                    source=str(package_dir),
-                    namespace="community",
-                )
-                # The SKILL.md frontmatter declares trust_level: community;
-                # make sure the runtime metadata keeps it regardless of the
-                # import-time source/trusted normalization.
-                skill.metadata["trust_level"] = "community"
-                self.skill_store.registry.register(skill)
-            except Exception:
-                logger.warning(
-                    "Failed to import approved genesis skill '%s'",
-                    skill_id,
-                    exc_info=True,
-                )
-                return None
-
-        # CBKB knowledge: "task signature -> crystallized skill".
+        # CBKB knowledge: "task signature -> crystallized skill". Doubles as
+        # the dedupe marker: a signature is crystallized at most once.
         self._add_lore(
             lore_id,
             param_name="crystallized_skill",
             param_value=skill_id,
             outcome_metric=METRIC_CRYSTALLIZED,
             outcome_value=1.0,
-            project_id=proposal_entry.project_id,
-            context={"call_id": context.get("call_id"), "skill_id": skill_id},
+            project_id=candidate.project_id,
+            context={"skill_id": skill_id},
         )
 
         # SkillDAG coordination: link from the origin (failed/absent) skill via
         # the standard CANDIDATE runtime proposal; promotion to CONFIRMED still
         # goes through the existing observed-edge thresholds.
-        origin = self._origin_for(lore_id)
+        origin = candidate.origin_skill or self._origin_for(lore_id)
         if origin and self.skill_dag is not None:
             try:
                 from homomics_lab.skills.skill_dag import EdgeType
@@ -726,10 +598,6 @@ class SkillGenesis:
         return f"{LORE_PREFIX}{signature.hash()}"
 
     @staticmethod
-    def _call_id(signature: TaskSignature) -> str:
-        return f"skill-genesis:{signature.hash()}"
-
-    @staticmethod
     def _skill_id_for(candidate: GenesisCandidate) -> str:
         return f"genesis_{candidate.signature.action}_{candidate.signature.hash()[:6]}"
 
@@ -769,14 +637,15 @@ class SkillGenesis:
             )
 
     async def _emit_notification(self, notification: GenesisNotification) -> None:
-        """Deliver a proposal notification through the injected channel.
+        """Deliver a crystallization notification through the injected channel.
 
-        The proposal is always visible via the shared approval store (the
-        existing pending-approvals API); ``notify`` is an optional extra
-        channel (chat message, WebSocket push, ...). Defaults to logging.
+        ``notify`` is an optional extra channel (chat message, WebSocket
+        push, ...); delivery defaults to logging. The undo path for a
+        crystallized skill is the existing skill deletion API — no approval
+        flow is involved.
         """
         if self.notify is None:
-            logger.info("Skill genesis proposal: %s", notification.get("message"))
+            logger.info("Skill genesis crystallized: %s", notification.get("message"))
             return
         try:
             result = self.notify(notification)

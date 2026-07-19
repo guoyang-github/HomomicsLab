@@ -7,11 +7,10 @@ from typing import Any, Callable, Coroutine, Dict, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.date import DateTrigger
 from sqlalchemy import desc, select
 
 from homomics_lab.config import settings
-from homomics_lab.database.connection import AsyncSessionLocal
+from homomics_lab.database import connection as _db_connection
 from homomics_lab.database.models import ScheduledJobRun
 from homomics_lab.knowledge.cbkb import CBKB
 from homomics_lab.knowledge.curator import CBKBCurator
@@ -22,12 +21,30 @@ logger = logging.getLogger(__name__)
 
 JobCoroutine = Callable[..., Coroutine[Any, Any, Any]]
 
+# Data-volume gates (docs/improvement-plan-v2.0.md, Phase 2): the four
+# research jobs are always registered ("default awake"), but each run first
+# checks that the CBKB holds enough experiment nodes to mine meaningful
+# patterns. Below the threshold the run is skipped (log-only, no audit
+# record) so sparse data cannot produce garbage knowledge that would
+# pollute planning.
+MIN_EXPERIMENTS_FOR_CURATION = 10
+MIN_EXPERIMENTS_FOR_SOP_PROPOSAL = 5
+MIN_EXPERIMENTS_FOR_EVOLUTION = 10
+MIN_EXPERIMENTS_FOR_NARRATIVE = 3
+
+# Fixed schedules (formerly HOMOMICS_* config fields; defaults kept).
+SCHEDULER_TIMEZONE = "UTC"
+CURATION_SCHEDULE = "0 2 * * *"
+NARRATIVE_REPORT_SCHEDULE = "0 6 * * *"
+SOP_PROPOSAL_SCHEDULE = "0 3 * * 0"
+EVOLUTION_SCHEDULE = "0 2 * * *"
+
 
 class HomomicsScheduler:
     """Wraps APScheduler and provides scheduled curation and evolution jobs."""
 
     def __init__(self):
-        self._scheduler = AsyncIOScheduler(timezone=settings.scheduler_timezone)
+        self._scheduler = AsyncIOScheduler(timezone=SCHEDULER_TIMEZONE)
         self._curator: Optional[CBKBCurator] = None
         self._evolution_engine: Optional[Any] = None
 
@@ -65,54 +82,37 @@ class HomomicsScheduler:
         )
 
     async def start(self) -> None:
-        """Register configured jobs and start the scheduler."""
+        """Register the research cron jobs and start the scheduler.
+
+        All four research jobs are registered unconditionally (default
+        awake); each run is guarded by a CBKB data-volume gate rather than
+        an on/off config switch.
+        """
         if self._curator is None:
             self._curator = CBKBCurator(CBKB(settings.data_dir))
         if self._evolution_engine is None:
             self._build_evolution_engine(CBKB(settings.data_dir), SkillDAG(registry=get_default_registry(), db_path=settings.data_dir / "skill_dag.db"))
 
-        if settings.curation_enabled:
-            self._add_cron_job(
-                "cbkb_full_curation",
-                settings.curation_schedule,
-                self._run_full_curation,
-            )
-        if settings.narrative_report_enabled:
-            self._add_cron_job(
-                "narrative_report",
-                settings.narrative_report_schedule,
-                self._run_narrative_report,
-            )
-        if settings.sop_proposal_enabled:
-            self._add_cron_job(
-                "sop_proposal",
-                settings.sop_proposal_schedule,
-                self._run_sop_proposal,
-            )
-        if settings.evolution_enabled:
-            self._add_cron_job(
-                "evolution_pass",
-                settings.evolution_schedule,
-                self._run_evolution_pass,
-            )
-
-        if settings.scheduler_run_at_startup:
-            # Schedule all enabled jobs to run a few seconds after startup.
-            for name, enabled, fn in [
-                ("cbkb_full_curation", settings.curation_enabled, self._run_full_curation),
-                ("narrative_report", settings.narrative_report_enabled, self._run_narrative_report),
-                ("sop_proposal", settings.sop_proposal_enabled, self._run_sop_proposal),
-                ("evolution_pass", settings.evolution_enabled, self._run_evolution_pass),
-            ]:
-                if enabled:
-                    self._scheduler.add_job(
-                        fn,
-                        trigger=DateTrigger(),
-                        id=f"{name}_startup",
-                        name=f"{name}_startup",
-                        replace_existing=True,
-                        max_instances=1,
-                    )
+        self._add_cron_job(
+            "cbkb_full_curation",
+            CURATION_SCHEDULE,
+            self._run_full_curation,
+        )
+        self._add_cron_job(
+            "narrative_report",
+            NARRATIVE_REPORT_SCHEDULE,
+            self._run_narrative_report,
+        )
+        self._add_cron_job(
+            "sop_proposal",
+            SOP_PROPOSAL_SCHEDULE,
+            self._run_sop_proposal,
+        )
+        self._add_cron_job(
+            "evolution_pass",
+            EVOLUTION_SCHEDULE,
+            self._run_evolution_pass,
+        )
 
         self._scheduler.start()
         logger.info("Scheduler started with %d jobs", len(self._scheduler.get_jobs()))
@@ -126,7 +126,9 @@ class HomomicsScheduler:
     async def run_now(self, job_name: str) -> Optional[ScheduledJobRun]:
         """Manually trigger a scheduled job by name.
 
-        Returns the audit record for the run, or None if the job is unknown/disabled.
+        Returns the audit record for the run. Raises ValueError for unknown
+        job names. Data-volume gates apply to manual runs too: a gated job
+        completes as a no-op (see ``_has_enough_experiments``).
         """
         mapping: Dict[str, JobCoroutine] = {
             "cbkb_full_curation": self._run_full_curation,
@@ -147,7 +149,7 @@ class HomomicsScheduler:
         schedule: str,
         coro_fn: JobCoroutine,
     ) -> None:
-        trigger = CronTrigger.from_crontab(schedule, timezone=settings.scheduler_timezone)
+        trigger = CronTrigger.from_crontab(schedule, timezone=SCHEDULER_TIMEZONE)
         self._scheduler.add_job(
             coro_fn,
             trigger=trigger,
@@ -158,10 +160,45 @@ class HomomicsScheduler:
         )
         logger.info("Registered scheduled job %s with schedule %s", name, schedule)
 
+    def _count_cbkb_experiments(self) -> int:
+        """Total experiment nodes recorded in the CBKB."""
+        if self._curator is None:
+            self._curator = CBKBCurator(CBKB(settings.data_dir))
+        return self._curator.cbkb.count_experiments()
+
+    def _has_enough_experiments(self, job_name: str, minimum: int) -> bool:
+        """Data-volume gate: return False (skip) below ``minimum`` experiments.
+
+        A skip is a normal outcome — it is logged at INFO level and leaves
+        no audit record, so a gated job never shows up as a failure.
+        """
+        try:
+            count = self._count_cbkb_experiments()
+        except Exception:
+            logger.warning(
+                "Skipping %s: failed to count CBKB experiments",
+                job_name,
+                exc_info=True,
+            )
+            return False
+        if count < minimum:
+            logger.info(
+                "Skipping %s: %d CBKB experiment(s) below minimum %d",
+                job_name,
+                count,
+                minimum,
+            )
+            return False
+        return True
+
     async def _run_full_curation(self) -> None:
+        if not self._has_enough_experiments("cbkb_full_curation", MIN_EXPERIMENTS_FOR_CURATION):
+            return
         await self._run_task("cbkb_full_curation", self._curator.run_full_curation)
 
     async def _run_narrative_report(self) -> None:
+        if not self._has_enough_experiments("narrative_report", MIN_EXPERIMENTS_FOR_NARRATIVE):
+            return
         await self._run_task(
             "narrative_report",
             self._curator.generate_narrative,
@@ -169,11 +206,15 @@ class HomomicsScheduler:
         )
 
     async def _run_sop_proposal(self) -> None:
+        if not self._has_enough_experiments("sop_proposal", MIN_EXPERIMENTS_FOR_SOP_PROPOSAL):
+            return
         await self._run_task("sop_proposal", self._curator.propose_sop_updates)
 
     async def _run_evolution_pass(self) -> None:
         if self._evolution_engine is None:
             logger.warning("EvolutionEngine not initialized; skipping evolution_pass")
+            return
+        if not self._has_enough_experiments("evolution_pass", MIN_EXPERIMENTS_FOR_EVOLUTION):
             return
         await self._run_task("evolution_pass", self._evolution_engine.run_evolution_pass)
 
@@ -220,7 +261,7 @@ class HomomicsScheduler:
             start_time=datetime.now(timezone.utc),
             status="running",
         )
-        async with AsyncSessionLocal() as session:
+        async with _db_connection.AsyncSessionLocal() as session:
             session.add(run)
             await session.commit()
             await session.refresh(run)
@@ -237,7 +278,7 @@ class HomomicsScheduler:
         run.end_time = datetime.now(timezone.utc)
         run.result_json = result_json
         run.error_message = error_message
-        async with AsyncSessionLocal() as session:
+        async with _db_connection.AsyncSessionLocal() as session:
             await session.merge(run)
             await session.commit()
 
@@ -246,7 +287,7 @@ class HomomicsScheduler:
         job_name: Optional[str] = None,
         limit: int = 20,
     ) -> list[ScheduledJobRun]:
-        async with AsyncSessionLocal() as session:
+        async with _db_connection.AsyncSessionLocal() as session:
             stmt = select(ScheduledJobRun)
             if job_name:
                 stmt = stmt.where(ScheduledJobRun.job_name == job_name)

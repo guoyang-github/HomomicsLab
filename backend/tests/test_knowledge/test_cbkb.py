@@ -34,6 +34,20 @@ class TestExperimentGraph:
         assert loaded is not None
         assert loaded.skills_used == ["scanpy_qc", "scanpy_cluster"]
 
+    def test_count_experiments(self, cbkb):
+        assert cbkb.count_experiments() == 0
+        for i in range(3):
+            cbkb.add_experiment_node(
+                ExperimentNode(
+                    bundle_id=f"b{i}",
+                    project_id="p1" if i < 2 else "p2",
+                    created_at="2024-01-01T00:00:00+00:00",
+                    skills_used=[],
+                    phases=[],
+                )
+            )
+        assert cbkb.count_experiments() == 3
+
     def test_add_and_find_edges(self, cbkb):
         n1 = ExperimentNode(bundle_id="b1", project_id="p1", created_at="2024-01-01T00:00:00+00:00", skills_used=[], phases=[])
         n2 = ExperimentNode(bundle_id="b2", project_id="p1", created_at="2024-01-02T00:00:00+00:00", skills_used=[], phases=[])

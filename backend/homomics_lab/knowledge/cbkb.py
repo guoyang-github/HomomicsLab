@@ -387,6 +387,12 @@ class CBKB:
             for r in rows
         ]
 
+    def count_experiments(self) -> int:
+        """Return the total number of recorded experiment nodes."""
+        with sqlite3.connect(str(self.db_path)) as conn:
+            row = conn.execute("SELECT COUNT(*) FROM experiment_nodes").fetchone()
+        return int(row[0])
+
     # ── Layer 2: Parameter Lore ─────────────────────
 
     def add_parameter_lore(self, entry: ParameterLoreEntry) -> None:

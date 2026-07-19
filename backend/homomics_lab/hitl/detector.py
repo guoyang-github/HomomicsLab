@@ -1,8 +1,11 @@
+import logging
 from typing import Any, Dict, List, Optional
 
 from homomics_lab.hitl.preference_resolver import HITLPreferenceResolver
 from homomics_lab.models.common import HITLCheckpoint, HITLTrigger, Option
 from homomics_lab.tasks.models import TaskNode
+
+logger = logging.getLogger(__name__)
 
 
 class HITLDetector:
@@ -31,14 +34,16 @@ class HITLDetector:
         if task.estimated_duration_minutes > cost_threshold:
             return self._create_cost_checkpoint(task, project_id=project_id)
 
-        # Check confidence threshold
+        # Low confidence no longer pauses execution; it is only logged so
+        # intent-quality trends remain observable.
         confidence = context.get("confidence", 1.0)
-        confidence_threshold = context.get(
-            "confidence_threshold", self.DEFAULT_CONFIDENCE_THRESHOLD
-        )
-        if confidence < confidence_threshold:
-            return self._create_confidence_checkpoint(
-                task, confidence, confidence_threshold, project_id=project_id
+        if confidence < self.DEFAULT_CONFIDENCE_THRESHOLD:
+            logger.info(
+                "Low intent confidence (%.2f < %.2f) for task '%s'; "
+                "continuing without a HITL pause",
+                confidence,
+                self.DEFAULT_CONFIDENCE_THRESHOLD,
+                task.name,
             )
 
         # Check risk threshold
@@ -70,36 +75,6 @@ class HITLDetector:
             ),
             options=options,
             metadata={"scope_type": "task", "scope_id": task.id, "task_name": task.name},
-        )
-        self._apply_preference_defaults(project_id, checkpoint)
-        return checkpoint
-
-    def _create_confidence_checkpoint(
-        self,
-        task: TaskNode,
-        confidence: float,
-        confidence_threshold: float,
-        project_id: Optional[str] = None,
-    ) -> HITLCheckpoint:
-        options: List[Option] = [
-            Option(id="accept", label="Accept and continue"),
-            Option(id="modify", label="Modify parameters"),
-        ]
-        checkpoint = HITLCheckpoint(
-            id=f"hitl_conf_{task.id}",
-            trigger_reason=HITLTrigger.LOW_CONFIDENCE,
-            context_summary=(
-                f"Low confidence ({confidence:.2f} < {confidence_threshold:.2f}) "
-                f"for task '{task.name}'. Please review parameters."
-            ),
-            options=options,
-            metadata={
-                "scope_type": "task",
-                "scope_id": task.id,
-                "task_name": task.name,
-                "confidence": confidence,
-                "confidence_threshold": confidence_threshold,
-            },
         )
         self._apply_preference_defaults(project_id, checkpoint)
         return checkpoint

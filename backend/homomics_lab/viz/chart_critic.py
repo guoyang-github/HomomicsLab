@@ -6,8 +6,10 @@ problems (empty figure, missing axes, garbled labels, truncated data, legend
 occlusion, chart type not matching the intent). The caller can then feed the
 suggestion back into code generation for a bounded repair pass.
 
-Design rules (this is an optional enhancement, never a new failure point):
+Design rules (always on and self-gating, never a new failure point):
 
+* No enable switch: the critic activates whenever the resolved model is
+  vision-capable (``supports_vision_model``) and silently skips otherwise.
 * Cheap rule pre-checks run first (missing/zero-byte file, blank image via
   PIL statistics). When a rule can decide, no LLM call is made.
 * When the configured model is not vision-capable, or the VLM call fails for
@@ -202,6 +204,20 @@ class ChartCritic:
         except Exception:
             logger.debug("chart VLM critique failed for %s", image_path, exc_info=True)
             return ChartCritique(ok=True, source="skipped")
+
+    def has_vision_capability(self) -> bool:
+        """True when a vision-capable, configured LLM is available for critique.
+
+        Used by callers to short-circuit before doing any critique work. The
+        critique path itself remains self-gating; this is a cheap pre-flight.
+        """
+        client = self._llm_client
+        if client is None:
+            return False
+        if not supports_vision_model(self._resolve_model()):
+            return False
+        is_configured = getattr(client, "is_configured", None)
+        return bool(is_configured()) if callable(is_configured) else True
 
     # ------------------------------------------------------------------
     # Rule pre-checks

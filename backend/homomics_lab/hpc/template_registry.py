@@ -8,6 +8,9 @@ auto-generating a stub workflow from ``SimpleNFTranslator``.
 from pathlib import Path
 from typing import Dict, Optional
 
+# nf-core integration is always on (formerly HOMOMICS_NFCORE_ENABLED).
+NFCORE_ENABLED = True
+
 
 class NextflowTemplateRegistry:
     """Registry of curated Nextflow workflow templates."""
@@ -54,10 +57,9 @@ class NextflowTemplateRegistry:
                 return local_path
 
         # Fall back to nf-core pipeline suggestion.
-        from homomics_lab.config import settings
         from homomics_lab.nfcore_integration import get_nfcore_manager
 
-        if not getattr(settings, "nfcore_enabled", True):
+        if not NFCORE_ENABLED:
             return None
 
         nfcore_manager = get_nfcore_manager()

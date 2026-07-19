@@ -120,8 +120,8 @@ class TestSelectExecutionBackend:
     def test_nextflow_disabled_runs_local(self, patch_backends, monkeypatch):
         patch_backends(slurm=False, nextflow=True)
         monkeypatch.setattr(
-            router_module.settings,
-            "workflow_nextflow_enabled",
+            router_module,
+            "WORKFLOW_NEXTFLOW_ENABLED",
             False,
         )
         plan = PlanResult(

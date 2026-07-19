@@ -1,7 +1,6 @@
 """Execution backend routing logic."""
 
 from homomics_lab.agent.plan.models import DataState, PlanResult
-from homomics_lab.config import settings
 from homomics_lab.hpc.scheduler import NextflowRunner, SlurmScheduler
 
 
@@ -9,6 +8,13 @@ from homomics_lab.hpc.scheduler import NextflowRunner, SlurmScheduler
 # single-skill or LLM-fallback executions that are cheaper and simpler to run
 # locally through the existing skill runtime.
 _NON_WORKFLOW_DERIVATIONS = {"standalone-skill", "llm-fallback", "hardcoded"}
+
+# Nextflow routing thresholds (formerly HOMOMICS_WORKFLOW_NEXTFLOW_* config
+# fields; defaults kept). Nextflow is reserved for genuinely large workflows:
+# the conservative phase threshold plus the sample-count guard below keeps
+# most interactive analyses local.
+WORKFLOW_NEXTFLOW_ENABLED = True
+WORKFLOW_NEXTFLOW_MIN_PHASES = 8
 
 
 def select_execution_backend(
@@ -20,7 +26,7 @@ def select_execution_backend(
 
     Routing heuristics (conservative by default):
       - Nextflow is only chosen when it is enabled, the plan has at least
-        ``workflow_nextflow_min_phases`` required phases (default 8), and the
+        ``WORKFLOW_NEXTFLOW_MIN_PHASES`` required phases (default 8), and the
         workload is large (>100 effective samples/cells) or the plan is a
         curated multi-step domain pipeline.  Small interactive analyses always
         run locally to avoid the overhead of building a Nextflow project.
@@ -36,7 +42,7 @@ def select_execution_backend(
     Returns:
         One of "local", "slurm", or "nextflow".
     """
-    nextflow_enabled = getattr(settings, "workflow_nextflow_enabled", True)
+    nextflow_enabled = WORKFLOW_NEXTFLOW_ENABLED
 
     n_phases = len([p for p in plan.phases if p.required])
     n_samples = data_state.n_samples or 1
@@ -46,7 +52,7 @@ def select_execution_backend(
 
     derivation = getattr(plan, "derivation", None) or ""
     is_large_workflow = (
-        n_phases >= getattr(settings, "workflow_nextflow_min_phases", 8)
+        n_phases >= WORKFLOW_NEXTFLOW_MIN_PHASES
         and derivation not in _NON_WORKFLOW_DERIVATIONS
     )
 
