@@ -65,7 +65,7 @@ async def test_fast_path_hit_skips_three_way_assembly(working_memory, assembly_m
     assert runner._extra_context == {}
     assert runner._context_bundle is None
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()
 
 
 @pytest.mark.asyncio
@@ -87,7 +87,7 @@ async def test_fast_path_hit_for_greeting(working_memory, assembly_mocks):
     capability_index.search.assert_not_awaited()
     context_engine.build.assert_not_awaited()
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()
 
 
 @pytest.mark.asyncio
@@ -110,7 +110,7 @@ async def test_fast_path_miss_runs_full_assembly(working_memory, assembly_mocks)
     # Enrichment results are merged as before.
     assert runner._extra_context["memory_snippets"] == ["snip"]
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()
 
 
 @pytest.mark.asyncio
@@ -164,4 +164,4 @@ async def test_debate_response_bypasses_fast_path(working_memory, assembly_mocks
     capability_index.search.assert_awaited_once()
     context_engine.build.assert_awaited_once()
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()

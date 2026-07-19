@@ -74,7 +74,7 @@ async def test_gather_single_failure_degrades(working_memory):
     assert runner._extra_context == {}
     assert runner._context_bundle is None
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()
 
 
 @pytest.mark.asyncio
@@ -119,4 +119,4 @@ async def test_semantic_search_runs_once_per_turn(working_memory):
     assert context_engine.build.await_args.kwargs["session_id"] == "sess_gather_2"
     assert runner._extra_context["memory_snippets"] == ["snip"]
 
-    await runner._state_persistence.drain()
+    await runner._state.drain()

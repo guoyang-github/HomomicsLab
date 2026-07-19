@@ -11,7 +11,7 @@ import pytest
 from PIL import Image
 
 from homomics_lab.agent.orchestrator_executors import TaskExecutors
-from homomics_lab.agent.turn_result_assembler import ResultAssembler
+from homomics_lab.agent.turn_responder import ResultAssembler
 from homomics_lab.tasks.models import TaskNode
 from homomics_lab.viz.chart_critic import (
     ChartCritic,
