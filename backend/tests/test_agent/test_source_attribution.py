@@ -1,53 +1,11 @@
 """Tests for source attribution and anti-hallucination helpers."""
 
-import pytest
-
-from homomics_lab.agent.agent_loop import AgentLoopResult, ToolCallRecord
-from homomics_lab.agent.open_agent.executor import OpenAgentExecutor
-from homomics_lab.agent.plan.models import DataState, Phase, PlanResult
 from homomics_lab.agent.source_attribution import (
     ensure_source_section,
     extract_sources,
     format_source_list,
     source_section_present,
 )
-from homomics_lab.context.working_memory import WorkingMemory
-from homomics_lab.tools.models import ToolResult
-from homomics_lab.tools.registry import ToolRegistry
-
-
-class FakeLLM:
-    def __init__(self, response: str = "fake response"):
-        self.response = response
-        self.calls = []
-
-    def is_configured(self):
-        return True
-
-    async def chat_completion(self, **kwargs):
-        self.calls.append(kwargs)
-        return self.response
-
-    async def chat_completion_message(self, **kwargs):
-        from types import SimpleNamespace
-
-        return SimpleNamespace(content=self.response, tool_calls=None), {"cost_usd": 0.0}
-
-
-def _make_phase(step_type: str, params: dict = None) -> Phase:
-    return Phase(
-        phase_type=step_type,
-        parameters={"open_agent_step_type": step_type, **(params or {})},
-    )
-
-
-def _make_plan(*phases: Phase) -> PlanResult:
-    return PlanResult(
-        phases=list(phases),
-        strategy_name="open-agent",
-        data_state=DataState(),
-        derivation="open-agent",
-    )
 
 
 class TestExtractSources:
@@ -137,61 +95,3 @@ class TestSourceSectionPresent:
         assert source_section_present("Sources: ...")
         assert source_section_present("References: ...")
         assert not source_section_present("Just an answer.")
-
-
-@pytest.mark.asyncio
-async def test_open_agent_executor_appends_sources_from_explore(monkeypatch):
-    """Explore-phase tool outputs are extracted and cited in the final answer."""
-    tool_output = {
-        "count": 1,
-        "results": [
-            {"title": "Hallmark paper", "url": "https://pubmed.ncbi.nlm.nih.gov/1"}
-        ],
-    }
-
-    async def fake_loop_run(*args, **kwargs):
-        return AgentLoopResult(
-            response_text="Found a hallmark paper.",
-            llm_calls=1,
-            tool_calls_count=1,
-            cost_usd=0.01,
-            tool_calls=[
-                ToolCallRecord(
-                    tool_call_id="tc1",
-                    tool_name="science_search",
-                    inputs={"query": "hallmark"},
-                    success=True,
-                    output_summary="1 result",
-                    raw_output=tool_output,
-                )
-            ],
-        )
-
-    monkeypatch.setattr(
-        "homomics_lab.agent.open_agent.executor.AgentLoop.run", fake_loop_run
-    )
-
-    tool_registry = ToolRegistry()
-    tool_registry.register_builtin(
-        name="science_search",
-        description="Search scientific literature",
-        handler=lambda **kwargs: ToolResult(success=True, output=tool_output),
-    )
-
-    executor = OpenAgentExecutor(
-        llm_client=FakeLLM("unused"),
-        tool_registry=tool_registry,
-    )
-    plan = _make_plan(
-        _make_phase(
-            "explore",
-            {"tool_intents": [{"tool_name": "science_search", "inputs": {}, "reason": "search"}]},
-        )
-    )
-
-    result = await executor.execute(plan, "search hallmark genes", WorkingMemory())
-
-    assert "Found a hallmark paper." in result.response_text
-    assert "### 来源 / Sources" in result.response_text
-    assert "Hallmark paper" in result.response_text
-    assert "https://pubmed.ncbi.nlm.nih.gov/1" in result.response_text

@@ -14,7 +14,6 @@ from homomics_lab.agent.plan.composite_planner import CompositePlanner
 from homomics_lab.agent.plan.cross_domain_planner import CrossDomainPlanner
 from homomics_lab.agent.plan.engine import PlanEngine
 from homomics_lab.agent.plan.models import DataState, Phase, PlanResult, SuccessCriterion
-from homomics_lab.agent.open_agent.planner import OpenAgentPlanner
 from homomics_lab.agent.plan.standalone_planner import StandaloneSkillPlanner
 from homomics_lab.agent.plan.template import AnalysisTemplate
 from homomics_lab.agent.plan.template_store import AnalysisTemplateStore
@@ -59,7 +58,6 @@ class TaskDecomposer:
         skill_registry: Optional[SkillRegistry] = None,
         standalone_planner: Optional[StandaloneSkillPlanner] = None,
         cross_domain_planner: Optional[CrossDomainPlanner] = None,
-        open_agent_planner: Optional[OpenAgentPlanner] = None,
         cbkb=None,
         capability_index=None,
         analysis_template_store: Optional[AnalysisTemplateStore] = None,
@@ -71,7 +69,6 @@ class TaskDecomposer:
         self._skill_registry = skill_registry or get_default_registry()
         self._standalone_planner = standalone_planner
         self._cross_domain_planner = cross_domain_planner
-        self._open_agent_planner = open_agent_planner
         self._composite_planner = composite_planner
         self._cbkb = cbkb
         self._capability_index = capability_index
@@ -137,15 +134,6 @@ class TaskDecomposer:
                 skill_registry=self._skill_registry
             )
         return self._standalone_planner
-
-    def _get_open_agent_planner(self) -> OpenAgentPlanner:
-        """Lazy initialize the open agent planner."""
-        if self._open_agent_planner is None:
-            self._open_agent_planner = OpenAgentPlanner(
-                skill_registry=self._skill_registry,
-                capability_index=self._capability_index,
-            )
-        return self._open_agent_planner
 
     def _get_cross_domain_planner(self) -> CrossDomainPlanner:
         """Lazy initialize the cross-domain planner."""
@@ -435,7 +423,7 @@ class TaskDecomposer:
                 )
 
         # Domain/phase-level intents declared in a domain.yaml should be planned
-        # by the domain strategy, not delegated to the open agent.
+        # by the domain strategy, not left on the no-coverage fallback route.
         if (
             assembly.route == "open_agent"
             and self._has_domain_strategy(intent_strategy_key(intent))
@@ -545,10 +533,6 @@ class TaskDecomposer:
             composite_plan = await self._get_composite_planner().plan(intent)
             if composite_plan is not None:
                 return composite_plan, self._plan_result_to_task_tree(composite_plan)
-            # Degrade to open agent if composition is unavailable.
-            open_plan = await self._get_open_agent_planner().plan(intent)
-            if open_plan is not None:
-                return open_plan, self._plan_result_to_task_tree(open_plan)
 
         if route == Route.STANDALONE_SKILL:
             effective_intent = self._merge_derived_sub_intents(intent)
@@ -562,17 +546,10 @@ class TaskDecomposer:
                 tree = self._plan_result_to_task_tree(standalone_plan)
                 tree.display_steps = standalone_plan.display_steps
                 return standalone_plan, tree
-            # Degrade to open agent if standalone planning is unavailable.
-            open_plan = await self._get_open_agent_planner().plan(intent)
-            if open_plan is not None:
-                return open_plan, self._plan_result_to_task_tree(open_plan)
 
-        if route == Route.OPEN_AGENT:
-            open_plan = await self._get_open_agent_planner().plan(intent)
-            if open_plan is not None:
-                return open_plan, self._plan_result_to_task_tree(open_plan)
-
-        # DOMAIN_TEMPLATE or any route that declined: use PlanEngine.
+        # DOMAIN_TEMPLATE, OPEN_AGENT (no strong capability match), or any
+        # route that declined: use PlanEngine (domain strategy -> generic ->
+        # LLM fallback planner).
         return await self._plan_via_domain_engine(intent, context, decision.template)
 
     async def _plan_via_domain_engine(

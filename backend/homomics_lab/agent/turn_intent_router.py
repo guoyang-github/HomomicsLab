@@ -35,10 +35,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Routing gates (formerly HOMOMICS_EXPLORATION_ENABLED /
-# HOMOMICS_OPEN_AGENT_FALLBACK_ENABLED; defaults kept: both on).
+# Routing gate (formerly HOMOMICS_EXPLORATION_ENABLED; default kept: on).
 EXPLORATION_ENABLED = True
-OPEN_AGENT_FALLBACK_ENABLED = True
 
 # Domain values used by the domain registry for real analysis workflows.
 # Builtin intent definitions use placeholder domains such as "builtin" or
@@ -127,8 +125,6 @@ class IntentRouter:
         Routing is driven by the v2 ``interaction_mode`` / ``scope`` / ``target``
         fields on the intent.
         """
-        from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
-
         interaction_mode = intent.interaction_mode
         scope = intent.scope
 
@@ -247,56 +243,8 @@ class IntentRouter:
             intent, context=plan_context
         )
 
-        # If the domain planner only produced a fallback (no concrete skill match),
-        # let the open agent try before presenting an approval-gated fallback plan.
-        if (
-            plan_result.is_fallback
-            and not self._runner._is_fallback_suggestion(tree)
-            and OPEN_AGENT_FALLBACK_ENABLED
-        ):
-            open_plan = (
-                await self._runner.task_decomposer._get_open_agent_planner().plan(
-                    intent
-                )
-            )
-            if open_plan is not None and not open_plan.is_fallback:
-                plan_result = open_plan
-                tree = self._runner.task_decomposer._plan_result_to_task_tree(open_plan)
-
-        # Open agent plans are executed by the open agent executor.
-        if plan_result.derivation == "open-agent":
-            executor = self._runner._get_open_agent_executor()
-            exec_context = {
-                "session_id": session_id,
-                "project_id": project_id,
-                "project_path": (
-                    str(settings.data_dir / "workspaces" / project_id)
-                    if project_id
-                    else None
-                ),
-                "trace_id": getattr(self._runner, "_trace_id", None),
-            }
-            exec_result = await executor.execute(
-                plan_result=plan_result,
-                user_message=user_message,
-                working_memory=working_memory,
-                context=exec_context,
-            )
-            # Convert OpenAgentExecutionResult to TurnResult.
-            from homomics_lab.models.common import HITLCheckpoint
-
-            hitl_checkpoint = None
-            if exec_result.hitl_checkpoint is not None and isinstance(
-                exec_result.hitl_checkpoint, HITLCheckpoint
-            ):
-                hitl_checkpoint = exec_result.hitl_checkpoint
-            return TurnResult(
-                mode=ExecutionMode(exec_result.mode),
-                response_text=exec_result.response_text,
-                agent_message=exec_result.agent_message,
-                hitl_checkpoint=hitl_checkpoint,
-            )
-
+        # Fallback plans (no concrete skill match) go straight to the
+        # approval-gated path below; their skill-less tasks execute via CodeAct.
         plan: Optional[Plan] = None
         if plan_store is not None:
             plan = Plan(

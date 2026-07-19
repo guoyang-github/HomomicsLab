@@ -28,26 +28,18 @@ from homomics_lab.agent.factory import create_default_agents
 from homomics_lab.agent.general_agent import GeneralScientificAgent
 from homomics_lab.agent.intent_analyzer import IntentAnalyzer, UserIntent
 from homomics_lab.agent.intent.classifiers import KeywordIntentClassifier
-from homomics_lab.agent.open_agent.executor import OpenAgentExecutor
 from homomics_lab.agent.message_bus import AgentMessageBus
 from homomics_lab.agent.orchestrator import Orchestrator
 from homomics_lab.agent.phase_gate import PhaseGateEvaluator
 from homomics_lab.agent.plan.replanning import DynamicReplanningEngine
 from homomics_lab.agent.plan.self_correction import SelfCorrectionEngine
 from homomics_lab.agent.task_decomposer import TaskDecomposer
-from homomics_lab.agent.turn_agent_loop import AgentLoopHandler
-from homomics_lab.agent.turn_approval_handler import ToolApprovalHandler
-from homomics_lab.agent.turn_clarification import ClarificationHandler
-from homomics_lab.agent.turn_context_formatter import ContextFormatter
+from homomics_lab.agent.turn_executor import TurnExecutor
 from homomics_lab.agent.turn_feedback_recorder import FeedbackRecorder
-from homomics_lab.agent.turn_file_resolver import FileReferenceResolver
+from homomics_lab.agent.turn_guard import TurnGuard
 from homomics_lab.agent.turn_intent_router import IntentRouter
-from homomics_lab.agent.turn_response_generator import ResponseGenerator
-from homomics_lab.agent.turn_result_assembler import ResultAssembler
-from homomics_lab.agent.turn_risk_assessor import RiskAssessor
-from homomics_lab.agent.turn_self_correction import SelfCorrectionHandler
-from homomics_lab.agent.turn_state_persistence import TurnStatePersistence
-from homomics_lab.agent.turn_workflow_handler import WorkflowHandler
+from homomics_lab.agent.turn_responder import TurnResponder
+from homomics_lab.agent.turn_state import TurnState
 from homomics_lab.agent.permission_ruleset import (
     PermissionRegistry,
     get_permission_registry,
@@ -67,7 +59,6 @@ from homomics_lab.models.common import ChatMessage, MessageType
 from homomics_lab.plan.models import Plan
 from homomics_lab.tools.registry import ToolRegistry
 from homomics_lab.plan.store import PlanStore
-from homomics_lab.plots import extract_plot_attachments
 from homomics_lab.skills.capability_index import CapabilityIndex, CapabilityType
 from homomics_lab.tasks.task_tree import TaskTree
 
@@ -210,7 +201,6 @@ class TurnRunner:
         self._supervisor = supervisor
         self._reviewer = reviewer
         self._message_bus = message_bus
-        self._open_agent_executor: Optional[OpenAgentExecutor] = None
         self._tool_registry = tool_registry
         self.memory_manager = memory_manager
         self.memory_backend = memory_backend
@@ -247,28 +237,74 @@ class TurnRunner:
             analysis_template_store=analysis_template_store,
         )
 
-        # Collaborators extracted from TurnRunner (pure code move, no logic
-        # changes). The private delegate shells live at the end of the class.
-        self._result_assembler = ResultAssembler(self)
-        self._context_formatter = ContextFormatter(self)
-        self._risk_assessor = RiskAssessor(self)
-        self._file_resolver = FileReferenceResolver(self)
-        self._clarification_handler = ClarificationHandler(self)
-        self._intent_router = IntentRouter(self)
-        self._response_generator = ResponseGenerator(self)
-        self._self_correction_handler = SelfCorrectionHandler(self)
-        self._workflow_handler = WorkflowHandler(self)
-        self._state_persistence = TurnStatePersistence(self)
-        self._agent_loop_handler = AgentLoopHandler(self)
-        self._approval_handler = ToolApprovalHandler(self)
-        # FeedbackRecorder is the one collaborator without a runner
-        # back-reference: its services are never reassigned after
-        # construction, so they are injected explicitly.
+        # Collaborators extracted from TurnRunner, consolidated into cohesive
+        # modules with constructor injection (no runner back-references;
+        # per-turn mutable state is passed explicitly via ``_turn_ctx()``).
+        # The private delegate shells live at the end of the class.
+        #
+        # FeedbackRecorder was already constructor-injected: its services are
+        # never reassigned after construction, so they are injected explicitly.
         self._feedback_recorder = FeedbackRecorder(
             capability_index=self.capability_index,
             memory_backend=self.memory_backend,
             skill_dag=self.skill_dag,
         )
+        self._state = TurnState(
+            run_turn_once=self._run_turn_once,
+            build_error_result=self._build_error_result,
+            memory_manager=self.memory_manager,
+            project_state_manager=self.project_state_manager,
+            trace_store=self._trace_store,
+            compressor=self.compressor,
+        )
+        self._responder = TurnResponder(
+            state=self._state,
+            intent_analyzer=self.intent_analyzer,
+            llm_client_provider=lambda: self._llm_client,
+            tool_registry=self._tool_registry,
+            prompter=self.prompter,
+            project_state_manager=self.project_state_manager,
+        )
+        self._guard = TurnGuard(
+            task_decomposer=self.task_decomposer,
+            self_correction_engine_provider=self._get_self_correction_engine,
+            single_step_handler=self._handle_single_step,
+            workflow_handler=self._handle_workflow,
+        )
+        self._executor = TurnExecutor(
+            orchestrator_provider=self._get_orchestrator,
+            workflow_service_provider=self._get_workflow_execution_service,
+            orchestrator_context_builder=self._build_orchestrator_context,
+            self_correction=self._apply_self_correction,
+            is_fallback_suggestion=self._is_fallback_suggestion,
+            responder=self._responder,
+            state=self._state,
+            feedback_recorder=self._feedback_recorder,
+            llm_client_provider=lambda: self._llm_client,
+            tool_registry=self._tool_registry,
+            permission_registry=self._permission_registry,
+            approval_store=self._approval_store,
+        )
+        # The intent router still holds a runner back-reference; it is owned
+        # by another task and intentionally left as-is.
+        self._intent_router = IntentRouter(self)
+
+    def _turn_ctx(self) -> Dict[str, Any]:
+        """Snapshot the per-turn mutable state collaborators need.
+
+        Collaborators receive this dict explicitly instead of reading private
+        runner attributes. Keys: ``session_id``, ``project_id``,
+        ``request_id``, ``event_callback``, ``extra_context``,
+        ``context_bundle``.
+        """
+        return {
+            "session_id": getattr(self, "_session_id", None),
+            "project_id": getattr(self, "_project_id", None),
+            "request_id": getattr(self, "_turn_request_id", None),
+            "event_callback": getattr(self, "_event_callback", None),
+            "extra_context": self._extra_context,
+            "context_bundle": self._context_bundle,
+        }
 
     @staticmethod
     def _build_debate_experts() -> List[Any]:
@@ -372,18 +408,6 @@ class TurnRunner:
                 prompter=self.prompter,
             )
         return self._general_agent
-
-    def _get_open_agent_executor(self) -> OpenAgentExecutor:
-        """Lazy initialize the open agent executor."""
-        if self._open_agent_executor is None:
-            if self._llm_client is None:
-                self._llm_client = LLMClient()
-            self._open_agent_executor = OpenAgentExecutor(
-                llm_client=self._llm_client,
-                tool_registry=self._tool_registry,
-                trace_store=self._trace_store,
-            )
-        return self._open_agent_executor
 
     def _get_workflow_execution_service(self) -> Optional[WorkflowExecutionService]:
         """Lazy init the workflow execution service."""
@@ -1019,8 +1043,7 @@ class TurnRunner:
 
     @staticmethod
     def _single_skill_id(tree: TaskTree) -> Optional[str]:
-        ids = [t.skills_required[0] for t in tree.tasks if t.skills_required]
-        return ids[0] if len(ids) == 1 else None
+        return TurnResponder.single_skill_id(tree)
 
     async def resume_hitl(
         self,
@@ -1079,6 +1102,13 @@ class TurnRunner:
             and not tree.tasks[0].skills_required
         )
 
+    # --- Delegated collaborators -------------------------------------------
+    # Thin shells kept for backward compatibility: tests and internal callers
+    # (including the intent router) still invoke these private methods on
+    # TurnRunner, while the implementations live in the consolidated
+    # collaborator modules (turn_executor / turn_responder / turn_state /
+    # turn_guard / turn_feedback_recorder).
+
     def _extract_plot_messages(
         self,
         results: Dict[str, Any],
@@ -1086,51 +1116,7 @@ class TurnRunner:
         working_memory: WorkingMemory,
     ) -> List[ChatMessage]:
         """Scan execution results for plot outputs and build chat messages."""
-        messages: List[ChatMessage] = []
-        task_lookup = {t.id: t for t in tree.tasks}
-        base_id = len(working_memory.messages)
-
-        for task_id, result in results.items():
-            if not isinstance(result, dict):
-                continue
-
-            skill_output = result.get("result", {})
-            if not isinstance(skill_output, dict):
-                continue
-
-            task = task_lookup.get(task_id)
-            skill_id = result.get("skill") or (
-                task.skills_required[0] if task and task.skills_required else None
-            )
-
-            plot_type = skill_output.get("plot_type") or (
-                task.name if task else "visualization"
-            )
-            attachments = extract_plot_attachments(
-                skill_output,
-                default_plot_type=plot_type,
-                default_title=f"{plot_type} visualization",
-            )
-
-            for attachment in attachments:
-                msg = ChatMessage(
-                    id=f"msg_{base_id}",
-                    type=MessageType.PLOT_DATA if attachment.data else MessageType.PLOT,
-                    content=attachment.to_chat_content(),
-                    sender="agent",
-                    task_id=task_id,
-                    skill_id=skill_id,
-                )
-                base_id += 1
-                messages.append(msg)
-
-        return messages
-
-    # --- Delegated collaborators -------------------------------------------
-    # Thin shells kept for backward compatibility: tests and internal callers
-    # still invoke these private methods on TurnRunner, while the
-    # implementations live in dedicated collaborator classes (pure code move,
-    # no logic changes).
+        return self._responder.extract_plot_messages(results, tree, working_memory)
 
     async def _run_turn_with_state(
         self,
@@ -1146,7 +1132,7 @@ class TurnRunner:
         plan_mode: bool = False,
         trace_id: Optional[str] = None,
     ) -> TurnResult:
-        return await self._state_persistence.run_with_state(
+        return await self._state.run_with_state(
             session_id=session_id,
             user_message=user_message,
             working_memory=working_memory,
@@ -1167,11 +1153,12 @@ class TurnRunner:
         allowed_tools: Optional[List[str]] = None,
         intent: Optional[UserIntent] = None,
     ) -> TurnResult:
-        return await self._agent_loop_handler.handle(
+        return await self._executor.handle_agent_loop(
             user_message=user_message,
             working_memory=working_memory,
             allowed_tools=allowed_tools,
             intent=intent,
+            ctx=self._turn_ctx(),
         )
 
     async def respond_to_tool_approval(
@@ -1181,11 +1168,12 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: str,
     ) -> "TurnResult":
-        return await self._approval_handler.respond(
+        return await self._executor.respond_to_tool_approval(
             call_id=call_id,
             approved=approved,
             working_memory=working_memory,
             project_id=project_id,
+            ctx=self._turn_ctx(),
         )
 
     async def _record_execution_feedback(
@@ -1201,7 +1189,7 @@ class TurnRunner:
     def _working_memory_to_history(
         self, working_memory: WorkingMemory
     ) -> List[Dict[str, Any]]:
-        return self._context_formatter.working_memory_to_history(working_memory)
+        return self._state.working_memory_to_history(working_memory)
 
     def _summarize_mcp_result(
         self,
@@ -1209,7 +1197,7 @@ class TurnRunner:
         output: Any,
         tool_inputs: Optional[Dict[str, Any]] = None,
     ) -> str:
-        return self._context_formatter.summarize_mcp_result(
+        return self._state.summarize_mcp_result(
             tool_name, output, tool_inputs
         )
 
@@ -1218,27 +1206,27 @@ class TurnRunner:
         output: Dict[str, Any],
         tool_inputs: Optional[Dict[str, Any]] = None,
     ) -> str:
-        return self._context_formatter.format_pubmed_search(output, tool_inputs)
+        return self._state.format_pubmed_search(output, tool_inputs)
 
     def _format_science_dbs(self, output: Dict[str, Any]) -> str:
-        return self._context_formatter.format_science_dbs(output)
+        return self._state.format_science_dbs(output)
 
     def _format_science_search(
         self,
         output: Dict[str, Any],
         tool_inputs: Optional[Dict[str, Any]] = None,
     ) -> str:
-        return self._context_formatter.format_science_search(output, tool_inputs)
+        return self._state.format_science_search(output, tool_inputs)
 
     def _format_pubmed_fetch(
         self,
         output: Dict[str, Any],
         tool_inputs: Optional[Dict[str, Any]] = None,
     ) -> str:
-        return self._context_formatter.format_pubmed_fetch(output, tool_inputs)
+        return self._state.format_pubmed_fetch(output, tool_inputs)
 
     def _format_extra_context(self) -> str:
-        return self._context_formatter.format_extra_context()
+        return self._state.format_extra_context(self._extra_context)
 
     def _build_risk_prompt(
         self,
@@ -1247,12 +1235,12 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
     ) -> str:
-        return self._risk_assessor.build_risk_prompt(
+        return self._guard.build_risk_prompt(
             intent, user_message, working_memory, project_id
         )
 
     def _parse_risk_score(self, response: Any) -> float:
-        return self._risk_assessor.parse_risk_score(response)
+        return self._guard.parse_risk_score(response)
 
     def _heuristic_risk_score(
         self,
@@ -1261,7 +1249,7 @@ class TurnRunner:
         low_risk_keywords: set,
         high_risk_keywords: set,
     ) -> float:
-        return self._risk_assessor.heuristic_risk_score(
+        return self._guard.heuristic_risk_score(
             user_message, intent, low_risk_keywords, high_risk_keywords
         )
 
@@ -1270,7 +1258,7 @@ class TurnRunner:
         user_message: Optional[str],
         project_id: str,
     ) -> List[Tuple[str, str]]:
-        return self._file_resolver.resolve_uploaded_file_references(
+        return self._state.resolve_uploaded_file_references(
             user_message, project_id
         )
 
@@ -1280,19 +1268,19 @@ class TurnRunner:
         user_message: Optional[str],
         project_id: str,
     ) -> None:
-        return self._file_resolver.attach_uploaded_files_to_tree(
+        return self._state.attach_uploaded_files_to_tree(
             tree, user_message, project_id
         )
 
     def _envelopes_from_artifacts(
         self, artifacts: Optional[List[Any]]
     ) -> List[Dict[str, Any]]:
-        return self._result_assembler.envelopes_from_artifacts(artifacts)
+        return self._responder.envelopes_from_artifacts(artifacts)
 
     def _envelopes_from_results(
         self, results: Optional[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        return self._result_assembler.envelopes_from_results(results)
+        return self._responder.envelopes_from_results(results)
 
     def _summarize(
         self,
@@ -1300,7 +1288,7 @@ class TurnRunner:
         user_message: str,
         skill_id: Optional[str],
     ) -> str:
-        return self._result_assembler.summarize(envelopes, user_message, skill_id)
+        return self._responder.summarize(envelopes, user_message, skill_id)
 
     def _build_workflow_result(
         self,
@@ -1311,7 +1299,7 @@ class TurnRunner:
         error: Optional[str] = None,
         user_message: str = "",
     ) -> TurnResult:
-        return self._result_assembler.build_workflow_result(
+        return self._responder.build_workflow_result(
             tree=tree,
             working_memory=working_memory,
             backend=backend,
@@ -1325,10 +1313,10 @@ class TurnRunner:
         tree: TaskTree,
         working_memory: WorkingMemory,
     ) -> TurnResult:
-        return self._result_assembler.build_fallback_result(tree, working_memory)
+        return self._responder.build_fallback_result(tree, working_memory)
 
     def _extract_hitl(self, results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return self._result_assembler.extract_hitl(results)
+        return self._responder.extract_hitl(results)
 
     def _build_hitl_result(
         self,
@@ -1336,35 +1324,35 @@ class TurnRunner:
         hitl_info: Dict[str, Any],
         working_memory: WorkingMemory,
     ) -> TurnResult:
-        return self._result_assembler.build_hitl_result(
+        return self._responder.build_hitl_result(
             tree, hitl_info, working_memory
         )
 
     def _build_error_result(
         self, error: Union[str, TurnError], working_memory: WorkingMemory
     ) -> TurnResult:
-        return self._result_assembler.build_error_result(error, working_memory)
+        return self._responder.build_error_result(error, working_memory)
 
     def _handle_clarification(
         self,
         intent: UserIntent,
         working_memory: WorkingMemory,
     ) -> TurnResult:
-        return self._clarification_handler.handle_clarification(intent, working_memory)
+        return self._responder.handle_clarification(intent, working_memory)
 
     def _build_debate_resolved_intent(
         self,
         debate_response: Dict[str, Any],
         user_message: str,
     ) -> UserIntent:
-        return self._clarification_handler.build_debate_resolved_intent(
+        return self._responder.build_debate_resolved_intent(
             debate_response, user_message
         )
 
     def _compress_working_memory(
         self, working_memory: WorkingMemory, current_goal: str
     ) -> str:
-        return self._context_formatter.compress_working_memory(
+        return self._state.compress_working_memory(
             working_memory, current_goal
         )
 
@@ -1401,7 +1389,7 @@ class TurnRunner:
         user_message: Optional[str] = None,
         plan: Optional[Plan] = None,
     ) -> TurnResult:
-        return await self._workflow_handler.handle(
+        return await self._executor.handle_workflow(
             tree=tree,
             working_memory=working_memory,
             project_id=project_id,
@@ -1419,7 +1407,7 @@ class TurnRunner:
         intent: Optional[UserIntent] = None,
         user_message: Optional[str] = None,
     ) -> Optional[TurnResult]:
-        return await self._self_correction_handler.apply(
+        return await self._guard.apply_self_correction(
             tree=tree,
             working_memory=working_memory,
             project_id=project_id,
@@ -1431,8 +1419,8 @@ class TurnRunner:
     async def _generate_general_help_response(
         self, user_message: str, working_memory: WorkingMemory
     ) -> str:
-        return await self._response_generator.generate_general_help_response(
-            user_message, working_memory
+        return await self._responder.generate_general_help_response(
+            user_message, working_memory, self._turn_ctx()
         )
 
     async def _generate_direct_response_via_llm(
@@ -1444,13 +1432,14 @@ class TurnRunner:
         project_id: Optional[str] = None,
         max_tokens: Optional[int] = None,
     ) -> Optional[str]:
-        return await self._response_generator.generate_direct_response_via_llm(
+        return await self._responder.generate_direct_response_via_llm(
             response_type=response_type,
             user_message=user_message,
             intent=intent,
             working_memory=working_memory,
             project_id=project_id,
             max_tokens=max_tokens,
+            ctx=self._turn_ctx(),
         )
 
     async def _generate_greeting_response(
@@ -1459,8 +1448,8 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
     ) -> str:
-        return await self._response_generator.generate_greeting_response(
-            user_message, working_memory, project_id
+        return await self._responder.generate_greeting_response(
+            user_message, working_memory, project_id, self._turn_ctx()
         )
 
     async def _generate_qa_response(
@@ -1470,12 +1459,12 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
     ) -> str:
-        return await self._response_generator.generate_qa_response(
-            intent, user_message, working_memory, project_id
+        return await self._responder.generate_qa_response(
+            intent, user_message, working_memory, project_id, self._turn_ctx()
         )
 
     async def _try_web_search_response(self, user_message: str) -> Optional[str]:
-        return await self._response_generator.try_web_search_response(user_message)
+        return await self._responder.try_web_search_response(user_message)
 
     async def _generate_information_request_response(
         self,
@@ -1483,6 +1472,6 @@ class TurnRunner:
         working_memory: WorkingMemory,
         project_id: Optional[str] = None,
     ) -> str:
-        return await self._response_generator.generate_information_request_response(
-            intent, working_memory, project_id
+        return await self._responder.generate_information_request_response(
+            intent, working_memory, project_id, self._turn_ctx()
         )

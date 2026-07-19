@@ -410,3 +410,34 @@ async def test_preflight_single_shot_overrides_domain_template():
     assert len(tree.tasks) == 1
     assert tree.tasks[0].name == "bio-single-cell-annotation-celltypist"
     assert tree.tasks[0].parameters.get("use_skill_reference") is True
+
+
+@pytest.mark.asyncio
+async def test_no_coverage_intent_falls_through_to_plan_engine():
+    """Open-ended/diagnostic intents (formerly the open-agent trigger) now go
+    straight to PlanEngine's generic -> LLM fallback planner.
+
+    With no registered skill coverage the result is the standard
+    approval-gated fallback shape: ``derivation`` is never ``open-agent``,
+    and executable fallback tasks carry no bound skill so the orchestrator
+    runs them through CodeAct (an empty-phase fallback degrades to a
+    suggestion task).
+    """
+    decomposer = TaskDecomposer(skill_registry=SkillRegistry())
+    intent = UserIntent(
+        intent_type="explore",
+        interaction_mode="explore",
+        scope="full",
+        original_message="为什么我的实验结果和预期不一致？",
+    )
+
+    plan, tree = await decomposer.decompose_with_plan(intent, context={})
+
+    assert plan.derivation != "open-agent"
+    assert plan.strategy_name != "open-agent"
+    assert plan.is_fallback
+    assert tree.tasks, "fallback plan must still produce a task tree"
+    for task in tree.tasks:
+        assert task.derivation != "open-agent"
+        # Either a suggestion task or a skill-less (CodeAct-executable) task.
+        assert not task.skills_required
