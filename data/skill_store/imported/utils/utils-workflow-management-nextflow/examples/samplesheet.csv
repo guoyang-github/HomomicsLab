@@ -1,4 +1,0 @@
-sample,fastq_1,fastq_2,strandedness
-SAMPLE1,data/SAMPLE1_R1.fq.gz,data/SAMPLE1_R2.fq.gz,auto
-SAMPLE2,data/SAMPLE2_R1.fq.gz,data/SAMPLE2_R2.fq.gz,auto
-SAMPLE3,data/SAMPLE3_R1.fq.gz,,reverse

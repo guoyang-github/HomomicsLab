@@ -61,6 +61,25 @@ backend/data/memory_graph.json
 backend/data/skill_store/skills.json
 backend/data/raw/default/*.txt
 
+# Runtime state and workspace artifacts (never track; seed data such as
+# analysis_templates/ and mcp_marketplace_catalog.json is kept on purpose)
+backend/data/workspaces/
+data/workspaces/
+backend/data/workflows/
+backend/data/debates/
+data/debates/
+backend/data/objects/
+backend/data/raw/
+data/raw/
+backend/data/.metadata/
+backend/data/mcp_servers.json
+data/mcp_servers.json
+data/skill_store/
+backend/data/backend/
+backend/data/*.py
+backend/data/mock_*
+data/wiki.db
+
 # Workspace runtime outputs (keep data/ and .metadata)
 backend/data/workspaces/*/outputs/
 backend/data/workspaces/*/output/
