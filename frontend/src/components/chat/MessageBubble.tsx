@@ -24,14 +24,12 @@ import { DebateRequest } from './DebateRequest'
 import { ResultPreview, type ResultPreviewContent } from './ResultPreview'
 import { FollowUpSuggestions } from './FollowUpSuggestions'
 import { ReasoningBlock } from './ReasoningBlock'
-import { ArtifactMessage, type ArtifactMessageContent } from './ArtifactMessage'
 import { FigureCard } from './FigureCard'
 import { useTranslation } from '@/i18n'
 import { chatApi, fileApi } from '@/services/api'
 import { toastSuccess } from '@/stores/toastStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useChatStore } from '@/stores/chatStore'
-import type { Artifact } from '@/components/artifacts'
 import type {
   ChatMessage,
   TodoListContent,
@@ -123,17 +121,6 @@ function isFollowUpContent(content: unknown): content is FollowUpContent {
     content !== null &&
     'suggestions' in content &&
     Array.isArray((content as Record<string, unknown>).suggestions)
-  )
-}
-
-function isArtifactContent(content: unknown): content is Artifact | ArtifactMessageContent {
-  if (typeof content !== 'object' || content === null) return false
-  const c = content as Record<string, unknown>
-  return (
-    Array.isArray(c.artifacts) ||
-    (typeof c.artifact === 'object' && c.artifact !== null) ||
-    'kind' in c ||
-    'mime' in c
   )
 }
 
@@ -246,11 +233,6 @@ export function MessageBubble({ message, onRegenerate, hideHeader, hideRelatedFi
       case 'tool_call':
         if (isResultPreviewContent(message.content)) {
           return <ResultPreview content={message.content} />
-        }
-        return null
-      case 'artifact':
-        if (isArtifactContent(message.content)) {
-          return <ArtifactMessage content={message.content} />
         }
         return null
       case 'follow_up':

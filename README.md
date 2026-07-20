@@ -2,7 +2,7 @@
 
 A **domain-native agent platform for computational biology** that bridges rigid bioinformatics pipelines and unstructured notebook collections. HomomicsLab turns natural-language research questions into reproducible, auditable, and extensible analysis workflows—combining the adaptability of AI agents with the rigor of production-grade data engineering.
 
-> **v0.5.0** — Intent-driven analysis automation with single-file domain declarations, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, multi-agent swarm, self-evolving SkillDAG, dynamic replanning, CBKB curation, multi-layer stability guards, reproducibility bundles, DataStore offloading, skill memoization, CodeAct caching, cross-process sandboxed tool invocation, and a domain template marketplace.
+> **v0.5.0** — Intent-driven analysis automation with single-file domain declarations, CLI scaffolding, LLM-assisted domain generation, runtime hot-reloading, dynamic agent roles, hypothesis-driven exploration, self-evolving SkillDAG, dynamic replanning, CBKB curation, reproducibility bundles, DataStore offloading, skill memoization, CodeAct caching, cross-process sandboxed tool invocation, and a domain template marketplace.
 
 ---
 
@@ -29,7 +29,7 @@ HomomicsLab is a **production-ready agent framework** with a growing library of 
 |---|---|---|
 | Agent orchestration (intent → plan → execute) | ✅ Implemented | `Orchestrator`, `PlanEngine`, `TaskDecomposer`, `TurnRunner` |
 | Dynamic agent roles | ✅ Implemented | YAML-configurable `RoleDefinition` + `DynamicAgent` |
-| Multi-agent swarm & consensus | ✅ Implemented | `AgentSwarm` with semaphore-controlled parallelism |
+| Hypothesis-driven exploration | ✅ Implemented | `ExplorationEngine` blueprint → critique → evidence report |
 | Skill runtime & sandboxing | ✅ Implemented | Local / bubblewrap / container backends |
 | Schema validation (L1) | ✅ Implemented | JSON Schema input/output validation per skill |
 | Version locking (L2) | ✅ Implemented | Project-level skill/env/version locks |
@@ -215,7 +215,7 @@ HOMOMICS_LLM_MODEL=qwen2.5:14b
 HomomicsLab/
 ├── backend/
 │   ├── homomics_lab/            # Main Python package
-│   │   ├── agent/               # Orchestration, planning, intent, swarm
+│   │   ├── agent/               # Orchestration, planning, intent, exploration
 │   │   ├── api/                 # FastAPI routers
 │   │   ├── cli/                 # `homomics` command-line tool
 │   │   ├── domain/              # Domain loader, registry, marketplace, domains/

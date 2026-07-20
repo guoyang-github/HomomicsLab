@@ -306,4 +306,58 @@ describe('useExecutionSSE', () => {
     act(() => es.emit('state', { job_id: 'job_1', status: 'running', progress_pct: 10 }))
     expect(useExecutionStore.getState().jobs['job_1'].percent).toBe(10)
   })
+
+  it('renders chart_critique agent events as leveled log lines', () => {
+    useExecutionStore.getState().startJob('job_1', 'sess_1')
+    renderHook(() => useExecutionSSE('job_1'))
+    const es = MockEventSource.instances[0]
+
+    act(() =>
+      es.emit('state', {
+        job_id: 'job_1',
+        status: 'running',
+        progress_pct: 85,
+        active_task_id: 't1',
+        resource_usage: {
+          agent_events: [
+            {
+              type: 'chart_critique',
+              timestamp: 1700000000,
+              tool: 'chart_critic',
+              success: true,
+              output: 'umap.png: ok=True severity=low issues=[] suggestion= source=vlm',
+              artifacts: ['/tmp/umap.png'],
+            },
+            {
+              type: 'chart_critique',
+              timestamp: 1700000001,
+              tool: 'chart_critic',
+              success: false,
+              output: "volcano.png: ok=False severity=high issues=['blank image'] suggestion=regenerate source=vlm",
+              artifacts: ['/tmp/volcano.png'],
+            },
+            {
+              type: 'chart_critique',
+              timestamp: 1700000002,
+              tool: 'chart_critic',
+              success: false,
+              output: "heat.png: ok=False severity=medium issues=['small fonts'] suggestion=enlarge source=vlm",
+              artifacts: ['/tmp/heat.png'],
+            },
+          ],
+        },
+      })
+    )
+
+    const job = useExecutionStore.getState().jobs['job_1']
+    const pass = job.logs.find((l) => l.message.includes('umap.png'))
+    const high = job.logs.find((l) => l.message.includes('volcano.png'))
+    const medium = job.logs.find((l) => l.message.includes('heat.png'))
+    expect(pass?.level).toBe('success')
+    expect(pass?.message).toContain('chart_critic')
+    expect(pass?.taskId).toBe('t1')
+    expect(high?.level).toBe('error')
+    expect(high?.message).toContain('severity=high')
+    expect(medium?.level).toBe('warning')
+  })
 })

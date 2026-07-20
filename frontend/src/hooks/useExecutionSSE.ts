@@ -306,6 +306,22 @@ export function useExecutionSSE(jobId: string | null) {
               message: `模型调用失败，正在重试${evt.error_message ? `: ${evt.error_message}` : ''}`,
               taskId,
             })
+          } else if (evt.type === 'chart_critique') {
+            // ChartCritic per-chart quality verdict (orchestrator_executors.py
+            // `_emit_chart_critique_event`). The event carries ok via
+            // `success`; severity only exists inside the `output` summary
+            // string ("... severity=high ..."), so parse it out for the level.
+            const ok = evt.success !== false
+            const severity =
+              typeof evt.output === 'string'
+                ? /severity=(\w+)/i.exec(evt.output)?.[1]?.toLowerCase()
+                : undefined
+            pushLog({
+              timestamp: ts,
+              level: ok ? 'success' : severity === 'high' ? 'error' : 'warning',
+              message: `${ok ? '✓' : '⚠'} ${evt.tool || 'chart_critic'}${evt.output ? ` · ${evt.output}` : ''}`,
+              taskId,
+            })
           }
         })
       }
