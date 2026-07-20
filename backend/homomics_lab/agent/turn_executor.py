@@ -3,8 +3,9 @@
 Merges the former ``turn_workflow_handler``, ``turn_agent_loop`` and
 ``turn_approval_handler`` collaborators into one cognitively cohesive module:
 
-- ``WorkflowHandler`` — executes multi-step task trees (orchestrator /
-  Nextflow backend).
+- ``WorkflowHandler`` — executes task trees through the orchestrator /
+  Nextflow backend: single-step trees, multi-step workflows, HITL resume,
+  and pre-built tree dispatch (``execute_tree``).
 - ``AgentLoopHandler`` — LLM-driven MCP tool-calling loop for a turn.
 - ``ToolApprovalHandler`` — resume the agent loop after a tool approval
   decision.
@@ -60,7 +61,12 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowHandler:
-    """Run complex multi-step workflows through the orchestrator or Nextflow backend."""
+    """Run task trees through the orchestrator or the Nextflow backend.
+
+    Owns every orchestrator-driven execution path: single-step trees,
+    complex multi-step workflows, HITL resume, and the pre-built tree
+    dispatch (``execute_tree``) used by the background worker.
+    """
 
     def __init__(
         self,
@@ -73,6 +79,7 @@ class WorkflowHandler:
         responder: "TurnResponder",
         state: "TurnState",
         feedback_recorder: "FeedbackRecorder",
+        memory_manager: Optional[Any] = None,
     ):
         self._orchestrator_provider = orchestrator_provider
         self._workflow_service_provider = workflow_service_provider
@@ -82,6 +89,7 @@ class WorkflowHandler:
         self._responder = responder
         self._state = state
         self._feedback_recorder = feedback_recorder
+        self._memory_manager = memory_manager
 
     async def handle(
         self,
@@ -199,6 +207,189 @@ class WorkflowHandler:
             agent_message=agent_msg,
             attachments=plot_messages,
         )
+
+    async def handle_single_step(
+        self,
+        tree: "TaskTree",
+        working_memory: "WorkingMemory",
+        project_id: str,
+        intent: Optional["UserIntent"] = None,
+        user_message: Optional[str] = None,
+    ) -> "TurnResult":
+        """Handle single-step tasks (e.g., file conversion)."""
+        from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
+
+        # Handle non-executable fallback suggestions directly.
+        if self._is_fallback_suggestion(tree):
+            return self._responder.build_fallback_result(tree, working_memory)
+
+        orchestrator = self._orchestrator_provider()
+        self._state.attach_uploaded_files_to_tree(tree, user_message, project_id)
+        context = await self._orchestrator_context_builder(
+            project_id,
+            intent=intent,
+            user_message=user_message,
+            working_memory=working_memory,
+            execution_mode=getattr(tree, "execution_mode", None),
+        )
+        try:
+            results = await orchestrator.run_tree(tree, context=context)
+        except ExecutionError as exc:
+            corrected = await self._self_correction(
+                tree,
+                working_memory,
+                project_id,
+                exc,
+                intent=intent,
+                user_message=user_message,
+            )
+            if corrected is not None:
+                return corrected
+            raise
+
+        # Check for HITL
+        hitl_info = self._responder.extract_hitl(results)
+        if hitl_info:
+            return self._responder.build_hitl_result(tree, hitl_info, working_memory)
+
+        await self._feedback_recorder.record_execution_feedback(tree, results, project_id)
+
+        response_text = f"已完成：{tree.tasks[0].description}"
+
+        # Extract any plots produced by the skill
+        plot_messages = self._responder.extract_plot_messages(results, tree, working_memory)
+        for msg in plot_messages:
+            working_memory.add_message(msg)
+
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TODO_LIST,
+            content={
+                "text": response_text,
+                "tasks": [t.model_dump() for t in tree.tasks],
+                "progress": orchestrator.get_progress(tree),
+                "project_id": project_id,
+            },
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.SINGLE_STEP,
+            response_text=response_text,
+            task_tree=tree,
+            progress=orchestrator.get_progress(tree),
+            agent_message=agent_msg,
+            attachments=plot_messages,
+        )
+
+    async def resume_hitl(
+        self,
+        session_id: str,
+        task_id: str,
+        choice: str,
+        parameters: Dict[str, Any],
+        working_memory: "WorkingMemory",
+        task_tree: "TaskTree",
+        project_id: str = "default",
+    ) -> "TurnResult":
+        """Resume execution after receiving HITL response."""
+        from homomics_lab.agent.turn_runner import ExecutionMode, TurnResult
+
+        orchestrator = self._orchestrator_provider()
+
+        result = await orchestrator.resume_task(
+            task_tree,
+            task_id,
+            {"choice": choice, "parameters": parameters},
+        )
+
+        await self._feedback_recorder.record_execution_feedback(task_tree, result, project_id)
+
+        response_text = f"已恢复任务 {task_id}，继续执行后续步骤。"
+
+        # Extract any plots produced after resuming
+        plot_messages = self._responder.extract_plot_messages(result, task_tree, working_memory)
+        for msg in plot_messages:
+            working_memory.add_message(msg)
+
+        agent_msg = ChatMessage(
+            id=f"msg_{len(working_memory.messages)}",
+            type=MessageType.TODO_LIST,
+            content={
+                "text": response_text,
+                "tasks": [t.model_dump() for t in task_tree.tasks],
+                "progress": orchestrator.get_progress(task_tree),
+            },
+            sender="agent",
+        )
+        working_memory.add_message(agent_msg)
+
+        return TurnResult(
+            mode=ExecutionMode.RESUME_HITL,
+            response_text=response_text,
+            task_tree=task_tree,
+            progress=orchestrator.get_progress(task_tree),
+            agent_message=agent_msg,
+            attachments=plot_messages,
+        )
+
+    async def execute_tree(
+        self,
+        tree: "TaskTree",
+        working_memory: "WorkingMemory",
+        project_id: str,
+        trace_id: Optional[str] = None,
+        session_id: str = "",
+        plan_id: Optional[str] = None,
+    ) -> "TurnResult":
+        """Execute a pre-built task tree.
+
+        This is used by the background worker after a job has been enqueued.
+        It skips intent analysis and decomposition. When ``plan_id`` is provided
+        and the workflow execution service decides a Nextflow backend is
+        appropriate, the whole plan is executed as a Nextflow workflow.
+        """
+        from homomics_lab.plan.store import PlanStore
+
+        plan: Optional["Plan"] = None
+        if plan_id is not None:
+            plan = await PlanStore().get(plan_id)
+            if plan is not None:
+                tree = plan.task_tree
+
+        if self._is_fallback_suggestion(tree):
+            turn_result = self._responder.build_fallback_result(tree, working_memory)
+        elif len(tree.tasks) == 1:
+            turn_result = await self.handle_single_step(
+                tree, working_memory, project_id
+            )
+        else:
+            turn_result = await self.handle(
+                tree, working_memory, project_id, plan=plan
+            )
+
+        # Persist turn to long-term memory (best-effort)
+        if self._memory_manager is not None:
+            try:
+                # Derive a user_message placeholder from the tree for memory summary
+                user_message = (
+                    tree.tasks[0].description if tree.tasks else "background execution"
+                )
+                await self._memory_manager.persist_turn(
+                    session_id=session_id,
+                    project_id=project_id,
+                    user_message=user_message,
+                    turn_result=turn_result,
+                    working_memory=working_memory,
+                    task_tree=turn_result.task_tree,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to persist background execution to memory", exc_info=True
+                )
+
+        return turn_result
 
 
 class AgentLoopHandler:
@@ -624,6 +815,7 @@ class TurnExecutor:
         tool_registry: Optional["ToolRegistry"] = None,
         permission_registry: Optional[Any] = None,
         approval_store: Optional[Any] = None,
+        memory_manager: Optional[Any] = None,
     ):
         self._workflow_handler = WorkflowHandler(
             orchestrator_provider=orchestrator_provider,
@@ -634,6 +826,7 @@ class TurnExecutor:
             responder=responder,
             state=state,
             feedback_recorder=feedback_recorder,
+            memory_manager=memory_manager,
         )
         self._approval_handler = ToolApprovalHandler(
             approval_store=approval_store,
@@ -664,6 +857,60 @@ class TurnExecutor:
             intent=intent,
             user_message=user_message,
             plan=plan,
+        )
+
+    async def handle_single_step(
+        self,
+        tree: "TaskTree",
+        working_memory: "WorkingMemory",
+        project_id: str,
+        intent: Optional["UserIntent"] = None,
+        user_message: Optional[str] = None,
+    ) -> "TurnResult":
+        return await self._workflow_handler.handle_single_step(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
+            intent=intent,
+            user_message=user_message,
+        )
+
+    async def resume_hitl(
+        self,
+        session_id: str,
+        task_id: str,
+        choice: str,
+        parameters: Dict[str, Any],
+        working_memory: "WorkingMemory",
+        task_tree: "TaskTree",
+        project_id: str = "default",
+    ) -> "TurnResult":
+        return await self._workflow_handler.resume_hitl(
+            session_id=session_id,
+            task_id=task_id,
+            choice=choice,
+            parameters=parameters,
+            working_memory=working_memory,
+            task_tree=task_tree,
+            project_id=project_id,
+        )
+
+    async def execute_tree(
+        self,
+        tree: "TaskTree",
+        working_memory: "WorkingMemory",
+        project_id: str,
+        trace_id: Optional[str] = None,
+        session_id: str = "",
+        plan_id: Optional[str] = None,
+    ) -> "TurnResult":
+        return await self._workflow_handler.execute_tree(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            plan_id=plan_id,
         )
 
     async def handle_agent_loop(

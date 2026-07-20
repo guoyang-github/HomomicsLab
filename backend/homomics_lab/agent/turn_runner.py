@@ -284,6 +284,7 @@ class TurnRunner:
             tool_registry=self._tool_registry,
             permission_registry=self._permission_registry,
             approval_store=self._approval_store,
+            memory_manager=self.memory_manager,
         )
         # The intent router still holds a runner back-reference; it is owned
         # by another task and intentionally left as-is.
@@ -437,49 +438,20 @@ class TurnRunner:
         It skips intent analysis and decomposition. When ``plan_id`` is provided
         and the workflow execution service decides a Nextflow backend is
         appropriate, the whole plan is executed as a Nextflow workflow.
+
+        Thin delegate: the implementation lives in ``TurnExecutor``; the
+        runner only owns the per-turn ``_trace_id`` mutable state that the
+        orchestrator context builder reads.
         """
         self._trace_id = trace_id
-
-        plan: Optional[Plan] = None
-        if plan_id is not None:
-            plan = await PlanStore().get(plan_id)
-            if plan is not None:
-                tree = plan.task_tree
-
-        if self._is_fallback_suggestion(tree):
-            turn_result = self._build_fallback_result(tree, working_memory)
-        elif len(tree.tasks) == 1:
-            turn_result = await self._handle_single_step(
-                tree, working_memory, project_id
-            )
-        else:
-            turn_result = await self._handle_workflow(
-                tree, working_memory, project_id, plan=plan
-            )
-
-        # Persist turn to long-term memory (best-effort)
-        if self.memory_manager is not None:
-            try:
-                # Derive a user_message placeholder from the tree for memory summary
-                user_message = (
-                    tree.tasks[0].description if tree.tasks else "background execution"
-                )
-                await self.memory_manager.persist_turn(
-                    session_id=session_id,
-                    project_id=project_id,
-                    user_message=user_message,
-                    turn_result=turn_result,
-                    working_memory=working_memory,
-                    task_tree=turn_result.task_tree,
-                )
-            except Exception:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "Failed to persist background execution to memory", exc_info=True
-                )
-
-        return turn_result
+        return await self._executor.execute_tree(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            plan_id=plan_id,
+        )
 
     async def run_turn(
         self,
@@ -977,68 +949,12 @@ class TurnRunner:
         user_message: Optional[str] = None,
     ) -> TurnResult:
         """Handle single-step tasks (e.g., file conversion)."""
-        # Handle non-executable fallback suggestions directly.
-        if self._is_fallback_suggestion(tree):
-            return self._build_fallback_result(tree, working_memory)
-
-        orchestrator = self._get_orchestrator()
-        self._attach_uploaded_files_to_tree(tree, user_message, project_id)
-        context = await self._build_orchestrator_context(
-            project_id,
+        return await self._executor.handle_single_step(
+            tree=tree,
+            working_memory=working_memory,
+            project_id=project_id,
             intent=intent,
             user_message=user_message,
-            working_memory=working_memory,
-            execution_mode=getattr(tree, "execution_mode", None),
-        )
-        try:
-            results = await orchestrator.run_tree(tree, context=context)
-        except ExecutionError as exc:
-            corrected = await self._apply_self_correction(
-                tree,
-                working_memory,
-                project_id,
-                exc,
-                intent=intent,
-                user_message=user_message,
-            )
-            if corrected is not None:
-                return corrected
-            raise
-
-        # Check for HITL
-        hitl_info = self._extract_hitl(results)
-        if hitl_info:
-            return self._build_hitl_result(tree, hitl_info, working_memory)
-
-        await self._record_execution_feedback(tree, results, project_id)
-
-        response_text = f"已完成：{tree.tasks[0].description}"
-
-        # Extract any plots produced by the skill
-        plot_messages = self._extract_plot_messages(results, tree, working_memory)
-        for msg in plot_messages:
-            working_memory.add_message(msg)
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": response_text,
-                "tasks": [t.model_dump() for t in tree.tasks],
-                "progress": orchestrator.get_progress(tree),
-                "project_id": project_id,
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.SINGLE_STEP,
-            response_text=response_text,
-            task_tree=tree,
-            progress=orchestrator.get_progress(tree),
-            agent_message=agent_msg,
-            attachments=plot_messages,
         )
 
     @staticmethod
@@ -1056,42 +972,14 @@ class TurnRunner:
         project_id: str = "default",
     ) -> TurnResult:
         """Resume execution after receiving HITL response."""
-        orchestrator = self._get_orchestrator()
-
-        result = await orchestrator.resume_task(
-            task_tree,
-            task_id,
-            {"choice": choice, "parameters": parameters},
-        )
-
-        await self._record_execution_feedback(task_tree, result, project_id)
-
-        response_text = f"已恢复任务 {task_id}，继续执行后续步骤。"
-
-        # Extract any plots produced after resuming
-        plot_messages = self._extract_plot_messages(result, task_tree, working_memory)
-        for msg in plot_messages:
-            working_memory.add_message(msg)
-
-        agent_msg = ChatMessage(
-            id=f"msg_{len(working_memory.messages)}",
-            type=MessageType.TODO_LIST,
-            content={
-                "text": response_text,
-                "tasks": [t.model_dump() for t in task_tree.tasks],
-                "progress": orchestrator.get_progress(task_tree),
-            },
-            sender="agent",
-        )
-        working_memory.add_message(agent_msg)
-
-        return TurnResult(
-            mode=ExecutionMode.RESUME_HITL,
-            response_text=response_text,
+        return await self._executor.resume_hitl(
+            session_id=session_id,
+            task_id=task_id,
+            choice=choice,
+            parameters=parameters,
+            working_memory=working_memory,
             task_tree=task_tree,
-            progress=orchestrator.get_progress(task_tree),
-            agent_message=agent_msg,
-            attachments=plot_messages,
+            project_id=project_id,
         )
 
     def _is_fallback_suggestion(self, tree: TaskTree) -> bool:
@@ -1186,11 +1074,6 @@ class TurnRunner:
             tree, results, project_id
         )
 
-    def _working_memory_to_history(
-        self, working_memory: WorkingMemory
-    ) -> List[Dict[str, Any]]:
-        return self._state.working_memory_to_history(working_memory)
-
     def _summarize_mcp_result(
         self,
         tool_name: str,
@@ -1200,33 +1083,6 @@ class TurnRunner:
         return self._state.summarize_mcp_result(
             tool_name, output, tool_inputs
         )
-
-    def _format_pubmed_search(
-        self,
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        return self._state.format_pubmed_search(output, tool_inputs)
-
-    def _format_science_dbs(self, output: Dict[str, Any]) -> str:
-        return self._state.format_science_dbs(output)
-
-    def _format_science_search(
-        self,
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        return self._state.format_science_search(output, tool_inputs)
-
-    def _format_pubmed_fetch(
-        self,
-        output: Dict[str, Any],
-        tool_inputs: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        return self._state.format_pubmed_fetch(output, tool_inputs)
-
-    def _format_extra_context(self) -> str:
-        return self._state.format_extra_context(self._extra_context)
 
     def _build_risk_prompt(
         self,
@@ -1271,16 +1127,6 @@ class TurnRunner:
         return self._state.attach_uploaded_files_to_tree(
             tree, user_message, project_id
         )
-
-    def _envelopes_from_artifacts(
-        self, artifacts: Optional[List[Any]]
-    ) -> List[Dict[str, Any]]:
-        return self._responder.envelopes_from_artifacts(artifacts)
-
-    def _envelopes_from_results(
-        self, results: Optional[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        return self._responder.envelopes_from_results(results)
 
     def _summarize(
         self,
@@ -1347,13 +1193,6 @@ class TurnRunner:
     ) -> UserIntent:
         return self._responder.build_debate_resolved_intent(
             debate_response, user_message
-        )
-
-    def _compress_working_memory(
-        self, working_memory: WorkingMemory, current_goal: str
-    ) -> str:
-        return self._state.compress_working_memory(
-            working_memory, current_goal
         )
 
     async def _route_by_intent(
