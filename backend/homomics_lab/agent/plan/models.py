@@ -290,7 +290,8 @@ class PlanResult:
     approval_required: bool = False  # when True, execution must be explicitly approved
 
     # Plan-level execution mode: "auto" | "fixed_pipeline" | "codeact".
-    # "auto" (default) defers per-phase routing to the ExecutionRouter;
+    # "auto" (default) lets the Orchestrator route per task: supervisor
+    # curated-skill dispatch with a CodeAct fallback on failure;
     # "fixed_pipeline" runs curated skills as-is; "codeact" generates code.
     # Filled by ModeSelector in PlanEngine when left at the default.
     execution_mode: str = "auto"

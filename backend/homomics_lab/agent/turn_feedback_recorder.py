@@ -10,6 +10,7 @@ them is reassigned after ``TurnRunner`` construction.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -30,6 +31,64 @@ logger = logging.getLogger(__name__)
 # promoted to a CONFIRMED SkillDAG edge (formerly
 # HOMOMICS_SEED_OBSERVED_PROMOTION_THRESHOLD; default kept).
 SEED_OBSERVED_PROMOTION_THRESHOLD = 3
+
+
+async def _notify_genesis_crystallized(notification: Dict[str, Any]) -> None:
+    """Persist a crystallization notice as an agent message in the session chat.
+
+    The recorder only knows the ``project_id`` of the running turn, so the
+    notice is appended to the most recently updated session of that project
+    in the shared SessionStore — the same channel the job runner uses for
+    result summaries (``jobs/runner.py``). Job-driven turns reload and
+    re-save the persisted session when the job finishes
+    (``_update_queued_todo_message``), so a notice written mid-job survives
+    the final merge and shows up in the conversation history on next load.
+
+    Best-effort: failures are logged here and also degrade to the log line
+    in ``SkillGenesis._emit_notification``.
+    """
+    message = str(notification.get("message") or "").strip()
+    if not message:
+        return
+    project_id = str(notification.get("project_id") or "default")
+    skill_id = str(notification.get("skill_id") or "unknown")
+    try:
+        from homomics_lab.context.session_store import (
+            create_session_store_from_settings,
+        )
+        from homomics_lab.models.common import ChatMessage, MessageType
+
+        store = create_session_store_from_settings()
+        await store.init()
+        states = await store.list(project_id=project_id)
+        if not states:
+            logger.info(
+                "Skill genesis notification has no session for project %s: %s",
+                project_id,
+                message,
+            )
+            return
+        state = max(states, key=lambda s: s.updated_at)
+        # Deterministic id: a skill is crystallized at most once, and this
+        # guard keeps a redelivered notice from duplicating the message.
+        message_id = f"msg_genesis_{skill_id}"
+        existing_ids = {
+            getattr(m, "id", None) for m in state.working_memory.messages
+        }
+        if message_id in existing_ids:
+            return
+        state.working_memory.add_message(
+            ChatMessage(
+                id=message_id,
+                type=MessageType.TEXT,
+                content=message,
+                sender="agent",
+            )
+        )
+        state.updated_at = datetime.now(timezone.utc)
+        await store.save(state)
+    except Exception:
+        logger.warning("Failed to deliver skill genesis notification", exc_info=True)
 
 
 class FeedbackRecorder:
@@ -55,7 +114,8 @@ class FeedbackRecorder:
 
         The default build is lazy so turns pay nothing until the first
         CodeAct success is recorded, and no TurnRunner call site needs new
-        wiring.
+        wiring. Crystallization notifications are routed to the project's
+        chat session via ``_notify_genesis_crystallized``.
         """
         if self._genesis_checked:
             return self._skill_genesis or None
@@ -64,7 +124,8 @@ class FeedbackRecorder:
             from homomics_lab.skills.genesis import SkillGenesis
 
             self._skill_genesis = SkillGenesis.from_settings(
-                skill_dag=self._skill_dag
+                skill_dag=self._skill_dag,
+                notify=_notify_genesis_crystallized,
             )
         except Exception:
             logger.warning("Failed to initialize SkillGenesis", exc_info=True)

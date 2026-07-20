@@ -431,21 +431,31 @@ async def test_feedback_recorder_ignores_non_codeact_results():
 
 @pytest.mark.asyncio
 async def test_feedback_recorder_builds_genesis_by_default(monkeypatch):
-    # Genesis is always on: a default recorder lazily builds the service.
+    # Genesis is always on: a default recorder lazily builds the service and
+    # wires the session-chat notification channel into it.
+    from homomics_lab.agent import turn_feedback_recorder as recorder_module
+
     sentinel = object()
+    captured = {}
+
+    def _from_settings(cls, skill_dag=None, notify=None):
+        captured["notify"] = notify
+        return sentinel
+
     monkeypatch.setattr(
         "homomics_lab.skills.genesis.SkillGenesis.from_settings",
-        classmethod(lambda cls, skill_dag=None: sentinel),
+        classmethod(_from_settings),
     )
     recorder = FeedbackRecorder()
     assert recorder._get_skill_genesis() is sentinel
+    assert captured["notify"] is recorder_module._notify_genesis_crystallized
 
 
 @pytest.mark.asyncio
 async def test_feedback_recorder_genesis_build_failure_degrades(
     monkeypatch, caplog
 ):
-    def _boom(cls, skill_dag=None):
+    def _boom(cls, skill_dag=None, notify=None):
         raise RuntimeError("no fs")
 
     monkeypatch.setattr(
@@ -469,3 +479,101 @@ async def test_lore_success_rows_accumulate(genesis, cbkb):
         if e.outcome_metric == METRIC_SUCCESS
     ]
     assert len(entries) == 2
+
+
+# ─────────────────────────────────────────
+# Notification channel (session chat)
+# ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_notification_reaches_session_chat(
+    tmp_path, cbkb, skill_store, monkeypatch
+):
+    """End-to-end: a crystallization notice lands in the project's chat session.
+
+    The recorder-level notify channel appends an agent message to the most
+    recently updated session of the project in the shared SessionStore.
+    """
+    from datetime import datetime, timezone
+
+    from homomics_lab.agent.turn_feedback_recorder import (
+        _notify_genesis_crystallized,
+    )
+    from homomics_lab.config import settings
+    from homomics_lab.context.session_store import (
+        SessionState,
+        create_session_store_from_settings,
+    )
+    from homomics_lab.context.working_memory import WorkingMemory
+
+    db_path = tmp_path / "sessions.db"
+    monkeypatch.setattr(
+        settings, "session_store_url", f"sqlite+aiosqlite:///{db_path}"
+    )
+
+    # Seed the session a real turn would have created for project p1.
+    store = create_session_store_from_settings()
+    await store.init()
+    await store.save(
+        SessionState(
+            session_id="s1",
+            project_id="p1",
+            working_memory=WorkingMemory(),
+            task_tree=None,
+            updated_at=datetime.now(timezone.utc),
+        )
+    )
+
+    g = SkillGenesis(
+        cbkb=cbkb,
+        skill_store=skill_store,
+        llm_client=FakeLLM(),
+        notify=_notify_genesis_crystallized,
+        staging_dir=tmp_path / "staging",
+        min_successes=3,
+    )
+    skill = await _record(g, fixes=[{"attempt": 1, "stderr": "boom"}])
+    assert skill is not None
+
+    # Re-open the store with a fresh connection and read the session back.
+    stored = await create_session_store_from_settings().get("s1")
+    assert stored is not None
+    notes = [
+        m
+        for m in stored.working_memory.messages
+        if m.id == f"msg_genesis_{skill.id}"
+    ]
+    assert len(notes) == 1
+    note = notes[0]
+    assert note.sender == "agent"
+    assert f"已学会新技能 '{skill.id}'" in note.content
+    assert "1 次成功执行" in note.content
+    assert "经自我修复后验证通过" in note.content
+    assert "community 信任级别" in note.content
+    assert "删除" in note.content
+
+
+@pytest.mark.asyncio
+async def test_notification_without_session_degrades_to_log(
+    tmp_path, monkeypatch, caplog
+):
+    """No session for the project: the notice is logged, never raised."""
+    from homomics_lab.agent.turn_feedback_recorder import (
+        _notify_genesis_crystallized,
+    )
+    from homomics_lab.config import settings
+
+    monkeypatch.setattr(
+        settings, "session_store_url", f"sqlite+aiosqlite:///{tmp_path}/sessions.db"
+    )
+    with caplog.at_level(logging.INFO):
+        await _notify_genesis_crystallized(
+            {
+                "kind": "skill_genesis_crystallized",
+                "skill_id": "genesis_x",
+                "project_id": "no_such_project",
+                "message": "已学会新技能 'genesis_x'",
+            }
+        )
+    assert "已学会新技能 'genesis_x'" in caplog.text

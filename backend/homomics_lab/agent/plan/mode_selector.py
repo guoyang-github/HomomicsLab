@@ -7,12 +7,13 @@ Selects between three plan-level execution modes:
     when curated skills cover the plan well.
   - ``codeact``: let the agent generate bridging/analysis code (CodeAct).
     Most flexible, but costs LLM tokens and is less deterministic.
-  - ``auto``: defer to the phase-level ``ExecutionRouter``
-    (``agent/execution_router.py``), which decides per phase. This is the
-    previous behaviour and the default.
+  - ``auto``: defer per-task routing to the ``Orchestrator``: tasks are
+    dispatched through the supervisor's curated-skill path when a supervisor
+    is registered (otherwise the curated skill runtime directly), and
+    failures are recovered by the CodeAct fallback. This is the previous
+    behaviour and the default.
 
-The selector is intentionally rule-based so its decisions are auditable,
-mirroring the design philosophy of ``ExecutionRouter``.
+The selector is intentionally rule-based so its decisions are auditable.
 
 Signals used (all from ``PlanResult``):
   - skill coverage: fraction of phases with a ``selected_skill``
@@ -37,7 +38,7 @@ Decision rules (defaults in parentheses, overridable via constructor):
   6. coverage < codeact_coverage (0.5)
      OR gap_count >= codeact_gap_count (2)
      -> ``codeact``.
-  7. Otherwise -> ``auto`` (middle ground: per-phase routing).
+  7. Otherwise -> ``auto`` (middle ground: orchestrator-routed execution).
 """
 
 from typing import List, Optional
@@ -154,7 +155,8 @@ class ModeSelector:
         if coverage < self.codeact_coverage or gap_count >= self.codeact_gap_count:
             return "codeact"
 
-        # 7. Middle ground: let the phase-level ExecutionRouter decide.
+        # 7. Middle ground: let the Orchestrator route per task (supervisor
+        # curated path with CodeAct fallback).
         return "auto"
 
     @staticmethod

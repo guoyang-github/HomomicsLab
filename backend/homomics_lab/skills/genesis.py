@@ -171,8 +171,17 @@ class SkillGenesis:
         self.staging_dir = Path(staging_dir or settings.data_dir / "skill_genesis")
 
     @classmethod
-    def from_settings(cls, skill_dag: Optional[Any] = None) -> "SkillGenesis":
-        """Build the default runtime instance from global settings/services."""
+    def from_settings(
+        cls,
+        skill_dag: Optional[Any] = None,
+        notify: Optional[NotifyFn] = None,
+    ) -> "SkillGenesis":
+        """Build the default runtime instance from global settings/services.
+
+        ``notify`` is forwarded to the constructor so callers can route the
+        crystallization notification to a user-visible channel; without it
+        delivery is log-only (see ``_emit_notification``).
+        """
         from homomics_lab.skills.registry import get_default_registry
         from homomics_lab.skills.skill_store import SkillStore
 
@@ -184,6 +193,7 @@ class SkillGenesis:
                 skills_dir=settings.skills_dir,
             ),
             skill_dag=skill_dag,
+            notify=notify,
         )
 
     # ─────────────────────────────────────────
