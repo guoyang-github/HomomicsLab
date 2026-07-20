@@ -55,12 +55,10 @@ class Orchestrator:
         skill_registry: Optional[SkillRegistry] = None,
         workflow_cache: Optional[WorkflowCache] = None,
         skill_executor: Optional[Any] = None,
-        execution_router: Optional[Any] = None,
     ):
         self.registry = registry or get_default_registry()
         self.skill_registry = skill_registry or get_default_skill_registry()
         self.skill_executor = skill_executor
-        self.execution_router = execution_router
         self.workflow_cache = workflow_cache
         self.state_machine = TaskStateMachine()
         self.hitl_detector = HITLDetector()

@@ -826,56 +826,6 @@ class SkillRuntimeExecutor:
             "error_message": result.error_message,
         }
 
-    async def execute_route(
-        self,
-        route,
-        inputs: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Execute an ExecutionRoute produced by the ExecutionRouter.
-
-        This is the foundation-first dispatch point: curated skills are used
-        when available, otherwise CodeAct generates and executes code.
-        """
-        from homomics_lab.agent.execution_router import ExecutionMode
-
-        inputs = inputs or {}
-
-        if route.mode == ExecutionMode.CURATED_SKILL:
-            if route.skill is None:
-                raise ValueError("CURATED_SKILL route missing skill")
-            return await self.execute(route.skill.id, route.context.get("parameters", inputs))
-
-        if route.mode in {
-            ExecutionMode.GENERATED_FROM_TEMPLATE,
-            ExecutionMode.CODE_FROM_RETRIEVAL,
-            ExecutionMode.CODE_FROM_SCRATCH,
-        }:
-            return await run_code_act(
-                task=route.task,
-                language=route.language,
-                context={**route.context, **inputs},
-                working_dir=self.working_dir,
-                llm_client=self.llm_client,
-                skill_registry=self.registry,
-                tool_registry=self.tool_registry,
-            )
-
-        if route.mode == ExecutionMode.TOOL_ONLY:
-            outputs = {}
-            for tool_name in route.tools:
-                try:
-                    result = await self.tool_registry.invoke_async(tool_name, inputs)
-                    outputs[tool_name] = {
-                        "success": result.success,
-                        "output": result.output,
-                        "error": result.error_message,
-                    }
-                except Exception as exc:
-                    outputs[tool_name] = {"success": False, "error": str(exc)}
-            return {"success": True, "tool_outputs": outputs}
-
-        raise ValueError(f"Unsupported execution mode: {route.mode}")
-
     def _resolve_scripts_dir(self, skill: SkillDefinition) -> Optional[Path]:
         """Resolve the scripts directory for a skill.
 
